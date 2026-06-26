@@ -4,9 +4,9 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/IconButton';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
@@ -64,7 +64,7 @@ export default function AccountScreen() {
           }
         />
 
-        <Card style={styles.profileCard} padding={Spacing.xl}>
+        <Card style={{ ...styles.profileCard, padding: Spacing.xl }}>
           <View style={styles.avatarWrap}>
             <Image
               source={{ uri: 'https://i.pravatar.cc/300?img=47' }}
@@ -80,15 +80,15 @@ export default function AccountScreen() {
               style={styles.editPencil}
             />
           </View>
-          <AppText variant="h1" style={styles.profileName}>
+          <Text variant="title" style={styles.profileName}>
             คุณอู้ฟู่
-          </AppText>
-          <AppText variant="body" color={Colors.textMuted}>
+          </Text>
+          <Text variant="body" style={{ color: Colors.textMuted }}>
             oofoo@email.com
-          </AppText>
+          </Text>
         </Card>
 
-        <Card style={styles.menuCard} padding={0}>
+        <Card style={{ ...styles.menuCard, padding: 0 }}>
           {MENU_ROWS.map((row, index) => (
             <MenuItem
               key={row.key}
@@ -136,9 +136,9 @@ function MenuItem({
           color={row.danger ? Colors.danger : Colors.primary}
         />
       </View>
-      <AppText variant="h2" color={tint} style={styles.rowLabel}>
+      <Text variant="subtitle" style={[styles.rowLabel, { color: tint }]}>
         {row.label}
-      </AppText>
+      </Text>
       <Ionicons
         name="chevron-forward"
         size={18}

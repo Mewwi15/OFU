@@ -1,13 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Chip } from '@/components/ui/Chip';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { SearchBar } from '@/components/ui/SearchBar';
-import { AppText } from '@/components/ui/Text';
+import { SearchBar } from '@/components/ui/searchbar';
+import { Text } from '@/components/ui/text';
 import { ProductCard } from '@/components/product/ProductCard';
 import { Colors, Spacing } from '@/constants/theme';
 import { categories, products, type Category } from '@/data/products';
@@ -72,8 +73,12 @@ export default function SearchScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="ค้นหาสินค้า"
-          onFilterPress={() => {}}
-          style={styles.search}
+          rightIcon={
+            <Pressable onPress={() => {}} hitSlop={8}>
+              <Ionicons name="options-outline" size={20} color={Colors.primary} />
+            </Pressable>
+          }
+          containerStyle={styles.search}
         />
 
         <ScrollView
@@ -107,15 +112,14 @@ export default function SearchScreen() {
               size={64}
               disabled
             />
-            <AppText variant="h2" style={styles.emptyTitle}>
+            <Text variant="subtitle" style={styles.emptyTitle}>
               ไม่พบสินค้าที่ค้นหา
-            </AppText>
-            <AppText
+            </Text>
+            <Text
               variant="body"
-              color={Colors.textMuted}
-              style={styles.emptyBody}>
+              style={[{ color: Colors.textMuted }, styles.emptyBody]}>
               ลองค้นหาด้วยคำอื่นหรือเลือกหมวดหมู่อื่นดูนะคะ
-            </AppText>
+            </Text>
           </View>
         )}
       </ScrollView>

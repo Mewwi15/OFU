@@ -7,7 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
 export type QuantityStepperProps = {
@@ -57,9 +57,9 @@ export function QuantityStepper({
         <Ionicons name="remove" size={18} color={Colors.text} />
       </Pressable>
 
-      <AppText variant="h2" style={styles.value}>
+      <Text variant="subtitle" style={styles.value}>
         {value}
-      </AppText>
+      </Text>
 
       <Pressable
         accessibilityRole="button"

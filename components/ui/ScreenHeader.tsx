@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Spacing } from '@/constants/theme';
 
 export type ScreenHeaderProps = {
@@ -46,9 +46,9 @@ export function ScreenHeader({
 
       {!brand && title ? (
         <View style={styles.center} pointerEvents="none">
-          <AppText variant="h1" numberOfLines={1}>
+          <Text variant="title" numberOfLines={1}>
             {title}
-          </AppText>
+          </Text>
         </View>
       ) : null}
 

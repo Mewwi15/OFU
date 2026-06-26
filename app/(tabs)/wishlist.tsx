@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { ProductListItem } from '@/components/product/ProductListItem';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useWishlist, wishlistProducts } from '@/store/wishlist';
@@ -49,15 +49,14 @@ export default function WishlistScreen() {
               color={Colors.primary}
             />
           </View>
-          <AppText variant="h2" style={styles.emptyTitle}>
+          <Text variant="subtitle" style={styles.emptyTitle}>
             ยังไม่มีรายการโปรด
-          </AppText>
-          <AppText
+          </Text>
+          <Text
             variant="body"
-            color={Colors.textMuted}
-            style={styles.emptyBody}>
+            style={[{ color: Colors.textMuted }, styles.emptyBody]}>
             แตะรูปหัวใจที่สินค้าเพื่อบันทึกไว้ดูภายหลัง
-          </AppText>
+          </Text>
         </View>
       ) : (
         <FlatList

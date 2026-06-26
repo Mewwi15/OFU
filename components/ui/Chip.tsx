@@ -5,7 +5,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
 export type ChipProps = {
@@ -31,11 +31,14 @@ export function Chip({ label, active, onPress, style }: ChipProps) {
         pressed && styles.pressed,
         style,
       ]}>
-      <AppText
-        variant="button"
-        color={active ? Colors.textOnPrimary : Colors.text}>
+      <Text
+        variant="body"
+        style={{
+          fontFamily: 'Poppins_600SemiBold',
+          color: active ? Colors.textOnPrimary : Colors.text,
+        }}>
         {label}
-      </AppText>
+      </Text>
     </Pressable>
   );
 }

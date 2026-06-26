@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -9,12 +11,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product/ProductCard';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/Chip';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { SearchBar } from '@/components/ui/SearchBar';
-import { AppText } from '@/components/ui/Text';
+import { SearchBar } from '@/components/ui/searchbar';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories, products, type Category } from '@/data/products';
 
@@ -69,9 +71,13 @@ export default function HomeScreen() {
         <SearchBar
           value={query}
           onChangeText={setQuery}
-          onFilterPress={() => {}}
           placeholder="ค้นหาสินค้า"
-          style={styles.search}
+          containerStyle={styles.search}
+          rightIcon={
+            <Pressable onPress={() => {}} hitSlop={8}>
+              <Ionicons name="options-outline" size={20} color={Colors.primary} />
+            </Pressable>
+          }
         />
 
         <View style={styles.banner}>
@@ -84,15 +90,12 @@ export default function HomeScreen() {
           />
           <View style={styles.bannerOverlay} />
           <View style={styles.bannerContent}>
-            <AppText variant="banner" color={Colors.textOnPrimary}>
+            <Text variant="title" style={{ color: Colors.textOnPrimary }}>
               {'ลดสูงสุด 40%\nช้อปเลยวันนี้!'}
-            </AppText>
-            <Button
-              title="ช้อปเลย"
-              size="sm"
-              onPress={() => {}}
-              style={styles.bannerButton}
-            />
+            </Text>
+            <Button size="sm" onPress={() => {}} style={styles.bannerButton}>
+              ช้อปเลย
+            </Button>
             <View style={styles.dots}>
               {PROMO_DOTS.map((d) => (
                 <View
@@ -121,9 +124,9 @@ export default function HomeScreen() {
         <View style={styles.grid}>
           {filtered.length === 0 ? (
             <View style={styles.empty}>
-              <AppText variant="h2" color={Colors.textMuted}>
+              <Text variant="subtitle" style={{ color: Colors.textMuted }}>
                 ไม่พบสินค้าที่ค้นหา
-              </AppText>
+              </Text>
             </View>
           ) : (
             filtered.map((product) => (

@@ -14,14 +14,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { ColorSwatches } from '@/components/ui/ColorSwatches';
 import { IconButton } from '@/components/ui/IconButton';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { RatingStars } from '@/components/ui/RatingStars';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { ShopBadge } from '@/components/ui/ShopBadge';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { getProduct } from '@/data/products';
 import { money } from '@/lib/format';
@@ -66,9 +66,9 @@ export default function ProductDetailsScreen() {
             size={48}
             color={Colors.textMuted}
           />
-          <AppText variant="h2" color={Colors.textMuted} style={styles.missingText}>
+          <Text variant="subtitle" style={[styles.missingText, { color: Colors.textMuted }]}>
             ไม่พบสินค้านี้
-          </AppText>
+          </Text>
         </View>
       </View>
     );
@@ -137,9 +137,9 @@ export default function ProductDetailsScreen() {
           <View style={styles.overlay}>
             <ShopBadge />
             <View style={styles.priceTag}>
-              <AppText variant="price" color={Colors.textOnPrimary}>
+              <Text variant="body" style={{ fontFamily: 'Poppins_700Bold', color: Colors.textOnPrimary }}>
                 {money(product.price)}
-              </AppText>
+              </Text>
             </View>
           </View>
 
@@ -161,13 +161,12 @@ export default function ProductDetailsScreen() {
 
         <View style={styles.body}>
           {/* Title / subtitle / rating */}
-          <AppText variant="h1">{product.name}</AppText>
-          <AppText
+          <Text variant="title">{product.name}</Text>
+          <Text
             variant="body"
-            color={Colors.textMuted}
-            style={styles.subtitle}>
+            style={[styles.subtitle, { color: Colors.textMuted }]}>
             {product.subtitle}
-          </AppText>
+          </Text>
           <RatingStars
             rating={product.rating}
             size={16}
@@ -176,32 +175,31 @@ export default function ProductDetailsScreen() {
           />
 
           {/* Description with Read More */}
-          <AppText variant="h2" style={styles.sectionLabel}>
+          <Text variant="subtitle" style={styles.sectionLabel}>
             รายละเอียด
-          </AppText>
-          <AppText
+          </Text>
+          <Text
             variant="body"
-            color={Colors.textMuted}
+            style={{ color: Colors.textMuted }}
             numberOfLines={expanded ? undefined : 2}>
             {product.description}
-          </AppText>
+          </Text>
           <Pressable
             onPress={() => setExpanded((prev) => !prev)}
             hitSlop={Spacing.sm}>
-            <AppText
+            <Text
               variant="caption"
-              color={Colors.primary}
-              style={styles.readMore}>
+              style={[styles.readMore, { color: Colors.primary }]}>
               {expanded ? 'ย่อ' : 'อ่านเพิ่มเติม'}
-            </AppText>
+            </Text>
           </Pressable>
 
           {/* Color selector */}
           {product.colors.length > 0 ? (
             <>
-              <AppText variant="h2" style={styles.sectionLabel}>
+              <Text variant="subtitle" style={styles.sectionLabel}>
                 เลือกสี
-              </AppText>
+              </Text>
               <ColorSwatches
                 colors={product.colors}
                 selected={selectedColor}
@@ -214,9 +212,9 @@ export default function ProductDetailsScreen() {
           {/* Size selector */}
           {product.sizes.length > 0 ? (
             <>
-              <AppText variant="h2" style={styles.sectionLabel}>
+              <Text variant="subtitle" style={styles.sectionLabel}>
                 ขนาด
-              </AppText>
+              </Text>
               <View style={styles.sizeRow}>
                 {product.sizes.map((size) => {
                   const active = size === selectedSize;
@@ -228,11 +226,14 @@ export default function ProductDetailsScreen() {
                         styles.sizePill,
                         active ? styles.sizePillActive : styles.sizePillInactive,
                       ]}>
-                      <AppText
-                        variant="button"
-                        color={active ? Colors.textOnPrimary : Colors.text}>
+                      <Text
+                        variant="body"
+                        style={{
+                          fontFamily: 'Poppins_600SemiBold',
+                          color: active ? Colors.textOnPrimary : Colors.text,
+                        }}>
                         {size}
-                      </AppText>
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -249,12 +250,9 @@ export default function ProductDetailsScreen() {
           { paddingBottom: insets.bottom + Spacing.md },
         ]}>
         <QuantityStepper value={qty} onChange={setQty} />
-        <Button
-          title="เพิ่มลงตะกร้า"
-          leftIcon="bag-handle-outline"
-          onPress={handleAddToCart}
-          style={styles.addButton}
-        />
+        <Button onPress={handleAddToCart} style={styles.addButton}>
+          เพิ่มลงตะกร้า
+        </Button>
       </View>
     </View>
   );

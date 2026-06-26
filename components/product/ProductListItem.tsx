@@ -25,7 +25,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { RatingStars } from '@/components/ui/RatingStars';
 import { ShopBadge } from '@/components/ui/ShopBadge';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
@@ -101,24 +101,28 @@ export function ProductListItem({
 
       {/* Middle: details */}
       <View style={styles.middle}>
-        <AppText variant="h2" numberOfLines={1}>
+        <Text variant="subtitle" numberOfLines={1}>
           {product.name}
-        </AppText>
-        <AppText
+        </Text>
+        <Text
           variant="caption"
-          color={Colors.textMuted}
           numberOfLines={1}
-          style={styles.subtitle}>
+          style={[styles.subtitle, { color: Colors.textMuted }]}>
           {product.subtitle}
-        </AppText>
+        </Text>
         <RatingStars
           rating={product.rating}
           showValue
           style={styles.rating}
         />
-        <AppText variant="price" color={Colors.primary} style={styles.price}>
+        <Text
+          variant="body"
+          style={[
+            styles.price,
+            { color: Colors.primary, fontFamily: 'Poppins_700Bold' },
+          ]}>
           {money(product.price)}
-        </AppText>
+        </Text>
       </View>
 
       {/* Right: variant-specific controls */}
@@ -130,9 +134,11 @@ export function ProductListItem({
             size={36}
             onPress={() => toggleWishlist(product.id)}
           />
-          <AppText variant="price" color={Colors.primary}>
+          <Text
+            variant="body"
+            style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
             {money(product.price)}
-          </AppText>
+          </Text>
         </View>
       ) : (
         <View style={styles.rightCart}>

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 
 export type ShopBadgeProps = {
@@ -23,9 +23,9 @@ export function ShopBadge({ label = 'ช้อป', style }: ShopBadgeProps) {
         color={Colors.textOnPrimary}
         style={styles.icon}
       />
-      <AppText variant="caption" color={Colors.textOnPrimary}>
+      <Text variant="caption" style={{ color: Colors.textOnPrimary }}>
         {label}
-      </AppText>
+      </Text>
     </View>
   );
 }

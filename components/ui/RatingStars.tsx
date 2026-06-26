@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Spacing } from '@/constants/theme';
 
 export type RatingStarsProps = {
@@ -44,9 +44,9 @@ export function RatingStars({
         );
       })}
       {showValue ? (
-        <AppText variant="caption" color={Colors.textMuted} style={styles.value}>
+        <Text variant="caption" style={[styles.value, { color: Colors.textMuted }]}>
           {clamped.toFixed(1)}
-        </AppText>
+        </Text>
       ) : null}
     </View>
   );

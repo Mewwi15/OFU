@@ -1,40 +1,110 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { useColor } from '@/hooks/useColor';
+import { BORDER_RADIUS } from '@/theme/globals';
+import { TextStyle, ViewStyle } from 'react-native';
 
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+interface CardProps {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}
 
-export type CardProps = {
-  children?: React.ReactNode;
-  /** Inner padding in px. Defaults to 16 (Spacing.lg). */
-  padding?: number;
-  /** Corner radius in px. Defaults to 20 (Radius.lg). */
-  radius?: number;
-  style?: StyleProp<ViewStyle>;
-};
+export function Card({ children, style }: CardProps) {
+  const cardColor = useColor('card');
+  const foregroundColor = useColor('foreground');
 
-/**
- * White surface wrapper with a soft shadow and rounded corners.
- */
-export function Card({
-  children,
-  padding = Spacing.lg,
-  radius = Radius.lg,
-  style,
-}: CardProps) {
   return (
     <View
       style={[
-        styles.card,
-        { padding, borderRadius: radius },
+        {
+          width: '100%',
+          backgroundColor: cardColor,
+          borderRadius: BORDER_RADIUS,
+          padding: 18,
+          shadowColor: foregroundColor,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
+          elevation: 2,
+        },
         style,
-      ]}>
+      ]}
+    >
       {children}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    ...Shadow.card,
-  },
-});
+interface CardHeaderProps {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}
+
+export function CardHeader({ children, style }: CardHeaderProps) {
+  return <View style={[{ marginBottom: 8 }, style]}>{children}</View>;
+}
+
+interface CardTitleProps {
+  children: React.ReactNode;
+  style?: TextStyle;
+}
+
+export function CardTitle({ children, style }: CardTitleProps) {
+  return (
+    <Text
+      variant='title'
+      style={[
+        {
+          marginBottom: 4,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </Text>
+  );
+}
+
+interface CardDescriptionProps {
+  children: React.ReactNode;
+  style?: TextStyle;
+}
+
+export function CardDescription({ children, style }: CardDescriptionProps) {
+  return (
+    <Text variant='caption' style={[style]}>
+      {children}
+    </Text>
+  );
+}
+
+interface CardContentProps {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}
+
+export function CardContent({ children, style }: CardContentProps) {
+  return <View style={[style]}>{children}</View>;
+}
+
+interface CardFooterProps {
+  children: React.ReactNode;
+  style?: ViewStyle;
+}
+
+export function CardFooter({ children, style }: CardFooterProps) {
+  return (
+    <View
+      style={[
+        {
+          marginTop: 16,
+          flexDirection: 'row',
+          gap: 8,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}

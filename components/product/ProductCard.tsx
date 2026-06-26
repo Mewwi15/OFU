@@ -20,7 +20,7 @@ import {
 import { ColorSwatches } from '@/components/ui/ColorSwatches';
 import { IconButton } from '@/components/ui/IconButton';
 import { ShopBadge } from '@/components/ui/ShopBadge';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
@@ -64,21 +64,22 @@ export function ProductCard({ product, style }: ProductCardProps) {
         />
       </View>
 
-      <AppText variant="h2" numberOfLines={1} style={styles.name}>
+      <Text variant="subtitle" numberOfLines={1} style={styles.name}>
         {product.name}
-      </AppText>
-      <AppText
+      </Text>
+      <Text
         variant="caption"
-        color={Colors.textMuted}
         numberOfLines={1}
-        style={styles.subtitle}>
+        style={[styles.subtitle, { color: Colors.textMuted }]}>
         {product.subtitle}
-      </AppText>
+      </Text>
 
       <View style={styles.footer}>
-        <AppText variant="price" color={Colors.primary}>
+        <Text
+          variant="body"
+          style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
           {money(product.price)}
-        </AppText>
+        </Text>
         {product.colors.length > 0 && (
           <ColorSwatches
             colors={product.colors.slice(0, MAX_SWATCHES)}

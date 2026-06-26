@@ -20,11 +20,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductListItem } from '@/components/product/ProductListItem';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { AppText } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
 import { cartSubtotal, useCart } from '@/store/cart';
@@ -77,16 +77,15 @@ export default function CartScreen() {
             size={72}
             onPress={goShopping}
           />
-          <AppText variant="h1" style={styles.emptyTitle}>
+          <Text variant="title" style={styles.emptyTitle}>
             ตะกร้าว่างเปล่า
-          </AppText>
-          <AppText
+          </Text>
+          <Text
             variant="body"
-            color={Colors.textMuted}
-            style={styles.emptyBody}>
+            style={[styles.emptyBody, { color: Colors.textMuted }]}>
             ไปเลือกซื้อสินค้ากันเลย
-          </AppText>
-          <Button title="ช้อปเลย" onPress={goShopping} style={styles.emptyButton} />
+          </Text>
+          <Button onPress={goShopping} style={styles.emptyButton}>ช้อปเลย</Button>
         </View>
       ) : (
         <ScrollView
@@ -111,9 +110,9 @@ export default function CartScreen() {
           </View>
 
           {/* Promo code */}
-          <AppText variant="h2" style={styles.sectionTitle}>
+          <Text variant="subtitle" style={styles.sectionTitle}>
             กรอกโค้ดส่วนลด
-          </AppText>
+          </Text>
           <View style={styles.promoRow}>
             <View style={styles.promoInputWrap}>
               <TextInput
@@ -127,32 +126,33 @@ export default function CartScreen() {
                 onSubmitEditing={onApply}
               />
             </View>
-            <Button title="ใช้โค้ด" size="sm" onPress={onApply} />
+            <Button size="sm" onPress={onApply}>ใช้โค้ด</Button>
           </View>
 
           {/* Summary */}
-          <Card style={styles.summary} padding={Spacing.lg}>
+          <Card style={{ ...styles.summary, padding: Spacing.lg }}>
             <View style={styles.summaryRow}>
-              <AppText variant="body" color={Colors.textMuted}>
+              <Text variant="body" style={{ color: Colors.textMuted }}>
                 ยอดรวมสินค้า
-              </AppText>
-              <AppText variant="body">{money(subtotal)}</AppText>
+              </Text>
+              <Text variant="body">{money(subtotal)}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
-              <AppText variant="h2">รวมทั้งหมด</AppText>
-              <AppText variant="price" color={Colors.primary}>
+              <Text variant="subtitle">รวมทั้งหมด</Text>
+              <Text
+                variant="body"
+                style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
                 {money(total)}
-              </AppText>
+              </Text>
             </View>
           </Card>
 
-          <Button
-            title="สั่งซื้อเลย"
-            fullWidth
-            onPress={onBuyNow}
-            style={styles.buyButton}
-          />
+          <View style={[styles.buyButton, { flexDirection: 'row' }]}>
+            <Button style={{ flex: 1 }} onPress={onBuyNow}>
+              สั่งซื้อเลย
+            </Button>
+          </View>
         </ScrollView>
       )}
     </View>

@@ -1,35 +1,88 @@
-import { Text, type StyleProp, type TextStyle } from 'react-native';
+import { useColor } from '@/hooks/useColor';
+import { FONT_SIZE } from '@/theme/globals';
+import React, { forwardRef } from 'react';
+import {
+  Text as RNText,
+  TextProps as RNTextProps,
+  TextStyle,
+} from 'react-native';
 
-import { Colors, Typography, type TypographyVariant } from '@/constants/theme';
+type TextVariant =
+  | 'body'
+  | 'title'
+  | 'subtitle'
+  | 'caption'
+  | 'heading'
+  | 'link';
 
-export type AppTextProps = {
-  /** Typography variant from the design system. Defaults to `body`. */
-  variant?: TypographyVariant;
-  /** Text color. Defaults to the primary text token. */
-  color?: string;
-  /** Extra style overrides (applied last). */
-  style?: StyleProp<TextStyle>;
-  /** Truncate to N lines with an ellipsis. */
-  numberOfLines?: number;
-  children?: React.ReactNode;
-};
-
-/**
- * The single text primitive for the app. Screens MUST use `AppText` (never a
- * raw `<Text>`) so typography stays consistent with the design tokens.
- */
-export function AppText({
-  variant = 'body',
-  color = Colors.text,
-  style,
-  numberOfLines,
-  children,
-}: AppTextProps) {
-  return (
-    <Text
-      numberOfLines={numberOfLines}
-      style={[Typography[variant], { color }, style]}>
-      {children}
-    </Text>
-  );
+interface TextProps extends RNTextProps {
+  variant?: TextVariant;
+  lightColor?: string;
+  darkColor?: string;
+  children: React.ReactNode;
 }
+
+// อู้ฟู่ uses the Poppins family; weight is selected via the font family name
+// (not fontWeight) so Thai + Latin render consistently across platforms.
+export const Text = forwardRef<RNText, TextProps>(
+  (
+    { variant = 'body', lightColor, darkColor, style, children, ...props },
+    ref
+  ) => {
+    const textColor = useColor('text', { light: lightColor, dark: darkColor });
+    const mutedColor = useColor('textMuted');
+
+    const getTextStyle = (): TextStyle => {
+      const baseStyle: TextStyle = { color: textColor };
+
+      switch (variant) {
+        case 'heading':
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_700Bold',
+            fontSize: 28,
+          };
+        case 'title':
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_700Bold',
+            fontSize: 22,
+          };
+        case 'subtitle':
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_600SemiBold',
+            fontSize: 18,
+          };
+        case 'caption':
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_400Regular',
+            fontSize: FONT_SIZE - 2,
+            color: mutedColor,
+          };
+        case 'link':
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_500Medium',
+            fontSize: FONT_SIZE,
+            textDecorationLine: 'underline',
+          };
+        default: // 'body'
+          return {
+            ...baseStyle,
+            fontFamily: 'Poppins_400Regular',
+            fontSize: FONT_SIZE,
+          };
+      }
+    };
+
+    return (
+      <RNText ref={ref} style={[getTextStyle(), style]} {...props}>
+        {children}
+      </RNText>
+    );
+  }
+);
+
+Text.displayName = 'Text';
