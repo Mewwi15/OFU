@@ -1,98 +1,208 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { ProductCard } from '@/components/product/ProductCard';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { IconButton } from '@/components/ui/IconButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { SearchBar } from '@/components/ui/SearchBar';
+import { AppText } from '@/components/ui/Text';
+import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { categories, products, type Category } from '@/data/products';
+
+/** Bottom padding so the floating tab bar never covers the last row. */
+const TAB_BAR_CLEARANCE = 110;
+/** Promo banner background image. */
+const PROMO_IMAGE = 'https://picsum.photos/seed/oofoo-promo/900/600';
+/** Decorative dot indicators on the promo banner. */
+const PROMO_DOTS = [0, 1, 2];
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState<Category>('ทั้งหมด');
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return products.filter((p) => {
+      const matchesCategory =
+        activeCategory === 'ทั้งหมด' || p.category === activeCategory;
+      const matchesQuery =
+        q.length === 0 ||
+        p.name.toLowerCase().includes(q) ||
+        p.subtitle.toLowerCase().includes(q);
+      return matchesCategory && matchesQuery;
+    });
+  }, [query, activeCategory]);
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: TAB_BAR_CLEARANCE + insets.bottom },
+        ]}>
+        <ScreenHeader
+          brand
+          style={styles.header}
+          right={
+            <>
+              <IconButton icon="notifications-outline" onPress={() => {}} />
+              <IconButton
+                icon="bag-outline"
+                onPress={() => router.push('/cart')}
+              />
+            </>
+          }
+        />
+
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onFilterPress={() => {}}
+          placeholder="ค้นหาสินค้า"
+          style={styles.search}
+        />
+
+        <View style={styles.banner}>
+          <Image
+            source={{ uri: PROMO_IMAGE }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={300}
+            cachePolicy="memory-disk"
+          />
+          <View style={styles.bannerOverlay} />
+          <View style={styles.bannerContent}>
+            <AppText variant="banner" color={Colors.textOnPrimary}>
+              {'ลดสูงสุด 40%\nช้อปเลยวันนี้!'}
+            </AppText>
+            <Button
+              title="ช้อปเลย"
+              size="sm"
+              onPress={() => {}}
+              style={styles.bannerButton}
+            />
+            <View style={styles.dots}>
+              {PROMO_DOTS.map((d) => (
+                <View
+                  key={d}
+                  style={[styles.dot, d === 0 && styles.dotActive]}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}>
+          {categories.map((cat) => (
+            <Chip
+              key={cat}
+              label={cat}
+              active={cat === activeCategory}
+              onPress={() => setActiveCategory(cat)}
+            />
+          ))}
+        </ScrollView>
+
+        <View style={styles.grid}>
+          {filtered.length === 0 ? (
+            <View style={styles.empty}>
+              <AppText variant="h2" color={Colors.textMuted}>
+                ไม่พบสินค้าที่ค้นหา
+              </AppText>
+            </View>
+          ) : (
+            filtered.map((product) => (
+              <View key={product.id} style={styles.gridCell}>
+                <ProductCard product={product} />
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    paddingHorizontal: Spacing.lg,
+  },
+  header: {
+    marginTop: Spacing.sm,
+  },
+  search: {
+    marginTop: Spacing.lg,
+  },
+  banner: {
+    marginTop: Spacing.xl,
+    height: 180,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    backgroundColor: Colors.primaryTint,
+    ...Shadow.card,
+  },
+  bannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.scrim,
+  },
+  bannerContent: {
+    flex: 1,
+    padding: Spacing.xl,
+    justifyContent: 'center',
+  },
+  bannerButton: {
+    marginTop: Spacing.md,
+    alignSelf: 'flex-start',
+  },
+  dots: {
     flexDirection: 'row',
+    gap: Spacing.xs,
+    marginTop: Spacing.lg,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.whiteAlpha,
+  },
+  dotActive: {
+    width: 18,
+    backgroundColor: Colors.textOnPrimary,
+  },
+  chips: {
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xl,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  gridCell: {
+    width: '47.5%',
+  },
+  empty: {
+    width: '100%',
     alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+    paddingVertical: Spacing.x3,
   },
 });

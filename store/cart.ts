@@ -1,0 +1,96 @@
+/**
+ * Cart store (zustand).
+ *
+ * A cart line is keyed by `productId + size` so the same product in two
+ * different sizes occupies two lines. `add` merges quantity into an existing
+ * matching line. `subtotal`/`count` are derived via the exported helpers
+ * (`cartSubtotal` / `cartCount`) so consumers can compute them from the
+ * current `items` array without storing redundant state.
+ */
+
+import { create } from 'zustand';
+
+import type { Product } from '@/data/products';
+
+export type CartItem = {
+  /** Stable line id = `${product.id}-${size ?? 'default'}`. */
+  id: string;
+  product: Product;
+  qty: number;
+  size?: string;
+  color?: string;
+};
+
+export type AddOptions = {
+  size?: string;
+  color?: string;
+  qty?: number;
+};
+
+export type CartState = {
+  items: CartItem[];
+  /** Add a product (merges qty into a matching size line if one exists). */
+  add: (product: Product, opts?: AddOptions) => void;
+  /** Remove a line by its line id. */
+  remove: (id: string) => void;
+  /** Set the quantity of a line. A qty <= 0 removes the line. */
+  setQty: (id: string, qty: number) => void;
+  /** Empty the cart. */
+  clear: () => void;
+};
+
+/** Build the stable line id for a product + chosen size. */
+export function cartItemId(productId: string, size?: string): string {
+  return `${productId}-${size ?? 'default'}`;
+}
+
+/** Sum of price * qty across all cart lines. */
+export function cartSubtotal(items: CartItem[]): number {
+  return items.reduce((total, item) => total + item.product.price * item.qty, 0);
+}
+
+/** Total number of units across all cart lines. */
+export function cartCount(items: CartItem[]): number {
+  return items.reduce((total, item) => total + item.qty, 0);
+}
+
+export const useCart = create<CartState>((set) => ({
+  items: [],
+
+  add: (product, opts) =>
+    set((state) => {
+      const qty = Math.max(1, opts?.qty ?? 1);
+      const size = opts?.size;
+      const color = opts?.color ?? product.colors[0];
+      const id = cartItemId(product.id, size);
+
+      const existing = state.items.find((item) => item.id === id);
+      if (existing) {
+        return {
+          items: state.items.map((item) =>
+            item.id === id ? { ...item, qty: item.qty + qty } : item,
+          ),
+        };
+      }
+
+      const line: CartItem = { id, product, qty, size, color };
+      return { items: [...state.items, line] };
+    }),
+
+  remove: (id) =>
+    set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+
+  setQty: (id, qty) =>
+    set((state) => {
+      if (qty <= 0) {
+        return { items: state.items.filter((item) => item.id !== id) };
+      }
+      return {
+        items: state.items.map((item) =>
+          item.id === id ? { ...item, qty } : item,
+        ),
+      };
+    }),
+
+  clear: () => set({ items: [] }),
+}));

@@ -1,0 +1,62 @@
+import {
+  Pressable,
+  StyleSheet,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+
+import { AppText } from '@/components/ui/Text';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+
+export type ChipProps = {
+  label: string;
+  /** Active = coral filled w/ white text; inactive = white w/ border. */
+  active?: boolean;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Category filter pill.
+ */
+export function Chip({ label, active, onPress, style }: ChipProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        active ? styles.chipActive : styles.chipInactive,
+        pressed && styles.pressed,
+        style,
+      ]}>
+      <AppText
+        variant="button"
+        color={active ? Colors.textOnPrimary : Colors.text}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  chip: {
+    height: 40,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipActive: {
+    backgroundColor: Colors.primary,
+  },
+  chipInactive: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+});
