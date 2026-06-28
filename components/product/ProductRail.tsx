@@ -35,9 +35,9 @@ export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}>
-        {data.map((product) => (
+        {data.map((product, i) => (
           <View key={product.id} style={styles.card}>
-            <ProductCard product={product} />
+            <ProductCard product={product} index={i} />
           </View>
         ))}
       </ScrollView>

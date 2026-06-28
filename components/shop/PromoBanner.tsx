@@ -6,8 +6,9 @@
 
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 
@@ -28,11 +29,12 @@ export function PromoBanner({
   onPress,
 }: PromoBannerProps) {
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${title} ${subtitle}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+      scaleTo={0.975}
+      style={styles.card}>
       <Image
         source={{ uri: image }}
         style={StyleSheet.absoluteFill}
@@ -59,7 +61,7 @@ export function PromoBanner({
           <Text style={styles.ctaText}>{cta}</Text>
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -71,9 +73,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
     ...Shadow.card,
-  },
-  pressed: {
-    opacity: 0.92,
   },
   content: {
     flex: 1,

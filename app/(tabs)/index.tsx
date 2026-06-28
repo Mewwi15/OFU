@@ -17,9 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProductRail } from '@/components/product/ProductRail';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories, products, type Category } from '@/data/products';
+import { selectedAddress, useAddress } from '@/store/address';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
 const TAB_BAR_CLEARANCE = 110;
@@ -66,6 +68,7 @@ const NEW_ARRIVALS = [...products].reverse().slice(0, 8);
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const address = useAddress(selectedAddress);
 
   /* ----- Auto-rotating hero banner ----- */
   const bannerRef = useRef<ScrollView>(null);
@@ -152,7 +155,7 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="เปลี่ยนที่อยู่จัดส่ง"
               style={styles.locLeft}
-              onPress={() => {}}>
+              onPress={() => router.push('/address')}>
               <View style={styles.locPin}>
                 <Ionicons
                   name="location-sharp"
@@ -162,11 +165,11 @@ export default function HomeScreen() {
               </View>
               <View style={styles.locText}>
                 <Text variant="caption" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  จัดส่งไปที่
+                  จัดส่งไปที่{address ? ` · ${address.label}` : ''}
                 </Text>
                 <View style={styles.locAddrRow}>
                   <Text numberOfLines={1} style={styles.locAddr}>
-                    123 ถนนสุขุมวิท
+                    {address ? address.line : 'เพิ่มที่อยู่จัดส่ง'}
                   </Text>
                   <Ionicons
                     name="chevron-down"
@@ -196,15 +199,16 @@ export default function HomeScreen() {
         {/* Body (padded) — search floats over the hero's bottom edge */}
         <View style={styles.body}>
           {/* Search entry — tapping opens the full catalog */}
-          <Pressable
+          <PressableScale
             accessibilityRole="search"
             accessibilityLabel="ค้นหาสินค้า"
             onPress={() => openCatalog()}
+            scaleTo={0.98}
             style={styles.searchEntry}>
             <Ionicons name="search" size={20} color={Colors.textMuted} />
             <Text style={styles.searchPlaceholder}>ค้นหาสินค้า</Text>
             <Ionicons name="mic-outline" size={20} color={Colors.primary} />
-          </Pressable>
+          </PressableScale>
 
           {/* Category shortcuts → catalog */}
           <ScrollView
@@ -212,7 +216,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.catRow}>
             {categories.map((cat) => (
-              <Pressable
+              <PressableScale
                 key={cat}
                 accessibilityRole="button"
                 accessibilityLabel={cat}
@@ -224,7 +228,7 @@ export default function HomeScreen() {
                 <Text numberOfLines={1} style={styles.catLabel}>
                   {cat}
                 </Text>
-              </Pressable>
+              </PressableScale>
             ))}
           </ScrollView>
 

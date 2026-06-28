@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,20 +12,26 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
-import { ColorSwatches } from '@/components/ui/ColorSwatches';
 import { IconButton } from '@/components/ui/IconButton';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { RatingStars } from '@/components/ui/RatingStars';
-import { ScreenHeader } from '@/components/ui/ScreenHeader';
-import { ShopBadge } from '@/components/ui/ShopBadge';
 import { Text } from '@/components/ui/text';
+import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { getProduct } from '@/data/products';
 import { money } from '@/lib/format';
 import { useCart } from '@/store/cart';
 import { useWishlist } from '@/store/wishlist';
+
+/** At-a-glance promises shown under the price. */
+const PERKS = [
+  { icon: 'bicycle-outline', label: 'ส่งไว' },
+  { icon: 'leaf-outline', label: 'ของสดคัดพิเศษ' },
+  { icon: 'shield-checkmark-outline', label: 'การันตีคุณภาพ' },
+] as const;
 
 export default function ProductDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,35 +43,39 @@ export default function ProductDetailsScreen() {
 
   const add = useCart((s) => s.add);
   const toggleWishlist = useWishlist((s) => s.toggle);
-  const isWishlisted = useWishlist((s) => (product ? s.ids.includes(product.id) : false));
+  const isWishlisted = useWishlist((s) =>
+    product ? s.ids.includes(product.id) : false,
+  );
 
   const [activeImage, setActiveImage] = useState(0);
-  const [selectedSize, setSelectedSize] = useState<string | undefined>(
-    product?.sizes[0],
-  );
-  const [selectedColor, setSelectedColor] = useState<string | undefined>(
-    product?.colors[0],
-  );
   const [qty, setQty] = useState(1);
   const [expanded, setExpanded] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  // Bump on each add so a re-tap while the toast is up forces a fresh pop.
+  const [toastKey, setToastKey] = useState(0);
+
+  /** Floating back button — shared by the found / not-found states. */
+  const backButton = (
+    <IconButton
+      icon="chevron-back"
+      accessibilityLabel="ย้อนกลับ"
+      onPress={() => router.back()}
+    />
+  );
 
   if (!product) {
     return (
-      <View style={[styles.screen, styles.missing, { paddingTop: insets.top }]}>
-        <ScreenHeader
-          title="รายละเอียดสินค้า"
-          left={
-            <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
-          }
-          style={styles.header}
-        />
+      <View style={styles.screen}>
+        <View style={[styles.topBar, { top: insets.top + Spacing.sm }]}>
+          {backButton}
+        </View>
         <View style={styles.missingBody}>
           <Ionicons
             name="alert-circle-outline"
             size={48}
             color={Colors.textMuted}
           />
-          <Text variant="subtitle" style={[styles.missingText, { color: Colors.textMuted }]}>
+          <Text variant="subtitle" style={{ color: Colors.textMuted }}>
             ไม่พบสินค้านี้
           </Text>
         </View>
@@ -74,52 +83,27 @@ export default function ProductDetailsScreen() {
     );
   }
 
-  const imageWidth = width;
+  const imageHeight = Math.round(width * 0.92);
+  const total = product.price * qty;
 
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / imageWidth);
+    const index = Math.round(e.nativeEvent.contentOffset.x / width);
     if (index !== activeImage) setActiveImage(index);
   };
 
   const handleAddToCart = () => {
-    add(product, { size: selectedSize, qty, color: selectedColor });
-    router.push('/cart');
+    add(product, { qty });
+    setToastKey((k) => k + 1);
+    setShowToast(true);
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScreenHeader
-        title="รายละเอียดสินค้า"
-        left={<IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />}
-        right={
-          <>
-            <IconButton
-              icon="share-social-outline"
-              accessibilityLabel="แชร์สินค้า"
-              onPress={() =>
-                Alert.alert('แชร์', `แชร์ "${product.name}"`)
-              }
-            />
-            <IconButton
-              icon={isWishlisted ? 'heart' : 'heart-outline'}
-              color={isWishlisted ? Colors.primary : undefined}
-              accessibilityLabel={
-                isWishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
-              }
-              onPress={() => toggleWishlist(product.id)}
-            />
-          </>
-        }
-        style={styles.header}
-      />
-
+    <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + Spacing.x3,
-        }}>
-        {/* Image carousel */}
-        <View style={styles.carousel}>
+        contentContainerStyle={{ paddingBottom: insets.bottom + 132 }}>
+        {/* Full-bleed hero image (single image, or a swipeable pager) */}
+        <View style={[styles.hero, { height: imageHeight }]}>
           <ScrollView
             horizontal
             pagingEnabled
@@ -130,134 +114,114 @@ export default function ProductDetailsScreen() {
               <Image
                 key={i}
                 source={{ uri }}
-                style={[styles.image, { width: imageWidth }]}
+                style={{ width, height: imageHeight }}
                 contentFit="cover"
                 transition={300}
+                cachePolicy="memory-disk"
               />
             ))}
           </ScrollView>
 
-          {/* Price + Shop badge overlay (bottom-left) */}
-          <View style={styles.overlay}>
-            <ShopBadge />
-            <View style={styles.priceTag}>
-              <Text variant="body" style={{ fontFamily: 'Mitr_600SemiBold', color: Colors.textOnPrimary }}>
-                {money(product.price)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Dot indicators */}
           {product.images.length > 1 ? (
             <View style={styles.dots}>
               {product.images.map((_, i) => (
                 <View
                   key={i}
-                  style={[
-                    styles.dot,
-                    i === activeImage ? styles.dotActive : styles.dotInactive,
-                  ]}
+                  style={[styles.dot, i === activeImage && styles.dotActive]}
                 />
               ))}
             </View>
           ) : null}
         </View>
 
-        <View style={styles.body}>
-          {/* Title / subtitle / rating */}
-          <Text variant="title">{product.name}</Text>
-          <Text
-            variant="body"
-            style={[styles.subtitle, { color: Colors.textMuted }]}>
+        {/* Content card overlapping the image's bottom edge */}
+        <Animated.View entering={FadeInDown.duration(420)} style={styles.card}>
+          <View style={styles.metaRow}>
+            <View style={styles.categoryPill}>
+              <Text variant="caption" style={styles.categoryText}>
+                {product.category}
+              </Text>
+            </View>
+            <RatingStars rating={product.rating} size={15} showValue />
+          </View>
+
+          <Text variant="title" style={styles.name}>
+            {product.name}
+          </Text>
+          <Text variant="body" style={[styles.subtitle, { color: Colors.textMuted }]}>
             {product.subtitle}
           </Text>
-          <RatingStars
-            rating={product.rating}
-            size={16}
-            showValue
-            style={styles.rating}
-          />
 
-          {/* Description with Read More */}
+          <Text style={styles.price}>{money(product.price)}</Text>
+
+          {/* Perks */}
+          <View style={styles.perks}>
+            {PERKS.map((perk) => (
+              <View key={perk.label} style={styles.perk}>
+                <Ionicons name={perk.icon} size={16} color={Colors.primaryStrong} />
+                <Text variant="caption" style={styles.perkLabel}>
+                  {perk.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Description */}
           <Text variant="subtitle" style={styles.sectionLabel}>
             รายละเอียด
           </Text>
           <Text
             variant="body"
             style={{ color: Colors.textMuted }}
-            numberOfLines={expanded ? undefined : 2}>
+            numberOfLines={expanded ? undefined : 3}>
             {product.description}
           </Text>
-          <Pressable
-            onPress={() => setExpanded((prev) => !prev)}
-            hitSlop={Spacing.sm}>
-            <Text
-              variant="caption"
-              style={[styles.readMore, { color: Colors.primaryStrong }]}>
+          <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={Spacing.sm}>
+            <Text variant="caption" style={styles.readMore}>
               {expanded ? 'ย่อ' : 'อ่านเพิ่มเติม'}
             </Text>
           </Pressable>
-
-          {/* Color selector */}
-          {product.colors.length > 0 ? (
-            <>
-              <Text variant="subtitle" style={styles.sectionLabel}>
-                เลือกสี
-              </Text>
-              <ColorSwatches
-                colors={product.colors}
-                selected={selectedColor}
-                onSelect={setSelectedColor}
-                size={28}
-              />
-            </>
-          ) : null}
-
-          {/* Size selector */}
-          {product.sizes.length > 0 ? (
-            <>
-              <Text variant="subtitle" style={styles.sectionLabel}>
-                ขนาด
-              </Text>
-              <View style={styles.sizeRow}>
-                {product.sizes.map((size) => {
-                  const active = size === selectedSize;
-                  return (
-                    <Pressable
-                      key={size}
-                      onPress={() => setSelectedSize(size)}
-                      style={[
-                        styles.sizePill,
-                        active ? styles.sizePillActive : styles.sizePillInactive,
-                      ]}>
-                      <Text
-                        variant="body"
-                        style={{
-                          fontFamily: 'Mitr_500Medium',
-                          color: active ? Colors.textOnPrimary : Colors.text,
-                        }}>
-                        {size}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* Bottom action row */}
-      <View
-        style={[
-          styles.actionBar,
-          { paddingBottom: insets.bottom + Spacing.md },
-        ]}>
-        <QuantityStepper value={qty} onChange={setQty} />
-        <Button onPress={handleAddToCart} style={styles.addButton}>
-          เพิ่มลงตะกร้า
-        </Button>
+      {/* Floating top buttons over the hero */}
+      <View style={[styles.topBar, { top: insets.top + Spacing.sm }]}>
+        {backButton}
+        <IconButton
+          icon={isWishlisted ? 'heart' : 'heart-outline'}
+          color={isWishlisted ? Colors.primary : undefined}
+          accessibilityLabel={
+            isWishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
+          }
+          onPress={() => toggleWishlist(product.id)}
+        />
       </View>
+
+      {/* Sticky action bar: quantity + add-to-cart with live total */}
+      <Animated.View
+        entering={FadeInUp.delay(120).duration(380)}
+        style={[styles.actionBar, { paddingBottom: insets.bottom + Spacing.md }]}>
+        <QuantityStepper value={qty} onChange={setQty} max={99} />
+        <Button onPress={handleAddToCart} style={styles.addButton}>
+          {`เพิ่มลงตะกร้า · ${money(total)}`}
+        </Button>
+      </Animated.View>
+
+      {showToast ? (
+        <Toast
+          key={toastKey}
+          message="เพิ่มลงตะกร้าแล้ว"
+          subtitle={`${product.name} × ${qty}`}
+          actionLabel="ดูตะกร้า"
+          onAction={() => {
+            setShowToast(false);
+            router.push('/cart');
+          }}
+          onHide={() => setShowToast(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -267,110 +231,117 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.sm,
-  },
-  missing: {
-    flex: 1,
-  },
   missingBody: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.md,
   },
-  missingText: {
-    marginTop: Spacing.sm,
-  },
-  carousel: {
-    position: 'relative',
-  },
-  image: {
-    aspectRatio: 3 / 4,
-  },
-  overlay: {
-    position: 'absolute',
-    left: Spacing.xl,
-    bottom: Spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  priceTag: {
-    backgroundColor: Colors.primaryStrong,
-    borderRadius: Radius.pill,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
+  hero: {
+    width: '100%',
+    backgroundColor: Colors.primaryTint,
   },
   dots: {
     position: 'absolute',
-    bottom: Spacing.xl,
-    right: Spacing.xl,
+    bottom: Spacing.x2 + Spacing.sm,
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: Spacing.xs,
   },
   dot: {
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: Radius.pill,
+    backgroundColor: Colors.whiteAlpha,
   },
   dotActive: {
-    width: 20,
-    backgroundColor: Colors.primary,
+    width: 18,
+    backgroundColor: Colors.textOnPrimary,
   },
-  dotInactive: {
-    width: 8,
-    backgroundColor: Colors.surface,
-    opacity: 0.7,
+  card: {
+    marginTop: -Spacing.x2,
+    paddingHorizontal: Spacing.x2,
+    paddingTop: Spacing.x2,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    backgroundColor: Colors.background,
   },
-  body: {
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xl,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categoryPill: {
+    backgroundColor: Colors.primaryTint,
+    borderRadius: Radius.pill,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+  },
+  categoryText: {
+    color: Colors.primaryStrong,
+  },
+  name: {
+    marginTop: Spacing.md,
   },
   subtitle: {
     marginTop: Spacing.xs,
   },
-  rating: {
+  price: {
     marginTop: Spacing.md,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 28,
+    color: Colors.primaryStrong,
+  },
+  perks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.lg,
+    marginTop: Spacing.lg,
+  },
+  perk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  perkLabel: {
+    color: Colors.text,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginTop: Spacing.x2,
   },
   sectionLabel: {
-    marginTop: Spacing.xl,
+    marginTop: Spacing.x2,
     marginBottom: Spacing.sm,
   },
   readMore: {
     marginTop: Spacing.xs,
+    color: Colors.primaryStrong,
+    fontFamily: 'Mitr_500Medium',
   },
-  sizeRow: {
+  topBar: {
+    position: 'absolute',
+    left: Spacing.lg,
+    right: Spacing.lg,
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  sizePill: {
-    minWidth: 48,
-    height: 44,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.md,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sizePillActive: {
-    backgroundColor: Colors.primaryStrong,
-  },
-  sizePillInactive: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    justifyContent: 'space-between',
   },
   actionBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.x2,
+    paddingTop: Spacing.lg,
     backgroundColor: Colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    ...Shadow.card,
+    ...Shadow.float,
   },
   addButton: {
     flex: 1,

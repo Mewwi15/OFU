@@ -47,6 +47,8 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="product/[id]" />
+            <Stack.Screen name="address/index" />
+            <Stack.Screen name="address/picker" />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

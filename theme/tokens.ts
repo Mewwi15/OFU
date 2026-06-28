@@ -38,7 +38,8 @@ import { Platform, type TextStyle } from 'react-native';
 const ref = {
   // neutrals
   white: '#FFFFFF',
-  ink: '#1E1E1E',         // default text — 16.67:1 white / 14.79:1 peach / 14.37:1 warmMuted
+  ink: '#1E1E1E',         // near-black — reserved for max-contrast needs (scrim-like)
+  inkSoft: '#4A423C',     // default text — softened warm charcoal (less harsh than ink): ~9.3:1 white / ~8.2:1 peach — PASS AA
   peach50: '#FBEFE9',     // app canvas (warm peach)
   warmMuted100: '#F3EDE9',// muted surface (warm) — fill only (1.16:1 vs white; ink-on 14.37, muted-on 5.08)
   borderHair: '#EFE4DD',  // decorative hairline — 1.25:1 white / 1.11:1 peach (informational only)
@@ -92,7 +93,7 @@ const color = {
   surface: { base: ref.white, muted: ref.warmMuted100 },
 
   text: {
-    default: ref.ink,              // 16.67:1 white / 14.79:1 peach — PASS
+    default: ref.inkSoft,          // softened warm charcoal — ~9.3:1 white / ~8.2:1 peach — PASS
     muted: ref.warmGray600,        // 5.89:1 white / 5.23:1 peach — PASS both
     inverse: ref.white,            // on *Strong fills below
     brandPrimary: ref.coralStrong, // 5.68:1 white / 5.04:1 peach / 4.77:1 on coralTint — PASS (coral text)

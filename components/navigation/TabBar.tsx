@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CartBadge } from '@/components/navigation/CartBadge';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -91,11 +92,14 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   isFocused && styles.indicatorActive,
                 ]}
               />
-              <Ionicons
-                name={isFocused ? meta.active : meta.inactive}
-                size={24}
-                color={tint}
-              />
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={isFocused ? meta.active : meta.inactive}
+                  size={24}
+                  color={tint}
+                />
+                {route.name === 'cart' ? <CartBadge /> : null}
+              </View>
               <Text
                 numberOfLines={1}
                 style={[
@@ -140,6 +144,10 @@ const styles = StyleSheet.create({
   },
   itemPressed: {
     opacity: 0.6,
+  },
+  iconWrap: {
+    // Anchor for the absolutely-positioned cart count badge.
+    position: 'relative',
   },
   indicator: {
     width: 20,

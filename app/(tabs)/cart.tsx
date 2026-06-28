@@ -19,15 +19,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { ProductListItem } from '@/components/product/ProductListItem';
 import { ModeSwitch } from '@/components/shop/ModeSwitch';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
+import { selectedAddress, useAddress } from '@/store/address';
 import { cartSubtotal, useCart } from '@/store/cart';
 import { deliveryFeeFor, useMode } from '@/store/mode';
 
@@ -47,6 +51,7 @@ export default function CartScreen() {
   const items = useCart((s) => s.items);
   const clear = useCart((s) => s.clear);
   const mode = useMode((s) => s.mode);
+  const address = useAddress(selectedAddress);
 
   const [promo, setPromo] = useState('');
 
@@ -110,6 +115,44 @@ export default function CartScreen() {
           ]}>
           {/* Mode switch (เดลิเวอรี่ / ออนไลน์ — payment differs) */}
           <ModeSwitch compact style={styles.modeSwitch} />
+
+          {/* Delivery address (delivery mode only — online = pickup at store) */}
+          {mode === 'delivery' ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="เลือกที่อยู่จัดส่ง"
+              onPress={() => router.push(address ? '/address' : '/address/picker')}
+              scaleTo={0.98}
+              style={styles.addrCard}>
+              <View style={styles.addrIcon}>
+                <Ionicons name="location-sharp" size={20} color={Colors.primaryStrong} />
+              </View>
+              <View style={styles.addrBody}>
+                {address ? (
+                  <>
+                    <View style={styles.addrTop}>
+                      <Text style={styles.addrLabel}>จัดส่งไปที่ · {address.label}</Text>
+                      <Text style={styles.addrChange}>เปลี่ยน</Text>
+                    </View>
+                    <Text variant="caption" numberOfLines={1} style={styles.addrLine}>
+                      {address.recipient} · {address.phone}
+                    </Text>
+                    <Text variant="caption" numberOfLines={1} style={styles.addrLine}>
+                      {address.line}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.addrLabel}>เพิ่มที่อยู่จัดส่ง</Text>
+                    <Text variant="caption" style={styles.addrLine}>
+                      ปักหมุดบนแผนที่เพื่อจัดส่งถึงบ้าน
+                    </Text>
+                  </>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+            </PressableScale>
+          ) : null}
 
           {/* Cart lines */}
           <View style={styles.list}>
@@ -215,6 +258,46 @@ const styles = StyleSheet.create({
   },
   modeSwitch: {
     marginBottom: Spacing.lg,
+  },
+  addrCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    ...Shadow.card,
+  },
+  addrIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addrBody: {
+    flex: 1,
+  },
+  addrTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addrLabel: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 14,
+    color: Colors.text,
+  },
+  addrChange: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13,
+    color: Colors.primaryStrong,
+  },
+  addrLine: {
+    marginTop: 1,
+    color: Colors.textMuted,
   },
   list: {
     gap: Spacing.md,

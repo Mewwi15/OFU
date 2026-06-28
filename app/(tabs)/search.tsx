@@ -112,9 +112,6 @@ export default function CatalogScreen() {
               <Text variant="caption" style={styles.heroKicker}>
                 อู้ฟู่ · ของสดของดี
               </Text>
-              <Text variant="title" style={styles.heroTitle}>
-                สินค้าทั้งหมด
-              </Text>
             </View>
             <IconButton
               icon="bag-outline"
@@ -185,9 +182,9 @@ export default function CatalogScreen() {
                 แนะนำสำหรับคุณ
               </Text>
               <View style={styles.grid}>
-                {products.map((product) => (
+                {products.map((product, i) => (
                   <View key={product.id} style={styles.gridCell}>
-                    <ProductCard product={product} />
+                    <ProductCard product={product} index={i} />
                   </View>
                 ))}
               </View>
@@ -196,9 +193,9 @@ export default function CatalogScreen() {
         ) : results.length > 0 ? (
           /* Filtered view: a flat grid */
           <View style={styles.grid}>
-            {results.map((product) => (
+            {results.map((product, i) => (
               <View key={product.id} style={styles.gridCell}>
-                <ProductCard product={product} />
+                <ProductCard product={product} index={i} />
               </View>
             ))}
           </View>
@@ -246,10 +243,6 @@ const styles = StyleSheet.create({
   },
   heroKicker: {
     color: 'rgba(255,255,255,0.9)',
-  },
-  heroTitle: {
-    color: Colors.textOnPrimary,
-    marginTop: 2,
   },
   heroLogoWrap: {
     position: 'absolute',

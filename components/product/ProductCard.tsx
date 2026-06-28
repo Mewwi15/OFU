@@ -9,85 +9,70 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { WishlistHeart } from '@/components/ui/WishlistHeart';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
-import { useWishlist } from '@/store/wishlist';
 
 export type ProductCardProps = {
   product: Product;
   style?: StyleProp<ViewStyle>;
+  /** Position in its list — staggers the entrance fade. */
+  index?: number;
 };
 
-export function ProductCard({ product, style }: ProductCardProps) {
+export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
   const router = useRouter();
-  const wishlisted = useWishlist((s) => s.ids.includes(product.id));
-  const toggle = useWishlist((s) => s.toggle);
 
   const open = () => router.push(`/product/${product.id}`);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={open}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed, style]}>
-      <Image
-        source={{ uri: product.images[0] }}
-        style={styles.image}
-        contentFit="cover"
-        transition={250}
-        cachePolicy="memory-disk"
-      />
+    <Animated.View
+      entering={FadeIn.delay(Math.min(index, 8) * 55).duration(320)}
+      style={[styles.wrapper, style]}>
+      <PressableScale accessibilityRole="button" onPress={open} style={styles.card}>
+        <Image
+          source={{ uri: product.images[0] }}
+          style={styles.image}
+          contentFit="cover"
+          transition={250}
+          cachePolicy="memory-disk"
+        />
 
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text numberOfLines={1} style={styles.name}>
-            {product.name}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              wishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
-            }
-            hitSlop={10}
-            onPress={() => toggle(product.id)}>
-            <Ionicons
-              name={wishlisted ? 'heart' : 'heart-outline'}
-              size={22}
-              color={Colors.primary}
-            />
-          </Pressable>
-        </View>
+        <View style={styles.info}>
+          <View style={styles.nameRow}>
+            <Text numberOfLines={1} style={styles.name}>
+              {product.name}
+            </Text>
+            <WishlistHeart productId={product.id} />
+          </View>
 
-        <View style={styles.metaRow}>
-          <Ionicons name="star" size={13} color={Colors.primary} />
-          <Text style={styles.rating}>{product.rating.toFixed(1)}</Text>
-          <Text style={styles.dot}>·</Text>
-          <Text style={styles.price}>{money(product.price)}</Text>
+          <View style={styles.metaRow}>
+            <Ionicons name="star" size={13} color={Colors.primary} />
+            <Text style={styles.rating}>{product.rating.toFixed(1)}</Text>
+            <Text style={styles.dot}>·</Text>
+            <Text style={styles.price}>{money(product.price)}</Text>
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </PressableScale>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+  },
   card: {
     flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     ...Shadow.float,
-  },
-  pressed: {
-    opacity: 0.9,
   },
   image: {
     width: '100%',
