@@ -1,10 +1,12 @@
 /**
- * ProductListItem — horizontal row card used by the Wishlist and Cart lists.
+ * ProductListItem — horizontal row used by the Wishlist and Cart lists.
  *
- * White rounded card: image (left), then name + a meta row (coral star · rating)
- * + price. Right-hand controls differ by `variant`:
- *  - `wishlist`: a single coral heart toggle.
- *  - `cart`: a trash button + a QuantityStepper.
+ *  - `wishlist`: a standalone white card — image, name, coral star · rating,
+ *    price, and a coral heart toggle.
+ *  - `cart` (`embedded`): a flat, transparent row meant to live INSIDE a shared
+ *    surface (the cart "ledger"), separated from its neighbours by hairlines.
+ *    A left checkbox selects the line; the right QuantityStepper folds the
+ *    delete action into its minus button (`removable`).
  *
  * Tapping the row (outside the controls) opens the product details route.
  */
@@ -20,10 +22,10 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { IconButton } from '@/components/ui/IconButton';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { cartItemId, useCart } from '@/store/cart';
@@ -39,16 +41,24 @@ export type ProductListItemProps = {
    * correct line (a product can appear in multiple sizes).
    */
   cartItemId?: string;
-  /** Chosen size for this cart line (shown next to the rating). */
+  /** Chosen size for this cart line (shown as a muted caption). */
   size?: string;
   /** Chosen color for this cart line (currently unused for groceries). */
   color?: string;
   /** Quantity for the `cart` variant. */
   qty?: number;
+  /** Render the cart row flat (no card chrome) for use inside a shared surface. */
+  embedded?: boolean;
+  /** Show a left checkbox (cart variant) for Shopee-style line selection. */
+  selectable?: boolean;
+  /** Whether this line's checkbox is ticked. */
+  selected?: boolean;
+  /** Called when the checkbox is tapped. */
+  onToggleSelect?: () => void;
+  /** Called when the line is removed (stepper trash at qty = min). */
+  onRemove?: () => void;
   style?: StyleProp<ViewStyle>;
 };
-
-const IMAGE_SIZE = 92;
 
 export function ProductListItem({
   product,
@@ -56,6 +66,11 @@ export function ProductListItem({
   cartItemId: lineId,
   size,
   qty = 1,
+  embedded = false,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  onRemove,
   style,
 }: ProductListItemProps) {
   const router = useRouter();
@@ -68,19 +83,34 @@ export function ProductListItem({
 
   const resolvedLineId = lineId ?? cartItemId(product.id, size);
   const open = () => router.push(`/product/${product.id}`);
-
-  /** Secondary meta after the rating: chosen size (cart) or subtitle. */
-  const metaTail = variant === 'cart' ? size : product.subtitle;
+  const isCart = variant === 'cart';
 
   return (
     <Pressable
       accessibilityRole="button"
       onPress={open}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed, style]}>
-      {/* Left: image */}
+      style={({ pressed }) => [
+        styles.row,
+        embedded ? styles.embedded : styles.card,
+        pressed && !embedded && styles.pressed,
+        style,
+      ]}>
+      {/* Optional left checkbox (cart selection) */}
+      {selectable ? (
+        <Checkbox
+          checked={selected}
+          onPress={onToggleSelect}
+          accessibilityLabel={selected ? 'นำออกจากการเลือก' : 'เลือกสินค้านี้'}
+        />
+      ) : null}
+
+      {/* Image */}
       <Image
         source={{ uri: product.images[0] }}
-        style={styles.image}
+        style={[
+          isCart ? styles.imageSm : styles.image,
+          selectable && styles.imageGap,
+        ]}
         contentFit="cover"
         transition={250}
         cachePolicy="memory-disk"
@@ -88,21 +118,31 @@ export function ProductListItem({
 
       {/* Middle: name + meta + price */}
       <View style={styles.middle}>
-        <Text variant="subtitle" numberOfLines={1}>
+        <Text style={styles.name} numberOfLines={1}>
           {product.name}
         </Text>
-        <View style={styles.metaRow}>
-          <Ionicons name="star" size={13} color={Colors.primary} />
-          <Text style={styles.metaText}>{product.rating.toFixed(1)}</Text>
-          {metaTail ? (
-            <>
-              <Text style={styles.dot}>·</Text>
-              <Text style={styles.metaTextMuted} numberOfLines={1}>
-                {metaTail}
-              </Text>
-            </>
-          ) : null}
-        </View>
+
+        {isCart ? (
+          size ? (
+            <Text variant="caption" numberOfLines={1}>
+              {size}
+            </Text>
+          ) : null
+        ) : (
+          <View style={styles.metaRow}>
+            <Ionicons name="star" size={13} color={Colors.star} />
+            <Text style={styles.metaText}>{product.rating.toFixed(1)}</Text>
+            {product.subtitle ? (
+              <>
+                <Text style={styles.dot}>·</Text>
+                <Text style={styles.metaTextMuted} numberOfLines={1}>
+                  {product.subtitle}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        )}
+
         <Text style={styles.price}>{money(product.price)}</Text>
       </View>
 
@@ -123,20 +163,13 @@ export function ProductListItem({
           />
         </Pressable>
       ) : (
-        <View style={styles.rightCart}>
-          <IconButton
-            icon="trash-outline"
-            color={Colors.danger}
-            size={32}
-            accessibilityLabel="ลบสินค้าออกจากตะกร้า"
-            onPress={() => removeFromCart(resolvedLineId)}
-          />
-          <QuantityStepper
-            value={qty}
-            onChange={(next) => setQty(resolvedLineId, next)}
-            min={1}
-          />
-        </View>
+        <QuantityStepper
+          value={qty}
+          onChange={(next) => setQty(resolvedLineId, next)}
+          min={1}
+          removable
+          onRemove={onRemove ?? (() => removeFromCart(resolvedLineId))}
+        />
       )}
     </Pressable>
   );
@@ -146,6 +179,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  /* Wishlist: standalone white card. */
+  card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.sm,
@@ -154,17 +190,35 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.95,
   },
+  /* Cart: flat transparent row inside the shared ledger surface. */
+  embedded: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+  },
   image: {
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
+    width: 92,
+    height: 92,
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryTint,
+  },
+  imageSm: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primaryTint,
+  },
+  imageGap: {
+    marginLeft: Spacing.md,
   },
   middle: {
     flex: 1,
     marginHorizontal: Spacing.md,
     justifyContent: 'center',
-    gap: 2,
+    gap: Spacing.xxs,
+  },
+  name: {
+    ...Typography.bodyStrong,
+    color: Colors.text,
   },
   metaRow: {
     flexDirection: 'row',
@@ -186,20 +240,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   price: {
-    fontFamily: 'Mitr_600SemiBold',
-    fontSize: 15,
+    ...Typography.price,
     color: Colors.primaryStrong,
-    marginTop: 2,
   },
   rightWishlist: {
     width: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  rightCart: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginLeft: Spacing.sm,
   },
 });

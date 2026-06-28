@@ -1,23 +1,26 @@
 /**
  * ModeSwitch — pick between the two shopping flows (เดลิเวอรี่ / ออนไลน์).
  *
- * 7-Eleven "7 Delivery / ALL Online" look: white rounded cards, a circular
- * tinted icon badge, title + tagline, and a colored ring + check on the
- * selected one. Each mode has its own accent (delivery = green, online =
- * orange). `compact` renders small pills for the cart/checkout header. Reads and
- * writes the shared `useMode` store, so every instance stays in sync.
+ *  - default: two large white cards (home) — circular tinted icon, title +
+ *    tagline, accent ring + check on the selected one (delivery = green accent,
+ *    online = orange accent).
+ *  - `compact`: a single segmented track (cart/checkout) — a surfaceMuted pill
+ *    rail with a white thumb sliding under the active segment. Unified on coral
+ *    so green stays reserved for success/discount.
+ *
+ * Reads/writes the shared `useMode` store, so every instance stays in sync.
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
 
 const MODES = Object.values(MODE_META);
 
-/** Per-mode accent: delivery = 7-Eleven green, online = warm orange. */
+/** Per-mode accent (large cards only): delivery = green, online = orange. */
 const ACCENT: Record<ShopMode, { color: string; tint: string }> = {
   delivery: { color: Colors.primaryStrong, tint: Colors.primaryTint },
   online: { color: Colors.accentStrong, tint: Colors.accentTint },
@@ -32,40 +35,38 @@ export function ModeSwitch({ compact = false, style }: Props) {
   const mode = useMode((s) => s.mode);
   const setMode = useMode((s) => s.setMode);
 
+  /* Compact: one segmented track with a white active thumb. */
+  if (compact) {
+    return (
+      <View style={[styles.track, style]}>
+        {MODES.map((m) => {
+          const active = m.key === mode;
+          const icon = m.icon as keyof typeof Ionicons.glyphMap;
+          const tint = active ? Colors.primaryStrong : Colors.textMuted;
+          return (
+            <Pressable
+              key={m.key}
+              accessibilityRole="button"
+              accessibilityState={active ? { selected: true } : {}}
+              accessibilityLabel={m.label}
+              onPress={() => setMode(m.key)}
+              style={[styles.segment, active && styles.segmentActive]}>
+              <Ionicons name={icon} size={18} color={tint} />
+              <Text style={[Typography.button, { color: tint }]}>{m.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+
+  /* Default: two large cards (home). */
   return (
     <View style={[styles.row, style]}>
       {MODES.map((m) => {
         const active = m.key === mode;
         const accent = ACCENT[m.key];
         const icon = m.icon as keyof typeof Ionicons.glyphMap;
-
-        /* Compact pill (cart/checkout). */
-        if (compact) {
-          return (
-            <Pressable
-              key={m.key}
-              onPress={() => setMode(m.key)}
-              style={[
-                styles.pill,
-                active
-                  ? { backgroundColor: accent.color }
-                  : styles.pillInactive,
-              ]}>
-              <Ionicons
-                name={icon}
-                size={18}
-                color={active ? Colors.textOnPrimary : accent.color}
-              />
-              <Text
-                variant="subtitle"
-                style={{ color: active ? Colors.textOnPrimary : Colors.text }}>
-                {m.label}
-              </Text>
-            </Pressable>
-          );
-        }
-
-        /* Large card (home). */
         return (
           <Pressable
             key={m.key}
@@ -96,12 +97,33 @@ export function ModeSwitch({ compact = false, style }: Props) {
 }
 
 const styles = StyleSheet.create({
+  /* Compact segmented track. */
+  track: {
+    flexDirection: 'row',
+    padding: Spacing.xxs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  segment: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    minHeight: 44,
+    borderRadius: Radius.pill,
+  },
+  segmentActive: {
+    backgroundColor: Colors.surface,
+    ...Shadow.card,
+  },
+
+  /* Large cards (home). */
   row: {
     flexDirection: 'row',
     gap: Spacing.md,
   },
-
-  /* Large card (home). */
   card: {
     flex: 1,
     flexDirection: 'row',
@@ -134,21 +156,5 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  /* Small pill (cart/checkout). */
-  pill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-  },
-  pillInactive: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
 });

@@ -47,17 +47,16 @@ const BANNER_SLIDES = [
 const BANNER_INTERVAL = 5000;
 
 /**
- * Per-category emoji — TEMPORARY placeholders. Swap to real category artwork by
- * dropping square PNGs (transparent bg) into assets/images/categories/ and
- * replacing this map's values with `require(...)` + an <Image> in the card.
+ * Per-category Ionicons glyph. Placeholder until real square category artwork
+ * lands in assets/images/categories/ (swap the <Ionicons> for an <Image> then).
  */
-const CATEGORY_EMOJI: Record<Category, string> = {
-  ทั้งหมด: '🛒',
-  ของสด: '🥬',
-  เครื่องดื่ม: '🥤',
-  ของแห้ง: '🍚',
-  ของใช้ในบ้าน: '🧴',
-  ขนม: '🍪',
+const CATEGORY_ICON: Record<Category, keyof typeof Ionicons.glyphMap> = {
+  ทั้งหมด: 'apps',
+  ของสด: 'leaf',
+  เครื่องดื่ม: 'cafe',
+  ของแห้ง: 'cube',
+  ของใช้ในบ้าน: 'home',
+  ขนม: 'ice-cream',
 };
 
 /* Curated home rails (derived from the mock catalog). */
@@ -223,7 +222,7 @@ export default function HomeScreen() {
                 onPress={() => openCatalog(cat)}
                 style={styles.catCard}>
                 <View style={styles.catIcon}>
-                  <Text style={styles.catEmoji}>{CATEGORY_EMOJI[cat]}</Text>
+                  <Ionicons name={CATEGORY_ICON[cat]} size={24} color={Colors.primaryStrong} />
                 </View>
                 <Text numberOfLines={1} style={styles.catLabel}>
                   {cat}
@@ -362,9 +361,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  catEmoji: {
-    fontSize: 24,
   },
   catLabel: {
     fontFamily: 'Mitr_400Regular',

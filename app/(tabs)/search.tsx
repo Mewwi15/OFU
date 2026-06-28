@@ -27,7 +27,7 @@ const HOT_WEEKLY = [...products].sort((a, b) => b.rating - a.rating).slice(0, 6)
 /** Promo banner heading each curated section. */
 const SECTION_BANNERS = {
   trending: {
-    title: 'กำลังมาแรง 🔥',
+    title: 'กำลังมาแรง',
     subtitle: 'สินค้าที่คนสั่งเยอะที่สุดสัปดาห์นี้',
     image: 'https://picsum.photos/seed/oofoo-trend/900/360',
   },
@@ -37,7 +37,7 @@ const SECTION_BANNERS = {
     image: 'https://picsum.photos/seed/oofoo-promo/900/360',
   },
   hot: {
-    title: 'เรตติ้งสูงสุด ⭐',
+    title: 'เรตติ้งสูงสุด',
     subtitle: 'คัดจากรีวิวลูกค้าตัวจริง',
     image: 'https://picsum.photos/seed/oofoo-hot/900/360',
   },

@@ -29,12 +29,20 @@ export type AddOptions = {
 
 export type CartState = {
   items: CartItem[];
+  /** Line ids currently ticked for checkout (Shopee-style selection). */
+  selectedIds: string[];
   /** Add a product (merges qty into a matching size line if one exists). */
   add: (product: Product, opts?: AddOptions) => void;
   /** Remove a line by its line id. */
   remove: (id: string) => void;
   /** Set the quantity of a line. A qty <= 0 removes the line. */
   setQty: (id: string, qty: number) => void;
+  /** Toggle whether a line is ticked for checkout. */
+  toggleSelect: (id: string) => void;
+  /** Select every line (true) or none (false). */
+  selectAll: (select: boolean) => void;
+  /** Remove every ticked line (used after checkout / "ลบที่เลือก"). */
+  removeSelected: () => void;
   /** Empty the cart. */
   clear: () => void;
 };
@@ -54,8 +62,15 @@ export function cartCount(items: CartItem[]): number {
   return items.reduce((total, item) => total + item.qty, 0);
 }
 
+/** Only the lines whose id is in `selectedIds`. */
+export function selectedItems(items: CartItem[], selectedIds: string[]): CartItem[] {
+  const set = new Set(selectedIds);
+  return items.filter((item) => set.has(item.id));
+}
+
 export const useCart = create<CartState>((set) => ({
   items: [],
+  selectedIds: [],
 
   add: (product, opts) =>
     set((state) => {
@@ -64,9 +79,15 @@ export const useCart = create<CartState>((set) => ({
       const color = opts?.color ?? product.colors[0];
       const id = cartItemId(product.id, size);
 
+      // Newly added lines start ticked for checkout.
+      const selectedIds = state.selectedIds.includes(id)
+        ? state.selectedIds
+        : [...state.selectedIds, id];
+
       const existing = state.items.find((item) => item.id === id);
       if (existing) {
         return {
+          selectedIds,
           items: state.items.map((item) =>
             item.id === id ? { ...item, qty: item.qty + qty } : item,
           ),
@@ -74,16 +95,22 @@ export const useCart = create<CartState>((set) => ({
       }
 
       const line: CartItem = { id, product, qty, size, color };
-      return { items: [...state.items, line] };
+      return { selectedIds, items: [...state.items, line] };
     }),
 
   remove: (id) =>
-    set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+    set((state) => ({
+      items: state.items.filter((item) => item.id !== id),
+      selectedIds: state.selectedIds.filter((sid) => sid !== id),
+    })),
 
   setQty: (id, qty) =>
     set((state) => {
       if (qty <= 0) {
-        return { items: state.items.filter((item) => item.id !== id) };
+        return {
+          items: state.items.filter((item) => item.id !== id),
+          selectedIds: state.selectedIds.filter((sid) => sid !== id),
+        };
       }
       return {
         items: state.items.map((item) =>
@@ -92,5 +119,26 @@ export const useCart = create<CartState>((set) => ({
       };
     }),
 
-  clear: () => set({ items: [] }),
+  toggleSelect: (id) =>
+    set((state) => ({
+      selectedIds: state.selectedIds.includes(id)
+        ? state.selectedIds.filter((sid) => sid !== id)
+        : [...state.selectedIds, id],
+    })),
+
+  selectAll: (select) =>
+    set((state) => ({
+      selectedIds: select ? state.items.map((item) => item.id) : [],
+    })),
+
+  removeSelected: () =>
+    set((state) => {
+      const drop = new Set(state.selectedIds);
+      return {
+        items: state.items.filter((item) => !drop.has(item.id)),
+        selectedIds: [],
+      };
+    }),
+
+  clear: () => set({ items: [], selectedIds: [] }),
 }));
