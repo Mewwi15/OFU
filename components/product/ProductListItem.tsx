@@ -1,15 +1,15 @@
 /**
  * ProductListItem — horizontal row card used by the Wishlist and Cart lists.
  *
- * Layout is shared; the right-hand controls differ by `variant`:
- *  - `wishlist`: image (with ShopBadge + heart), name/subtitle/rating, and a
- *    right column with a heart toggle + price.
- *  - `cart`: image (with ShopBadge), name/subtitle/rating, and a right column
- *    with a QuantityStepper, a small color swatch, and a danger trash button.
+ * White rounded card: image (left), then name + a meta row (coral star · rating)
+ * + price. Right-hand controls differ by `variant`:
+ *  - `wishlist`: a single coral heart toggle.
+ *  - `cart`: a trash button + a QuantityStepper.
  *
  * Tapping the row (outside the controls) opens the product details route.
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import {
@@ -20,11 +20,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { ColorSwatches } from '@/components/ui/ColorSwatches';
 import { IconButton } from '@/components/ui/IconButton';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
-import { RatingStars } from '@/components/ui/RatingStars';
-import { ShopBadge } from '@/components/ui/ShopBadge';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
@@ -42,23 +39,22 @@ export type ProductListItemProps = {
    * correct line (a product can appear in multiple sizes).
    */
   cartItemId?: string;
-  /** Chosen size for this cart line (shown next to the name). */
+  /** Chosen size for this cart line (shown next to the rating). */
   size?: string;
-  /** Chosen color for this cart line (shown as a swatch). */
+  /** Chosen color for this cart line (currently unused for groceries). */
   color?: string;
   /** Quantity for the `cart` variant. */
   qty?: number;
   style?: StyleProp<ViewStyle>;
 };
 
-const IMAGE_SIZE = 96;
+const IMAGE_SIZE = 92;
 
 export function ProductListItem({
   product,
   variant,
   cartItemId: lineId,
   size,
-  color,
   qty = 1,
   style,
 }: ProductListItemProps) {
@@ -73,91 +69,73 @@ export function ProductListItem({
   const resolvedLineId = lineId ?? cartItemId(product.id, size);
   const open = () => router.push(`/product/${product.id}`);
 
+  /** Secondary meta after the rating: chosen size (cart) or subtitle. */
+  const metaTail = variant === 'cart' ? size : product.subtitle;
+
   return (
     <Pressable
       accessibilityRole="button"
       onPress={open}
       style={({ pressed }) => [styles.row, pressed && styles.pressed, style]}>
       {/* Left: image */}
-      <View style={styles.imageWrap}>
-        <Image
-          source={{ uri: product.images[0] }}
-          style={styles.image}
-          contentFit="cover"
-          transition={250}
-          cachePolicy="memory-disk"
-        />
-        <ShopBadge style={styles.badge} />
-        {variant === 'wishlist' ? (
-          <IconButton
-            icon={wishlisted ? 'heart' : 'heart-outline'}
-            color={wishlisted ? Colors.primary : Colors.text}
-            size={28}
-            onPress={() => toggleWishlist(product.id)}
-            style={styles.imageHeart}
-          />
-        ) : null}
-      </View>
+      <Image
+        source={{ uri: product.images[0] }}
+        style={styles.image}
+        contentFit="cover"
+        transition={250}
+        cachePolicy="memory-disk"
+      />
 
-      {/* Middle: details */}
+      {/* Middle: name + meta + price */}
       <View style={styles.middle}>
         <Text variant="subtitle" numberOfLines={1}>
           {product.name}
         </Text>
-        <Text
-          variant="caption"
-          numberOfLines={1}
-          style={[styles.subtitle, { color: Colors.textMuted }]}>
-          {product.subtitle}
-        </Text>
-        <RatingStars
-          rating={product.rating}
-          showValue
-          style={styles.rating}
-        />
-        <Text
-          variant="body"
-          style={[
-            styles.price,
-            { color: Colors.primary, fontFamily: 'Poppins_700Bold' },
-          ]}>
-          {money(product.price)}
-        </Text>
+        <View style={styles.metaRow}>
+          <Ionicons name="star" size={13} color={Colors.primary} />
+          <Text style={styles.metaText}>{product.rating.toFixed(1)}</Text>
+          {metaTail ? (
+            <>
+              <Text style={styles.dot}>·</Text>
+              <Text style={styles.metaTextMuted} numberOfLines={1}>
+                {metaTail}
+              </Text>
+            </>
+          ) : null}
+        </View>
+        <Text style={styles.price}>{money(product.price)}</Text>
       </View>
 
       {/* Right: variant-specific controls */}
       {variant === 'wishlist' ? (
-        <View style={styles.rightWishlist}>
-          <IconButton
-            icon={wishlisted ? 'heart' : 'heart-outline'}
-            color={wishlisted ? Colors.primary : Colors.text}
-            size={36}
-            onPress={() => toggleWishlist(product.id)}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            wishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
+          }
+          hitSlop={10}
+          onPress={() => toggleWishlist(product.id)}
+          style={styles.rightWishlist}>
+          <Ionicons
+            name={wishlisted ? 'heart' : 'heart-outline'}
+            size={24}
+            color={Colors.primary}
           />
-          <Text
-            variant="body"
-            style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
-            {money(product.price)}
-          </Text>
-        </View>
+        </Pressable>
       ) : (
         <View style={styles.rightCart}>
+          <IconButton
+            icon="trash-outline"
+            color={Colors.danger}
+            size={32}
+            accessibilityLabel="ลบสินค้าออกจากตะกร้า"
+            onPress={() => removeFromCart(resolvedLineId)}
+          />
           <QuantityStepper
             value={qty}
             onChange={(next) => setQty(resolvedLineId, next)}
             min={1}
           />
-          <View style={styles.cartFooter}>
-            {color ?? product.colors[0] ? (
-              <ColorSwatches colors={[color ?? product.colors[0]]} size={14} />
-            ) : null}
-            <IconButton
-              icon="trash-outline"
-              color={Colors.danger}
-              size={36}
-              onPress={() => removeFromCart(resolvedLineId)}
-            />
-          </View>
         </View>
       )}
     </Pressable>
@@ -167,20 +145,14 @@ export function ProductListItem({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.sm,
-    ...Shadow.card,
+    ...Shadow.float,
   },
   pressed: {
     opacity: 0.95,
-  },
-  imageWrap: {
-    position: 'relative',
-    width: IMAGE_SIZE,
-    height: IMAGE_SIZE,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
   },
   image: {
     width: IMAGE_SIZE,
@@ -188,44 +160,46 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryTint,
   },
-  badge: {
-    position: 'absolute',
-    left: Spacing.xs,
-    bottom: Spacing.xs,
-  },
-  imageHeart: {
-    position: 'absolute',
-    top: Spacing.xs,
-    right: Spacing.xs,
-  },
   middle: {
     flex: 1,
-    marginLeft: Spacing.md,
+    marginHorizontal: Spacing.md,
     justifyContent: 'center',
+    gap: 2,
   },
-  subtitle: {
-    marginTop: 2,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  rating: {
-    marginTop: Spacing.xs,
+  metaText: {
+    fontFamily: 'Mitr_400Regular',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  metaTextMuted: {
+    flexShrink: 1,
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  dot: {
+    color: Colors.textMuted,
+    fontSize: 13,
   },
   price: {
-    marginTop: Spacing.xs,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 15,
+    color: Colors.primaryStrong,
+    marginTop: 2,
   },
   rightWishlist: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginLeft: Spacing.sm,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rightCart: {
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginLeft: Spacing.sm,
-  },
-  cartFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.sm,
-    marginTop: Spacing.sm,
+    marginLeft: Spacing.sm,
   },
 });

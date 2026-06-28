@@ -56,7 +56,7 @@ export default function ProductDetailsScreen() {
         <ScreenHeader
           title="รายละเอียดสินค้า"
           left={
-            <IconButton icon="chevron-back" onPress={() => router.back()} />
+            <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
           }
           style={styles.header}
         />
@@ -90,11 +90,12 @@ export default function ProductDetailsScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
         title="รายละเอียดสินค้า"
-        left={<IconButton icon="chevron-back" onPress={() => router.back()} />}
+        left={<IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />}
         right={
           <>
             <IconButton
               icon="share-social-outline"
+              accessibilityLabel="แชร์สินค้า"
               onPress={() =>
                 Alert.alert('แชร์', `แชร์ "${product.name}"`)
               }
@@ -102,6 +103,9 @@ export default function ProductDetailsScreen() {
             <IconButton
               icon={isWishlisted ? 'heart' : 'heart-outline'}
               color={isWishlisted ? Colors.primary : undefined}
+              accessibilityLabel={
+                isWishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
+              }
               onPress={() => toggleWishlist(product.id)}
             />
           </>
@@ -137,7 +141,7 @@ export default function ProductDetailsScreen() {
           <View style={styles.overlay}>
             <ShopBadge />
             <View style={styles.priceTag}>
-              <Text variant="body" style={{ fontFamily: 'Poppins_700Bold', color: Colors.textOnPrimary }}>
+              <Text variant="body" style={{ fontFamily: 'Mitr_600SemiBold', color: Colors.textOnPrimary }}>
                 {money(product.price)}
               </Text>
             </View>
@@ -189,7 +193,7 @@ export default function ProductDetailsScreen() {
             hitSlop={Spacing.sm}>
             <Text
               variant="caption"
-              style={[styles.readMore, { color: Colors.primary }]}>
+              style={[styles.readMore, { color: Colors.primaryStrong }]}>
               {expanded ? 'ย่อ' : 'อ่านเพิ่มเติม'}
             </Text>
           </Pressable>
@@ -229,7 +233,7 @@ export default function ProductDetailsScreen() {
                       <Text
                         variant="body"
                         style={{
-                          fontFamily: 'Poppins_600SemiBold',
+                          fontFamily: 'Mitr_500Medium',
                           color: active ? Colors.textOnPrimary : Colors.text,
                         }}>
                         {size}
@@ -294,7 +298,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   priceTag: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryStrong,
     borderRadius: Radius.pill,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
@@ -350,7 +354,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sizePillActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryStrong,
   },
   sizePillInactive: {
     backgroundColor: Colors.surface,

@@ -34,7 +34,7 @@ export function Chip({ label, active, onPress, style }: ChipProps) {
       <Text
         variant="body"
         style={{
-          fontFamily: 'Poppins_600SemiBold',
+          fontFamily: 'Mitr_500Medium',
           color: active ? Colors.textOnPrimary : Colors.text,
         }}>
         {label}
@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryStrong,
   },
   chipInactive: {
     backgroundColor: Colors.surface,

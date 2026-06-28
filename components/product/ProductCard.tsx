@@ -1,12 +1,12 @@
 /**
- * ProductCard — the 2-column grid card.
+ * ProductCard — the 2-column grid card (Oroshi "Explore" frame).
  *
- * Image (rounded) on top with a ShopBadge bottom-left and a wishlist heart
- * top-right. Below the image: name, subtitle, then a row of price + a small
- * non-selectable color swatch preview. Tapping the card navigates to the
- * product details route.
+ * White card with the product image filling the top edge-to-edge (rounded only
+ * at the top), then a padded info area: name + inline coral wishlist heart, and
+ * a meta row (coral star · rating · price). Tapping the card opens the details.
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import {
@@ -17,9 +17,6 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { ColorSwatches } from '@/components/ui/ColorSwatches';
-import { IconButton } from '@/components/ui/IconButton';
-import { ShopBadge } from '@/components/ui/ShopBadge';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
@@ -30,9 +27,6 @@ export type ProductCardProps = {
   product: Product;
   style?: StyleProp<ViewStyle>;
 };
-
-/** Max swatches to preview on a grid card before it gets crowded. */
-const MAX_SWATCHES = 3;
 
 export function ProductCard({ product, style }: ProductCardProps) {
   const router = useRouter();
@@ -46,46 +40,40 @@ export function ProductCard({ product, style }: ProductCardProps) {
       accessibilityRole="button"
       onPress={open}
       style={({ pressed }) => [styles.card, pressed && styles.pressed, style]}>
-      <View style={styles.imageWrap}>
-        <Image
-          source={{ uri: product.images[0] }}
-          style={styles.image}
-          contentFit="cover"
-          transition={250}
-          cachePolicy="memory-disk"
-        />
-        <ShopBadge style={styles.badge} />
-        <IconButton
-          icon={wishlisted ? 'heart' : 'heart-outline'}
-          color={wishlisted ? Colors.primary : Colors.text}
-          size={32}
-          onPress={() => toggle(product.id)}
-          style={styles.heart}
-        />
-      </View>
+      <Image
+        source={{ uri: product.images[0] }}
+        style={styles.image}
+        contentFit="cover"
+        transition={250}
+        cachePolicy="memory-disk"
+      />
 
-      <Text variant="subtitle" numberOfLines={1} style={styles.name}>
-        {product.name}
-      </Text>
-      <Text
-        variant="caption"
-        numberOfLines={1}
-        style={[styles.subtitle, { color: Colors.textMuted }]}>
-        {product.subtitle}
-      </Text>
+      <View style={styles.info}>
+        <View style={styles.nameRow}>
+          <Text numberOfLines={1} style={styles.name}>
+            {product.name}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              wishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
+            }
+            hitSlop={10}
+            onPress={() => toggle(product.id)}>
+            <Ionicons
+              name={wishlisted ? 'heart' : 'heart-outline'}
+              size={22}
+              color={Colors.primary}
+            />
+          </Pressable>
+        </View>
 
-      <View style={styles.footer}>
-        <Text
-          variant="body"
-          style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
-          {money(product.price)}
-        </Text>
-        {product.colors.length > 0 && (
-          <ColorSwatches
-            colors={product.colors.slice(0, MAX_SWATCHES)}
-            size={12}
-          />
-        )}
+        <View style={styles.metaRow}>
+          <Ionicons name="star" size={13} color={Colors.primary} />
+          <Text style={styles.rating}>{product.rating.toFixed(1)}</Text>
+          <Text style={styles.dot}>·</Text>
+          <Text style={styles.price}>{money(product.price)}</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -95,44 +83,53 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.sm,
-    ...Shadow.card,
+    borderRadius: Radius.md,
+    ...Shadow.float,
   },
   pressed: {
     opacity: 0.9,
   },
-  imageWrap: {
-    position: 'relative',
-    borderRadius: Radius.md,
-    overflow: 'hidden',
-  },
   image: {
     width: '100%',
-    aspectRatio: 3 / 4,
-    borderRadius: Radius.md,
+    aspectRatio: 1,
+    borderTopLeftRadius: Radius.md,
+    borderTopRightRadius: Radius.md,
     backgroundColor: Colors.primaryTint,
   },
-  badge: {
-    position: 'absolute',
-    left: Spacing.sm,
-    bottom: Spacing.sm,
+  info: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: 2,
   },
-  heart: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-  },
-  name: {
-    marginTop: Spacing.sm,
-  },
-  subtitle: {
-    marginTop: 2,
-  },
-  footer: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  name: {
+    flex: 1,
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    lineHeight: 20,
+    color: Colors.text,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rating: {
+    fontFamily: 'Mitr_400Regular',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  dot: {
+    color: Colors.textMuted,
+    fontSize: 13,
+  },
+  price: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 14,
+    color: Colors.primaryStrong,
   },
 });

@@ -45,7 +45,8 @@ export function QuantityStepper({
     <View style={[styles.row, style]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Decrease quantity"
+        accessibilityLabel="ลดจำนวน"
+        hitSlop={6}
         disabled={!canDecrement}
         onPress={decrement}
         style={({ pressed }) => [
@@ -63,7 +64,8 @@ export function QuantityStepper({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Increase quantity"
+        accessibilityLabel="เพิ่มจำนวน"
+        hitSlop={6}
         disabled={!canIncrement}
         onPress={increment}
         style={({ pressed }) => [

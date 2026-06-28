@@ -22,8 +22,8 @@ interface TextProps extends RNTextProps {
   children: React.ReactNode;
 }
 
-// อู้ฟู่ uses the Poppins family; weight is selected via the font family name
-// (not fontWeight) so Thai + Latin render consistently across platforms.
+// อู้ฟู่ uses the Mitr family (Thai + Latin in one face); weight is selected via
+// the font family name (not fontWeight) so both scripts render consistently.
 export const Text = forwardRef<RNText, TextProps>(
   (
     { variant = 'body', lightColor, darkColor, style, children, ...props },
@@ -39,39 +39,39 @@ export const Text = forwardRef<RNText, TextProps>(
         case 'heading':
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_700Bold',
+            fontFamily: 'Mitr_600SemiBold',
             fontSize: 28,
           };
         case 'title':
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_700Bold',
+            fontFamily: 'Mitr_600SemiBold',
             fontSize: 22,
           };
         case 'subtitle':
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_600SemiBold',
+            fontFamily: 'Mitr_500Medium',
             fontSize: 18,
           };
         case 'caption':
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_400Regular',
+            fontFamily: 'Mitr_300Light',
             fontSize: FONT_SIZE - 2,
             color: mutedColor,
           };
         case 'link':
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_500Medium',
+            fontFamily: 'Mitr_400Regular',
             fontSize: FONT_SIZE,
             textDecorationLine: 'underline',
           };
         default: // 'body'
           return {
             ...baseStyle,
-            fontFamily: 'Poppins_400Regular',
+            fontFamily: 'Mitr_300Light',
             fontSize: FONT_SIZE,
           };
       }

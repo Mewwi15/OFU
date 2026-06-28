@@ -70,9 +70,9 @@ export const Button = forwardRef<View, ButtonProps>(
     const primaryForegroundColor = useColor('primaryForeground');
     const secondaryColor = useColor('secondary');
     const secondaryForegroundColor = useColor('secondaryForeground');
-    const destructiveColor = useColor('red');
+    const destructiveColor = useColor('destructive');
     const destructiveForegroundColor = useColor('destructiveForeground');
-    const greenColor = useColor('green');
+    const greenColor = useColor('success');
     const borderColor = useColor('border');
 
     // Animation values for liquid glass effect
@@ -138,7 +138,7 @@ export const Button = forwardRef<View, ButtonProps>(
     const getButtonTextStyle = (): TextStyle => {
       const baseTextStyle: TextStyle = {
         fontSize: FONT_SIZE,
-        fontFamily: 'Poppins_600SemiBold',
+        fontFamily: 'Mitr_500Medium',
       };
 
       switch (variant) {

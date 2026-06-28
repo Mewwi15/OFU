@@ -129,11 +129,11 @@ function MenuItem({
         !isLast && styles.rowDivider,
         pressed && styles.rowPressed,
       ]}>
-      <View style={styles.iconCircle}>
+      <View style={styles.iconTile}>
         <Ionicons
           name={row.icon}
           size={20}
-          color={row.danger ? Colors.danger : Colors.primary}
+          color={row.danger ? Colors.danger : Colors.primaryStrong}
         />
       </View>
       <Text variant="subtitle" style={[styles.rowLabel, { color: tint }]}>
@@ -198,10 +198,10 @@ const styles = StyleSheet.create({
   rowPressed: {
     backgroundColor: Colors.backgroundAlt,
   },
-  iconCircle: {
+  iconTile: {
     width: 40,
     height: 40,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.md,
     backgroundColor: Colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',

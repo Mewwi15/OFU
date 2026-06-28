@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductListItem } from '@/components/product/ProductListItem';
+import { ModeSwitch } from '@/components/shop/ModeSwitch';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/IconButton';
@@ -28,6 +29,13 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
 import { cartSubtotal, useCart } from '@/store/cart';
+import { deliveryFeeFor, useMode } from '@/store/mode';
+
+/** Payment hint shown per mode (the two flows differ on payment). */
+const PAYMENT_HINT = {
+  delivery: 'ชำระปลายทาง หรือโอนเมื่อรับของ',
+  online: 'ชำระออนไลน์ PromptPay/โอน + แนบสลิป',
+} as const;
 
 /** Bottom space so content clears the floating tab bar. */
 const TAB_BAR_CLEARANCE = 110;
@@ -38,11 +46,13 @@ export default function CartScreen() {
 
   const items = useCart((s) => s.items);
   const clear = useCart((s) => s.clear);
+  const mode = useMode((s) => s.mode);
 
   const [promo, setPromo] = useState('');
 
   const subtotal = cartSubtotal(items);
-  const total = subtotal;
+  const deliveryFee = deliveryFeeFor(mode, subtotal);
+  const total = subtotal + deliveryFee;
   const isEmpty = items.length === 0;
 
   const goShopping = () => router.push('/');
@@ -58,7 +68,11 @@ export default function CartScreen() {
   const onBuyNow = () => {
     clear();
     setPromo('');
-    Alert.alert('สั่งซื้อสำเร็จ', 'ขอบคุณที่อุดหนุนร้านอู้ฟู่ค่ะ');
+    const detail =
+      mode === 'delivery'
+        ? 'เราจะจัดส่งถึงบ้านคุณเร็วๆ นี้ค่ะ'
+        : 'ชำระเงินออนไลน์แล้วแนบสลิป รับสินค้าที่ร้านได้เลยค่ะ';
+    Alert.alert('สั่งซื้อสำเร็จ', `ขอบคุณที่อุดหนุนร้านอู้ฟู่ค่ะ\n${detail}`);
   };
 
   return (
@@ -94,6 +108,9 @@ export default function CartScreen() {
             styles.content,
             { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
           ]}>
+          {/* Mode switch (เดลิเวอรี่ / ออนไลน์ — payment differs) */}
+          <ModeSwitch compact style={styles.modeSwitch} />
+
           {/* Cart lines */}
           <View style={styles.list}>
             {items.map((item) => (
@@ -137,12 +154,36 @@ export default function CartScreen() {
               </Text>
               <Text variant="body">{money(subtotal)}</Text>
             </View>
+
+            {mode === 'delivery' && (
+              <View style={[styles.summaryRow, styles.summaryRowGap]}>
+                <Text variant="body" style={{ color: Colors.textMuted }}>
+                  ค่าจัดส่ง
+                </Text>
+                <Text
+                  variant="body"
+                  style={deliveryFee === 0 ? { color: Colors.primaryStrong } : undefined}>
+                  {deliveryFee === 0 ? 'ฟรี' : money(deliveryFee)}
+                </Text>
+              </View>
+            )}
+
+            {/* Payment method hint — differs by mode */}
+            <View style={[styles.summaryRow, styles.summaryRowGap]}>
+              <Text variant="body" style={{ color: Colors.textMuted }}>
+                การชำระเงิน
+              </Text>
+              <Text variant="caption" style={styles.payHint}>
+                {PAYMENT_HINT[mode]}
+              </Text>
+            </View>
+
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
               <Text variant="subtitle">รวมทั้งหมด</Text>
               <Text
                 variant="body"
-                style={{ color: Colors.primary, fontFamily: 'Poppins_700Bold' }}>
+                style={{ color: Colors.text, fontFamily: 'Mitr_600SemiBold' }}>
                 {money(total)}
               </Text>
             </View>
@@ -150,7 +191,7 @@ export default function CartScreen() {
 
           <View style={[styles.buyButton, { flexDirection: 'row' }]}>
             <Button style={{ flex: 1 }} onPress={onBuyNow}>
-              สั่งซื้อเลย
+              {mode === 'delivery' ? 'สั่งซื้อ & จัดส่ง' : 'ชำระเงินออนไลน์'}
             </Button>
           </View>
         </ScrollView>
@@ -172,8 +213,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
   },
+  modeSwitch: {
+    marginBottom: Spacing.lg,
+  },
   list: {
     gap: Spacing.md,
+  },
+  summaryRowGap: {
+    marginTop: Spacing.md,
+  },
+  payHint: {
+    flex: 1,
+    textAlign: 'right',
+    color: Colors.text,
   },
   sectionTitle: {
     marginTop: Spacing.x2,

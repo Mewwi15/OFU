@@ -1,11 +1,10 @@
 import {
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_700Bold_Italic,
+  Mitr_300Light,
+  Mitr_400Regular,
+  Mitr_500Medium,
+  Mitr_600SemiBold,
   useFonts,
-} from '@expo-google-fonts/poppins';
+} from '@expo-google-fonts/mitr';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -25,11 +24,10 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_700Bold_Italic,
+    Mitr_300Light,
+    Mitr_400Regular,
+    Mitr_500Medium,
+    Mitr_600SemiBold,
   });
 
   useEffect(() => {

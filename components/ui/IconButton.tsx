@@ -15,13 +15,21 @@ export type IconButtonProps = {
   onPress?: () => void;
   /** Diameter of the circle in px. Defaults to 44. */
   size?: number;
-  /** `surface` = white circle w/ soft shadow; `primary` = coral filled. */
+  /** `surface` = white circle w/ soft shadow; `primary` = green filled. */
   variant?: IconButtonVariant;
   /** Override the icon color. Defaults based on variant. */
   color?: string;
+  /**
+   * Screen-reader label (icon-only buttons are otherwise unnamed). Strongly
+   * recommended at every call site, e.g. 'ลบสินค้า', 'เพิ่มในรายการโปรด'.
+   */
+  accessibilityLabel?: string;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
+
+/** Minimum accessible touch target (pt). */
+const MIN_TOUCH = 44;
 
 /**
  * Round icon button. `surface` renders a white circle with a soft shadow;
@@ -33,6 +41,7 @@ export function IconButton({
   size = 44,
   variant = 'surface',
   color,
+  accessibilityLabel,
   disabled,
   style,
 }: IconButtonProps) {
@@ -40,11 +49,15 @@ export function IconButton({
   const iconColor =
     color ?? (isPrimary ? Colors.textOnPrimary : Colors.text);
   const iconSize = Math.round(size * 0.5);
+  // Expand the press area to the 44pt minimum when the circle is smaller.
+  const slop = Math.max(0, Math.round((MIN_TOUCH - size) / 2));
 
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: !!disabled }}
+      hitSlop={slop}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
