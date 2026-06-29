@@ -24,12 +24,14 @@
 | `OPEN-QUESTIONS.md` (คำถามค้าง + consistency critique) | 1 | 🟡 living doc |
 | `adr/ADR-0001-backend-platform.md` + `backend-comparison.md` | 2 | ✅ Accepted (Supabase → NestJS) |
 | `adr/ADR-0002-payment.md` | 2 | ✅ Accepted (delivery = prepay หรือ COD) |
+| `adr/ADR-0003-parcel-tracking-integration.md` | 2 | ✅ Accepted (online = Flash Open API ตรง) |
 | `06-data-model.md` (Postgres schema 39 ตาราง + RLS + RPC + Realtime) | 2 | ✅ FINAL (รวมรีวิว 3 มุม) |
 | `07-api-contract.md` (RPC/PostgREST/Realtime/Storage/Edge Fn + error model) | 2 | ✅ FINAL |
 | `05-architecture.md` (3 surfaces, auth, realtime, cross-cutting) | 2 | ✅ FINAL |
 | `08-design-system.md` + `theme/tokens.ts` (token เดียว, AA-verified) | 2 | ✅ implemented · 🔥 **warm coral rebrand** |
 | `10-ui-direction.md` (study: Oroshi reference) | 2 | ✅ study + roadmap |
 | `09-test-plan.md` | 4 | ⬜ |
+| `11-backend-build-plan.md` (implementation plan: seam + slices, auth-first) | 3 | 🟡 Draft — Phase 3 kickoff |
 
 ## หมายเหตุ
 รายงานรีวิวโค้ดล่าสุด (ดู memory / สรุปในแชต) ทำหน้าที่เป็น **baseline ของฐานปัจจุบัน** — หนี้ทางเทคนิคที่ต้องสะสางระหว่างทาง (พาเลตต์ซ้อน, hook ซ้ำ, โค้ด template ตาย, a11y/contrast)
