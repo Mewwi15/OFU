@@ -1,7 +1,7 @@
 # 06 — Data Model (Supabase / Postgres) — v1 FINAL
 
 > Phase 2 (Design). ที่มา: designer → 3 reviewers (integrity / security-PDPA / coverage) → สังเคราะห์รวม findings
-> Backend = Supabase managed Postgres (ADR-0001), Singapore region. 39 ตาราง + RPC + RLS + Realtime + Storage
+> Backend = Supabase managed Postgres (ADR-0001), Singapore region. 40 ตาราง + RPC + RLS + Realtime + Storage   <!-- [RECON-FLASH] +parcel_shipments -->
 > **เวอร์ชันนี้รวมการแก้จากรีวิวแล้ว** — ดู §Changelog ท้ายเอกสารว่าแก้อะไรปิด finding ไหน
 
 ## Conventions
@@ -17,19 +17,21 @@
 role_t              = customer | admin | rider
 admin_tier_t        = owner | staff
 account_state_t     = pending | active | deactivated
-shop_mode_t         = delivery | pickup
+shop_mode_t         = delivery | online   -- [RECON-FLASH] pickup→online: online = ส่งพัสดุทั่วประเทศผ่าน Flash (ADR-0003), ไม่ใช่รับที่ร้าน
 payment_method_t    = promptpay_slip | cod
 payment_status_t    = awaiting_payment | slip_uploaded | verifying | paid | rejected
 order_status_t      = placed | awaiting_payment | slip_uploaded | payment_verifying | confirmed |
                       preparing | assigned_to_rider | out_for_delivery | delivered |
-                      ready_for_pickup | picked_up | cancelled | payment_rejected | delivery_failed
+                      picked_up | in_transit | returned | cancelled | payment_rejected | delivery_failed
+                      -- [RECON-FLASH] ลบ ready_for_pickup; picked_up=Flash รับพัสดุ(code1), in_transit=ขนส่งระหว่างศูนย์(code2),
+                      --   returned=ตีกลับ(code7); assigned_to_rider=delivery เท่านั้น. map Flash code 1-9 ดู lib/flash.ts
 assignment_state_t  = pending_acceptance | accepted | declined | expired   -- Delivery sub-state, ไม่ใช่ OrderStatus
 assignment_source_t = admin_push | self_accept
 rider_availability_t= online | offline
 shift_status_t      = open | settled
 shift_entry_kind_t  = opening_float | collection | reversal | adjustment   -- [แก้ INT-6: enum แทน free text]
 refund_status_t     = owed | sent | confirmed | failed
-refund_reason_t     = cancelled | payment_rejected | delivery_failed
+refund_reason_t     = cancelled | payment_rejected | delivery_failed | returned   -- [RECON-FLASH] parcel ตีกลับ
 publish_state_t     = draft | published
 promo_type_t        = percent | fixed_baht
 promo_scope_t       = subtotal | delivery
@@ -153,7 +155,7 @@ products
   id pk | shop_id fk | category_id fk
   name | subtitle | description | rating numeric(2,1) default 0
   publish_state publish_state_t default 'draft' | archived_at null
-  orderable_delivery bool default true | orderable_pickup bool default true
+  orderable_delivery bool default true | orderable_online bool default true   -- [RECON-FLASH] pickup→online
   row_version int default 0 | created_at | updated_at
   idx (shop_id, publish_state) where archived_at is null; idx (category_id)
 
@@ -209,10 +211,10 @@ orders
   address_id fk->addresses null on delete set null            -- [แก้ INT-8: PDPA erasure ไม่ block]
   ship_recipient | ship_phone | ship_address_text | ship_lat | ship_lng   -- snapshot (fulfillment คงอยู่หลังลบ address)
   cancel_reason cancel_reason_t null | cancel_note null
-  placed_at | confirmed_at null | preparing_at null | ready_for_pickup_at null
+  placed_at | confirmed_at null | preparing_at null | shipped_at null   -- [RECON-FLASH] ready_for_pickup_at→shipped_at (ส่งเข้า Flash)
   out_for_delivery_at null | delivered_at null | picked_up_at null | terminal_at null
   idempotency_key text null | row_version int default 0
-  CHECK: pickup ⇒ payment_method='promptpay_slip'             -- GROOM-PAY-01 invariant
+  CHECK: online ⇒ payment_method='promptpay_slip'             -- [RECON-FLASH] online (Flash) = prepay only ใน v1 (Flash COD เปิดภายหลัง); cod ⇒ delivery
   uniq (shop_id, order_number)                                -- [แก้ INT-9: per-shop scope]
   uniq (shop_id, idempotency_key) where idempotency_key is not null
   idx (shop_id, order_status, placed_at desc); idx (customer_user_id, placed_at desc)
@@ -259,9 +261,26 @@ refunds  (manual PromptPay owed→sent→confirmed→failed)
   created_at | partial uniq (order_id) where status <> 'failed'
 ```
 
-## DOMAIN: Delivery / Rider
+## DOMAIN: Fulfilment — Delivery (rider) / Parcel (Flash) / Rider
 ```
-deliveries  (1:1 delivery order)
+-- shop_mode discriminates the 1:1 fulfilment row: delivery→`deliveries`, online→`parcel_shipments`.
+
+parcel_shipments  (1:1 online order; Flash Express — [RECON-FLASH] ADR-0003)
+  order_id pk fk->orders | shop_id fk
+  courier text default 'Flash Express'
+  tracking_no text null                            -- `pno` จาก Flash Create Order (POST /open/v3/orders); แทนเลขปลอม trackingNoFor()
+  flash_state smallint null | flash_state_text text null   -- raw Flash code 1-9 (+label); map→order_status ผ่าน lib/flash.ts
+  weight_g int null | express_category smallint null | article_category smallint null  -- ของสด = express_category 5 (Fruit)
+  cod_amount int default 0                          -- v1 = 0 (prepay only); Flash codEnabled เปิดภายหลัง
+  label_printed_at null                             -- pre_print PDF (ฝั่งแอดมิน)
+  shipped_at null | delivered_at null | returned_at null | failed_at null
+  failure_reason delivery_fail_t null               -- ใช้ enum เดียวกับ deliveries
+  client_op_id uuid null                            -- idempotent create + webhook apply (กัน webhook ซ้ำ)
+  uniq (tracking_no) where tracking_no is not null
+  idx (shop_id, flash_state)
+  -- NOTE: ไม่มี rider/GPS/POD/cash — Flash จัดการเอง. สถานะมาจาก webhook (verify ด้วยการ re-call routes ก่อนเชื่อ — ADR-0003)
+
+deliveries  (1:1 delivery order — rider mode เท่านั้น)
   order_id pk fk->orders | shop_id fk | rider_user_id fk null
   is_available bool default false                 -- [แก้ INT-3: denormalized gate, maintained ใน RPC]
                                                   --   true เมื่อ order=preparing & rider null (partial index ใช้ได้จริง)
@@ -353,9 +372,10 @@ featured_section_items
 |-----|--------|------------------|
 | `place_order(...)` | สร้าง order + reserve stock + redeem promo + gen per-shop order_number | 1 tx; lock variant rows + promo_codes row; idempotency_key; floor reserve |
 | `approve_slip` / `reject_slip` / `claim_slip` | ตรวจสลิป → payments.status (mirror→order) + commit/release stock | 1 tx; payments authoritative |
-| `advance_order` / `cancel_order` | เปลี่ยน OrderStatus ตาม state machine + restock | row_version optimistic; restock ledger |
-| `assign_rider` / `rider_respond` / `accept_available_job` | มอบหมาย/รับงาน + set is_available | first-writer-wins บน deliveries |
-| `start_run` / `complete_delivery` / `fail_delivery` | out_for_delivery→delivered/​failed + POD + COD cash | client_op_id idempotent; floor(0) commit |
+| `advance_order` / `cancel_order` | เปลี่ยน OrderStatus ตาม state machine + restock (delivery: assigned→out→delivered; **online: picked_up→in_transit→out→delivered/returned**) | row_version optimistic; restock ledger |
+| `assign_rider` / `rider_respond` / `accept_available_job` | (delivery) มอบหมาย/รับงาน + set is_available | first-writer-wins บน deliveries |
+| `start_run` / `complete_delivery` / `fail_delivery` | (delivery) out_for_delivery→delivered/​failed + POD + COD cash | client_op_id idempotent; floor(0) commit |
+| `create_flash_shipment` / `apply_flash_webhook` | **(online)** สร้างพัสดุ Flash → เก็บ `pno` ใน parcel_shipments / apply สถานะจาก webhook → order_status (ผ่าน lib/flash map) | client_op_id idempotent; webhook **verify ด้วย re-call `routes`** ก่อนเชื่อ (sig อ่อน — ADR-0003) | [RECON-FLASH] |
 | `settle_shift` | ปิดกะ: variance = actual − expected(derived) | owner-tier accept ถ้า variance≠0 |
 | `record_refund_sent` / `confirm_refund` | refund owed→sent→confirmed | partial-uniq 1 open refund |
 | `validate_promo` | apply-time ตรวจ + คำนวณส่วนลด (rounding ร่วม place_order) | shared rounding fn |
@@ -404,6 +424,14 @@ featured_section_items
 - **SEC** ราคา/สต็อก/auth ไม่มี audit path → mutation ผ่าน audited RPC, REVOKE direct UPDATE
 
 **Medium (แก้แล้ว):** INT-4 (commit floor-at-0 + `commit_understocked`), INT-5 (order_items.line_total GENERATED + orders total CHECK), INT-6 (expected_cash derived + `shift_entry_kind_t` enum), INT-7 (promo cap: lock promo_codes row + filter released_at + CHECK), INT-8 (orders.address_id ON DELETE SET NULL), INT-9 (order_number per-shop uniq + seq table), SEC (storage.objects RLS + `get_media_signed_url`), SEC (Realtime authorization บน broadcast/presence GPS), SEC (marketing consent = pdpa_consents เป็น gate เดียว), SEC (SECURITY DEFINER search_path + role resolver), SEC (retention crons + columns), COV (carts.shop_mode/applied_promo, low-stock alert reset, notification_deliveries.scheduled_at, refunds.not_received, rider_shifts.variance_note/accepted_by, notification_recipients.created_at)
+
+**[RECON-FLASH] (2026-06-29) — โหมด online = Flash Express, ไม่ใช่ pickup (ADR-0003):**
+- `shop_mode_t` `pickup`→`online`; `products.orderable_pickup`→`orderable_online`; `orders.ready_for_pickup_at`→`shipped_at`; invariant `pickup⇒prepay`→`online⇒prepay`
+- `order_status_t`: ลบ `ready_for_pickup`; เพิ่ม/นิยามใหม่ `picked_up`(Flash code1) `in_transit`(2) `returned`(7) — map Flash 1-9 ที่ `lib/flash.ts`; `assigned_to_rider`=delivery เท่านั้น
+- ตารางใหม่ `parcel_shipments` (1:1 online order): `tracking_no(pno)`, `flash_state`, `weight_g`, `express_category`, ไม่มี rider/GPS/POD/cash
+- RPC ใหม่ `create_flash_shipment` / `apply_flash_webhook` (webhook verify ด้วย re-call routes); `advance_order` รองรับ online courier transitions
+- address required สำหรับ **ทั้ง** delivery และ online (parcel ต้องมีที่อยู่ — เลิก special-case "pickup ไม่มีที่อยู่"); `ship_*` snapshot ครบทั้งสองโหมด
+- **ค้าง:** v1 online = prepay only (Flash COD เปิดภายหลัง); ค่าส่ง Flash จริงจาก `estimate_rate` แทน flat fee
 
 **Residual open items (ขึ้นกับ business/legal):**
 - COD physical stock decrement: commit ที่ `confirmed` หรือเลื่อนถึง `delivered` (GROOM-STOCK-03 ยังเปิด)

@@ -18,17 +18,17 @@
 
 ---
 
-## 2. Doc reconciliation ที่ต้องทำก่อนเขียน migration
+## 2. Doc reconciliation — ✅ 06/07 เสร็จแล้ว (2026-06-29, tag `[RECON-FLASH]`)
 
-เอกสาร `06`/`07` เขียนตอน ShopMode ยังเป็น `delivery|pickup` — **ล้าสมัยแล้ว**. ต้อง patch ให้ตรงโมเดลปัจจุบันก่อนแปลงเป็น SQL:
+เอกสาร `06`/`07` เขียนตอน ShopMode ยังเป็น `delivery|pickup` — **reconcile แล้ว** ให้ตรงโมเดลปัจจุบัน (online=Flash):
 
-1. **ShopMode enum** `delivery|pickup` → `delivery|online` (online=Flash). ลบ flow pickup ออกจาก order state machine
-2. **OrderStatus** ขยายให้ตรงโค้ดที่ทำไปแล้ว (8 สถานะ): `preparing|picked_up|in_transit|out_for_delivery|delivered|delivery_failed|returned|cancelled` + map Flash code 1-9 (มีใน `lib/flash.ts` แล้ว)
-3. **เพิ่ม Flash fields** ลง `deliveries` (หรือตารางใหม่ `parcel_shipments`): `courier`, `tracking_no(pno)`, `flash_state`, `weight_g`, `express_category`, `article_category`
-4. **Variant pricing (D1):** ย้าย `price` จาก `products` → `product_variants`; `products.sizes[]` (mock ปัจจุบัน) กลายเป็น rows ใน `product_variants`
-5. **Stock fields (D2):** `product_variants` เพิ่ม `stock_qty`, `reserved_qty`; นิยาม `available = stock_qty - reserved_qty`
+1. ✅ **ShopMode enum** `delivery|pickup` → `delivery|online`; `orderable_pickup`→`orderable_online`; `ready_for_pickup_at`→`shipped_at`; invariant `pickup⇒prepay`→`online⇒prepay`; error `PICKUP_REQUIRES_PREPAY`→`ONLINE_REQUIRES_PREPAY`
+2. ✅ **OrderStatus** ลบ `ready_for_pickup`; เพิ่ม/นิยามใหม่ `picked_up`(Flash 1) `in_transit`(2) `returned`(7); map Flash 1-9 อยู่ที่ `lib/flash.ts`
+3. ✅ **Flash fields** → เลือกตารางใหม่ `parcel_shipments` (1:1 online order): `tracking_no(pno)`, `flash_state`, `weight_g`, `express_category`, `article_category` — แยกจาก `deliveries` (rider) ที่มี GPS/POD/cash; + RPC `create_flash_shipment`/`apply_flash_webhook`; address required ทั้งสองโหมด
+4. ✅ **Variant pricing (D1)** — *มีใน 06 อยู่แล้ว*: `product_variants.price` per-size (ไม่ต้องแก้ schema, แค่ migration จะ split `products.sizes[]` mock → variant rows)
+5. ✅ **Stock fields (D2)** — *มีใน 06 อยู่แล้ว*: `product_variants.stock_qty/reserved_qty/available_qty(generated)` + `stock_movements` ledger + `stock_reason_t` (reserve_placed/commit_confirmed/release_*) — reserve@place/commit@confirm พร้อมใช้
 
-> งานนี้เป็นการแก้เอกสาร + เพิ่ม changelog ไม่ใช่ redesign — ทำเป็น commit เดียวก่อนเริ่ม migration
+> **ยังค้าง (ไม่บล็อก migration):** `03-functional-requirements` (126 จุด pickup), `OPEN-QUESTIONS` (34), `03b` (26) — เป็น requirements/historical, reconcile ทีหลังได้
 
 ---
 

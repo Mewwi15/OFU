@@ -25,7 +25,7 @@
 | `adr/ADR-0001-backend-platform.md` + `backend-comparison.md` | 2 | ✅ Accepted (Supabase → NestJS) |
 | `adr/ADR-0002-payment.md` | 2 | ✅ Accepted (delivery = prepay หรือ COD) |
 | `adr/ADR-0003-parcel-tracking-integration.md` | 2 | ✅ Accepted (online = Flash Open API ตรง) |
-| `06-data-model.md` (Postgres schema 39 ตาราง + RLS + RPC + Realtime) | 2 | ✅ FINAL (รวมรีวิว 3 มุม) |
+| `06-data-model.md` (Postgres schema 40 ตาราง + RLS + RPC + Realtime) | 2 | ✅ FINAL (รวมรีวิว 3 มุม · 🔁 RECON-FLASH) |
 | `07-api-contract.md` (RPC/PostgREST/Realtime/Storage/Edge Fn + error model) | 2 | ✅ FINAL |
 | `05-architecture.md` (3 surfaces, auth, realtime, cross-cutting) | 2 | ✅ FINAL |
 | `08-design-system.md` + `theme/tokens.ts` (token เดียว, AA-verified) | 2 | ✅ implemented · 🔥 **warm coral rebrand** |
