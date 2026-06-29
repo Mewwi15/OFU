@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { authRepo, toE164Thai } from '@/lib/data/auth';
 import { useAuth } from '@/store/auth';
 
 /** External brand colors for the social buttons (exempt from design tokens). */
@@ -70,29 +72,53 @@ function SocialButton({ label, icon, bg, fg, bordered, onPress }: SocialProps) {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const login = useAuth((s) => s.login);
+  const startPhoneOtp = useAuth((s) => s.startPhoneOtp);
+  const verifyPhoneOtp = useAuth((s) => s.verifyPhoneOtp);
 
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const otpRef = useRef<TextInput>(null);
 
   const phoneValid = phone.length === 10;
   const codeValid = code.length === OTP_LENGTH;
 
-  const requestOtp = () => {
-    if (!phoneValid) return;
-    setCode('');
-    setStep('otp');
-    // Focus the hidden OTP field on the next tick.
-    setTimeout(() => otpRef.current?.focus(), 250);
+  const requestOtp = async () => {
+    if (!phoneValid || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await startPhoneOtp(toE164Thai(phone));
+      setCode('');
+      setStep('otp');
+      setTimeout(() => otpRef.current?.focus(), 250);
+    } catch {
+      setError('ส่งรหัส OTP ไม่สำเร็จ ลองใหม่อีกครั้ง');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const confirmOtp = () => {
-    if (!codeValid) return;
-    login({ phone: formatPhone(phone) });
-    // The auth guard (app/_layout) redirects into the app once authenticated.
+  const confirmOtp = async () => {
+    if (!codeValid || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyPhoneOtp(toE164Thai(phone), code);
+      // Record PDPA consent given at sign-in; the auth gate routes into the app.
+      await authRepo.grantConsent('data_processing', 'v1').catch(() => {});
+    } catch {
+      setError('รหัส OTP ไม่ถูกต้อง');
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const socialSoon = () =>
+    Alert.alert('เร็วๆ นี้', 'การเข้าสู่ระบบด้วยโซเชียลจะเปิดให้ใช้งานเร็วๆ นี้');
 
   return (
     <KeyboardAvoidingView
@@ -143,11 +169,12 @@ export default function LoginScreen() {
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel="ขอรหัส OTP"
-              disabled={!phoneValid}
+              disabled={!phoneValid || busy}
               onPress={requestOtp}
-              style={[styles.primaryBtn, !phoneValid && styles.primaryBtnOff]}>
-              <Text style={styles.primaryText}>ขอรหัส OTP</Text>
+              style={[styles.primaryBtn, (!phoneValid || busy) && styles.primaryBtnOff]}>
+              <Text style={styles.primaryText}>{busy ? 'กำลังส่ง…' : 'ขอรหัส OTP'}</Text>
             </PressableScale>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             {/* Divider */}
             <View style={styles.dividerRow}>
@@ -164,14 +191,14 @@ export default function LoginScreen() {
                 icon="chatbubble-ellipses"
                 bg={BRAND.line}
                 fg={Colors.textOnPrimary}
-                onPress={() => login({ name: 'ผู้ใช้ LINE' })}
+                onPress={socialSoon}
               />
               <SocialButton
                 label="ดำเนินการต่อด้วย Apple"
                 icon="logo-apple"
                 bg={BRAND.apple}
                 fg={Colors.textOnPrimary}
-                onPress={() => login({ name: 'ผู้ใช้ Apple' })}
+                onPress={socialSoon}
               />
               <SocialButton
                 label="ดำเนินการต่อด้วย Google"
@@ -179,7 +206,7 @@ export default function LoginScreen() {
                 bg={BRAND.google}
                 fg={Colors.text}
                 bordered
-                onPress={() => login({ name: 'ผู้ใช้ Google' })}
+                onPress={socialSoon}
               />
             </View>
           </>
@@ -229,11 +256,12 @@ export default function LoginScreen() {
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel="ยืนยันรหัส"
-              disabled={!codeValid}
+              disabled={!codeValid || busy}
               onPress={confirmOtp}
-              style={[styles.primaryBtn, !codeValid && styles.primaryBtnOff]}>
-              <Text style={styles.primaryText}>ยืนยัน</Text>
+              style={[styles.primaryBtn, (!codeValid || busy) && styles.primaryBtnOff]}>
+              <Text style={styles.primaryText}>{busy ? 'กำลังตรวจสอบ…' : 'ยืนยัน'}</Text>
             </PressableScale>
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Pressable
               accessibilityRole="button"
@@ -330,6 +358,12 @@ const styles = StyleSheet.create({
   },
   primaryBtnOff: {
     opacity: 0.45,
+  },
+  errorText: {
+    ...Typography.caption,
+    color: Colors.dangerStrong,
+    textAlign: 'center',
+    marginTop: Spacing.md,
   },
   primaryText: {
     ...Typography.button,

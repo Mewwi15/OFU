@@ -1,65 +1,131 @@
 /**
- * Auth store (zustand).
+ * Auth store (zustand) — backed by Supabase Auth via the auth repository.
  *
- * Holds the signed-in customer and the auth status that gates the whole app
- * (see the auth guard in `app/_layout.tsx`). Frontend-first: `login` accepts a
- * partial profile and seeds sensible defaults — no real OTP/social auth yet; the
- * backend (Supabase Auth: phone OTP + LINE/Apple/Google) lands later behind this
- * same interface.
+ * `status`/`user` derive from the Supabase session (persisted by supabase-js in
+ * AsyncStorage), not from this store. `initialize()` hydrates the current
+ * session and subscribes to sign-in/out; it's called once from the root layout,
+ * which also gates `ready` on `hydrated` so the auth gate doesn't flash. Login
+ * happens via phone OTP (startPhoneOtp → verifyPhoneOtp); the subscription then
+ * flips `status` and the gate routes into the app.
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
-import { zustandStorage } from '@/lib/storage';
+import { authRepo, type Profile } from '@/lib/data/auth';
 
 export type AuthUser = {
   name: string;
-  /** Thai mobile number, display-formatted (e.g. "081-234-5678"). */
+  /** Display phone, e.g. "+66812345678". */
   phone: string;
   email: string;
   avatar: string;
 };
 
-export type AuthStatus = 'unauthenticated' | 'authenticated';
+export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
 
-/** Profile used to seed a freshly signed-in user (mock). */
-const DEFAULT_USER: AuthUser = {
-  name: 'คุณอู้ฟู่',
-  phone: '',
-  email: '',
-  avatar: 'https://i.pravatar.cc/300?img=47',
-};
+const FALLBACK_AVATAR = 'https://i.pravatar.cc/300?img=47';
+const GUEST: AuthUser = { name: 'คุณอู้ฟู่', phone: '', email: '', avatar: FALLBACK_AVATAR };
+
+function toUser(p: Profile | null): AuthUser {
+  if (!p) return GUEST;
+  return {
+    name: p.displayName || GUEST.name,
+    phone: p.phone ? `+${p.phone}` : '',
+    email: p.email,
+    avatar: p.avatarPath ?? FALLBACK_AVATAR,
+  };
+}
 
 export type AuthState = {
   status: AuthStatus;
+  /** Initial session hydration finished (root layout gates `ready` on this). */
+  hydrated: boolean;
   user: AuthUser;
-  /** Sign in, merging any known fields (e.g. the phone from OTP) over defaults. */
-  login: (patch?: Partial<AuthUser>) => void;
-  /** Patch the signed-in profile (edit profile screen). */
-  updateProfile: (patch: Partial<AuthUser>) => void;
+  /** Hydrate the session + subscribe to auth changes (call once on startup). */
+  initialize: () => void;
+  /** Send a phone OTP (phone in E.164 without '+', e.g. "66812345678"). */
+  startPhoneOtp: (phoneE164: string) => Promise<void>;
+  /** Verify the OTP; the auth subscription flips status on success. */
+  verifyPhoneOtp: (phoneE164: string, code: string) => Promise<void>;
+  /** Re-fetch the profile row (e.g. after an edit elsewhere). */
+  refreshProfile: () => Promise<void>;
+  /** Patch the profile (name/avatar persist via RPC; rest optimistic). */
+  updateProfile: (patch: Partial<AuthUser>) => Promise<void>;
   /** Sign out and return to the login gate. */
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
-export const useAuth = create<AuthState>()(
-  persist(
-    (set) => ({
-      status: 'unauthenticated',
-      user: DEFAULT_USER,
+/** Module-level guard so initialize() subscribes at most once. */
+let unsubscribe: (() => void) | null = null;
 
-      login: (patch) =>
-        set({ status: 'authenticated', user: { ...DEFAULT_USER, ...patch } }),
+async function loadUser(): Promise<AuthUser> {
+  const profile = await authRepo.fetchProfile().catch(() => null);
+  return toUser(profile);
+}
 
-      updateProfile: (patch) =>
-        set((state) => ({ user: { ...state.user, ...patch } })),
+export const useAuth = create<AuthState>((set) => ({
+  status: 'loading',
+  hydrated: false,
+  user: GUEST,
 
-      logout: () => set({ status: 'unauthenticated', user: DEFAULT_USER }),
-    }),
-    {
-      name: 'oofoo-auth',
-      storage: zustandStorage,
-      partialize: (state) => ({ status: state.status, user: state.user }),
-    },
-  ),
-);
+  initialize: () => {
+    if (unsubscribe) return;
+
+    authRepo
+      .getSession()
+      .then(async (session) => {
+        if (session) {
+          set({ status: 'authenticated', user: await loadUser(), hydrated: true });
+        } else {
+          set({ status: 'unauthenticated', user: GUEST, hydrated: true });
+        }
+      })
+      .catch(() => set({ status: 'unauthenticated', user: GUEST, hydrated: true }));
+
+    // IMPORTANT: do NOT call other supabase methods synchronously inside the
+    // onAuthStateChange callback — it runs under the auth lock and awaiting
+    // getUser()/queries there can deadlock (login hangs). Flip status now and
+    // defer the profile fetch to a later tick.
+    unsubscribe = authRepo.onAuthChange((session) => {
+      if (session) {
+        set({ status: 'authenticated' });
+        setTimeout(() => {
+          void loadUser().then((user) => set({ user }));
+        }, 0);
+      } else {
+        set({ status: 'unauthenticated', user: GUEST });
+      }
+    });
+  },
+
+  startPhoneOtp: (phoneE164) => authRepo.startPhoneOtp(phoneE164),
+
+  verifyPhoneOtp: async (phoneE164, code) => {
+    await authRepo.verifyPhoneOtp(phoneE164, code);
+    // onAuthChange flips status → authenticated.
+  },
+
+  refreshProfile: async () => {
+    set({ user: await loadUser() });
+  },
+
+  updateProfile: async (patch) => {
+    await authRepo.updateProfile({
+      displayName: patch.name,
+      avatarPath: patch.avatar,
+      email: patch.email,
+    });
+    // Merge only fields we actually persist (name/avatar/email). `phone` is the
+    // verified login identity and is not editable here.
+    const persisted: Partial<AuthUser> = {};
+    if (patch.name !== undefined) persisted.name = patch.name;
+    if (patch.avatar !== undefined) persisted.avatar = patch.avatar;
+    if (patch.email !== undefined) persisted.email = patch.email;
+    set((s) => ({ user: { ...s.user, ...persisted } }));
+  },
+
+  logout: async () => {
+    await authRepo.signOut();
+    set({ status: 'unauthenticated', user: GUEST });
+  },
+}));

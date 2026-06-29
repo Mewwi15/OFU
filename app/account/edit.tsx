@@ -36,6 +36,9 @@ type FieldProps = {
   placeholder: string;
   keyboardType?: 'default' | 'email-address' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences';
+  /** Read-only display (e.g. the login phone number). */
+  readOnly?: boolean;
+  hint?: string;
 };
 
 function Field({
@@ -46,11 +49,13 @@ function Field({
   placeholder,
   keyboardType = 'default',
   autoCapitalize = 'sentences',
+  readOnly = false,
+  hint,
 }: FieldProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, readOnly && styles.inputRowReadonly]}>
         <Ionicons name={icon} size={18} color={Colors.textMuted} />
         <TextInput
           value={value}
@@ -60,9 +65,11 @@ function Field({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
-          style={styles.input}
+          editable={!readOnly}
+          style={[styles.input, readOnly && styles.inputReadonly]}
         />
       </View>
+      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
     </View>
   );
 }
@@ -74,16 +81,15 @@ export default function EditProfileScreen() {
   const updateProfile = useAuth((s) => s.updateProfile);
 
   const [name, setName] = useState(user.name);
-  const [phone, setPhone] = useState(user.phone);
   const [email, setEmail] = useState(user.email);
   const [saved, setSaved] = useState(false);
 
-  const dirty = name !== user.name || phone !== user.phone || email !== user.email;
+  const dirty = name !== user.name || email !== user.email;
   const canSave = dirty && name.trim().length > 0;
 
   const onSave = () => {
     if (!canSave) return;
-    updateProfile({ name: name.trim(), phone: phone.trim(), email: email.trim() });
+    updateProfile({ name: name.trim(), email: email.trim() });
     setSaved(true);
   };
 
@@ -144,10 +150,12 @@ export default function EditProfileScreen() {
           <Field
             label="เบอร์โทรศัพท์"
             icon="call-outline"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="081-234-5678"
+            value={user.phone}
+            onChangeText={() => {}}
+            placeholder="—"
             keyboardType="phone-pad"
+            readOnly
+            hint="เบอร์ที่ใช้เข้าสู่ระบบ เปลี่ยนไม่ได้"
           />
           <Field
             label="อีเมล"
@@ -249,6 +257,17 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.text,
     padding: 0,
+  },
+  inputRowReadonly: {
+    backgroundColor: Colors.surfaceMuted,
+    borderColor: 'transparent',
+  },
+  inputReadonly: {
+    color: Colors.textMuted,
+  },
+  fieldHint: {
+    ...Typography.caption,
+    color: Colors.textMuted,
   },
   footer: {
     paddingHorizontal: Spacing.lg,

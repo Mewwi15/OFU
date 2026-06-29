@@ -37,6 +37,8 @@ export default function RootLayout() {
   // so we never hit the "navigate before mounting" race). Exactly one of the
   // guarded blocks below is active at a time.
   const isAuthed = useAuth((s) => s.status === 'authenticated');
+  const authHydrated = useAuth((s) => s.hydrated);
+  const initAuth = useAuth((s) => s.initialize);
   const hydrated = useLock((s) => s.hydrated);
   const onboarded = useLock((s) => s.onboarded);
   const hasPin = useLock((s) => s.hasPin);
@@ -44,10 +46,11 @@ export default function RootLayout() {
   const hydrate = useLock((s) => s.hydrate);
   const lock = useLock((s) => s.lock);
 
-  // Hydrate persisted lock state once on startup.
+  // Hydrate persisted lock state + Supabase auth session once on startup.
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+    initAuth();
+  }, [hydrate, initAuth]);
 
   // Re-lock when the app is sent to the background (screen-lock behaviour).
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function RootLayout() {
     return () => sub.remove();
   }, [lock]);
 
-  const ready = (loaded || error) && hydrated;
+  const ready = (loaded || error) && hydrated && authHydrated;
 
   useEffect(() => {
     if (ready) {
