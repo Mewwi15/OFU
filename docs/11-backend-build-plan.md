@@ -3,6 +3,7 @@
 - **สถานะ:** Draft (2026-06-29) — แผน *implementation* สำหรับเริ่มสร้าง backend
 - **ความสัมพันธ์กับเอกสารอื่น:** สเปก design เสร็จแล้ว (`05-architecture`, `06-data-model` 39 ตาราง, `07-api-contract` 50+ RPC, ADR-0001/0002/0003). เอกสารนี้คือ **วิธีแปลงสเปก → ของที่สร้างได้จริง และลำดับการสร้าง** ไม่ใช่ออกแบบ schema ใหม่
 - **กฎความปลอดภัยที่ทับทุกอย่าง:** business logic อยู่ใน Postgres (`SECURITY DEFINER` RPC) เท่านั้น, key/secret อยู่ฝั่ง server เท่านั้น, ห้าม commit key (มี Google Maps key หลุดใน `app.json` อยู่แล้ว — flag ให้เจ้าของ)
+- **DB เดียว 3 surface (สำคัญ):** Postgres ตัวนี้คือ backend ร่วมของ **ทั้ง 3 แอป** — customer (RN นี้), **admin web** (Vite SPA), **rider app** (แอปแยก). แยกสิทธิ์ด้วย `role_t` (customer|admin|rider) + `admin_tier_t` + **RLS/RPC ต่อ role** ไม่ใช่แยกฐานข้อมูล (ADR-0001, `05-architecture`). ผลต่อการสร้าง: migration ต้องลง **โมเดลเต็มทุก domain ตั้งแต่แรก** (rider: deliveries/rider_shifts/cash; admin: shop_settings/audit/catalog) + RLS ครบทุก role ตั้งแต่วันแรก; auth = Supabase Auth เดียว, customer สมัครเอง แต่ **admin/rider เป็น invite-only** (`invite_staff`/`invite_rider`); แต่ละ frontend มี repository layer ของตัวเอง แต่ใช้ contract เดียวกัน (RPC/PostgREST/Realtime)
 
 ---
 
