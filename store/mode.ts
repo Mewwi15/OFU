@@ -1,11 +1,12 @@
 /**
  * Shopping-mode store (zustand).
  *
- * The shop runs two separate flows that differ mainly in **payment**:
- *  - `delivery` — order is shipped to the customer's address (delivery fee,
- *    cash-on-delivery or transfer).
- *  - `online`   — online order paid up-front (PromptPay / transfer + slip),
- *    picked up at the store. No delivery fee.
+ * The shop runs two separate fulfilment flows:
+ *  - `delivery` — a local อู้ฟู่ rider brings the order to a pinned address
+ *    (delivery fee, cash-on-delivery or transfer; same-area only).
+ *  - `online`   — paid up-front (PromptPay / transfer + slip) and shipped
+ *    nationwide as a parcel via Flash Express, so it needs a full structured
+ *    postal address (province + postcode), not just a map pin.
  *
  * Screens read `mode` to branch their UI (home mode switch, cart summary,
  * checkout payment options). `MODE_META` holds the shared Thai copy + icon so
@@ -13,6 +14,9 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+import { zustandStorage } from '@/lib/storage';
 
 export type ShopMode = 'delivery' | 'online';
 
@@ -36,20 +40,39 @@ export const MODE_META: Record<ShopMode, ModeMeta> = {
   online: {
     key: 'online',
     label: 'ออนไลน์',
-    tagline: 'ช้อปออนไลน์ รับที่ร้าน',
-    icon: 'storefront',
+    tagline: 'ส่งทั่วไทย ผ่าน Flash',
+    icon: 'cube',
   },
 };
 
-/** Delivery fee in Baht; waived above the free-shipping threshold. */
+/** Delivery (rider) fee in Baht; waived above the free-shipping threshold. */
 export const DELIVERY_FEE = 40;
-/** Order subtotal at/above which delivery is free. */
+/** Order subtotal at/above which rider delivery is free. */
 export const FREE_DELIVERY_MIN = 200;
+/** Minimum subtotal required to place a delivery order. */
+export const MIN_ORDER = 100;
 
-/** Delivery fee for a given subtotal + mode (0 for online or free-shipping). */
+/** Flat Flash Express parcel-shipping fee (online), waived above the threshold. */
+export const FLASH_FEE = 40;
+/** Order subtotal at/above which Flash shipping is free. */
+export const FLASH_FREE_MIN = 500;
+
+/**
+ * Fulfilment fee for a subtotal + mode — rider delivery fee (`delivery`) or
+ * Flash parcel-shipping fee (`online`), each waived above its free threshold.
+ */
 export function deliveryFeeFor(mode: ShopMode, subtotal: number): number {
-  if (mode !== 'delivery') return 0;
-  return subtotal >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
+  if (mode === 'delivery') {
+    return subtotal >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
+  }
+  // online → Flash Express parcel shipping
+  return subtotal >= FLASH_FREE_MIN ? 0 : FLASH_FEE;
+}
+
+/** Whether a subtotal clears the minimum-order floor (online has no floor). */
+export function meetsMinOrder(mode: ShopMode, subtotal: number): boolean {
+  if (mode !== 'delivery') return true;
+  return subtotal >= MIN_ORDER;
 }
 
 export type ModeState = {
@@ -57,7 +80,16 @@ export type ModeState = {
   setMode: (mode: ShopMode) => void;
 };
 
-export const useMode = create<ModeState>((set) => ({
-  mode: 'delivery',
-  setMode: (mode) => set({ mode }),
-}));
+export const useMode = create<ModeState>()(
+  persist(
+    (set) => ({
+      mode: 'delivery',
+      setMode: (mode) => set({ mode }),
+    }),
+    {
+      name: 'oofoo-mode',
+      storage: zustandStorage,
+      partialize: (state) => ({ mode: state.mode }),
+    },
+  ),
+);

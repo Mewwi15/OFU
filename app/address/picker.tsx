@@ -1,14 +1,18 @@
 /**
  * Address pin picker — `/address/picker` (optionally `?id=` to edit).
  *
- * A Grab/Uber-style location picker: the map pans under a fixed center pin, and
- * whenever the map settles we reverse-geocode the centre into an editable
- * address line. A "ตำแหน่งปัจจุบัน" button recenters on the device GPS. Below the
- * map a form collects label / recipient / phone / extra detail, then saves to
- * the address book.
+ * Three ways to set the delivery point, all funnelling into one editable line:
+ *  1. Pan the map under the fixed centre pin (Grab/Uber style).
+ *  2. TAP anywhere on the map to drop the pin there.
+ *  3. SEARCH a place/address in the top bar, then pick a result to fly there and
+ *     auto-fill the address.
+ * Whenever the point changes we reverse-geocode it into the editable "ตำแหน่งที่
+ * ปักหมุด" field. A FAB recenters on the device GPS. Below the map a form
+ * collects label / recipient / phone / extra detail, then saves to the book.
  *
  * Maps are native (expo-maps) — this screen only renders in a development build,
- * NOT Expo Go.
+ * NOT Expo Go. Forward/reverse geocoding is on-device (expo-location); it can
+ * return nothing on a bare emulator but works on iOS and real Android devices.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -31,11 +36,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { selectedAddress, useAddress } from '@/store/address';
+import { useMode } from '@/store/mode';
 
 type LatLng = { latitude: number; longitude: number };
+type SearchResult = { coords: LatLng; label: string };
+
+/** Best-effort map of a reverse-geocode result to Thai postal parts. */
+type ParcelParts = {
+  subDistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+};
+function parcelPartsFrom(a: Location.LocationGeocodedAddress): ParcelParts {
+  return {
+    subDistrict: a.district?.trim() ?? '',
+    district: (a.subregion ?? a.city)?.trim() ?? '',
+    province: (a.region ?? a.city)?.trim() ?? '',
+    postalCode: a.postalCode?.trim() ?? '',
+  };
+}
 
 /** Bangkok (สุขุมวิท) — fallback centre when there's no address yet. */
 const DEFAULT_CENTER: LatLng = { latitude: 13.7236, longitude: 100.5686 };
@@ -76,6 +100,9 @@ export default function AddressPickerScreen() {
     id ? s.addresses.find((a) => a.id === id) : undefined,
   );
   const current = useAddress(selectedAddress);
+  // Online (Flash Express) orders ship a parcel, so they need a full structured
+  // postal address; the delivery (rider) flow only needs the pin + line.
+  const isOnline = useMode((s) => s.mode === 'online');
 
   const start = editing ?? current;
   const initialCenter: LatLng = start
@@ -86,6 +113,9 @@ export default function AddressPickerScreen() {
   const googleRef = useRef<GoogleMaps.MapView>(null);
   const centerRef = useRef<LatLng>(initialCenter);
   const geoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geoSeq = useRef(0);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeq = useRef(0);
 
   const [line, setLine] = useState(editing?.line ?? '');
   const [geocoding, setGeocoding] = useState(false);
@@ -94,21 +124,51 @@ export default function AddressPickerScreen() {
   const [phone, setPhone] = useState(editing?.phone ?? '');
   const [detail, setDetail] = useState(editing?.detail ?? '');
 
+  // Structured parcel fields (online / Flash Express only).
+  const [subDistrict, setSubDistrict] = useState(editing?.subDistrict ?? '');
+  const [district, setDistrict] = useState(editing?.district ?? '');
+  const [province, setProvince] = useState(editing?.province ?? '');
+  const [postalCode, setPostalCode] = useState(editing?.postalCode ?? '');
+
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
   const recenter = (coordinates: LatLng) => {
-    appleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
-    googleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
+    // setCameraPosition is a native call that can throw if the view isn't ready
+    // yet (e.g. an auto-locate that resolves before the first layout). The pin
+    // is driven by centerRef regardless, so swallowing this is safe.
+    try {
+      appleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
+      googleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
+    } catch {
+      // view not ready — ignore
+    }
   };
 
   const runGeocode = async () => {
     const { latitude, longitude } = centerRef.current;
+    // Guard against out-of-order resolves: if the pin moves again before this
+    // reverse-geocode returns, a newer call bumps geoSeq and this stale result
+    // is ignored — otherwise it could overwrite the line with the old address.
+    const seq = ++geoSeq.current;
     setGeocoding(true);
     try {
       const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (res[0]) setLine(formatLine(res[0]));
+      if (seq === geoSeq.current && res[0]) {
+        setLine(formatLine(res[0]));
+        // Fill any BLANK parcel field from the geocode — never clobber a value
+        // the user has already typed/corrected.
+        const parts = parcelPartsFrom(res[0]);
+        if (parts.subDistrict) setSubDistrict((v) => v || parts.subDistrict);
+        if (parts.district) setDistrict((v) => v || parts.district);
+        if (parts.province) setProvince((v) => v || parts.province);
+        if (parts.postalCode) setPostalCode((v) => v || parts.postalCode);
+      }
     } catch {
       // Keep the previous line on failure.
     } finally {
-      setGeocoding(false);
+      if (seq === geoSeq.current) setGeocoding(false);
     }
   };
 
@@ -117,45 +177,172 @@ export default function AddressPickerScreen() {
     geoTimer.current = setTimeout(runGeocode, 650);
   };
 
-  // Prefill the line from the initial centre on first mount (new addresses).
+  // On first mount (new addresses only): if location permission was ALREADY
+  // granted, silently centre on the device GPS — no permission prompt (that's
+  // the FAB's job). Otherwise just reverse-geocode the default centre.
   useEffect(() => {
-    if (!editing?.line) runGeocode();
+    let cancelled = false;
+    const init = async () => {
+      if (!editing) {
+        try {
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            if (!cancelled) {
+              setPoint({
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+              });
+              return;
+            }
+          }
+        } catch {
+          // Permission check / fix failed — fall back to the default centre.
+        }
+      }
+      if (!cancelled && !editing?.line) runGeocode();
+    };
+    init();
     return () => {
+      cancelled = true;
       if (geoTimer.current) clearTimeout(geoTimer.current);
+      if (searchTimer.current) clearTimeout(searchTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onCameraMove = (e: { coordinates: Location.LocationObjectCoords | { latitude?: number; longitude?: number } }) => {
+  /** Move the pin to a point, then reverse-geocode it into the line. */
+  const setPoint = (coords: LatLng, { fly = true } = {}) => {
+    centerRef.current = coords;
+    if (fly) recenter(coords);
+    scheduleGeocode();
+  };
+
+  const onCameraMove = (e: {
+    coordinates: { latitude?: number; longitude?: number };
+  }) => {
     const { latitude, longitude } = e.coordinates;
     if (latitude == null || longitude == null) return;
-    centerRef.current = { latitude, longitude };
-    scheduleGeocode();
+    // User panned the map — the pin already tracks the centre; just geocode.
+    setPoint({ latitude, longitude }, { fly: false });
   };
 
-  const useMyLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'ต้องการสิทธิ์ตำแหน่ง',
-        'กรุณาอนุญาตให้แอปเข้าถึงตำแหน่ง เพื่อปักหมุดที่อยู่ปัจจุบัน',
-      );
+  /** Tap anywhere on the map to drop the pin there. */
+  const onMapClick = (e: {
+    coordinates: { latitude?: number; longitude?: number };
+  }) => {
+    const { latitude, longitude } = e.coordinates;
+    if (latitude == null || longitude == null) return;
+    setPoint({ latitude, longitude });
+    dismissSearch();
+  };
+
+  /* --------------------------- place search --------------------------- */
+
+  const runSearch = async (raw: string) => {
+    const q = raw.trim();
+    if (q.length < 3) {
+      setResults([]);
+      setSearching(false);
       return;
     }
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    const coords = {
-      latitude: loc.coords.latitude,
-      longitude: loc.coords.longitude,
-    };
-    centerRef.current = coords;
-    recenter(coords);
-    scheduleGeocode();
+    const seq = ++searchSeq.current;
+    setSearching(true);
+    try {
+      const hits = await Location.geocodeAsync(q);
+      const labeled = await Promise.all(
+        hits.slice(0, 5).map(async (h) => {
+          const coords = { latitude: h.latitude, longitude: h.longitude };
+          let label = q;
+          try {
+            const rev = await Location.reverseGeocodeAsync(coords);
+            const formatted = rev[0] && formatLine(rev[0]);
+            if (formatted) label = formatted;
+          } catch {
+            // fall back to the raw query
+          }
+          return { coords, label };
+        }),
+      );
+      // Drop duplicate labels (geocoder often returns near-identical hits).
+      const seen = new Set<string>();
+      const unique = labeled.filter((r) =>
+        seen.has(r.label) ? false : (seen.add(r.label), true),
+      );
+      if (seq === searchSeq.current) setResults(unique);
+    } catch {
+      if (seq === searchSeq.current) setResults([]);
+    } finally {
+      if (seq === searchSeq.current) setSearching(false);
+    }
   };
 
-  const canSave =
+  const onQueryChange = (text: string) => {
+    setQuery(text);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (text.trim().length < 3) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    searchTimer.current = setTimeout(() => runSearch(text), 450);
+  };
+
+  const pickResult = (r: SearchResult) => {
+    setPoint(r.coords);
+    setLine(r.label);
+    dismissSearch();
+  };
+
+  const dismissSearch = () => {
+    setResults([]);
+    setQuery('');
+    Keyboard.dismiss();
+  };
+
+  /* -------------------------------------------------------------------- */
+
+  const [locating, setLocating] = useState(false);
+
+  const useMyLocation = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'ต้องการสิทธิ์ตำแหน่ง',
+          'กรุณาอนุญาตให้แอปเข้าถึงตำแหน่ง เพื่อปักหมุดที่อยู่ปัจจุบัน',
+        );
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setPoint({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+    } catch {
+      // GPS can reject if location is momentarily unavailable (cold start,
+      // weak signal). Tell the user instead of leaking an unhandled rejection.
+      Alert.alert(
+        'หาตำแหน่งไม่สำเร็จ',
+        'ลองอีกครั้ง หรือเลื่อนแผนที่เพื่อปักหมุดเอง',
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const postalValid = /^\d{5}$/.test(postalCode.trim());
+  const baseValid =
     recipient.trim().length > 0 && phone.trim().length > 0 && line.trim().length > 0;
+  // Online parcels additionally need province + a valid 5-digit postcode.
+  const canSave =
+    baseValid && (!isOnline || (province.trim().length > 0 && postalValid));
 
   const onSave = () => {
     const c = centerRef.current;
@@ -168,6 +355,10 @@ export default function AddressPickerScreen() {
       detail: detail.trim(),
       lat: c.latitude,
       lng: c.longitude,
+      subDistrict: subDistrict.trim() || undefined,
+      district: district.trim() || undefined,
+      province: province.trim() || undefined,
+      postalCode: postalCode.trim() || undefined,
     });
     router.back();
   };
@@ -183,6 +374,7 @@ export default function AddressPickerScreen() {
             cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
             properties={{ isMyLocationEnabled: true }}
             uiSettings={{ myLocationButtonEnabled: false, compassEnabled: false }}
+            onMapClick={onMapClick}
             onCameraMove={onCameraMove}
           />
         ) : Platform.OS === 'android' ? (
@@ -190,6 +382,9 @@ export default function AddressPickerScreen() {
             ref={googleRef}
             style={StyleSheet.absoluteFill}
             cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
+            properties={{ isMyLocationEnabled: true }}
+            uiSettings={{ myLocationButtonEnabled: false }}
+            onMapClick={onMapClick}
             onCameraMove={onCameraMove}
           />
         ) : (
@@ -206,14 +401,59 @@ export default function AddressPickerScreen() {
           <View style={styles.pinShadow} />
         </View>
 
-        {/* Back button */}
-        <View style={[styles.backBtn, { top: insets.top + Spacing.sm }]}>
+        {/* Top bar: back + place search */}
+        <View style={[styles.topBar, { top: insets.top + Spacing.sm }]}>
           <IconButton
             icon="chevron-back"
             accessibilityLabel="ย้อนกลับ"
             onPress={() => router.back()}
           />
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color={Colors.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={onQueryChange}
+              placeholder="ค้นหาที่อยู่ หรือสถานที่"
+              placeholderTextColor={Colors.textMuted}
+              style={styles.searchInput}
+              returnKeyType="search"
+              onSubmitEditing={() => runSearch(query)}
+            />
+            {searching ? (
+              <ActivityIndicator size="small" color={Colors.primary} />
+            ) : query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="ล้างการค้นหา"
+                hitSlop={8}
+                onPress={dismissSearch}>
+                <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
         </View>
+
+        {/* Search results dropdown */}
+        {results.length > 0 ? (
+          <View style={[styles.results, { top: insets.top + Spacing.sm + 48 + Spacing.xs }]}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}>
+              {results.map((r, i) => (
+                <Pressable
+                  key={`${r.label}-${i}`}
+                  accessibilityRole="button"
+                  onPress={() => pickResult(r)}
+                  style={[styles.resultItem, i > 0 && styles.resultDivider]}>
+                  <Ionicons name="location-outline" size={18} color={Colors.primaryStrong} />
+                  <Text variant="body" numberOfLines={2} style={styles.resultText}>
+                    {r.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Current-location FAB */}
         <Pressable
@@ -221,7 +461,11 @@ export default function AddressPickerScreen() {
           accessibilityLabel="ใช้ตำแหน่งปัจจุบัน"
           onPress={useMyLocation}
           style={styles.locFab}>
-          <Ionicons name="locate" size={22} color={Colors.primaryStrong} />
+          {locating ? (
+            <ActivityIndicator size="small" color={Colors.primaryStrong} />
+          ) : (
+            <Ionicons name="locate" size={22} color={Colors.primaryStrong} />
+          )}
         </Pressable>
       </View>
 
@@ -248,7 +492,7 @@ export default function AddressPickerScreen() {
               <TextInput
                 value={line}
                 onChangeText={setLine}
-                placeholder="เลื่อนแผนที่เพื่อปักหมุด"
+                placeholder="เลื่อนหรือแตะแผนที่ เพื่อปักหมุด"
                 placeholderTextColor={Colors.textMuted}
                 multiline
                 style={styles.lineInput}
@@ -265,7 +509,7 @@ export default function AddressPickerScreen() {
             {LABELS.map((l) => {
               const active = l === label;
               return (
-                <Pressable
+                <PressableScale
                   key={l}
                   onPress={() => setLabel(l)}
                   style={[styles.chip, active && styles.chipActive]}>
@@ -276,7 +520,7 @@ export default function AddressPickerScreen() {
                     ]}>
                     {l}
                   </Text>
-                </Pressable>
+                </PressableScale>
               );
             })}
           </View>
@@ -322,10 +566,78 @@ export default function AddressPickerScreen() {
             style={styles.input}
           />
 
-          <Button
-            onPress={onSave}
-            disabled={!canSave}
-            style={styles.saveBtn}>
+          {/* Parcel address — online (Flash Express) only */}
+          {isOnline ? (
+            <>
+              <View style={styles.parcelHead}>
+                <Ionicons name="cube-outline" size={16} color={Colors.primaryStrong} />
+                <Text style={styles.parcelHeadText}>
+                  ข้อมูลสำหรับจัดส่งพัสดุ (Flash Express)
+                </Text>
+              </View>
+              <Text variant="caption" style={styles.parcelHint}>
+                ระบบเติมให้อัตโนมัติจากหมุด ตรวจสอบและแก้ไขให้ถูกต้องก่อนบันทึก
+              </Text>
+
+              <View style={styles.fieldRow}>
+                <View style={styles.fieldCol}>
+                  <Text variant="caption" style={styles.fieldLabel}>
+                    ตำบล / แขวง
+                  </Text>
+                  <TextInput
+                    value={subDistrict}
+                    onChangeText={setSubDistrict}
+                    placeholder="เช่น คลองเตย"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.fieldCol}>
+                  <Text variant="caption" style={styles.fieldLabel}>
+                    อำเภอ / เขต
+                  </Text>
+                  <TextInput
+                    value={district}
+                    onChangeText={setDistrict}
+                    placeholder="เช่น คลองเตย"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.fieldRow}>
+                <View style={styles.fieldCol}>
+                  <Text variant="caption" style={styles.fieldLabel}>
+                    จังหวัด
+                  </Text>
+                  <TextInput
+                    value={province}
+                    onChangeText={setProvince}
+                    placeholder="เช่น กรุงเทพมหานคร"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.fieldCol}>
+                  <Text variant="caption" style={styles.fieldLabel}>
+                    รหัสไปรษณีย์
+                  </Text>
+                  <TextInput
+                    value={postalCode}
+                    onChangeText={(t) => setPostalCode(t.replace(/\D/g, '').slice(0, 5))}
+                    placeholder="5 หลัก"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    style={styles.input}
+                  />
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          <Button onPress={onSave} disabled={!canSave} style={styles.saveBtn}>
             บันทึกที่อยู่
           </Button>
         </ScrollView>
@@ -365,10 +677,58 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.2)',
     marginTop: -2,
   },
-  backBtn: {
+
+  /* Top bar: back + search */
+  topBar: {
     position: 'absolute',
     left: Spacing.lg,
+    right: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
+  searchBar: {
+    flex: 1,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surface,
+    ...Shadow.float,
+  },
+  searchInput: {
+    ...Typography.body,
+    flex: 1,
+    color: Colors.text,
+    padding: 0,
+  },
+  results: {
+    position: 'absolute',
+    left: Spacing.lg + 44 + Spacing.sm,
+    right: Spacing.lg,
+    maxHeight: 240,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    overflow: 'hidden',
+    ...Shadow.float,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  resultDivider: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  resultText: {
+    flex: 1,
+  },
+
   locFab: {
     position: 'absolute',
     right: Spacing.lg,
@@ -447,6 +807,21 @@ const styles = StyleSheet.create({
   },
   fieldCol: {
     flex: 1,
+  },
+  parcelHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xl,
+  },
+  parcelHeadText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 14,
+    color: Colors.primaryStrong,
+  },
+  parcelHint: {
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   input: {
     ...Typography.body,

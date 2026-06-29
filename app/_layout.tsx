@@ -9,11 +9,14 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { ThemeProvider } from '@/theme/theme-provider';
+import { useAuth } from '@/store/auth';
+import { useLock } from '@/store/lock';
 
 // Keep the splash screen visible until the fonts have loaded.
 SplashScreen.preventAutoHideAsync();
@@ -30,25 +33,80 @@ export default function RootLayout() {
     Mitr_600SemiBold,
   });
 
+  // Auth + app-lock state drive a declarative gate (no imperative navigation,
+  // so we never hit the "navigate before mounting" race). Exactly one of the
+  // guarded blocks below is active at a time.
+  const isAuthed = useAuth((s) => s.status === 'authenticated');
+  const hydrated = useLock((s) => s.hydrated);
+  const onboarded = useLock((s) => s.onboarded);
+  const hasPin = useLock((s) => s.hasPin);
+  const locked = useLock((s) => s.locked);
+  const hydrate = useLock((s) => s.hydrate);
+  const lock = useLock((s) => s.lock);
+
+  // Hydrate persisted lock state once on startup.
   useEffect(() => {
-    if (loaded || error) {
+    hydrate();
+  }, [hydrate]);
+
+  // Re-lock when the app is sent to the background (screen-lock behaviour).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') lock();
+    });
+    return () => sub.remove();
+  }, [lock]);
+
+  const ready = (loaded || error) && hydrated;
+
+  useEffect(() => {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [ready]);
 
-  if (!loaded && !error) {
+  if (!ready) {
     return null;
   }
+
+  const showOnboarding = !onboarded;
+  const showLogin = onboarded && !isAuthed;
+  const showSetup = onboarded && isAuthed && !hasPin;
+  const showLock = onboarded && isAuthed && hasPin && locked;
+  const showApp = onboarded && isAuthed && hasPin && !locked;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
           <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="product/[id]" />
-            <Stack.Screen name="address/index" />
-            <Stack.Screen name="address/picker" />
+            <Stack.Protected guard={showOnboarding}>
+              <Stack.Screen name="onboarding" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={showLogin}>
+              <Stack.Screen name="login" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={showSetup}>
+              <Stack.Screen name="lock/setup" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={showLock}>
+              <Stack.Screen name="lock/index" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={showApp}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="product/[id]" />
+              <Stack.Screen name="address/index" />
+              <Stack.Screen name="address/picker" />
+              <Stack.Screen name="checkout/index" />
+              <Stack.Screen name="order/[id]" />
+              <Stack.Screen name="order/chat" />
+              <Stack.Screen name="account/edit" />
+              <Stack.Screen name="notifications" />
+            </Stack.Protected>
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

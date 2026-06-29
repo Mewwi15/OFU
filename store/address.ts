@@ -8,6 +8,9 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+import { zustandStorage } from '@/lib/storage';
 
 export type Address = {
   id: string;
@@ -22,6 +25,18 @@ export type Address = {
   /** Pin coordinates. */
   lat: number;
   lng: number;
+
+  /* Structured postal parts — required to ship a parcel via Flash Express
+     (online mode). Auto-filled from the reverse-geocode, then editable.
+     Optional because a delivery (rider) address only needs the pin + line. */
+  /** ตำบล / แขวง */
+  subDistrict?: string;
+  /** อำเภอ / เขต */
+  district?: string;
+  /** จังหวัด */
+  province?: string;
+  /** รหัสไปรษณีย์ (5 หลัก) */
+  postalCode?: string;
 };
 
 /** A draft passed to `upsert` — `id` present means edit, absent means create. */
@@ -46,17 +61,23 @@ const SEED: Address = {
   detail: '',
   lat: 13.7236,
   lng: 100.5686,
+  subDistrict: 'คลองเตย',
+  district: 'คลองเตย',
+  province: 'กรุงเทพมหานคร',
+  postalCode: '10110',
 };
 
 /** Monotonic id generator (avoids Date.now/Math.random for deterministic tests). */
 let seq = 1;
 const nextId = () => `addr-${++seq}`;
 
-export const useAddress = create<AddressState>((set) => ({
-  addresses: [SEED],
-  selectedId: SEED.id,
+export const useAddress = create<AddressState>()(
+  persist(
+    (set) => ({
+      addresses: [SEED],
+      selectedId: SEED.id,
 
-  upsert: (draft) => {
+      upsert: (draft) => {
     const id = draft.id ?? nextId();
     set((state) => {
       const exists = state.addresses.some((a) => a.id === id);
@@ -80,10 +101,35 @@ export const useAddress = create<AddressState>((set) => ({
       return { addresses, selectedId };
     }),
 
-  select: (id) => set({ selectedId: id }),
-}));
+      select: (id) => set({ selectedId: id }),
+    }),
+    {
+      name: 'oofoo-address',
+      storage: zustandStorage,
+      partialize: (state) => ({
+        addresses: state.addresses,
+        selectedId: state.selectedId,
+      }),
+    },
+  ),
+);
 
 /** The currently selected address (or undefined if none / empty book). */
 export function selectedAddress(state: AddressState): Address | undefined {
   return state.addresses.find((a) => a.id === state.selectedId);
+}
+
+/**
+ * Whether an address carries enough structured detail to print a Flash Express
+ * parcel label (online mode). Requires a recipient, phone, province and a
+ * 5-digit postcode — the rider (delivery) flow does NOT need these.
+ */
+export function hasParcelInfo(a?: Address): boolean {
+  return !!(
+    a &&
+    a.recipient.trim() &&
+    a.phone.trim() &&
+    a.province?.trim() &&
+    /^\d{5}$/.test(a.postalCode ?? '')
+  );
 }

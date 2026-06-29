@@ -1,14 +1,11 @@
 /**
- * ProductListItem — horizontal row used by the Wishlist and Cart lists.
+ * ProductListItem — the horizontal cart row.
  *
- *  - `wishlist`: a standalone white card — image, name, coral star · rating,
- *    price, and a coral heart toggle.
- *  - `cart` (`embedded`): a flat, transparent row meant to live INSIDE a shared
- *    surface (the cart "ledger"), separated from its neighbours by hairlines.
- *    A left checkbox selects the line; the right QuantityStepper folds the
- *    delete action into its minus button (`removable`).
- *
- * Tapping the row (outside the controls) opens the product details route.
+ * A flat, transparent row meant to live INSIDE a shared surface (the cart
+ * "ledger"), separated from its neighbours by hairlines. A left checkbox selects
+ * the line; the right QuantityStepper folds the delete action into its minus
+ * button (`removable`). Tapping the row (outside the controls) opens the product
+ * details route.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -29,9 +26,8 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { cartItemId, useCart } from '@/store/cart';
-import { useWishlist } from '@/store/wishlist';
 
-export type ProductListItemVariant = 'wishlist' | 'cart';
+export type ProductListItemVariant = 'cart';
 
 export type ProductListItemProps = {
   product: Product;
@@ -74,9 +70,6 @@ export function ProductListItem({
   style,
 }: ProductListItemProps) {
   const router = useRouter();
-
-  const wishlisted = useWishlist((s) => s.ids.includes(product.id));
-  const toggleWishlist = useWishlist((s) => s.toggle);
 
   const setQty = useCart((s) => s.setQty);
   const removeFromCart = useCart((s) => s.remove);
@@ -146,31 +139,14 @@ export function ProductListItem({
         <Text style={styles.price}>{money(product.price)}</Text>
       </View>
 
-      {/* Right: variant-specific controls */}
-      {variant === 'wishlist' ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            wishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
-          }
-          hitSlop={10}
-          onPress={() => toggleWishlist(product.id)}
-          style={styles.rightWishlist}>
-          <Ionicons
-            name={wishlisted ? 'heart' : 'heart-outline'}
-            size={24}
-            color={Colors.primary}
-          />
-        </Pressable>
-      ) : (
-        <QuantityStepper
-          value={qty}
-          onChange={(next) => setQty(resolvedLineId, next)}
-          min={1}
-          removable
-          onRemove={onRemove ?? (() => removeFromCart(resolvedLineId))}
-        />
-      )}
+      {/* Right: quantity stepper (delete folds into the minus button) */}
+      <QuantityStepper
+        value={qty}
+        onChange={(next) => setQty(resolvedLineId, next)}
+        min={1}
+        removable
+        onRemove={onRemove ?? (() => removeFromCart(resolvedLineId))}
+      />
     </Pressable>
   );
 }

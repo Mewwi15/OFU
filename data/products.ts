@@ -11,7 +11,8 @@ export type ProductCategory =
   | 'เครื่องดื่ม'
   | 'ของแห้ง'
   | 'ของใช้ในบ้าน'
-  | 'ขนม';
+  | 'ขนม'
+  | 'ยา';
 
 export type Product = {
   id: string;
@@ -42,6 +43,7 @@ export const categories = [
   'ของแห้ง',
   'ของใช้ในบ้าน',
   'ขนม',
+  'ยา',
 ] as const;
 
 export type Category = (typeof categories)[number];
@@ -155,6 +157,45 @@ export const products: Product[] = [
     colors: [],
     sizes: [],
     category: 'ขนม',
+  },
+  {
+    id: '9',
+    name: 'พาราเซตามอล 500 มก. (แผง 10 เม็ด)',
+    subtitle: 'บรรเทาปวด ลดไข้',
+    description:
+      'ยาพาราเซตามอล 500 มิลลิกรัม แผงละ 10 เม็ด บรรเทาอาการปวดศีรษะ ปวดเมื่อย และลดไข้ ใช้ได้ทั้งครอบครัว',
+    price: 12,
+    rating: 4.8,
+    images: [img('oofoo9')],
+    colors: [],
+    sizes: ['แผง 10 เม็ด', 'กล่อง 100 เม็ด'],
+    category: 'ยา',
+  },
+  {
+    id: '10',
+    name: 'ยาแก้แพ้ ลดน้ำมูก (10 เม็ด)',
+    subtitle: 'บรรเทาภูมิแพ้',
+    description:
+      'ยาบรรเทาอาการแพ้ คัดจมูก น้ำมูกไหล จากภูมิแพ้อากาศ แผงละ 10 เม็ด ออกฤทธิ์เร็ว ทานง่าย',
+    price: 28,
+    rating: 4.6,
+    images: [img('oofoo10')],
+    colors: [],
+    sizes: [],
+    category: 'ยา',
+  },
+  {
+    id: '11',
+    name: 'พลาสเตอร์ยา (กล่อง 20 ชิ้น)',
+    subtitle: 'ปิดแผล กันน้ำ',
+    description:
+      'พลาสเตอร์ปิดแผลกันน้ำ กล่องละ 20 ชิ้น เนื้อนุ่มยืดหยุ่น ติดแน่นไม่หลุดง่าย ปกป้องแผลให้สะอาด',
+    price: 35,
+    rating: 4.7,
+    images: [img('oofoo11')],
+    colors: [],
+    sizes: [],
+    category: 'ยา',
   },
 ];
 

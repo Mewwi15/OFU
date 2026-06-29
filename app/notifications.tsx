@@ -1,0 +1,189 @@
+/**
+ * Notifications — `/notifications`.
+ *
+ * The activity feed: a filter row (ทั้งหมด / คำสั่งซื้อ / โปรโมชั่น) over a list
+ * of notifications, each a kind-tinted icon tile with title, time and body.
+ * Unread items carry a coral dot. Tokens-only, zero emoji.
+ */
+
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Breathing } from '@/components/ui/Breathing';
+import { Chip } from '@/components/ui/Chip';
+import { IconButton } from '@/components/ui/IconButton';
+import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Text } from '@/components/ui/text';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { MOCK_NOTIFICATIONS, type NotificationKind } from '@/data/fulfillment';
+
+type Filter = 'all' | NotificationKind;
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'ทั้งหมด' },
+  { key: 'order', label: 'คำสั่งซื้อ' },
+  { key: 'promo', label: 'โปรโมชั่น' },
+];
+
+export default function NotificationsScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const items = useMemo(
+    () => (filter === 'all' ? MOCK_NOTIFICATIONS : MOCK_NOTIFICATIONS.filter((n) => n.kind === filter)),
+    [filter],
+  );
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScreenHeader
+        title="การแจ้งเตือน"
+        style={styles.header}
+        left={
+          <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
+        }
+      />
+
+      {/* Filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}>
+        {FILTERS.map((f) => (
+          <Chip key={f.key} label={f.label} active={f.key === filter} onPress={() => setFilter(f.key)} />
+        ))}
+      </ScrollView>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + Spacing.x2 }]}>
+        {items.map((n, i) => {
+          const promo = n.kind === 'promo';
+          return (
+            <Animated.View
+              key={n.id}
+              entering={FadeInDown.delay(i * 70).springify().damping(18)}
+              layout={LinearTransition.springify()}
+              style={styles.row}>
+              <View style={[styles.iconTile, promo ? styles.iconTilePromo : styles.iconTileOrder]}>
+                <Ionicons
+                  name={n.icon}
+                  size={20}
+                  color={promo ? Colors.accentStrong : Colors.primaryStrong}
+                />
+              </View>
+              <View style={styles.rowBody}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    {n.title}
+                  </Text>
+                  <Text variant="caption" style={styles.rowTime}>
+                    {n.time}
+                  </Text>
+                </View>
+                <Text variant="caption" style={styles.rowText}>
+                  {n.body}
+                </Text>
+              </View>
+              {n.unread ? (
+                <Breathing amount={0.35} duration={1100}>
+                  <View style={styles.unreadDot} />
+                </Breathing>
+              ) : null}
+            </Animated.View>
+          );
+        })}
+
+        {items.length === 0 ? (
+          <Text variant="body" style={styles.empty}>
+            ยังไม่มีการแจ้งเตือนในหมวดนี้
+          </Text>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+  },
+  filterScroll: {
+    flexGrow: 0,
+  },
+  filterRow: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    gap: Spacing.sm,
+  },
+  list: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xs,
+    gap: Spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    ...Shadow.card,
+  },
+  iconTile: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconTileOrder: {
+    backgroundColor: Colors.primaryTint,
+  },
+  iconTilePromo: {
+    backgroundColor: Colors.accentTint,
+  },
+  rowBody: {
+    flex: 1,
+    gap: 2,
+  },
+  rowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  rowTitle: {
+    flex: 1,
+    ...Typography.bodyStrong,
+    color: Colors.text,
+  },
+  rowTime: {
+    color: Colors.textMuted,
+  },
+  rowText: {
+    lineHeight: 19,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+    marginTop: Spacing.xs,
+  },
+  empty: {
+    textAlign: 'center',
+    color: Colors.textMuted,
+    paddingTop: Spacing.x3,
+  },
+});

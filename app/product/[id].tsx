@@ -24,7 +24,6 @@ import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { getProduct } from '@/data/products';
 import { money } from '@/lib/format';
 import { useCart } from '@/store/cart';
-import { useWishlist } from '@/store/wishlist';
 
 /** At-a-glance promises shown under the price. */
 const PERKS = [
@@ -42,10 +41,6 @@ export default function ProductDetailsScreen() {
   const product = getProduct(id);
 
   const add = useCart((s) => s.add);
-  const toggleWishlist = useWishlist((s) => s.toggle);
-  const isWishlisted = useWishlist((s) =>
-    product ? s.ids.includes(product.id) : false,
-  );
 
   const [activeImage, setActiveImage] = useState(0);
   const [qty, setQty] = useState(1);
@@ -186,17 +181,9 @@ export default function ProductDetailsScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Floating top buttons over the hero */}
+      {/* Floating back button over the hero */}
       <View style={[styles.topBar, { top: insets.top + Spacing.sm }]}>
         {backButton}
-        <IconButton
-          icon={isWishlisted ? 'heart' : 'heart-outline'}
-          color={isWishlisted ? Colors.primary : undefined}
-          accessibilityLabel={
-            isWishlisted ? 'นำออกจากรายการโปรด' : 'เพิ่มในรายการโปรด'
-          }
-          onPress={() => toggleWishlist(product.id)}
-        />
       </View>
 
       {/* Sticky action bar: quantity + add-to-cart with live total */}

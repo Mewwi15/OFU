@@ -26,6 +26,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductListItem } from '@/components/product/ProductListItem';
+import { CheckoutSheet } from '@/components/shop/CheckoutSheet';
 import { ModeSwitch } from '@/components/shop/ModeSwitch';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -34,8 +35,10 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography, tokens } from '@/constants/theme';
 import { products, type Product } from '@/data/products';
+import { SHOP_HOURS_LABEL } from '@/data/shop';
 import { money } from '@/lib/format';
-import { selectedAddress, useAddress } from '@/store/address';
+import { useShopOpen } from '@/lib/useShopOpen';
+import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import {
   cartCount,
   cartSubtotal,
@@ -43,7 +46,13 @@ import {
   useCart,
   type CartItem,
 } from '@/store/cart';
-import { deliveryFeeFor, FREE_DELIVERY_MIN, useMode } from '@/store/mode';
+import {
+  deliveryFeeFor,
+  FREE_DELIVERY_MIN,
+  meetsMinOrder,
+  MIN_ORDER,
+  useMode,
+} from '@/store/mode';
 
 /** Payment hint shown per mode (the two flows differ on payment). */
 const PAYMENT_HINT = {
@@ -58,6 +67,8 @@ const PAYMENT_ICON = {
 
 /** Footprint of the floating tab bar above the screen bottom. */
 const TAB_BAR_FOOTPRINT = 64;
+/** Breathing gap between the sticky checkout bar and the floating tab bar. */
+const CHECKOUT_BAR_GAP = Spacing.lg;
 /** Height reserved for the sticky checkout bar (so scroll content clears it). */
 const CHECKOUT_BAR_HEIGHT = 80;
 
@@ -176,6 +187,7 @@ export default function CartScreen() {
   const address = useAddress(selectedAddress);
 
   const [promo, setPromo] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
@@ -183,9 +195,18 @@ export default function CartScreen() {
   const deliveryFee = deliveryFeeFor(mode, subtotal);
   const total = subtotal + deliveryFee;
 
+  const shopOpen = useShopOpen();
+
   const isEmpty = items.length === 0;
   const allSelected = items.length > 0 && selectedIds.length === items.length;
   const nothingSelected = selectedCount === 0;
+  // Minimum-order floor (delivery only) — only relevant once something is ticked.
+  const belowMin = !nothingSelected && !meetsMinOrder(mode, subtotal);
+  const minShortfall = Math.max(0, MIN_ORDER - subtotal);
+  // Online (Flash) needs a parcel-ready address before checkout.
+  const needsParcel = mode === 'online' && !hasParcelInfo(address);
+  const canCheckout =
+    !nothingSelected && shopOpen && !belowMin && !needsParcel;
 
   const checkoutVerb = mode === 'delivery' ? 'สั่งซื้อ' : 'ชำระเงิน';
   const checkoutLabel =
@@ -223,15 +244,19 @@ export default function CartScreen() {
     ]);
   };
 
-  const onBuyNow = () => {
-    if (nothingSelected) return;
-    removeSelected();
+  const openCheckout = () => {
+    if (!canCheckout) return;
+    setSheetOpen(true);
+  };
+
+  // Fired when the user slides the confirm control to the end: close the sheet
+  // and hand off to the payment screen (which reads the ticked lines + mode from
+  // the stores). The cart is cleared there only once payment is verified.
+  const onConfirmOrder = () => {
+    setSheetOpen(false);
     setPromo('');
-    const detail =
-      mode === 'delivery'
-        ? 'เราจะจัดส่งถึงบ้านคุณเร็วๆ นี้ค่ะ'
-        : 'ชำระเงินออนไลน์แล้วแนบสลิป รับสินค้าที่ร้านได้เลยค่ะ';
-    Alert.alert('สั่งซื้อสำเร็จ', `ขอบคุณที่อุดหนุนร้านอู้ฟู่ค่ะ\n${detail}`);
+    // Let the sheet finish sliding out before the route transition.
+    setTimeout(() => router.push('/checkout'), 240);
   };
 
   return (
@@ -266,13 +291,27 @@ export default function CartScreen() {
               styles.content,
               {
                 paddingBottom:
-                  insets.bottom + TAB_BAR_FOOTPRINT + CHECKOUT_BAR_HEIGHT + Spacing.md,
+                  insets.bottom +
+                  TAB_BAR_FOOTPRINT +
+                  CHECKOUT_BAR_GAP +
+                  CHECKOUT_BAR_HEIGHT +
+                  Spacing.md,
               },
             ]}>
+            {/* Store-closed notice */}
+            {!shopOpen ? (
+              <View style={styles.closedBanner}>
+                <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
+                <Text style={styles.closedText}>
+                  ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {SHOP_HOURS_LABEL}
+                </Text>
+              </View>
+            ) : null}
+
             {/* Mode segmented control */}
             <ModeSwitch compact style={styles.modeSwitch} />
 
-            {/* Delivery surface (address + free-shipping) / pickup strip */}
+            {/* Delivery surface (rider address + free-shipping) */}
             {mode === 'delivery' ? (
               <View style={styles.deliveryCard}>
                 <PressableScale
@@ -310,11 +349,53 @@ export default function CartScreen() {
                 <FreeShipBlock subtotal={subtotal} />
               </View>
             ) : (
-              <View style={styles.pickupStrip}>
-                <Ionicons name="storefront-outline" size={16} color={Colors.textMuted} />
-                <Text variant="caption" style={styles.pickupText}>
-                  รับสินค้าที่ร้าน อู้ฟู่ · ชำระออนไลน์แล้วแนบสลิป
-                </Text>
+              /* Online surface — Flash Express parcel address */
+              <View style={styles.deliveryCard}>
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel="ที่อยู่จัดส่งพัสดุ"
+                  onPress={() => router.push(address ? '/address' : '/address/picker')}
+                  scaleTo={0.98}
+                  style={styles.addrRow}>
+                  <View style={styles.addrTile}>
+                    <Ionicons name="cube-outline" size={20} color={Colors.primaryStrong} />
+                  </View>
+                  <View style={styles.addrBody}>
+                    {address && !needsParcel ? (
+                      <>
+                        <Text style={styles.addrTitle} numberOfLines={1}>
+                          ส่ง Flash · {address.label}
+                        </Text>
+                        <Text variant="caption" numberOfLines={1}>
+                          {address.recipient} · {address.phone}
+                        </Text>
+                        <Text variant="caption" numberOfLines={2}>
+                          {address.line}
+                        </Text>
+                        <Text variant="caption" numberOfLines={1}>
+                          {[address.subDistrict, address.district, address.province, address.postalCode]
+                            .filter(Boolean)
+                            .join(' ')}
+                        </Text>
+                      </>
+                    ) : address ? (
+                      <>
+                        <Text style={[styles.addrTitle, styles.addrWarn]} numberOfLines={1}>
+                          ข้อมูลพัสดุไม่ครบ
+                        </Text>
+                        <Text variant="caption">
+                          แตะเพื่อเพิ่มจังหวัด/รหัสไปรษณีย์ สำหรับส่ง Flash
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.addrTitle}>เพิ่มที่อยู่จัดส่งพัสดุ</Text>
+                        <Text variant="caption">กรอกที่อยู่ + รหัสไปรษณีย์ เพื่อส่ง Flash ทั่วไทย</Text>
+                      </>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+                </PressableScale>
               </View>
             )}
 
@@ -402,22 +483,20 @@ export default function CartScreen() {
                 <Text style={styles.sumValue}>{money(subtotal)}</Text>
               </View>
 
-              {mode === 'delivery' ? (
-                <View style={[styles.sumRow, styles.sumRowGap]}>
-                  <Text variant="body" style={styles.sumLabel}>
-                    ค่าจัดส่ง
+              <View style={[styles.sumRow, styles.sumRowGap]}>
+                <Text variant="body" style={styles.sumLabel}>
+                  {mode === 'delivery' ? 'ค่าจัดส่ง' : 'ค่าส่ง Flash'}
+                </Text>
+                {deliveryFee === 0 ? (
+                  <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
+                    ฟรี
                   </Text>
-                  {deliveryFee === 0 ? (
-                    <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
-                      ฟรี
-                    </Text>
-                  ) : (
-                    <Text variant="body" style={{ color: Colors.text }}>
-                      {money(deliveryFee)}
-                    </Text>
-                  )}
-                </View>
-              ) : null}
+                ) : (
+                  <Text variant="body" style={{ color: Colors.text }}>
+                    {money(deliveryFee)}
+                  </Text>
+                )}
+              </View>
 
               {/* Payment hint — its own full-width line */}
               <View style={styles.payRow}>
@@ -439,18 +518,59 @@ export default function CartScreen() {
           {/* Sticky checkout bar (the only e2 element on the screen) */}
           <Animated.View
             entering={FadeInUp.duration(280)}
-            style={[styles.checkoutBar, { bottom: insets.bottom + TAB_BAR_FOOTPRINT }]}>
+            style={[
+              styles.checkoutBar,
+              { bottom: insets.bottom + TAB_BAR_FOOTPRINT + CHECKOUT_BAR_GAP },
+            ]}>
             <View style={styles.checkoutLeft}>
-              <Text variant="caption">รวมที่เลือก</Text>
-              <Text style={styles.checkoutTotal}>{money(total)}</Text>
+              <Text
+                style={[styles.checkoutLabel, !canCheckout && !nothingSelected && styles.checkoutLabelWarn]}
+                numberOfLines={1}>
+                {!shopOpen
+                  ? `ปิดอยู่ · ${SHOP_HOURS_LABEL}`
+                  : belowMin
+                    ? `สั่งขั้นต่ำ ฿${MIN_ORDER} · ขาดอีก ${money(minShortfall)}`
+                    : nothingSelected
+                      ? 'ยังไม่ได้เลือกสินค้า'
+                      : needsParcel
+                        ? 'เพิ่มที่อยู่จัดส่งพัสดุก่อน'
+                        : `รวมที่เลือก · ${selectedCount} ชิ้น`}
+              </Text>
+              <View style={styles.checkoutTotalRow}>
+                <Text style={styles.checkoutTotal}>
+                  {money(nothingSelected ? 0 : total)}
+                </Text>
+                {!nothingSelected && mode === 'delivery' && deliveryFee === 0 ? (
+                  <View style={styles.freeShipPill}>
+                    <Ionicons name="bicycle" size={12} color={Colors.accentStrong} />
+                    <Text style={styles.freeShipPillText}>ส่งฟรี</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
-            <Button
-              onPress={onBuyNow}
-              disabled={nothingSelected}
-              style={styles.checkoutBtn}>
-              {checkoutLabel}
-            </Button>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={checkoutLabel}
+              disabled={!canCheckout}
+              onPress={openCheckout}
+              style={[styles.checkoutCta, !canCheckout && styles.checkoutCtaOff]}>
+              <Text style={styles.checkoutCtaText}>{checkoutVerb}</Text>
+              <Ionicons name="arrow-forward" size={18} color={Colors.textOnPrimary} />
+            </PressableScale>
           </Animated.View>
+
+          {/* Slide-to-confirm checkout sheet */}
+          <CheckoutSheet
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            onConfirm={onConfirmOrder}
+            items={chosen}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            total={total}
+            mode={mode}
+            verb={checkoutVerb}
+          />
         </>
       )}
     </View>
@@ -485,6 +605,20 @@ const styles = StyleSheet.create({
   modeSwitch: {
     marginBottom: Spacing.x2,
   },
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  closedText: {
+    flex: 1,
+    ...Typography.caption,
+    color: Colors.dangerStrong,
+  },
 
   /* Delivery surface */
   deliveryCard: {
@@ -515,6 +649,9 @@ const styles = StyleSheet.create({
   addrTitle: {
     ...Typography.bodyStrong,
     color: Colors.text,
+  },
+  addrWarn: {
+    color: Colors.dangerStrong,
   },
   insetHairline: {
     height: 1,
@@ -557,19 +694,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
 
-  /* Pickup strip (online) */
-  pickupStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    marginBottom: Spacing.x2,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surfaceMuted,
-  },
-  pickupText: {
-    flex: 1,
-  },
 
   /* Items ledger */
   itemsCard: {
@@ -719,22 +843,64 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.sm + 2,
     paddingLeft: Spacing.lg,
     paddingRight: Spacing.sm,
-    borderRadius: Radius.pill,
+    borderRadius: Radius.xl,
     backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     ...Shadow.float,
   },
   checkoutLeft: {
     flex: 1,
+    gap: 2,
+  },
+  checkoutLabel: {
+    ...Typography.caption,
+    color: Colors.textMuted,
+  },
+  checkoutLabelWarn: {
+    color: Colors.dangerStrong,
+  },
+  checkoutTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   checkoutTotal: {
     ...Typography.title,
     color: Colors.text,
   },
-  checkoutBtn: {
-    minWidth: 150,
+  freeShipPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xxs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accentTint,
+  },
+  freeShipPillText: {
+    ...Typography.label,
+    color: Colors.accentStrong,
+  },
+  checkoutCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    minHeight: 52,
+    paddingHorizontal: Spacing.x2,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+  },
+  checkoutCtaOff: {
+    opacity: 0.45,
+  },
+  checkoutCtaText: {
+    ...Typography.button,
+    color: Colors.textOnPrimary,
   },
 
   /* Empty state */

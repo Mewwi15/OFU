@@ -2,8 +2,8 @@
  * ProductCard — the 2-column grid card (Oroshi "Explore" frame).
  *
  * White card with the product image filling the top edge-to-edge (rounded only
- * at the top), then a padded info area: name + inline coral wishlist heart, and
- * a meta row (coral star · rating · price). Tapping the card opens the details.
+ * at the top), then a padded info area: name and a meta row (coral star · rating
+ * · price). Tapping the card opens the details.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -14,8 +14,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
-import { WishlistHeart } from '@/components/ui/WishlistHeart';
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 
@@ -45,12 +44,9 @@ export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
         />
 
         <View style={styles.info}>
-          <View style={styles.nameRow}>
-            <Text numberOfLines={1} style={styles.name}>
-              {product.name}
-            </Text>
-            <WishlistHeart productId={product.id} />
-          </View>
+          <Text numberOfLines={1} style={styles.name}>
+            {product.name}
+          </Text>
 
           <View style={styles.metaRow}>
             <Ionicons name="star" size={13} color={Colors.primary} />
@@ -72,7 +68,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    ...Shadow.float,
   },
   image: {
     width: '100%',
@@ -86,13 +81,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     gap: 2,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
   name: {
-    flex: 1,
     fontFamily: 'Mitr_500Medium',
     fontSize: 15,
     lineHeight: 20,

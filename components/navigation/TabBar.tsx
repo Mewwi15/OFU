@@ -22,14 +22,16 @@ type TabMeta = {
   label: string;
   active: IconName;
   inactive: IconName;
+  /** Render as the raised, prominent centre button (FAB-style). */
+  raised?: boolean;
 };
 
 /** Per-route icon pair + Thai label, keyed by the route file name. */
 const TABS: Record<string, TabMeta> = {
   index: { label: 'หน้าหลัก', active: 'home', inactive: 'home-outline' },
   search: { label: 'สินค้า', active: 'grid', inactive: 'grid-outline' },
+  orders: { label: 'คำสั่งซื้อ', active: 'receipt', inactive: 'receipt-outline', raised: true },
   cart: { label: 'ตะกร้า', active: 'cart', inactive: 'cart-outline' },
-  wishlist: { label: 'รายการโปรด', active: 'heart', inactive: 'heart-outline' },
   account: { label: 'บัญชี', active: 'person', inactive: 'person-outline' },
 };
 
@@ -69,6 +71,38 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           const onLongPress = () => {
             navigation.emit({ type: 'tabLongPress', target: route.key });
           };
+
+          // Raised centre button (e.g. คำสั่งซื้อ) — large coral disc lifted above
+          // the bar with a white ring, so it reads as the hero action.
+          if (meta.raised) {
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityLabel={options.tabBarAccessibilityLabel ?? meta.label}
+                onPress={onPress}
+                onLongPress={onLongPress}
+                style={styles.raisedItem}>
+                <View style={[styles.raisedDisc, isFocused && styles.raisedDiscActive]}>
+                  <Ionicons
+                    name={isFocused ? meta.active : meta.inactive}
+                    size={28}
+                    color={Colors.textOnPrimary}
+                  />
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.label,
+                    styles.raisedLabel,
+                    { color: isFocused ? Colors.primaryStrong : Colors.textMuted },
+                  ]}>
+                  {meta.label}
+                </Text>
+              </Pressable>
+            );
+          }
 
           const tint = isFocused ? Colors.primary : Colors.textMuted;
 
@@ -163,5 +197,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Mitr_400Regular',
     fontSize: 11,
     lineHeight: 14,
+  },
+
+  /* Raised centre button */
+  raisedItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  raisedDisc: {
+    width: 60,
+    height: 60,
+    borderRadius: Radius.pill,
+    marginTop: -30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    borderWidth: 5,
+    borderColor: Colors.surface,
+    ...Shadow.float,
+  },
+  raisedDiscActive: {
+    backgroundColor: Colors.primaryStrong,
+  },
+  raisedLabel: {
+    marginTop: 4,
   },
 });

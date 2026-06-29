@@ -1,16 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductRail } from '@/components/product/ProductRail';
+import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { PromoBanner } from '@/components/shop/PromoBanner';
-import { Chip } from '@/components/ui/Chip';
 import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -57,6 +63,9 @@ function isCategory(value: string | undefined): value is Category {
 export default function CatalogScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  // Show the full marketing banner (1672×941) below the safe area, uncropped.
+  const bannerHeight = screenW / (1672 / 941);
   const { category } = useLocalSearchParams<{ category?: string }>();
 
   const [query, setQuery] = useState('');
@@ -93,43 +102,28 @@ export default function CatalogScreen() {
         contentContainerStyle={{
           paddingBottom: insets.bottom + TAB_BAR_CLEARANCE,
         }}>
-        {/* Brand hero (coral) — แอป อู้ฟู่ mascot logo on the right edge. The
-            gradient deepens toward the bottom-right so the light watercolor
-            logo stays legible. */}
-        <View
-          style={[
-            styles.hero,
-            { paddingTop: insets.top + Spacing.sm, height: insets.top + 182 },
-          ]}>
-          <LinearGradient
-            colors={['#F15929', '#A8331A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
+        {/* Brand hero — full-bleed marketing banner (owner-designed: coral
+            gradient, อู้ฟู่ mascot + OFU wordmark + groceries, with its own
+            copy baked in). The cart button is overlaid top-right. */}
+        <View style={[styles.hero, { height: insets.top + bannerHeight }]}>
+          <Image
+            source={require('../../assets/images/braner.png')}
+            style={{
+              position: 'absolute',
+              top: insets.top,
+              left: 0,
+              right: 0,
+              height: bannerHeight,
+            }}
+            contentFit="cover"
           />
-          <View style={styles.heroTop}>
-            <View style={styles.heroTitleWrap}>
-              <Text variant="caption" style={styles.heroKicker}>
-                อู้ฟู่ · ของสดของดี
-              </Text>
-            </View>
+          <View
+            style={[styles.heroTop, { paddingTop: insets.top + Spacing.sm }]}>
+            <View style={styles.heroTitleWrap} />
             <IconButton
               icon="bag-outline"
               accessibilityLabel="ตะกร้า"
               onPress={() => router.push('/cart')}
-            />
-          </View>
-          {/* The mascot's face is translucent in the artwork, so a white disc
-              sits behind ONLY the face — the rest of the logo (fu, body, tail)
-              shows on the coral hero directly (ref: brand logo on a dark bg). */}
-          <View
-            style={[styles.heroLogoWrap, { top: insets.top + 60 }]}
-            pointerEvents="none">
-            <View style={styles.heroLogoFace} />
-            <Image
-              source={require('../../assets/images/logo-oofoo.png')}
-              style={styles.heroLogo}
-              contentFit="contain"
             />
           </View>
         </View>
@@ -154,16 +148,33 @@ export default function CatalogScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipsRow}
+            contentContainerStyle={styles.catRow}
             style={styles.chipsScroll}>
-            {categories.map((cat) => (
-              <Chip
-                key={cat}
-                label={cat}
-                active={cat === activeCategory}
-                onPress={() => setActiveCategory(cat)}
-              />
-            ))}
+            {categories.map((cat) => {
+              const active = cat === activeCategory;
+              return (
+                <PressableScale
+                  key={cat}
+                  accessibilityRole="button"
+                  accessibilityLabel={cat}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setActiveCategory(cat)}
+                  style={styles.catCard}>
+                  <CategoryIcon category={cat} size={60} />
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.catLabel, active && styles.catLabelActive]}>
+                    {cat}
+                  </Text>
+                  <View
+                    style={[
+                      styles.catIndicator,
+                      active && styles.catIndicatorActive,
+                    ]}
+                  />
+                </PressableScale>
+              );
+            })}
           </ScrollView>
 
           {isBrowsing ? (
@@ -226,7 +237,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   hero: {
-    paddingHorizontal: Spacing.lg,
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
     overflow: 'hidden',
@@ -236,36 +246,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
   },
   heroTitleWrap: {
     flex: 1,
-  },
-  heroKicker: {
-    color: 'rgba(255,255,255,0.9)',
-  },
-  heroLogoWrap: {
-    position: 'absolute',
-    right: Spacing.md,
-    width: 184,
-    height: 81,
-  },
-  heroLogoFace: {
-    // White disc behind the mascot's face (centered ~x0.22, y0.60 of the
-    // artwork). Sized larger than the face opening on purpose — the opaque tan
-    // head renders on top and masks the overflow, leaving a fully white face
-    // with no coral rim.
-    position: 'absolute',
-    left: 29,
-    top: 28,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
-  },
-  heroLogo: {
-    width: 184,
-    height: 81,
   },
   body: {
     paddingHorizontal: Spacing.lg,
@@ -277,9 +262,33 @@ const styles = StyleSheet.create({
   chipsScroll: {
     marginHorizontal: -Spacing.lg,
   },
-  chipsRow: {
+  catRow: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
+    paddingTop: Spacing.xs,
+    gap: Spacing.md,
+  },
+  catCard: {
+    width: 72,
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  catLabel: {
+    fontFamily: 'Mitr_400Regular',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  catLabelActive: {
+    fontFamily: 'Mitr_500Medium',
+    color: Colors.primaryStrong,
+  },
+  catIndicator: {
+    width: 18,
+    height: 3,
+    borderRadius: Radius.pill,
+    backgroundColor: 'transparent',
+  },
+  catIndicatorActive: {
+    backgroundColor: Colors.primary,
   },
   gridSection: {
     marginTop: Spacing.xl,

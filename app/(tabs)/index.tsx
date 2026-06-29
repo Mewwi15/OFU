@@ -15,12 +15,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductRail } from '@/components/product/ProductRail';
+import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories, products, type Category } from '@/data/products';
+import { SHOP_HOURS_LABEL } from '@/data/shop';
+import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
@@ -46,19 +49,6 @@ const BANNER_SLIDES = [
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
 
-/**
- * Per-category Ionicons glyph. Placeholder until real square category artwork
- * lands in assets/images/categories/ (swap the <Ionicons> for an <Image> then).
- */
-const CATEGORY_ICON: Record<Category, keyof typeof Ionicons.glyphMap> = {
-  ทั้งหมด: 'apps',
-  ของสด: 'leaf',
-  เครื่องดื่ม: 'cafe',
-  ของแห้ง: 'cube',
-  ของใช้ในบ้าน: 'home',
-  ขนม: 'ice-cream',
-};
-
 /* Curated home rails (derived from the mock catalog). */
 const BEST_SELLERS = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
 const RECOMMENDED = products.slice(0, 8);
@@ -68,6 +58,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const address = useAddress(selectedAddress);
+  const shopOpen = useShopOpen();
 
   /* ----- Auto-rotating hero banner ----- */
   const bannerRef = useRef<ScrollView>(null);
@@ -181,7 +172,7 @@ export default function HomeScreen() {
             <IconButton
               icon="notifications-outline"
               accessibilityLabel="การแจ้งเตือน"
-              onPress={() => {}}
+              onPress={() => router.push('/notifications')}
             />
           </View>
 
@@ -209,6 +200,16 @@ export default function HomeScreen() {
             <Ionicons name="mic-outline" size={20} color={Colors.primary} />
           </PressableScale>
 
+          {/* Store-closed notice */}
+          {!shopOpen ? (
+            <View style={styles.closedBanner}>
+              <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
+              <Text style={styles.closedText}>
+                ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {SHOP_HOURS_LABEL}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Category shortcuts → catalog */}
           <ScrollView
             horizontal
@@ -221,9 +222,7 @@ export default function HomeScreen() {
                 accessibilityLabel={cat}
                 onPress={() => openCatalog(cat)}
                 style={styles.catCard}>
-                <View style={styles.catIcon}>
-                  <Ionicons name={CATEGORY_ICON[cat]} size={24} color={Colors.primaryStrong} />
-                </View>
+                <CategoryIcon category={cat} size={64} />
                 <Text numberOfLines={1} style={styles.catLabel}>
                   {cat}
                 </Text>
@@ -312,6 +311,20 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.textMuted,
   },
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    marginTop: Spacing.lg,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  closedText: {
+    flex: 1,
+    ...Typography.caption,
+    color: Colors.dangerStrong,
+  },
   bannerContent: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
@@ -345,22 +358,9 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.lg,
   },
   catCard: {
-    width: 78,
+    width: 72,
     alignItems: 'center',
     gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
-    ...Shadow.card,
-  },
-  catIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   catLabel: {
     fontFamily: 'Mitr_400Regular',

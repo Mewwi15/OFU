@@ -9,7 +9,9 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
+import { zustandStorage } from '@/lib/storage';
 import type { Product } from '@/data/products';
 
 export type CartItem = {
@@ -68,11 +70,13 @@ export function selectedItems(items: CartItem[], selectedIds: string[]): CartIte
   return items.filter((item) => set.has(item.id));
 }
 
-export const useCart = create<CartState>((set) => ({
-  items: [],
-  selectedIds: [],
+export const useCart = create<CartState>()(
+  persist(
+    (set) => ({
+      items: [],
+      selectedIds: [],
 
-  add: (product, opts) =>
+      add: (product, opts) =>
     set((state) => {
       const qty = Math.max(1, opts?.qty ?? 1);
       const size = opts?.size;
@@ -140,5 +144,12 @@ export const useCart = create<CartState>((set) => ({
       };
     }),
 
-  clear: () => set({ items: [], selectedIds: [] }),
-}));
+      clear: () => set({ items: [], selectedIds: [] }),
+    }),
+    {
+      name: 'oofoo-cart',
+      storage: zustandStorage,
+      partialize: (state) => ({ items: state.items, selectedIds: state.selectedIds }),
+    },
+  ),
+);

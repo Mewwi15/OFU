@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -12,6 +13,8 @@ export type ChipProps = {
   label: string;
   /** Active = coral filled w/ white text; inactive = white w/ border. */
   active?: boolean;
+  /** Optional leading element (e.g. a category icon) shown before the label. */
+  leading?: ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -19,7 +22,7 @@ export type ChipProps = {
 /**
  * Category filter pill.
  */
-export function Chip({ label, active, onPress, style }: ChipProps) {
+export function Chip({ label, active, leading, onPress, style }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -27,10 +30,12 @@ export function Chip({ label, active, onPress, style }: ChipProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
+        leading ? styles.chipWithLeading : null,
         active ? styles.chipActive : styles.chipInactive,
         pressed && styles.pressed,
         style,
       ]}>
+      {leading}
       <Text
         variant="body"
         style={{
@@ -46,10 +51,16 @@ export function Chip({ label, active, onPress, style }: ChipProps) {
 const styles = StyleSheet.create({
   chip: {
     height: 40,
+    flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  chipWithLeading: {
+    // Tighter left inset so the icon sits closer to the pill edge.
+    paddingLeft: Spacing.xs,
   },
   chipActive: {
     backgroundColor: Colors.primaryStrong,
