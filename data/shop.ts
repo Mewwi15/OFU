@@ -1,34 +1,41 @@
 /**
- * Shop / merchant profile — single-shop v1.
+ * Shop / merchant profile types + helpers — single-shop v1.
  *
- * Holds the receiving-account details the customer pays INTO. The PromptPay
- * `target` is what the QR encodes (a phone, citizen-id, tax-id or e-wallet id);
- * `displayName` + `accountNo` are shown on the QR card and the manual-transfer
- * fallback.
- *
- * NOTE: these are placeholder demo values. Before going live, replace them with
- * the real merchant PromptPay id / bank account (and move them server-side so a
- * tampered build can't redirect payments).
+ * The live values are loaded from the backend (`shops` + `shop_hours`) into
+ * `store/shop.ts`; `DEFAULT_SHOP` is the fallback used until that resolves.
+ * The PromptPay `target` is what the QR encodes (phone / citizen-id / e-wallet).
  */
-export const SHOP = {
-  name: 'ร้าน อู้ฟู่',
+
+export type ShopHours = { open: string; close: string };
+
+export type ShopInfo = {
+  name: string;
   promptPay: {
     /** PromptPay target the QR encodes — phone (10) / citizen-id (13) / e-wallet (15). */
-    target: '0812345678',
+    target: string;
     /** Account-holder name shown under the QR. */
-    displayName: 'ร้าน อู้ฟู่ (พร้อมเพย์)',
+    displayName: string;
     /** Receiving bank, for the manual-transfer fallback. */
+    bankName: string;
+  };
+  /** Today's operating window, "HH:MM" 24h. */
+  hours: ShopHours;
+};
+
+export const DEFAULT_SHOP: ShopInfo = {
+  name: 'ร้าน อู้ฟู่',
+  promptPay: {
+    target: '0812345678',
+    displayName: 'ร้าน อู้ฟู่ (พร้อมเพย์)',
     bankName: 'พร้อมเพย์ · เบอร์โทร',
   },
-  /** Daily operating hours, "HH:MM" 24h. Orders are blocked outside this window. */
-  hours: {
-    open: '08:00',
-    close: '22:00',
-  },
-} as const;
+  hours: { open: '08:00', close: '22:00' },
+};
 
 /** Operating-hours label shown to the customer. */
-export const SHOP_HOURS_LABEL = `ทุกวัน ${SHOP.hours.open}–${SHOP.hours.close} น.`;
+export function shopHoursLabel(hours: ShopHours): string {
+  return `ทุกวัน ${hours.open}–${hours.close} น.`;
+}
 
 /** "HH:MM" → minutes since midnight. */
 function toMinutes(hm: string): number {
@@ -37,9 +44,9 @@ function toMinutes(hm: string): number {
 }
 
 /** Whether the shop is open at `now` (handles windows that cross midnight). */
-export function isShopOpen(now: Date = new Date()): boolean {
+export function isShopOpen(hours: ShopHours, now: Date = new Date()): boolean {
   const mins = now.getHours() * 60 + now.getMinutes();
-  const open = toMinutes(SHOP.hours.open);
-  const close = toMinutes(SHOP.hours.close);
+  const open = toMinutes(hours.open);
+  const close = toMinutes(hours.close);
   return open <= close ? mins >= open && mins < close : mins >= open || mins < close;
 }

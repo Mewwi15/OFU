@@ -38,8 +38,8 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { SHOP } from '@/data/shop';
 import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
+import { useShop } from '@/store/shop';
 import { money } from '@/lib/format';
 import { type PaymentMethod } from '@/lib/payment';
 import { selectedAddress, useAddress } from '@/store/address';
@@ -79,6 +79,7 @@ export default function CheckoutScreen() {
   const selectedIds = useCart((s) => s.selectedIds);
   const removeSelected = useCart((s) => s.removeSelected);
   const mode = useMode((s) => s.mode);
+  const promptPay = useShop((s) => s.info.promptPay);
   const address = useAddress(selectedAddress);
 
   const chosen = selectedItems(items, selectedIds);
@@ -133,7 +134,7 @@ export default function CheckoutScreen() {
   }
 
   const copyNumber = async () => {
-    await Clipboard.setStringAsync(SHOP.promptPay.target);
+    await Clipboard.setStringAsync(promptPay.target);
     setCopied(true);
   };
 
@@ -312,9 +313,9 @@ export default function CheckoutScreen() {
         {method === 'promptpay' ? (
           <Animated.View entering={FadeIn.duration(220)}>
             <PromptPayQR
-              target={SHOP.promptPay.target}
+              target={promptPay.target}
               amount={total}
-              displayName={SHOP.promptPay.displayName}
+              displayName={promptPay.displayName}
               onCopyNumber={copyNumber}
             />
 

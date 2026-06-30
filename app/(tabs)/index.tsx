@@ -22,10 +22,11 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories, type Category } from '@/data/products';
-import { SHOP_HOURS_LABEL } from '@/data/shop';
+import { shopHoursLabel } from '@/data/shop';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
+import { useShop } from '@/store/shop';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
 const TAB_BAR_CLEARANCE = 110;
@@ -55,6 +56,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const address = useAddress(selectedAddress);
   const shopOpen = useShopOpen();
+  const shop = useShop((s) => s.info);
 
   /* ----- Catalog (from Supabase) ----- */
   const products = useCatalog((s) => s.products);
@@ -210,7 +212,7 @@ export default function HomeScreen() {
             <View style={styles.closedBanner}>
               <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
               <Text style={styles.closedText}>
-                ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {SHOP_HOURS_LABEL}
+                ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {shopHoursLabel(shop.hours)}
               </Text>
             </View>
           ) : null}

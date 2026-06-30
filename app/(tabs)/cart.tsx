@@ -35,11 +35,12 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography, tokens } from '@/constants/theme';
 import { type Product } from '@/data/products';
-import { SHOP_HOURS_LABEL } from '@/data/shop';
+import { shopHoursLabel } from '@/data/shop';
 import { money } from '@/lib/format';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
+import { useShop } from '@/store/shop';
 import {
   cartCount,
   cartSubtotal,
@@ -186,6 +187,7 @@ export default function CartScreen() {
   const add = useCart((s) => s.add);
   const mode = useMode((s) => s.mode);
   const address = useAddress(selectedAddress);
+  const shopHours = useShop((s) => s.info.hours);
 
   const [promo, setPromo] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -305,7 +307,7 @@ export default function CartScreen() {
               <View style={styles.closedBanner}>
                 <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
                 <Text style={styles.closedText}>
-                  ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {SHOP_HOURS_LABEL}
+                  ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {shopHoursLabel(shopHours)}
                 </Text>
               </View>
             ) : null}
@@ -529,7 +531,7 @@ export default function CartScreen() {
                 style={[styles.checkoutLabel, !canCheckout && !nothingSelected && styles.checkoutLabelWarn]}
                 numberOfLines={1}>
                 {!shopOpen
-                  ? `ปิดอยู่ · ${SHOP_HOURS_LABEL}`
+                  ? `ปิดอยู่ · ${shopHoursLabel(shopHours)}`
                   : belowMin
                     ? `สั่งขั้นต่ำ ฿${MIN_ORDER} · ขาดอีก ${money(minShortfall)}`
                     : nothingSelected
