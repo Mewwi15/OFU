@@ -23,6 +23,8 @@ export type CreateOrderInput = {
   addressLine: string;
   /** Fulfilment kind — defaults to `delivery` (local rider). */
   fulfilment?: 'delivery' | 'parcel';
+  /** Real backend order number (e.g. "OF00001"); used as the tracking id. */
+  orderNumber?: string;
 };
 
 /** Flash-style tracking number derived from the order id (Hermes-safe, stable). */
@@ -86,7 +88,7 @@ export const useOrder = create<OrderState>()(
 
       createOrder: (input) => {
         const { active, history } = get();
-        const id = nextOrderId([active, ...history]);
+        const id = input.orderNumber ?? nextOrderId([active, ...history]);
         const isParcel = input.fulfilment === 'parcel';
         const order: TrackedOrder = {
           id,

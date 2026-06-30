@@ -21,6 +21,10 @@ export type CartItem = {
   qty: number;
   size?: string;
   color?: string;
+  /** product_variants.id — what the cart/place_order RPCs key on (Stage 2). */
+  variantId: string;
+  /** Snapshot of the chosen variant's price (the line's true unit price). */
+  unitPrice: number;
 };
 
 export type AddOptions = {
@@ -54,9 +58,18 @@ export function cartItemId(productId: string, size?: string): string {
   return `${productId}-${size ?? 'default'}`;
 }
 
-/** Sum of price * qty across all cart lines. */
+/** The variant matching a chosen size (falls back to the first/cheapest). */
+function resolveVariant(product: Product, size?: string) {
+  const match = size ? product.variants.find((v) => v.size === size) : undefined;
+  return match ?? product.variants[0];
+}
+
+/** Sum of unit price * qty across all cart lines. */
 export function cartSubtotal(items: CartItem[]): number {
-  return items.reduce((total, item) => total + item.product.price * item.qty, 0);
+  return items.reduce(
+    (total, item) => total + (item.unitPrice ?? item.product.price) * item.qty,
+    0,
+  );
 }
 
 /** Total number of units across all cart lines. */
@@ -79,7 +92,10 @@ export const useCart = create<CartState>()(
       add: (product, opts) =>
     set((state) => {
       const qty = Math.max(1, opts?.qty ?? 1);
-      const size = opts?.size;
+      const variant = resolveVariant(product, opts?.size);
+      // Use the resolved variant's size as the line's size (so a sizeless
+      // product with a single default variant lands on one stable line).
+      const size = variant?.size ?? undefined;
       const color = opts?.color ?? product.colors[0];
       const id = cartItemId(product.id, size);
 
@@ -98,7 +114,15 @@ export const useCart = create<CartState>()(
         };
       }
 
-      const line: CartItem = { id, product, qty, size, color };
+      const line: CartItem = {
+        id,
+        product,
+        qty,
+        size,
+        color,
+        variantId: variant?.id ?? '',
+        unitPrice: variant?.price ?? product.price,
+      };
       return { selectedIds, items: [...state.items, line] };
     }),
 
@@ -148,6 +172,10 @@ export const useCart = create<CartState>()(
     }),
     {
       name: 'oofoo-cart',
+      // v2: lines now carry variantId/unitPrice and product ids are DB uuids —
+      // discard any pre-backend persisted cart.
+      version: 2,
+      migrate: () => ({ items: [], selectedIds: [] }),
       storage: zustandStorage,
       partialize: (state) => ({ items: state.items, selectedIds: state.selectedIds }),
     },

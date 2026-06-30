@@ -39,8 +39,10 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { SHOP } from '@/data/shop';
+import { ensureRemoteAddress } from '@/lib/data/address';
+import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
 import { money } from '@/lib/format';
-import { type PaymentMethod, verifyPayment } from '@/lib/payment';
+import { type PaymentMethod } from '@/lib/payment';
 import { selectedAddress, useAddress } from '@/store/address';
 import { cartCount, cartSubtotal, selectedItems, useCart } from '@/store/cart';
 import { deliveryFeeFor, useMode } from '@/store/mode';
@@ -97,6 +99,7 @@ export default function CheckoutScreen() {
   );
   const [slipUri, setSlipUri] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
+  const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [copied, setCopied] = useState(false);
 
   const needsSlip = method === 'promptpay';
@@ -161,31 +164,45 @@ export default function CheckoutScreen() {
       Alert.alert('ยังไม่ได้แนบสลิป', 'กรุณาแนบสลิปการโอนเงินก่อนยืนยัน');
       return;
     }
+    if (!address) {
+      Alert.alert('ยังไม่มีที่อยู่จัดส่ง', 'กรุณาเลือกที่อยู่ก่อนสั่งซื้อ');
+      return;
+    }
+    if (chosen.length === 0) return;
     setStatus('verifying');
     try {
-      const result = await verifyPayment({ amount: total, method, slipUri });
-      if (result.ok) {
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setStatus('success');
-      } else {
-        setStatus('idle');
-        Alert.alert('ตรวจสอบไม่สำเร็จ', result.reason ?? 'กรุณาลองใหม่อีกครั้ง');
+      // The order is created on the backend: address → server cart → place_order.
+      const addressId = await ensureRemoteAddress(address);
+      const order = await placeOrder({
+        items: chosen,
+        mode,
+        paymentMethod: method === 'cod' ? 'cod' : 'promptpay_slip',
+        addressId,
+        promoCode: null,
+      });
+      // Prepay: record the uploaded slip (the file upload to Storage lands later).
+      if (method !== 'cod') {
+        await attachSlip(order.id, `payment-slips/${order.id}.jpg`, order.total).catch(() => {});
       }
-    } catch {
+      setPlaced(order);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setStatus('success');
+    } catch (e) {
       setStatus('idle');
-      Alert.alert('เกิดข้อผิดพลาด', 'ตรวจสอบการชำระเงินไม่สำเร็จ กรุณาลองใหม่');
+      Alert.alert('สั่งซื้อไม่สำเร็จ', orderErrorMessage(e));
     }
   };
 
   // Once the success card is closed: clear the paid lines, then start tracking —
   // delivery → live rider map, online → Flash parcel timeline.
   const finishSuccess = () => {
-    const paidTotal = total;
-    const paidCount = count;
     removeSelected();
     const id = createOrder({
-      total: paidTotal,
-      itemCount: paidCount,
+      orderNumber: placed?.orderNumber,
+      total: placed?.total ?? total,
+      itemCount: count,
       addressLabel: address?.label ?? 'บ้าน',
       addressLine: address?.line ?? '',
       fulfilment: mode === 'online' ? 'parcel' : 'delivery',
