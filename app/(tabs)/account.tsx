@@ -33,6 +33,7 @@ type MenuRow = {
 const MENU_ROWS: MenuRow[] = [
   { key: 'orders', label: 'คำสั่งซื้อของฉัน', caption: 'ดูออเดอร์ที่ผ่านมาและกำลังดำเนินการ', icon: 'receipt-outline' },
   { key: 'address', label: 'ที่อยู่จัดส่ง', caption: 'จัดการที่อยู่สำหรับจัดส่งสินค้า', icon: 'location-outline' },
+  { key: 'settings', label: 'ตั้งค่าการแจ้งเตือน', caption: 'ข่าวสารและโปรโมชัน', icon: 'notifications-outline' },
   { key: 'help', label: 'ศูนย์ช่วยเหลือ', caption: 'ติดต่อเราหรือคำถามที่พบบ่อย', icon: 'help-buoy-outline' },
 ];
 
@@ -50,6 +51,9 @@ export default function ProfileScreen() {
         break;
       case 'address':
         router.push('/address');
+        break;
+      case 'settings':
+        router.push('/account/settings');
         break;
       case 'help':
         Alert.alert('ศูนย์ช่วยเหลือ', 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.');

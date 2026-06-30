@@ -86,6 +86,26 @@ export async function markAllNotificationsRead(): Promise<void> {
   if (error) throw error;
 }
 
+/** Whether the user opted in to marketing/promo push (default on). */
+export async function getPushEnabled(): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('push_enabled')
+    .maybeSingle();
+  if (error) throw error;
+  return data?.push_enabled ?? true;
+}
+
+/** Set the marketing/promo push preference (transactional alerts are unaffected). */
+export async function setPushEnabled(enabled: boolean): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('UNAUTHENTICATED');
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert({ user_id: u.user.id, push_enabled: enabled });
+  if (error) throw error;
+}
+
 /** Register an Expo push token for the signed-in user. */
 export async function registerPushToken(token: string, platform?: string): Promise<void> {
   const { error } = await supabase.rpc('register_push_token', {
