@@ -13,7 +13,7 @@
  */
 
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, View, StyleSheet } from 'react-native';
 
 import { DeliveredView } from '@/components/order/DeliveredView';
@@ -23,7 +23,7 @@ import { TrackingMapView } from '@/components/order/TrackingMapView';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Spacing } from '@/constants/theme';
-import { submitRating as submitRatingApi } from '@/lib/data/order';
+import { submitRating as submitRatingApi, subscribeOrder } from '@/lib/data/order';
 import { useOrder } from '@/store/order';
 
 export default function OrderTrackingScreen() {
@@ -43,6 +43,12 @@ export default function OrderTrackingScreen() {
       if (id) void loadActive(id);
     }, [id, loadActive]),
   );
+
+  // Live status: refetch whenever this order changes on the backend.
+  useEffect(() => {
+    if (!id) return;
+    return subscribeOrder(id, () => void loadActive(id));
+  }, [id, loadActive]);
 
   const goHome = () => router.replace('/');
   const openChat = () => router.push('/order/chat');

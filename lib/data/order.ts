@@ -240,6 +240,28 @@ export async function listOrders(): Promise<TrackedOrder[]> {
   return ((data ?? []) as unknown as OrderRow[]).map(toTracked);
 }
 
+/**
+ * Subscribe to live updates for one order (Realtime postgres_changes on orders;
+ * RLS limits the stream to the caller's own orders). Calls `onChange` when the
+ * tracked order changes. Returns an unsubscribe fn.
+ */
+export function subscribeOrder(orderNumber: string, onChange: () => void): () => void {
+  const channel = supabase
+    .channel(`order:${orderNumber}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'orders' },
+      (payload) => {
+        const row = payload.new as { order_number?: string };
+        if (row.order_number === orderNumber) onChange();
+      },
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 /** A single order by its order_number (for the tracking screen). */
 export async function getOrderByNumber(orderNumber: string): Promise<TrackedOrder | null> {
   const { data, error } = await supabase
