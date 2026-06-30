@@ -1,3 +1,4 @@
+import { Card, Title } from '@tremor/react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './auth';
@@ -7,7 +8,8 @@ import { Products } from './pages/Products';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { ready, session, isAdmin } = useAuth();
-  if (!ready) return <div className="center-note">กำลังโหลด…</div>;
+  if (!ready)
+    return <div className="min-h-screen flex items-center justify-center text-tremor-content">กำลังโหลด…</div>;
   if (!session || !isAdmin) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
@@ -36,10 +38,10 @@ export default function App() {
 function Placeholder({ title }: { title: string }) {
   return (
     <>
-      <div className="page-head">
-        <h1>{title}</h1>
-      </div>
-      <div className="card center-note">เร็วๆ นี้</div>
+      <Title className="!text-2xl mb-6">{title}</Title>
+      <Card>
+        <p className="text-center text-tremor-content py-8">เร็วๆ นี้</p>
+      </Card>
     </>
   );
 }

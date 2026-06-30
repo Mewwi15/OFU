@@ -1,99 +1,13 @@
-:root {
-  --coral: #f15929;
-  --coral-strong: #c5410f;
-  --coral-tint: #fdeee7;
-  --green: #1e9e5c;
-  --green-strong: #017a3a;
-  --danger: #c62828;
-  --ink: #2b2320;
-  --muted: #8a807a;
-  --line: #ece6e2;
-  --bg: #faf6f3;
-  --surface: #ffffff;
-  --radius: 12px;
-  font-family: 'Mitr', system-ui, -apple-system, 'Noto Sans Thai', sans-serif;
-  color: var(--ink);
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  font-family: 'Mitr', system-ui, 'Noto Sans Thai', sans-serif;
+  font-weight: 300;
 }
 
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
-body { background: var(--bg); font-weight: 300; font-size: 14px; }
-a { color: var(--coral-strong); text-decoration: none; }
-h1, h2, h3 { font-weight: 500; margin: 0; }
-
-/* Layout */
-.shell { display: flex; min-height: 100vh; }
-.sidebar {
-  width: 230px; background: #241c18; color: #f4ede8; padding: 22px 14px;
-  display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh;
+body {
+  margin: 0;
+  @apply bg-tremor-background-muted text-tremor-content-strong;
 }
-.brand { font-weight: 600; font-size: 20px; color: #fff; padding: 6px 10px 18px; }
-.brand span { color: var(--coral); }
-.nav-link {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
-  color: #cdbfb6; font-weight: 300; cursor: pointer; border: none; background: none;
-  width: 100%; text-align: left; font-size: 14px;
-}
-.nav-link:hover { background: #322823; color: #fff; }
-.nav-link.active { background: var(--coral); color: #fff; font-weight: 400; }
-.sidebar .spacer { flex: 1; }
-.sidebar .who { font-size: 12px; color: #9c8d83; padding: 8px 12px; }
-
-.main { flex: 1; padding: 28px 34px; max-width: 1100px; }
-.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
-.page-head h1 { font-size: 24px; }
-
-/* Buttons */
-button {
-  font-family: inherit; font-size: 14px; border: none; border-radius: 10px; cursor: pointer;
-  padding: 9px 16px; font-weight: 400;
-}
-.btn { background: var(--coral); color: #fff; }
-.btn:hover { background: var(--coral-strong); }
-.btn:disabled { opacity: .5; cursor: default; }
-.btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
-.btn-ghost:hover { background: #f3eeea; }
-.btn-danger { background: transparent; color: var(--danger); border: 1px solid #f0d3d3; }
-.btn-danger:hover { background: #fbeaea; }
-.btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
-
-/* Cards / tables */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); }
-th { font-weight: 500; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-tr:last-child td { border-bottom: none; }
-td.right, th.right { text-align: right; }
-
-/* Badges */
-.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 400; }
-.badge-green { background: #e3f4ea; color: var(--green-strong); }
-.badge-muted { background: #f0ebe7; color: var(--muted); }
-.badge-coral { background: var(--coral-tint); color: var(--coral-strong); }
-.badge-danger { background: #fbeaea; color: var(--danger); }
-
-/* Forms */
-label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
-input, textarea, select {
-  width: 100%; font-family: inherit; font-size: 14px; padding: 10px 12px;
-  border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink);
-}
-input:focus, textarea:focus, select:focus { outline: none; border-color: var(--coral); }
-.row { display: flex; gap: 12px; }
-.row > * { flex: 1; }
-.muted { color: var(--muted); }
-.err { color: var(--danger); font-size: 13px; margin-top: 10px; }
-
-/* Modal */
-.overlay { position: fixed; inset: 0; background: rgba(20,14,10,.45); display: flex;
-  align-items: center; justify-content: center; padding: 20px; z-index: 50; }
-.modal { background: #fff; border-radius: 16px; padding: 24px; width: 460px; max-width: 100%;
-  max-height: 90vh; overflow: auto; }
-.modal h2 { font-size: 19px; margin-bottom: 6px; }
-
-/* Login */
-.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-.login-card { width: 360px; }
-.login-card .brand { padding: 0 0 18px; text-align: center; }
-
-.center-note { text-align: center; color: var(--muted); padding: 40px; }

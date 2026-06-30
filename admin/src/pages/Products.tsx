@@ -1,4 +1,13 @@
-import { useEffect, useState } from 'react';
+import { Badge, Select, SelectItem, Textarea, TextInput } from '@tremor/react';
+import {
+  RiAddLine,
+  RiDeleteBinLine,
+  RiEyeLine,
+  RiEyeOffLine,
+  RiPencilLine,
+  RiStarFill,
+} from '@remixicon/react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import {
   adjustStock,
@@ -12,6 +21,9 @@ import {
   type Category,
   type Product,
 } from '../lib/api';
+
+const primaryImage = (p: Product) =>
+  p.product_images.find((i) => i.is_primary)?.storage_path ?? p.product_images[0]?.storage_path ?? null;
 
 export function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -27,6 +39,7 @@ export function Products() {
       const [p, c] = await Promise.all([listProducts(), listCategories()]);
       setProducts(p);
       setCategories(c);
+      setVariantsFor((cur) => (cur ? p.find((x) => x.id === cur.id) ?? null : null));
     } catch (e) {
       setError(apiError(e));
     } finally {
@@ -59,69 +72,81 @@ export function Products() {
 
   return (
     <>
-      <div className="page-head">
-        <h1>สินค้า</h1>
-        <button className="btn" onClick={() => setEditing('new')}>
-          + เพิ่มสินค้า
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">สินค้า</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{products.length} รายการ</p>
+        </div>
+        <button
+          onClick={() => setEditing('new')}
+          className="flex items-center gap-1.5 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl px-4 py-2.5 text-sm font-medium transition">
+          <RiAddLine className="w-4 h-4" />
+          เพิ่มสินค้า
         </button>
       </div>
-      {error ? <div className="err" style={{ marginBottom: 12 }}>{error}</div> : null}
+      {error ? <p className="text-red-600 text-sm mb-3">{error}</p> : null}
 
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? (
-          <div className="center-note">กำลังโหลด…</div>
-        ) : products.length === 0 ? (
-          <div className="center-note">ยังไม่มีสินค้า</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>ชื่อ</th>
-                <th>หมวด</th>
-                <th>ขนาด</th>
-                <th className="right">ราคาเริ่ม</th>
-                <th className="right">สต็อก</th>
-                <th>สถานะ</th>
-                <th className="right">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => {
-                const prices = p.product_variants.map((v) => v.price);
-                const stock = p.product_variants.reduce((s, v) => s + v.stock_qty, 0);
-                return (
-                  <tr key={p.id}>
-                    <td>{p.name}</td>
-                    <td className="muted">{p.categories?.name ?? '—'}</td>
-                    <td>{p.product_variants.length}</td>
-                    <td className="right">{prices.length ? `฿${Math.min(...prices)}` : '—'}</td>
-                    <td className="right">{stock}</td>
-                    <td>
-                      <span className={'badge ' + (p.publish_state === 'published' ? 'badge-green' : 'badge-muted')}>
-                        {p.publish_state === 'published' ? 'เผยแพร่' : 'ร่าง'}
-                      </span>
-                    </td>
-                    <td className="right" style={{ whiteSpace: 'nowrap' }}>
-                      <button className="btn-ghost btn-sm" onClick={() => setVariantsFor(p)}>
-                        ขนาด/สต็อก
-                      </button>{' '}
-                      <button className="btn-ghost btn-sm" onClick={() => setEditing(p)}>
-                        แก้ไข
-                      </button>{' '}
-                      <button className="btn-ghost btn-sm" onClick={() => void togglePublish(p)}>
-                        {p.publish_state === 'published' ? 'ซ่อน' : 'เผยแพร่'}
-                      </button>{' '}
-                      <button className="btn-danger btn-sm" onClick={() => void onArchive(p)}>
-                        ลบ
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {loading ? (
+        <p className="text-center text-gray-400 py-16">กำลังโหลด…</p>
+      ) : products.length === 0 ? (
+        <p className="text-center text-gray-400 py-16">ยังไม่มีสินค้า</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+          {products.map((p) => {
+            const prices = p.product_variants.map((v) => v.price);
+            const stock = p.product_variants.reduce((s, v) => s + v.stock_qty, 0);
+            const img = primaryImage(p);
+            const published = p.publish_state === 'published';
+            return (
+              <div
+                key={p.id}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                <div className="relative aspect-[4/3] bg-gray-100">
+                  {img ? (
+                    <img src={img} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full grid place-items-center text-gray-300 text-sm">ไม่มีรูป</div>
+                  )}
+                  <span className="absolute top-2.5 right-2.5">
+                    <Badge color={published ? 'emerald' : 'gray'}>{published ? 'เผยแพร่' : 'ร่าง'}</Badge>
+                  </span>
+                </div>
+                <div className="p-4 flex flex-col flex-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Badge color="orange">{p.categories?.name ?? 'ไม่ระบุ'}</Badge>
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <RiStarFill className="w-3.5 h-3.5 text-amber-400" />
+                      {p.rating.toFixed(1)}
+                    </span>
+                  </div>
+                  <h3 className="font-medium leading-snug line-clamp-2 min-h-[2.6em]">{p.name}</h3>
+                  <div className="flex gap-5 mt-3 mb-4">
+                    <Stat label="ราคาเริ่ม" value={prices.length ? `฿${Math.min(...prices)}` : '—'} />
+                    <Stat label="สต็อก" value={String(stock)} />
+                    <Stat label="ขนาด" value={String(p.product_variants.length)} className="ml-auto text-right" />
+                  </div>
+                  <div className="flex gap-2 mt-auto">
+                    <button
+                      onClick={() => setVariantsFor(p)}
+                      className="flex-1 bg-gray-900 hover:bg-gray-800 text-white rounded-xl py-2.5 text-sm font-medium transition">
+                      ขนาด & สต็อก
+                    </button>
+                    <IconBtn title="แก้ไข" onClick={() => setEditing(p)}>
+                      <RiPencilLine className="w-[18px] h-[18px]" />
+                    </IconBtn>
+                    <IconBtn title={published ? 'ซ่อน' : 'เผยแพร่'} onClick={() => void togglePublish(p)}>
+                      {published ? <RiEyeOffLine className="w-[18px] h-[18px]" /> : <RiEyeLine className="w-[18px] h-[18px]" />}
+                    </IconBtn>
+                    <IconBtn title="ลบ" danger onClick={() => void onArchive(p)}>
+                      <RiDeleteBinLine className="w-[18px] h-[18px]" />
+                    </IconBtn>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {editing ? (
         <ProductModal
@@ -136,19 +161,67 @@ export function Products() {
       ) : null}
 
       {variantsFor ? (
-        <VariantsModal
-          product={variantsFor}
-          onClose={() => setVariantsFor(null)}
-          onChanged={async () => {
-            await load();
-            // refresh the open modal's product reference
-            setVariantsFor((cur) => (cur ? products.find((p) => p.id === cur.id) ?? cur : cur));
-          }}
-        />
+        <VariantsModal product={variantsFor} onClose={() => setVariantsFor(null)} onChanged={load} />
       ) : null}
     </>
   );
 }
+
+function Stat({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <div className="text-xs text-gray-400">{label}</div>
+      <div className="font-medium text-gray-800">{value}</div>
+    </div>
+  );
+}
+
+function IconBtn({
+  children,
+  onClick,
+  title,
+  danger,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  title: string;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={
+        'w-10 grid place-items-center rounded-xl border transition ' +
+        (danger
+          ? 'border-gray-200 text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-100'
+          : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800')
+      }>
+      {children}
+    </button>
+  );
+}
+
+/* ── Modal shell (custom — reliable visibility + full control) ─────────────── */
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl w-[480px] max-w-full max-h-[90vh] overflow-auto p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className="mb-3">
+    <label className="text-xs text-gray-500 block mb-1">{label}</label>
+    {children}
+  </div>
+);
 
 function ProductModal({
   product,
@@ -187,41 +260,44 @@ function ProductModal({
       onSaved();
     } catch (e) {
       setErr(apiError(e));
-    } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>{product ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'}</h2>
-        <label>ชื่อสินค้า</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} />
-        <label>หมวดหมู่</label>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">— ไม่ระบุ —</option>
+    <Modal title={product ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'} onClose={onClose}>
+      <Field label="ชื่อสินค้า">
+        <TextInput value={name} onValueChange={setName} />
+      </Field>
+      <Field label="หมวดหมู่">
+        <Select value={categoryId} onValueChange={setCategoryId} enableClear={false}>
+          <SelectItem value="">— ไม่ระบุ —</SelectItem>
           {categories.map((c) => (
-            <option key={c.id} value={c.id}>
+            <SelectItem key={c.id} value={c.id}>
               {c.name}
-            </option>
+            </SelectItem>
           ))}
-        </select>
-        <label>คำโปรย</label>
-        <input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} />
-        <label>รายละเอียด</label>
-        <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
-        {err ? <div className="err">{err}</div> : null}
-        <div className="row" style={{ marginTop: 20 }}>
-          <button className="btn-ghost" onClick={onClose}>
-            ยกเลิก
-          </button>
-          <button className="btn" disabled={busy} onClick={() => void save()}>
-            {busy ? 'กำลังบันทึก…' : 'บันทึก'}
-          </button>
-        </div>
+        </Select>
+      </Field>
+      <Field label="คำโปรย">
+        <TextInput value={subtitle} onValueChange={setSubtitle} />
+      </Field>
+      <Field label="รายละเอียด">
+        <Textarea value={description} onValueChange={setDescription} rows={3} />
+      </Field>
+      {err ? <p className="text-red-600 text-sm">{err}</p> : null}
+      <div className="flex gap-3 mt-5">
+        <button className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm hover:bg-gray-50" onClick={onClose}>
+          ยกเลิก
+        </button>
+        <button
+          className="flex-1 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
+          disabled={busy}
+          onClick={() => void save()}>
+          {busy ? 'กำลังบันทึก…' : 'บันทึก'}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -277,72 +353,58 @@ function VariantsModal({
   };
 
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>ขนาด / สต็อก — {product.name}</h2>
-        <table style={{ marginTop: 8 }}>
-          <thead>
-            <tr>
-              <th>ขนาด</th>
-              <th className="right">ราคา</th>
-              <th className="right">สต็อก</th>
-              <th className="right">ปรับ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {product.product_variants.map((v) => (
-              <tr key={v.id}>
-                <td>{v.size ?? 'ปกติ'}</td>
-                <td className="right">฿{v.price}</td>
-                <td className="right">
-                  {v.stock_qty}
-                  {v.reserved_qty ? <span className="muted"> (จอง {v.reserved_qty})</span> : null}
-                </td>
-                <td className="right" style={{ whiteSpace: 'nowrap' }}>
-                  <button className="btn-ghost btn-sm" onClick={() => void bump(v.id, -1)}>
-                    −
-                  </button>{' '}
-                  <button className="btn-ghost btn-sm" onClick={() => void bump(v.id, +10)}>
-                    +10
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {product.product_variants.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="muted">
-                  ยังไม่มีขนาด
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-
-        <h3 style={{ marginTop: 18, fontSize: 15 }}>เพิ่มขนาด</h3>
-        <div className="row">
-          <div>
-            <label>ขนาด (เว้นว่าง = ปกติ)</label>
-            <input value={size} onChange={(e) => setSize(e.target.value)} placeholder="1 กก." />
-          </div>
-          <div>
-            <label>ราคา (฿)</label>
-            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
-          </div>
-          <div>
-            <label>สต็อก</label>
-            <input value={stock} onChange={(e) => setStock(e.target.value)} inputMode="numeric" />
-          </div>
-        </div>
-        {err ? <div className="err">{err}</div> : null}
-        <div className="row" style={{ marginTop: 18 }}>
-          <button className="btn-ghost" onClick={onClose}>
-            ปิด
-          </button>
-          <button className="btn" disabled={busy} onClick={() => void add()}>
-            {busy ? 'กำลังเพิ่ม…' : 'เพิ่มขนาด'}
-          </button>
-        </div>
+    <Modal title={`ขนาด / สต็อก — ${product.name}`} onClose={onClose}>
+      <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-4">
+        {product.product_variants.length === 0 ? (
+          <div className="text-gray-400 text-sm p-4">ยังไม่มีขนาด</div>
+        ) : (
+          product.product_variants.map((v) => (
+            <div key={v.id} className="flex items-center gap-3 p-3 text-sm">
+              <div className="flex-1 font-medium">{v.size ?? 'ปกติ'}</div>
+              <div className="w-16 text-right">฿{v.price}</div>
+              <div className="w-24 text-right text-gray-500">
+                สต็อก {v.stock_qty}
+                {v.reserved_qty ? ` (จอง ${v.reserved_qty})` : ''}
+              </div>
+              <button
+                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+                onClick={() => void bump(v.id, -1)}>
+                −
+              </button>
+              <button
+                className="w-10 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50"
+                onClick={() => void bump(v.id, +10)}>
+                +10
+              </button>
+            </div>
+          ))
+        )}
       </div>
-    </div>
+
+      <p className="font-medium text-sm mb-2">เพิ่มขนาด</p>
+      <div className="flex gap-3">
+        <Field label="ขนาด (เว้นว่าง = ปกติ)">
+          <TextInput value={size} onValueChange={setSize} placeholder="1 กก." />
+        </Field>
+        <Field label="ราคา (฿)">
+          <TextInput value={price} onValueChange={setPrice} />
+        </Field>
+        <Field label="สต็อก">
+          <TextInput value={stock} onValueChange={setStock} />
+        </Field>
+      </div>
+      {err ? <p className="text-red-600 text-sm">{err}</p> : null}
+      <div className="flex gap-3 mt-4">
+        <button className="flex-1 border border-gray-200 rounded-xl py-2.5 text-sm hover:bg-gray-50" onClick={onClose}>
+          ปิด
+        </button>
+        <button
+          className="flex-1 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl py-2.5 text-sm font-medium disabled:opacity-50"
+          disabled={busy}
+          onClick={() => void add()}>
+          {busy ? 'กำลังเพิ่ม…' : 'เพิ่มขนาด'}
+        </button>
+      </div>
+    </Modal>
   );
 }

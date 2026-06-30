@@ -1,3 +1,4 @@
+import { Button, Card, TextInput } from '@tremor/react';
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
@@ -18,8 +19,6 @@ export function Login() {
     setError(null);
     try {
       await signIn(email.trim(), password);
-      // session/profile flow in via the auth listener; if the account isn't an
-      // admin, the protected routes bounce back here.
     } catch {
       setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     } finally {
@@ -28,34 +27,36 @@ export function Login() {
   };
 
   return (
-    <div className="login-wrap">
-      <form className="card login-card" onSubmit={onSubmit}>
-        <div className="brand">
-          อู้ฟู่ <span>· แอดมิน</span>
+    <div className="min-h-screen flex items-center justify-center p-5">
+      <Card className="max-w-sm w-full">
+        <div className="text-center mb-6 text-2xl font-semibold">
+          อู้ฟู่ <span className="text-tremor-brand">· แอดมิน</span>
         </div>
-        <label>อีเมล</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="admin@oofoo.local"
-          autoComplete="username"
-        />
-        <label>รหัสผ่าน</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-        />
-        <button className="btn" style={{ width: '100%', marginTop: 18 }} disabled={busy}>
-          {busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
-        </button>
-        {ready && session && !isAdmin ? (
-          <div className="err">บัญชีนี้ไม่ใช่แอดมิน</div>
-        ) : null}
-        {error ? <div className="err">{error}</div> : null}
-      </form>
+        <form onSubmit={onSubmit} className="space-y-1">
+          <label className="text-tremor-label text-tremor-content">อีเมล</label>
+          <TextInput
+            type="email"
+            value={email}
+            onValueChange={setEmail}
+            placeholder="admin@oofoo.local"
+            autoComplete="username"
+          />
+          <label className="text-tremor-label text-tremor-content pt-2 block">รหัสผ่าน</label>
+          <TextInput
+            type="password"
+            value={password}
+            onValueChange={setPassword}
+            autoComplete="current-password"
+          />
+          <Button type="submit" loading={busy} className="w-full !mt-6">
+            เข้าสู่ระบบ
+          </Button>
+          {ready && session && !isAdmin ? (
+            <p className="text-red-600 text-tremor-default pt-2">บัญชีนี้ไม่ใช่แอดมิน</p>
+          ) : null}
+          {error ? <p className="text-red-600 text-tremor-default pt-2">{error}</p> : null}
+        </form>
+      </Card>
     </div>
   );
 }
