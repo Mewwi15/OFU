@@ -20,15 +20,11 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { categories, products, type Category } from '@/data/products';
+import { categories, type Category } from '@/data/products';
+import { useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
 const TAB_BAR_CLEARANCE = 96;
-
-/* Curated catalog rails (derived from the mock catalog). */
-const TRENDING = products.slice(0, 6);
-const PROMOTIONS = [...products].sort((a, b) => a.price - b.price).slice(0, 6);
-const HOT_WEEKLY = [...products].sort((a, b) => b.rating - a.rating).slice(0, 6);
 
 /** Promo banner heading each curated section. */
 const SECTION_BANNERS = {
@@ -78,6 +74,17 @@ export default function CatalogScreen() {
     if (isCategory(category)) setActiveCategory(category);
   }, [category]);
 
+  const products = useCatalog((s) => s.products);
+  const trending = useMemo(() => products.slice(0, 6), [products]);
+  const promotions = useMemo(
+    () => [...products].sort((a, b) => a.price - b.price).slice(0, 6),
+    [products],
+  );
+  const hotWeekly = useMemo(
+    () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 6),
+    [products],
+  );
+
   const q = query.trim().toLowerCase();
   const isBrowsing = q.length === 0 && activeCategory === 'ทั้งหมด';
 
@@ -92,7 +99,7 @@ export default function CatalogScreen() {
         product.subtitle.toLowerCase().includes(q)
       );
     });
-  }, [q, activeCategory]);
+  }, [products, q, activeCategory]);
 
   return (
     <View style={styles.screen}>
@@ -182,11 +189,11 @@ export default function CatalogScreen() {
              vertical recommended grid */
           <>
             <PromoBanner {...SECTION_BANNERS.trending} />
-            <ProductRail title="สินค้าติดกระแส" data={TRENDING} />
+            <ProductRail title="สินค้าติดกระแส" data={trending} />
             <PromoBanner {...SECTION_BANNERS.promo} />
-            <ProductRail title="โปรโมชั่น" data={PROMOTIONS} />
+            <ProductRail title="โปรโมชั่น" data={promotions} />
             <PromoBanner {...SECTION_BANNERS.hot} />
-            <ProductRail title="มาแรงประจำสัปดาห์" data={HOT_WEEKLY} />
+            <ProductRail title="มาแรงประจำสัปดาห์" data={hotWeekly} />
 
             <View style={styles.gridSection}>
               <Text variant="subtitle" style={styles.gridTitle}>

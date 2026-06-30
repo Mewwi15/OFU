@@ -34,11 +34,12 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography, tokens } from '@/constants/theme';
-import { products, type Product } from '@/data/products';
+import { type Product } from '@/data/products';
 import { SHOP_HOURS_LABEL } from '@/data/shop';
 import { money } from '@/lib/format';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
+import { useCatalog } from '@/store/catalog';
 import {
   cartCount,
   cartSubtotal,
@@ -213,6 +214,7 @@ export default function CartScreen() {
     selectedCount > 0 ? `${checkoutVerb} (${selectedCount})` : checkoutVerb;
 
   // Suggestions = catalog products not already in the cart.
+  const products = useCatalog((s) => s.products);
   const inCart = new Set(items.map((i) => i.product.id));
   const suggestions = products.filter((p) => !inCart.has(p.id)).slice(0, 8);
 

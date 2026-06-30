@@ -21,9 +21,9 @@ import { RatingStars } from '@/components/ui/RatingStars';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
-import { getProduct } from '@/data/products';
 import { money } from '@/lib/format';
 import { useCart } from '@/store/cart';
+import { findProduct, useCatalog } from '@/store/catalog';
 
 /** At-a-glance promises shown under the price. */
 const PERKS = [
@@ -38,7 +38,8 @@ export default function ProductDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  const product = getProduct(id);
+  const products = useCatalog((s) => s.products);
+  const product = findProduct(products, id);
 
   const add = useCart((s) => s.add);
 

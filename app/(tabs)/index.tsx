@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -21,10 +21,11 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { categories, products, type Category } from '@/data/products';
+import { categories, type Category } from '@/data/products';
 import { SHOP_HOURS_LABEL } from '@/data/shop';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
+import { useCatalog } from '@/store/catalog';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
 const TAB_BAR_CLEARANCE = 110;
@@ -49,16 +50,20 @@ const BANNER_SLIDES = [
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
 
-/* Curated home rails (derived from the mock catalog). */
-const BEST_SELLERS = [...products].sort((a, b) => b.rating - a.rating).slice(0, 8);
-const RECOMMENDED = products.slice(0, 8);
-const NEW_ARRIVALS = [...products].reverse().slice(0, 8);
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const address = useAddress(selectedAddress);
   const shopOpen = useShopOpen();
+
+  /* ----- Catalog (from Supabase) ----- */
+  const products = useCatalog((s) => s.products);
+  const bestSellers = useMemo(
+    () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
+    [products],
+  );
+  const recommended = useMemo(() => products.slice(0, 8), [products]);
+  const newArrivals = useMemo(() => [...products].reverse().slice(0, 8), [products]);
 
   /* ----- Auto-rotating hero banner ----- */
   const bannerRef = useRef<ScrollView>(null);
@@ -231,13 +236,13 @@ export default function HomeScreen() {
           </ScrollView>
 
           {/* Curated rails */}
-          <ProductRail title="ขายดี" data={BEST_SELLERS} onSeeAll={() => openCatalog()} />
+          <ProductRail title="ขายดี" data={bestSellers} onSeeAll={() => openCatalog()} />
           <ProductRail
             title="แนะนำสำหรับคุณ"
-            data={RECOMMENDED}
+            data={recommended}
             onSeeAll={() => openCatalog()}
           />
-          <ProductRail title="มาใหม่" data={NEW_ARRIVALS} onSeeAll={() => openCatalog()} />
+          <ProductRail title="มาใหม่" data={newArrivals} onSeeAll={() => openCatalog()} />
         </View>
       </ScrollView>
     </View>
