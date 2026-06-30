@@ -287,7 +287,37 @@ export async function submitRating(
   if (error) throw error;
 }
 
-/** Map a place_order error (RAISE message = the code) to friendly Thai. */
+/** The variant lines of a past order, for "reorder". */
+export async function getReorderItems(
+  orderNumber: string,
+): Promise<{ variantId: string; qty: number }[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('order_items(variant_id, qty)')
+    .eq('order_number', orderNumber)
+    .single();
+  if (error) throw error;
+  const rows = (data as { order_items: { variant_id: string; qty: number }[] | null }).order_items ?? [];
+  return rows.map((r) => ({ variantId: r.variant_id, qty: r.qty }));
+}
+
+/** Cancel an order the customer still owns (before it ships). */
+export async function cancelOrder(orderNumber: string, note?: string): Promise<void> {
+  const { data: row, error: e1 } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('order_number', orderNumber)
+    .single();
+  if (e1) throw e1;
+  const { error } = await supabase.rpc('cancel_order', {
+    p_order_id: (row as { id: string }).id,
+    p_reason: 'customer_request',
+    p_note: note ?? undefined,
+  });
+  if (error) throw error;
+}
+
+/** Map a place_order / cancel error (RAISE message = the code) to friendly Thai. */
 export function orderErrorMessage(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? '';
   const table: Record<string, string> = {
@@ -300,6 +330,8 @@ export function orderErrorMessage(e: unknown): string {
     ADDRESS_REQUIRED: 'กรุณาเลือกที่อยู่จัดส่ง',
     PROMO_INVALID: 'โค้ดส่วนลดใช้ไม่ได้',
     PROMO_MIN_SPEND: 'ยอดสั่งซื้อยังไม่ถึงขั้นต่ำของโค้ดส่วนลด',
+    ALREADY_TERMINAL: 'ออเดอร์นี้จบแล้ว ยกเลิกไม่ได้',
+    FORBIDDEN: 'ออเดอร์เริ่มจัดส่งแล้ว ยกเลิกไม่ได้',
   };
   return table[msg] ?? 'สั่งซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
 }

@@ -23,7 +23,12 @@ import { TrackingMapView } from '@/components/order/TrackingMapView';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Spacing } from '@/constants/theme';
-import { submitRating as submitRatingApi, subscribeOrder } from '@/lib/data/order';
+import {
+  cancelOrder,
+  orderErrorMessage,
+  submitRating as submitRatingApi,
+  subscribeOrder,
+} from '@/lib/data/order';
 import { useOrder } from '@/store/order';
 
 export default function OrderTrackingScreen() {
@@ -61,6 +66,25 @@ export default function OrderTrackingScreen() {
   const onSubmitRating = async (stars: number, comment: string) => {
     if (active) await submitRatingApi(active.id, stars, comment).catch(() => {});
     setSubmitted(true);
+  };
+
+  const onCancel = () => {
+    if (!active) return;
+    Alert.alert('ยกเลิกออเดอร์', `ต้องการยกเลิกออเดอร์ ${active.id} ?`, [
+      { text: 'ไม่ใช่', style: 'cancel' },
+      {
+        text: 'ยกเลิกออเดอร์',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancelOrder(active.id);
+            await loadActive(active.id);
+          } catch (e) {
+            Alert.alert('ยกเลิกไม่สำเร็จ', orderErrorMessage(e));
+          }
+        },
+      },
+    ]);
   };
 
   const finishRating = () => {
@@ -115,7 +139,12 @@ export default function OrderTrackingScreen() {
   return (
     <View style={styles.screen}>
       {active.status === 'preparing' ? (
-        <PreparingView order={active} onClose={goHome} onExplore={() => router.push('/search')} />
+        <PreparingView
+          order={active}
+          onClose={goHome}
+          onExplore={() => router.push('/search')}
+          onCancel={onCancel}
+        />
       ) : active.status === 'out_for_delivery' ? (
         <TrackingMapView
           order={active}

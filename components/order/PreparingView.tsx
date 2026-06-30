@@ -22,9 +22,11 @@ type Props = {
   order: TrackedOrder;
   onClose: () => void;
   onExplore: () => void;
+  /** Shown while the order can still be cancelled (before it ships). */
+  onCancel?: () => void;
 };
 
-export function PreparingView({ order, onClose, onExplore }: Props) {
+export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -91,6 +93,16 @@ export function PreparingView({ order, onClose, onExplore }: Props) {
           </View>
         </Animated.View>
       </View>
+
+      {onCancel ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel="ยกเลิกออเดอร์"
+          onPress={onCancel}
+          style={styles.cancelBtn}>
+          <Text style={styles.cancelText}>ยกเลิกออเดอร์</Text>
+        </PressableScale>
+      ) : null}
 
       {/* Pinned footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
@@ -237,6 +249,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  cancelBtn: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.xs,
+  },
+  cancelText: {
+    ...Typography.bodyStrong,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
   },
 
   /* Footer */

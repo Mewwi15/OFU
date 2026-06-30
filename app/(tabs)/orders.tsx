@@ -10,7 +10,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,8 +19,10 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { OrderStatus, TrackedOrder } from '@/data/fulfillment';
-import { TERMINAL } from '@/lib/data/order';
+import { getReorderItems, TERMINAL } from '@/lib/data/order';
 import { money } from '@/lib/format';
+import { useCart } from '@/store/cart';
+import { useCatalog } from '@/store/catalog';
 import { useOrder } from '@/store/order';
 
 type StatusTone = 'active' | 'done' | 'fail';
@@ -51,9 +53,11 @@ const TONE_TEXT: Record<StatusTone, string> = {
 function OrderRow({
   order,
   onPress,
+  onReorder,
 }: {
   order: TrackedOrder;
   onPress?: () => void;
+  onReorder?: () => void;
 }) {
   const meta = STATUS_META[order.status];
   const Row = (
@@ -77,7 +81,18 @@ function OrderRow({
           {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
         </Text>
       </View>
-      {onPress ? <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} /> : null}
+      {onReorder ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`สั่งซ้ำ ${order.id}`}
+          hitSlop={8}
+          onPress={onReorder}
+          style={styles.reorderPill}>
+          <Text style={styles.reorderText}>สั่งซ้ำ</Text>
+        </PressableScale>
+      ) : onPress ? (
+        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+      ) : null}
     </View>
   );
 
@@ -99,6 +114,8 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const list = useOrder((s) => s.list);
   const loadList = useOrder((s) => s.loadList);
+  const products = useCatalog((s) => s.products);
+  const addToCart = useCart((s) => s.add);
 
   // Refetch the customer's orders whenever this tab gains focus.
   useFocusEffect(
@@ -106,6 +123,28 @@ export default function OrdersScreen() {
       void loadList();
     }, [loadList]),
   );
+
+  const reorder = async (orderNumber: string) => {
+    try {
+      const items = await getReorderItems(orderNumber);
+      let added = 0;
+      for (const it of items) {
+        const product = products.find((p) => p.variants.some((v) => v.id === it.variantId));
+        const variant = product?.variants.find((v) => v.id === it.variantId);
+        if (product && variant && variant.available > 0) {
+          addToCart(product, { size: variant.size ?? undefined, qty: it.qty });
+          added += 1;
+        }
+      }
+      if (added > 0) {
+        router.push('/cart');
+      } else {
+        Alert.alert('สั่งซ้ำไม่ได้', 'สินค้าในออเดอร์นี้ไม่พร้อมจำหน่ายแล้ว');
+      }
+    } catch {
+      Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถสั่งซ้ำได้ กรุณาลองใหม่');
+    }
+  };
 
   const ongoing = list.filter((o) => !TERMINAL.includes(o.status));
   const history = list.filter((o) => TERMINAL.includes(o.status));
@@ -153,7 +192,11 @@ export default function OrdersScreen() {
                   <Animated.View
                     key={order.id}
                     entering={FadeInDown.delay(120 + i * 60).springify().damping(18)}>
-                    <OrderRow order={order} onPress={() => router.push(`/order/${order.id}`)} />
+                    <OrderRow
+                      order={order}
+                      onPress={() => router.push(`/order/${order.id}`)}
+                      onReorder={() => reorder(order.id)}
+                    />
                   </Animated.View>
                 ))}
               </View>
@@ -228,6 +271,17 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...Typography.label,
+  },
+  reorderPill: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+  },
+  reorderText: {
+    ...Typography.label,
+    color: Colors.primaryStrong,
   },
 
   /* Empty */
