@@ -7,8 +7,8 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,10 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Breathing } from '@/components/ui/Breathing';
 import { Chip } from '@/components/ui/Chip';
 import { IconButton } from '@/components/ui/IconButton';
+import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { MOCK_NOTIFICATIONS, type NotificationKind } from '@/data/fulfillment';
+import { type NotificationKind } from '@/data/fulfillment';
+import { unreadCount, useNotifications } from '@/store/notifications';
 
 type Filter = 'all' | NotificationKind;
 
@@ -34,9 +36,21 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>('all');
 
+  const all = useNotifications((s) => s.items);
+  const load = useNotifications((s) => s.load);
+  const markRead = useNotifications((s) => s.markRead);
+  const markAllRead = useNotifications((s) => s.markAllRead);
+  const unread = useNotifications(unreadCount);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
   const items = useMemo(
-    () => (filter === 'all' ? MOCK_NOTIFICATIONS : MOCK_NOTIFICATIONS.filter((n) => n.kind === filter)),
-    [filter],
+    () => (filter === 'all' ? all : all.filter((n) => n.kind === filter)),
+    [filter, all],
   );
 
   return (
@@ -46,6 +60,15 @@ export default function NotificationsScreen() {
         style={styles.header}
         left={
           <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
+        }
+        right={
+          unread > 0 ? (
+            <IconButton
+              icon="checkmark-done"
+              accessibilityLabel="อ่านทั้งหมด"
+              onPress={() => void markAllRead()}
+            />
+          ) : undefined
         }
       />
 
@@ -69,33 +92,39 @@ export default function NotificationsScreen() {
             <Animated.View
               key={n.id}
               entering={FadeInDown.delay(i * 70).springify().damping(18)}
-              layout={LinearTransition.springify()}
-              style={styles.row}>
-              <View style={[styles.iconTile, promo ? styles.iconTilePromo : styles.iconTileOrder]}>
-                <Ionicons
-                  name={n.icon}
-                  size={20}
-                  color={promo ? Colors.accentStrong : Colors.primaryStrong}
-                />
-              </View>
-              <View style={styles.rowBody}>
-                <View style={styles.rowTop}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    {n.title}
-                  </Text>
-                  <Text variant="caption" style={styles.rowTime}>
-                    {n.time}
+              layout={LinearTransition.springify()}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={`อ่าน ${n.title}`}
+                scaleTo={0.98}
+                onPress={() => n.unread && markRead(n.id)}
+                style={styles.row}>
+                <View style={[styles.iconTile, promo ? styles.iconTilePromo : styles.iconTileOrder]}>
+                  <Ionicons
+                    name={n.icon}
+                    size={20}
+                    color={promo ? Colors.accentStrong : Colors.primaryStrong}
+                  />
+                </View>
+                <View style={styles.rowBody}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>
+                      {n.title}
+                    </Text>
+                    <Text variant="caption" style={styles.rowTime}>
+                      {n.time}
+                    </Text>
+                  </View>
+                  <Text variant="caption" style={styles.rowText}>
+                    {n.body}
                   </Text>
                 </View>
-                <Text variant="caption" style={styles.rowText}>
-                  {n.body}
-                </Text>
-              </View>
-              {n.unread ? (
-                <Breathing amount={0.35} duration={1100}>
-                  <View style={styles.unreadDot} />
-                </Breathing>
-              ) : null}
+                {n.unread ? (
+                  <Breathing amount={0.35} duration={1100}>
+                    <View style={styles.unreadDot} />
+                  </Breathing>
+                ) : null}
+              </PressableScale>
             </Animated.View>
           );
         })}

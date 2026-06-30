@@ -4,18 +4,21 @@ import { useEffect } from 'react';
 import { TabBar } from '@/components/navigation/TabBar';
 import { useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
+import { useNotifications } from '@/store/notifications';
 import { useShop } from '@/store/shop';
 
 export default function TabLayout() {
-  // Load the catalog + address book + shop info once when the authed app mounts.
+  // Load the catalog + address book + shop info + notifications once on mount.
   const loadCatalog = useCatalog((s) => s.load);
   const loadAddresses = useAddress((s) => s.load);
   const loadShop = useShop((s) => s.load);
+  const loadNotifications = useNotifications((s) => s.load);
   useEffect(() => {
     loadCatalog();
     loadAddresses();
     loadShop();
-  }, [loadCatalog, loadAddresses, loadShop]);
+    loadNotifications();
+  }, [loadCatalog, loadAddresses, loadShop, loadNotifications]);
 
   return (
     <Tabs

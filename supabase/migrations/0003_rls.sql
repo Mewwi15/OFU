@@ -219,7 +219,7 @@ create policy shift_cash_read on shift_cash_entries for select using (
 create policy notifications_read on notifications for select using (
   public.is_admin_of(shop_id)
   or exists (select 1 from notification_recipients nr
-             where nr.notification_id = id and nr.user_id = auth.uid())
+             where nr.notification_id = notifications.id and nr.user_id = auth.uid())
 );
 -- recipients: read own + mark-read (update read_at) on own rows
 create policy notif_recipients_read on notification_recipients for select
