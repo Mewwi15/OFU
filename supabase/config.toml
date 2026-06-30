@@ -339,9 +339,10 @@ skip_nonce_check = false
 email_optional = false
 
 [auth.external.google]
-enabled = false
-client_id = ""
-# DO NOT commit the secret — use env substitution. Set enabled = true once keys exist.
+enabled = true
+# Both pulled from env so nothing lands in git. Export them before `supabase start`:
+#   SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID, SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
 url = ""
