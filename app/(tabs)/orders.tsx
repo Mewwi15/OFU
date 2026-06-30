@@ -8,7 +8,8 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { OrderStatus, TrackedOrder } from '@/data/fulfillment';
+import { TERMINAL } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { useOrder } from '@/store/order';
 
@@ -95,10 +97,19 @@ function OrderRow({
 export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const active = useOrder((s) => s.active);
-  const history = useOrder((s) => s.history);
+  const list = useOrder((s) => s.list);
+  const loadList = useOrder((s) => s.loadList);
 
-  const isEmpty = !active && history.length === 0;
+  // Refetch the customer's orders whenever this tab gains focus.
+  useFocusEffect(
+    useCallback(() => {
+      void loadList();
+    }, [loadList]),
+  );
+
+  const ongoing = list.filter((o) => !TERMINAL.includes(o.status));
+  const history = list.filter((o) => TERMINAL.includes(o.status));
+  const isEmpty = list.length === 0;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
@@ -123,22 +134,26 @@ export default function OrdersScreen() {
             styles.content,
             { paddingBottom: 110 + insets.bottom },
           ]}>
-          {active ? (
+          {ongoing.length > 0 ? (
             <Animated.View entering={FadeInDown.springify().damping(18)}>
               <Text style={styles.eyebrow}>กำลังดำเนินการ</Text>
-              <OrderRow order={active} onPress={() => router.push(`/order/${active.id}`)} />
+              <View style={styles.stack}>
+                {ongoing.map((order) => (
+                  <OrderRow key={order.id} order={order} onPress={() => router.push(`/order/${order.id}`)} />
+                ))}
+              </View>
             </Animated.View>
           ) : null}
 
           {history.length > 0 ? (
             <Animated.View entering={FadeInDown.delay(80).springify().damping(18)}>
-              <Text style={[styles.eyebrow, active && styles.eyebrowTop]}>ที่ผ่านมา</Text>
+              <Text style={[styles.eyebrow, ongoing.length > 0 && styles.eyebrowTop]}>ที่ผ่านมา</Text>
               <View style={styles.stack}>
                 {history.map((order, i) => (
                   <Animated.View
                     key={order.id}
                     entering={FadeInDown.delay(120 + i * 60).springify().damping(18)}>
-                    <OrderRow order={order} />
+                    <OrderRow order={order} onPress={() => router.push(`/order/${order.id}`)} />
                   </Animated.View>
                 ))}
               </View>

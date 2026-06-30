@@ -5,6 +5,7 @@
  * atomically (reserves/commits stock, applies promo, idempotent).
  */
 
+import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
 import type { CartItem } from '@/store/cart';
 import { supabase } from '@/lib/supabase/client';
 import { uuidv4 } from '@/lib/uuid';
@@ -96,6 +97,122 @@ export async function attachSlip(
     p_observed_amount: observedAmount ?? undefined,
   });
   if (error) throw error;
+}
+
+/* ── Reading orders back (for the orders tab + tracking screen) ────────────── */
+
+const THAI_MONTHS = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+];
+function thaiStamp(iso: string | null): string | undefined {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${hh}:${mm} น.`;
+}
+
+/** DB order_status (rich) → the app's tracking OrderStatus (coarse). */
+export function mapOrderStatus(db: string): OrderStatus {
+  switch (db) {
+    case 'placed':
+    case 'awaiting_payment':
+    case 'slip_uploaded':
+    case 'payment_verifying':
+    case 'confirmed':
+    case 'preparing':
+      return 'preparing';
+    case 'assigned_to_rider':
+    case 'out_for_delivery':
+      return 'out_for_delivery';
+    case 'picked_up':
+      return 'picked_up';
+    case 'in_transit':
+      return 'in_transit';
+    case 'delivered':
+      return 'delivered';
+    case 'returned':
+      return 'returned';
+    case 'delivery_failed':
+      return 'delivery_failed';
+    case 'cancelled':
+    case 'payment_rejected':
+      return 'cancelled';
+    default:
+      return 'preparing';
+  }
+}
+
+export const TERMINAL: OrderStatus[] = ['delivered', 'cancelled', 'returned', 'delivery_failed'];
+
+type OrderRow = {
+  order_number: string;
+  order_status: string;
+  payment_status: string;
+  payment_method: string;
+  shop_mode: string;
+  total: number;
+  placed_at: string;
+  delivered_at: string | null;
+  ship_recipient: string | null;
+  ship_address_text: string | null;
+  order_items: { qty: number }[] | null;
+  // PostgREST returns a reverse-embedded (FK→orders) relation as an array.
+  parcel_shipments: { tracking_no: string | null; courier: string | null }[] | null;
+};
+
+const ORDER_SELECT =
+  'order_number, order_status, payment_status, payment_method, shop_mode, total, placed_at, ' +
+  'delivered_at, ship_recipient, ship_address_text, order_items(qty), ' +
+  'parcel_shipments(tracking_no, courier)';
+
+function toTracked(r: OrderRow): TrackedOrder {
+  const fulfilment = r.shop_mode === 'online' ? 'parcel' : 'delivery';
+  const itemCount = (r.order_items ?? []).reduce((s, i) => s + i.qty, 0);
+  const status = mapOrderStatus(r.order_status);
+  return {
+    id: r.order_number,
+    shopName: 'ร้าน อู้ฟู่',
+    status,
+    etaText: fulfilment === 'parcel' ? 'ถึงภายใน 2-3 วัน' : '30-45 นาที',
+    etaShort: fulfilment === 'parcel' ? '2-3 วัน' : '25 นาที',
+    total: r.total,
+    itemCount,
+    addressLabel: 'บ้าน',
+    addressLine: r.ship_address_text ?? '',
+    placedAtLabel: thaiStamp(r.placed_at),
+    deliveredAt: thaiStamp(r.delivered_at),
+    rider: MOCK_RIDER,
+    fulfilment,
+    ...(fulfilment === 'parcel'
+      ? {
+          courier: r.parcel_shipments?.[0]?.courier ?? 'Flash Express',
+          trackingNo: r.parcel_shipments?.[0]?.tracking_no ?? undefined,
+        }
+      : {}),
+  };
+}
+
+/** All of the signed-in customer's orders, newest first (RLS → own only). */
+export async function listOrders(): Promise<TrackedOrder[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(ORDER_SELECT)
+    .order('placed_at', { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as OrderRow[]).map(toTracked);
+}
+
+/** A single order by its order_number (for the tracking screen). */
+export async function getOrderByNumber(orderNumber: string): Promise<TrackedOrder | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(ORDER_SELECT)
+    .eq('order_number', orderNumber)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? toTracked(data as unknown as OrderRow) : null;
 }
 
 /** Map a place_order error (RAISE message = the code) to friendly Thai. */

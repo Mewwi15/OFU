@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
+import { getOrderByNumber, listOrders } from '@/lib/data/order';
 import { zustandStorage } from '@/lib/storage';
 
 export type CreateOrderInput = {
@@ -43,6 +44,14 @@ export type OrderState = {
   active: TrackedOrder | null;
   history: TrackedOrder[];
   rating: OrderRating | null;
+  /** The customer's orders loaded from the backend (newest first). */
+  list: TrackedOrder[];
+  listLoading: boolean;
+  activeLoading: boolean;
+  /** Fetch the order list from the backend. */
+  loadList: () => Promise<void>;
+  /** Fetch + track a single order by its order_number. */
+  loadActive: (orderNumber: string) => Promise<void>;
   /** Create + start tracking a new order. Returns its id. */
   createOrder: (input: CreateOrderInput) => string;
   /** Advance / set the tracked order's status. */
@@ -85,6 +94,28 @@ export const useOrder = create<OrderState>()(
       active: null,
       history: [],
       rating: null,
+      list: [],
+      listLoading: false,
+      activeLoading: false,
+
+      loadList: async () => {
+        set({ listLoading: true });
+        try {
+          set({ list: await listOrders(), listLoading: false });
+        } catch {
+          set({ listLoading: false });
+        }
+      },
+
+      loadActive: async (orderNumber) => {
+        set({ activeLoading: true });
+        try {
+          const order = await getOrderByNumber(orderNumber);
+          set({ active: order, activeLoading: false });
+        } catch {
+          set({ activeLoading: false });
+        }
+      },
 
       createOrder: (input) => {
         const { active, history } = get();

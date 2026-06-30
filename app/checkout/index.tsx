@@ -81,7 +81,6 @@ export default function CheckoutScreen() {
   const removeSelected = useCart((s) => s.removeSelected);
   const mode = useMode((s) => s.mode);
   const address = useAddress(selectedAddress);
-  const createOrder = useOrder((s) => s.createOrder);
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
@@ -199,15 +198,9 @@ export default function CheckoutScreen() {
   // delivery → live rider map, online → Flash parcel timeline.
   const finishSuccess = () => {
     removeSelected();
-    const id = createOrder({
-      orderNumber: placed?.orderNumber,
-      total: placed?.total ?? total,
-      itemCount: count,
-      addressLabel: address?.label ?? 'บ้าน',
-      addressLine: address?.line ?? '',
-      fulfilment: mode === 'online' ? 'parcel' : 'delivery',
-    });
-    router.replace(`/order/${id}`);
+    // The order lives in the DB now; the tracking screen loads it by number.
+    if (placed) router.replace(`/order/${placed.orderNumber}`);
+    else router.replace('/');
   };
 
   return (
