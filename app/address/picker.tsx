@@ -344,23 +344,27 @@ export default function AddressPickerScreen() {
   const canSave =
     baseValid && (!isOnline || (province.trim().length > 0 && postalValid));
 
-  const onSave = () => {
+  const onSave = async () => {
     const c = centerRef.current;
-    upsert({
-      id: editing?.id,
-      label,
-      recipient: recipient.trim(),
-      phone: phone.trim(),
-      line: line.trim(),
-      detail: detail.trim(),
-      lat: c.latitude,
-      lng: c.longitude,
-      subDistrict: subDistrict.trim() || undefined,
-      district: district.trim() || undefined,
-      province: province.trim() || undefined,
-      postalCode: postalCode.trim() || undefined,
-    });
-    router.back();
+    try {
+      await upsert({
+        id: editing?.id,
+        label,
+        recipient: recipient.trim(),
+        phone: phone.trim(),
+        line: line.trim(),
+        detail: detail.trim(),
+        lat: c.latitude,
+        lng: c.longitude,
+        subDistrict: subDistrict.trim() || undefined,
+        district: district.trim() || undefined,
+        province: province.trim() || undefined,
+        postalCode: postalCode.trim() || undefined,
+      });
+      router.back();
+    } catch {
+      Alert.alert('บันทึกไม่สำเร็จ', 'ไม่สามารถบันทึกที่อยู่ได้ กรุณาลองใหม่');
+    }
   };
 
   return (

@@ -2,14 +2,17 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 
 import { TabBar } from '@/components/navigation/TabBar';
+import { useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
 
 export default function TabLayout() {
-  // Load the catalog once when the authed app mounts.
+  // Load the catalog + address book once when the authed app mounts.
   const loadCatalog = useCatalog((s) => s.load);
+  const loadAddresses = useAddress((s) => s.load);
   useEffect(() => {
     loadCatalog();
-  }, [loadCatalog]);
+    loadAddresses();
+  }, [loadCatalog, loadAddresses]);
 
   return (
     <Tabs

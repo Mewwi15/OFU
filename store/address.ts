@@ -1,15 +1,14 @@
 /**
- * Address book store (zustand).
- *
- * Holds the customer's saved delivery addresses and which one is currently
- * selected for checkout. Each address pairs a human-readable line (from the map
- * pin's reverse-geocode, editable) with the exact pin coordinates. The cart
- * reads `selectedAddress` in delivery mode; the map picker calls `upsert`.
+ * Address book store (zustand) — backed by the `addresses` table via the address
+ * repository. The list is loaded from the backend; only the current selection id
+ * is persisted locally. The cart reads `selectedAddress` in delivery mode; the
+ * map picker calls `upsert`.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { deleteAddress, listAddresses, upsertAddress } from '@/lib/data/address';
 import { zustandStorage } from '@/lib/storage';
 
 export type Address = {
@@ -26,16 +25,10 @@ export type Address = {
   lat: number;
   lng: number;
 
-  /* Structured postal parts — required to ship a parcel via Flash Express
-     (online mode). Auto-filled from the reverse-geocode, then editable.
-     Optional because a delivery (rider) address only needs the pin + line. */
-  /** ตำบล / แขวง */
+  /* Structured postal parts — required to ship a parcel via Flash Express. */
   subDistrict?: string;
-  /** อำเภอ / เขต */
   district?: string;
-  /** จังหวัด */
   province?: string;
-  /** รหัสไปรษณีย์ (5 หลัก) */
   postalCode?: string;
 };
 
@@ -45,71 +38,75 @@ export type AddressDraft = Omit<Address, 'id'> & { id?: string };
 export type AddressState = {
   addresses: Address[];
   selectedId: string | null;
-  /** Create (no id) or update (with id). Returns the resulting address id. */
-  upsert: (draft: AddressDraft) => string;
-  remove: (id: string) => void;
+  loading: boolean;
+  loaded: boolean;
+  /** Load the address book from the backend. */
+  load: (force?: boolean) => Promise<void>;
+  /** Create (no id) or update (with id) on the backend. Returns the address id. */
+  upsert: (draft: AddressDraft) => Promise<string>;
+  remove: (id: string) => Promise<void>;
   select: (id: string) => void;
 };
 
-/** Default seed so the cart/home have a sensible delivery address out of the box. */
-const SEED: Address = {
-  id: 'a1',
-  label: 'บ้าน',
-  recipient: 'คุณลูกค้า',
-  phone: '080-000-0000',
-  line: '123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110',
-  detail: '',
-  lat: 13.7236,
-  lng: 100.5686,
-  subDistrict: 'คลองเตย',
-  district: 'คลองเตย',
-  province: 'กรุงเทพมหานคร',
-  postalCode: '10110',
-};
-
-/** Monotonic id generator (avoids Date.now/Math.random for deterministic tests). */
-let seq = 1;
-const nextId = () => `addr-${++seq}`;
-
 export const useAddress = create<AddressState>()(
   persist(
-    (set) => ({
-      addresses: [SEED],
-      selectedId: SEED.id,
+    (set, get) => ({
+      addresses: [],
+      selectedId: null,
+      loading: false,
+      loaded: false,
 
-      upsert: (draft) => {
-    const id = draft.id ?? nextId();
-    set((state) => {
-      const exists = state.addresses.some((a) => a.id === id);
-      const next: Address = { ...draft, id };
-      return {
-        addresses: exists
-          ? state.addresses.map((a) => (a.id === id ? next : a))
-          : [...state.addresses, next],
-        // Auto-select a freshly added address.
-        selectedId: exists ? state.selectedId : id,
-      };
-    });
-    return id;
-  },
+      load: async (force = false) => {
+        if (get().loading) return;
+        if (get().loaded && !force) return;
+        set({ loading: true });
+        try {
+          const addresses = await listAddresses();
+          set((state) => ({
+            addresses,
+            loaded: true,
+            loading: false,
+            // keep a valid selection (or default to the first address)
+            selectedId:
+              state.selectedId && addresses.some((a) => a.id === state.selectedId)
+                ? state.selectedId
+                : (addresses[0]?.id ?? null),
+          }));
+        } catch {
+          set({ loading: false });
+        }
+      },
 
-  remove: (id) =>
-    set((state) => {
-      const addresses = state.addresses.filter((a) => a.id !== id);
-      const selectedId =
-        state.selectedId === id ? (addresses[0]?.id ?? null) : state.selectedId;
-      return { addresses, selectedId };
-    }),
+      upsert: async (draft) => {
+        const saved = await upsertAddress(draft);
+        const isNew = !draft.id;
+        set((state) => ({
+          addresses: state.addresses.some((a) => a.id === saved.id)
+            ? state.addresses.map((a) => (a.id === saved.id ? saved : a))
+            : [...state.addresses, saved],
+          selectedId: isNew ? saved.id : state.selectedId,
+        }));
+        return saved.id;
+      },
+
+      remove: async (id) => {
+        await deleteAddress(id);
+        set((state) => {
+          const addresses = state.addresses.filter((a) => a.id !== id);
+          return {
+            addresses,
+            selectedId: state.selectedId === id ? (addresses[0]?.id ?? null) : state.selectedId,
+          };
+        });
+      },
 
       select: (id) => set({ selectedId: id }),
     }),
     {
       name: 'oofoo-address',
       storage: zustandStorage,
-      partialize: (state) => ({
-        addresses: state.addresses,
-        selectedId: state.selectedId,
-      }),
+      // Only the selection is persisted; the list always comes from the backend.
+      partialize: (state) => ({ selectedId: state.selectedId }),
     },
   ),
 );
@@ -120,9 +117,8 @@ export function selectedAddress(state: AddressState): Address | undefined {
 }
 
 /**
- * Whether an address carries enough structured detail to print a Flash Express
- * parcel label (online mode). Requires a recipient, phone, province and a
- * 5-digit postcode — the rider (delivery) flow does NOT need these.
+ * Whether an address carries enough structured detail to ship a Flash Express
+ * parcel (online mode): recipient, phone, province and a 5-digit postcode.
  */
 export function hasParcelInfo(a?: Address): boolean {
   return !!(

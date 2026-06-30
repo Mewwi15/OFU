@@ -39,7 +39,6 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { SHOP } from '@/data/shop';
-import { ensureRemoteAddress } from '@/lib/data/address';
 import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { type PaymentMethod } from '@/lib/payment';
@@ -170,13 +169,12 @@ export default function CheckoutScreen() {
     if (chosen.length === 0) return;
     setStatus('verifying');
     try {
-      // The order is created on the backend: address → server cart → place_order.
-      const addressId = await ensureRemoteAddress(address);
+      // The selected address is already a backend row; place the order on it.
       const order = await placeOrder({
         items: chosen,
         mode,
         paymentMethod: method === 'cod' ? 'cod' : 'promptpay_slip',
-        addressId,
+        addressId: address.id,
         promoCode: null,
       });
       // Prepay: record the uploaded slip (the file upload to Storage lands later).
