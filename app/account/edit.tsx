@@ -8,9 +8,12 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -26,6 +29,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { uploadAvatar } from '@/lib/data/storage';
 import { useAuth } from '@/store/auth';
 
 type FieldProps = {
@@ -83,6 +87,32 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [saved, setSaved] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const pickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('ต้องการสิทธิ์เข้าถึงรูปภาพ', 'อนุญาตการเข้าถึงรูปภาพเพื่อเปลี่ยนรูปโปรไฟล์');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0].base64) return;
+    setAvatarBusy(true);
+    try {
+      const url = await uploadAvatar(result.assets[0].base64);
+      await updateProfile({ avatar: url });
+    } catch {
+      Alert.alert('อัปโหลดไม่สำเร็จ', 'ไม่สามารถเปลี่ยนรูปโปรไฟล์ได้ กรุณาลองใหม่');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   const dirty = name !== user.name || email !== user.email;
   const canSave = dirty && name.trim().length > 0;
@@ -134,9 +164,14 @@ export default function EditProfileScreen() {
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel="เปลี่ยนรูปโปรไฟล์"
-              onPress={() => {}}
+              disabled={avatarBusy}
+              onPress={() => void pickAvatar()}
               style={styles.avatarEdit}>
-              <Ionicons name="camera" size={16} color={Colors.textOnPrimary} />
+              {avatarBusy ? (
+                <ActivityIndicator size="small" color={Colors.textOnPrimary} />
+              ) : (
+                <Ionicons name="camera" size={16} color={Colors.textOnPrimary} />
+              )}
             </PressableScale>
           </View>
 

@@ -48,3 +48,19 @@ export async function uploadSlip(orderId: string, base64: string): Promise<strin
   if (error) throw error;
   return path;
 }
+
+/**
+ * Upload the signed-in user's profile photo (base64 JPEG) to the public avatars
+ * bucket (keyed by uid). Returns a cache-busted public URL to store + display.
+ */
+export async function uploadAvatar(base64: string): Promise<string> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('UNAUTHENTICATED');
+  const path = `${u.user.id}.jpg`;
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, base64ToBytes(base64), { contentType: 'image/jpeg', upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+  return `${data.publicUrl}?v=${Date.now()}`;
+}
