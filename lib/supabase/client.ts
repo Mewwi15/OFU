@@ -32,6 +32,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE for the mobile OAuth flow (code exchanged via exchangeCodeForSession).
+    flowType: 'pkce',
   },
 });
 

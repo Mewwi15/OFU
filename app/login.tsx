@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { authRepo, toE164Thai } from '@/lib/data/auth';
+import { authRepo, signInWithOAuthProvider, toE164Thai } from '@/lib/data/auth';
 import { useAuth } from '@/store/auth';
 
 /** External brand colors for the social buttons (exempt from design tokens). */
@@ -79,6 +79,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [socialBusy, setSocialBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const otpRef = useRef<TextInput>(null);
 
@@ -117,8 +118,22 @@ export default function LoginScreen() {
     }
   };
 
-  const socialSoon = () =>
-    Alert.alert('เร็วๆ นี้', 'การเข้าสู่ระบบด้วยโซเชียลจะเปิดให้ใช้งานเร็วๆ นี้');
+  const onSocial = async (provider: 'google' | 'apple') => {
+    if (socialBusy) return;
+    setSocialBusy(true);
+    try {
+      // Success flips the gate via the auth store's onAuthStateChange.
+      await signInWithOAuthProvider(provider);
+    } catch {
+      Alert.alert('เข้าสู่ระบบไม่สำเร็จ', 'ไม่สามารถเข้าสู่ระบบด้วยโซเชียลได้ กรุณาลองใหม่');
+    } finally {
+      setSocialBusy(false);
+    }
+  };
+
+  // LINE isn't a native Supabase provider — needs a custom flow (later).
+  const lineSoon = () =>
+    Alert.alert('เร็วๆ นี้', 'การเข้าสู่ระบบด้วย LINE จะเปิดให้ใช้งานเร็วๆ นี้');
 
   return (
     <KeyboardAvoidingView
@@ -191,14 +206,14 @@ export default function LoginScreen() {
                 icon="chatbubble-ellipses"
                 bg={BRAND.line}
                 fg={Colors.textOnPrimary}
-                onPress={socialSoon}
+                onPress={lineSoon}
               />
               <SocialButton
                 label="ดำเนินการต่อด้วย Apple"
                 icon="logo-apple"
                 bg={BRAND.apple}
                 fg={Colors.textOnPrimary}
-                onPress={socialSoon}
+                onPress={() => void onSocial('apple')}
               />
               <SocialButton
                 label="ดำเนินการต่อด้วย Google"
@@ -206,7 +221,7 @@ export default function LoginScreen() {
                 bg={BRAND.google}
                 fg={Colors.text}
                 bordered
-                onPress={socialSoon}
+                onPress={() => void onSocial('google')}
               />
             </View>
           </>

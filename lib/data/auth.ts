@@ -5,8 +5,56 @@
  */
 
 import type { Session } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import { supabase } from '@/lib/supabase/client';
+
+// Lets the auth browser tab close itself and hand control back to the app.
+WebBrowser.maybeCompleteAuthSession();
+
+/** OAuth providers Supabase supports natively (LINE needs a custom flow). */
+export type OAuthProvider = 'google' | 'apple';
+
+/**
+ * Social sign-in via Supabase OAuth (PKCE). Opens the provider in an auth
+ * browser session, then exchanges the returned code for a session. The auth
+ * store's onAuthStateChange picks the session up and flips the gate.
+ * Returns false if the user dismissed the browser.
+ *
+ * Requires the provider to be enabled in Supabase with its keys, and the
+ * redirect URL (myrnapp://auth-callback) to be allow-listed.
+ */
+export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<boolean> {
+  const redirectTo = Linking.createURL('auth-callback');
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo, skipBrowserRedirect: true },
+  });
+  if (error) throw error;
+  if (!data?.url) throw new Error('NO_OAUTH_URL');
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  if (result.type !== 'success' || !result.url) return false; // dismissed
+
+  const url = new URL(result.url);
+  const code = url.searchParams.get('code');
+  if (code) {
+    const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
+    if (exErr) throw exErr;
+    return true;
+  }
+  // Fallback: implicit flow returns tokens in the URL hash fragment.
+  const params = new URLSearchParams(result.url.split('#')[1] ?? '');
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+  if (access_token && refresh_token) {
+    const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (setErr) throw setErr;
+    return true;
+  }
+  return false;
+}
 
 export type Profile = {
   id: string;
