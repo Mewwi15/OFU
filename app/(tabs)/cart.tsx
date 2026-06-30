@@ -36,6 +36,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography, tokens } from '@/constants/theme';
 import { type Product } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
+import { validatePromo } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
@@ -190,13 +191,16 @@ export default function CartScreen() {
   const shopHours = useShop((s) => s.info.hours);
 
   const [promo, setPromo] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
   const selectedCount = cartCount(chosen);
   const deliveryFee = deliveryFeeFor(mode, subtotal);
-  const total = subtotal + deliveryFee;
+  const discount = appliedPromo?.discount ?? 0;
+  const total = subtotal + deliveryFee - discount;
 
   const shopOpen = useShopOpen();
 
@@ -227,11 +231,27 @@ export default function CartScreen() {
     add(product);
   };
 
-  const onApply = () => {
-    Alert.alert(
-      'โค้ดส่วนลด',
-      promo.trim() ? `ใช้โค้ด "${promo.trim()}" แล้ว` : 'กรุณากรอกโค้ดส่วนลดก่อน',
-    );
+  const onApply = async () => {
+    const code = promo.trim();
+    if (!code) {
+      setAppliedPromo(null);
+      return;
+    }
+    setPromoBusy(true);
+    try {
+      const res = await validatePromo(code, subtotal, mode);
+      if (res.valid) {
+        setAppliedPromo({ code, discount: res.discount });
+        Alert.alert('ใช้โค้ดสำเร็จ', res.messageTh || `รับส่วนลด ${money(res.discount)}`);
+      } else {
+        setAppliedPromo(null);
+        Alert.alert('โค้ดใช้ไม่ได้', res.messageTh || 'โค้ดส่วนลดไม่ถูกต้อง');
+      }
+    } catch {
+      Alert.alert('เกิดข้อผิดพลาด', 'ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setPromoBusy(false);
+    }
   };
 
   const confirmRemoveLine = (item: CartItem) => {
@@ -258,9 +278,11 @@ export default function CartScreen() {
   // the stores). The cart is cleared there only once payment is verified.
   const onConfirmOrder = () => {
     setSheetOpen(false);
-    setPromo('');
+    const params = appliedPromo
+      ? { promo: appliedPromo.code, discount: String(appliedPromo.discount) }
+      : undefined;
     // Let the sheet finish sliding out before the route transition.
-    setTimeout(() => router.push('/checkout'), 240);
+    setTimeout(() => router.push({ pathname: '/checkout', params }), 240);
   };
 
   return (
@@ -472,8 +494,14 @@ export default function CartScreen() {
                   returnKeyType="done"
                   onSubmitEditing={onApply}
                 />
-                <PressableScale accessibilityRole="button" hitSlop={8} onPress={onApply}>
-                  <Text style={styles.promoApply}>ใช้โค้ด</Text>
+                <PressableScale
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  disabled={promoBusy}
+                  onPress={onApply}>
+                  <Text style={styles.promoApply}>
+                    {promoBusy ? 'กำลังตรวจ…' : appliedPromo ? 'ใช้แล้ว' : 'ใช้โค้ด'}
+                  </Text>
                 </PressableScale>
               </View>
 
@@ -501,6 +529,17 @@ export default function CartScreen() {
                   </Text>
                 )}
               </View>
+
+              {appliedPromo ? (
+                <View style={[styles.sumRow, styles.sumRowGap]}>
+                  <Text variant="body" style={styles.sumLabel}>
+                    ส่วนลด ({appliedPromo.code})
+                  </Text>
+                  <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
+                    -{money(discount)}
+                  </Text>
+                </View>
+              ) : null}
 
               {/* Payment hint — its own full-width line */}
               <View style={styles.payRow}>

@@ -20,6 +20,11 @@ select '00000000-0000-0000-0000-0000000000a1', wd, '08:00', '22:00'
 from generate_series(0, 6) as wd
 on conflict (shop_id, weekday) do nothing;
 
+-- ── Promo (dev) ───────────────────────────────────────────────────────────────
+insert into public.promo_codes (shop_id, code, type, value, min_spend, scope, active)
+values ('00000000-0000-0000-0000-0000000000a1', 'OOFOO10', 'percent', 10, 0, 'subtotal', true)
+on conflict (shop_id, code) do nothing;
+
 -- ── Categories ────────────────────────────────────────────────────────────────
 insert into public.categories (shop_id, name, display_order)
 values

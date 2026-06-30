@@ -85,6 +85,42 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlacedOrder> {
   };
 }
 
+export type PromoCheck = {
+  valid: boolean;
+  discount: number;
+  scope: string;
+  reasonCode: string | null;
+  messageTh: string;
+};
+
+/** Non-throwing promo preview (validate_promo RPC). */
+export async function validatePromo(
+  code: string,
+  subtotal: number,
+  mode: ShopMode,
+): Promise<PromoCheck> {
+  const { data, error } = await supabase.rpc('validate_promo', {
+    p_code: code,
+    p_subtotal: subtotal,
+    p_shop_mode: mode,
+  });
+  if (error) throw error;
+  const d = (data ?? {}) as {
+    valid?: boolean;
+    discount?: number;
+    scope?: string;
+    reason_code?: string | null;
+    message_th?: string;
+  };
+  return {
+    valid: !!d.valid,
+    discount: d.discount ?? 0,
+    scope: d.scope ?? 'subtotal',
+    reasonCode: d.reason_code ?? null,
+    messageTh: d.message_th ?? '',
+  };
+}
+
 /** Attach a payment slip to a prepay order (slip_uploaded). */
 export async function attachSlip(
   orderId: string,

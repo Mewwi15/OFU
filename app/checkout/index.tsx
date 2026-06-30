@@ -18,7 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,11 +82,14 @@ export default function CheckoutScreen() {
   const promptPay = useShop((s) => s.info.promptPay);
   const address = useAddress(selectedAddress);
 
+  const { promo, discount } = useLocalSearchParams<{ promo?: string; discount?: string }>();
+  const promoDiscount = discount ? Number(discount) : 0;
+
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
   const count = cartCount(chosen);
   const deliveryFee = deliveryFeeFor(mode, subtotal);
-  const total = subtotal + deliveryFee;
+  const total = subtotal + deliveryFee - promoDiscount;
 
   // Online flow pays up-front (PromptPay only); delivery defaults to COD but may
   // also pay by PromptPay.
@@ -176,7 +179,7 @@ export default function CheckoutScreen() {
         mode,
         paymentMethod: method === 'cod' ? 'cod' : 'promptpay_slip',
         addressId: address.id,
-        promoCode: null,
+        promoCode: promo ?? null,
       });
       // Prepay: record the uploaded slip (the file upload to Storage lands later).
       if (method !== 'cod') {
@@ -255,6 +258,14 @@ export default function CheckoutScreen() {
                 <Text style={styles.breakValue}>{money(deliveryFee)}</Text>
               )}
             </View>
+            {promoDiscount > 0 ? (
+              <View style={[styles.breakRow, styles.breakRowGap]}>
+                <Text variant="caption">ส่วนลด{promo ? ` (${promo})` : ''}</Text>
+                <Text style={[styles.breakValue, { color: Colors.accentStrong }]}>
+                  -{money(promoDiscount)}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {address ? (
