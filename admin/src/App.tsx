@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
+import { Broadcast } from './pages/Broadcast';
 import { Login } from './pages/Login';
 import { Products } from './pages/Products';
 
@@ -26,6 +27,7 @@ export default function App() {
         }>
         <Route index element={<Navigate to="/products" replace />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
         <Route path="/orders" element={<Placeholder title="ออเดอร์" />} />
         <Route path="/payments" element={<Placeholder title="ตรวจสลิป" />} />

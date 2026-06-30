@@ -132,3 +132,12 @@ export const setPublishState = (productId: string, state: 'draft' | 'published',
 
 export const archiveProduct = (id: string, rowVersion?: number) =>
   rpc('archive_product', { p_id: id, p_expected_row_version: rowVersion ?? undefined });
+
+export type BroadcastResult = { notification_id: string; recipients: number; push: number };
+
+export const broadcastNotification = (p: { title: string; body?: string; category?: string }) =>
+  rpc<BroadcastResult>('broadcast_notification', {
+    p_title: p.title,
+    p_body: p.body ?? undefined,
+    p_category: p.category ?? 'promo',
+  });

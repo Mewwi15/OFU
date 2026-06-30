@@ -2,6 +2,7 @@ import {
   RiBillLine,
   RiImageLine,
   RiLogoutBoxRLine,
+  RiMegaphoneLine,
   RiNotification3Line,
   RiSearchLine,
   RiShoppingBag3Line,
@@ -13,6 +14,7 @@ import { useAuth } from '../auth';
 
 const NAV = [
   { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
+  { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
   { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
   { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
   { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
