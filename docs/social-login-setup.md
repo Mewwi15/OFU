@@ -8,8 +8,10 @@ The app code is wired and ready; activating each provider only needs its keys.
   OAuth (PKCE) opened in an `expo-web-browser` auth session, then
   `exchangeCodeForSession`. Success flips the gate via the auth store's
   `onAuthStateChange`.
-- Login screen: the **Google** and **Apple** buttons call it. **LINE was removed**
-  (not a native Supabase provider — see below).
+- Login screen: only the **Google** button is shown. **Apple was removed** (needs
+  the paid Apple Developer Program) and **LINE was removed** (custom flow). The
+  code still supports Apple (`signInWithOAuthProvider('apple')`) — re-add the
+  button to enable it.
 - Supabase client uses `flowType: 'pkce'`.
 - Redirect URL `myrnapp://auth-callback` is allow-listed in `supabase/config.toml`
   (`auth.additional_redirect_urls`); app scheme is `myrnapp`.
@@ -29,7 +31,14 @@ The app code is wired and ready; activating each provider only needs its keys.
    **Prod:** Dashboard → Authentication → Providers → Google → paste client id +
    secret.
 
-## Apple — enable
+## Apple — removed (paid account; re-add later)
+
+The Apple button was removed because Sign in with Apple needs the **Apple
+Developer Program ($99/yr)**. The OAuth code path is still in place; to turn it
+back on, re-add the Apple `SocialButton` in `app/login.tsx` and configure the
+provider below.
+
+### Apple — enable (when ready)
 
 1. Apple Developer → an **App ID** with *Sign in with Apple*, a **Services ID**
    (the OAuth client_id), and a **Sign in with Apple key** (.p8) → build the

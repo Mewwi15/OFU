@@ -2,7 +2,7 @@
  * Login — `/login`.
  *
  * The auth gate's entry screen. Two steps: enter a Thai mobile number → request
- * an OTP → enter the 6-digit code, plus Apple / Google social options.
+ * an OTP → enter the 6-digit code, plus a Google social option.
  * Frontend-first: no real OTP is sent and any 6-digit code is accepted; this UI
  * sits in front of the planned Supabase Auth (phone OTP + social). PDPA consent
  * line per product requirements. Tokens-only, zero emoji (social marks use real
@@ -31,7 +31,7 @@ import { authRepo, signInWithOAuthProvider, toE164Thai } from '@/lib/data/auth';
 import { useAuth } from '@/store/auth';
 
 /** External brand colors for the social buttons (exempt from design tokens). */
-const BRAND = { apple: '#000000', google: '#FFFFFF' } as const;
+const BRAND = { google: '#FFFFFF' } as const;
 
 const OTP_LENGTH = 6;
 
@@ -118,7 +118,7 @@ export default function LoginScreen() {
     }
   };
 
-  const onSocial = async (provider: 'google' | 'apple') => {
+  const onSocial = async (provider: 'google') => {
     if (socialBusy) return;
     setSocialBusy(true);
     try {
@@ -197,13 +197,6 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.socials}>
-              <SocialButton
-                label="ดำเนินการต่อด้วย Apple"
-                icon="logo-apple"
-                bg={BRAND.apple}
-                fg={Colors.textOnPrimary}
-                onPress={() => void onSocial('apple')}
-              />
               <SocialButton
                 label="ดำเนินการต่อด้วย Google"
                 icon="logo-google"
