@@ -39,6 +39,7 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
+import { uploadSlip } from '@/lib/data/storage';
 import { useShop } from '@/store/shop';
 import { money } from '@/lib/format';
 import { type PaymentMethod } from '@/lib/payment';
@@ -100,6 +101,7 @@ export default function CheckoutScreen() {
     mode === 'delivery' ? 'cod' : 'promptpay',
   );
   const [slipUri, setSlipUri] = useState<string | null>(null);
+  const [slipBase64, setSlipBase64] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [copied, setCopied] = useState(false);
@@ -153,9 +155,11 @@ export default function CheckoutScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.7,
+      base64: true,
     });
     if (!result.canceled) {
       setSlipUri(result.assets[0].uri);
+      setSlipBase64(result.assets[0].base64 ?? null);
       if (Platform.OS !== 'web') Haptics.selectionAsync();
     }
   };
@@ -181,9 +185,17 @@ export default function CheckoutScreen() {
         addressId: address.id,
         promoCode: promo ?? null,
       });
-      // Prepay: record the uploaded slip (the file upload to Storage lands later).
-      if (method !== 'cod') {
-        await attachSlip(order.id, `payment-slips/${order.id}.jpg`, order.total).catch(() => {});
+      // Prepay: upload the slip to Storage, then record its path.
+      if (method !== 'cod' && slipBase64) {
+        try {
+          const path = await uploadSlip(order.id, slipBase64);
+          await attachSlip(order.id, path, order.total);
+        } catch {
+          Alert.alert(
+            'อัปโหลดสลิปไม่สำเร็จ',
+            'ออเดอร์ถูกสร้างแล้ว แต่แนบสลิปไม่สำเร็จ กรุณาแนบสลิปใหม่จากหน้าคำสั่งซื้อ',
+          );
+        }
       }
       setPlaced(order);
       if (Platform.OS !== 'web') {
