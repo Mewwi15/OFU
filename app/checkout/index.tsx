@@ -5,9 +5,9 @@
  * reads the ticked cart lines + current mode, shows the amount due, lets the
  * customer pick a payment method, and — for PromptPay — renders a scannable Thai
  * QR for the exact amount, the shop account (with copy), and a slip-upload zone.
- * Confirming runs `verifyPayment` (a stub today; the real Slip/Gateway API lands
- * in the backend phase) through idle -> verifying -> success, then clears the
- * paid lines and returns to the cart.
+ * Confirming places the order via `place_order` (and, for prepay, uploads the
+ * slip to Storage + records it) through idle -> verifying -> success, then clears
+ * the paid lines and opens live order tracking.
  *
  * Coral is the sole interactive/price accent; ink carries the amount due; green
  * marks the verified-success state. Tokens-only, zero emoji.
