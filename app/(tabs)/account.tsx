@@ -20,14 +20,15 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { deleteAccount, getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
+import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 import { useLock } from '@/store/lock';
 
-/** "Google · a@b.com" / "เบอร์โทร · 081…" for the login-account row. */
-function loginAccountLabel(id: AccountIdentity | null): string {
+/** "Google · a@b.com" / "Phone · 081…" for the login-account row. */
+function loginAccountLabel(id: AccountIdentity | null, phoneLabel: string): string {
   if (!id) return '—';
   if (id.provider === 'google') return `Google · ${id.email ?? ''}`.trim();
-  if (id.provider === 'phone' || id.phone) return `เบอร์โทร · ${id.phone ?? ''}`.trim();
+  if (id.provider === 'phone' || id.phone) return `${phoneLabel} · ${id.phone ?? ''}`.trim();
   return id.provider;
 }
 
@@ -35,18 +36,18 @@ const AVATAR_SIZE = 64;
 
 type MenuRow = {
   key: string;
-  label: string;
-  caption: string;
+  labelKey: string;
+  capKey: string;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
 const MENU_ROWS: MenuRow[] = [
-  { key: 'orders', label: 'คำสั่งซื้อของฉัน', caption: 'ดูออเดอร์ที่ผ่านมาและกำลังดำเนินการ', icon: 'receipt-outline' },
-  { key: 'address', label: 'ที่อยู่จัดส่ง', caption: 'จัดการที่อยู่สำหรับจัดส่งสินค้า', icon: 'location-outline' },
-  { key: 'settings', label: 'ตั้งค่าการแจ้งเตือน', caption: 'ข่าวสารและโปรโมชัน', icon: 'notifications-outline' },
-  { key: 'language', label: 'เปลี่ยนภาษา', caption: 'ภาษาไทย / English', icon: 'language-outline' },
-  { key: 'legal', label: 'ข้อมูลทางกฎหมาย', caption: 'ข้อกำหนดและนโยบายความเป็นส่วนตัว', icon: 'document-text-outline' },
-  { key: 'help', label: 'ศูนย์ช่วยเหลือ', caption: 'ติดต่อเราหรือคำถามที่พบบ่อย', icon: 'help-buoy-outline' },
+  { key: 'orders', labelKey: 'account.menu.orders', capKey: 'account.menu.ordersCap', icon: 'receipt-outline' },
+  { key: 'address', labelKey: 'account.menu.address', capKey: 'account.menu.addressCap', icon: 'location-outline' },
+  { key: 'settings', labelKey: 'account.menu.notif', capKey: 'account.menu.notifCap', icon: 'notifications-outline' },
+  { key: 'language', labelKey: 'account.menu.lang', capKey: 'account.menu.langCap', icon: 'language-outline' },
+  { key: 'legal', labelKey: 'account.menu.legal', capKey: 'account.menu.legalCap', icon: 'document-text-outline' },
+  { key: 'help', labelKey: 'account.menu.help', capKey: 'account.menu.helpCap', icon: 'help-buoy-outline' },
 ];
 
 export default function ProfileScreen() {
@@ -56,6 +57,7 @@ export default function ProfileScreen() {
   const logout = useAuth((s) => s.logout);
   const resetLock = useLock((s) => s.resetLock);
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
+  const t = useT();
 
   useFocusEffect(
     useCallback(() => {
@@ -83,39 +85,35 @@ export default function ProfileScreen() {
         router.push('/account/legal');
         break;
       case 'help':
-        Alert.alert('ศูนย์ช่วยเหลือ', 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.');
+        Alert.alert(t('account.menu.help'), t('account.helpBody'));
         break;
     }
   };
 
   const confirmDelete = () => {
-    Alert.alert(
-      'ลบบัญชี',
-      'ข้อมูลส่วนตัวของคุณจะถูกลบถาวรและออกจากระบบทันที (ประวัติคำสั่งซื้อจะถูกเก็บแบบไม่ระบุตัวตนตามกฎหมาย) — ดำเนินการต่อหรือไม่?',
-      [
-        { text: 'ยกเลิก', style: 'cancel' },
-        {
-          text: 'ลบบัญชี',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAccount();
-              await resetLock();
-              logout();
-            } catch {
-              Alert.alert('ลบบัญชีไม่สำเร็จ', 'กรุณาลองใหม่อีกครั้ง');
-            }
-          },
+    Alert.alert(t('account.delete'), t('account.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('account.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAccount();
+            await resetLock();
+            logout();
+          } catch {
+            Alert.alert(t('account.deleteFailed'), t('common.tryAgain'));
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const confirmLogout = () => {
-    Alert.alert('ออกจากระบบ', 'ต้องการออกจากระบบใช่ไหม?', [
-      { text: 'ยกเลิก', style: 'cancel' },
+    Alert.alert(t('account.logout'), t('account.logoutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'ออกจากระบบ',
+        text: t('account.logout'),
         style: 'destructive',
         onPress: async () => {
           await resetLock();
@@ -134,11 +132,11 @@ export default function ProfileScreen() {
           { paddingTop: insets.top + Spacing.sm, paddingBottom: 110 + insets.bottom },
         ]}>
         <ScreenHeader
-          title="บัญชีของฉัน"
+          title={t('account.title')}
           right={
             <IconButton
               icon="notifications-outline"
-              accessibilityLabel="การแจ้งเตือน"
+              accessibilityLabel={t('account.notifications')}
               onPress={() => router.push('/notifications')}
             />
           }
@@ -160,7 +158,7 @@ export default function ProfileScreen() {
               <View style={styles.metaRow}>
                 <Ionicons name="card-outline" size={13} color={Colors.textMuted} />
                 <Text variant="caption" numberOfLines={1}>
-                  รหัสสมาชิก {identity ? identity.id.slice(0, 8).toUpperCase() : '—'}
+                  {t('account.memberId')} {identity ? identity.id.slice(0, 8).toUpperCase() : '—'}
                 </Text>
               </View>
             </View>
@@ -171,7 +169,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/account/edit')}
             style={styles.editBtn}>
             <Ionicons name="create-outline" size={16} color={Colors.primaryStrong} />
-            <Text style={styles.editText}>แก้ไขโปรไฟล์</Text>
+            <Text style={styles.editText}>{t('account.editProfile')}</Text>
           </PressableScale>
         </Animated.View>
 
@@ -181,18 +179,18 @@ export default function ProfileScreen() {
           style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text variant="caption" style={styles.infoLabel}>
-              เบอร์มือถือ
+              {t('account.phoneLabel')}
             </Text>
             <Text style={styles.infoValue} numberOfLines={1}>
-              {user.phone || identity?.phone || 'ยังไม่ได้เพิ่ม'}
+              {user.phone || identity?.phone || t('common.notSet')}
             </Text>
           </View>
           <View style={[styles.infoRow, styles.infoDivider]}>
             <Text variant="caption" style={styles.infoLabel}>
-              บัญชีที่ใช้เข้าสู่ระบบ
+              {t('account.loginAccountLabel')}
             </Text>
             <Text style={styles.infoValue} numberOfLines={1}>
-              {loginAccountLabel(identity)}
+              {loginAccountLabel(identity, t('account.loginPhone'))}
             </Text>
           </View>
         </Animated.View>
@@ -205,7 +203,7 @@ export default function ProfileScreen() {
               entering={FadeInDown.delay(120 + i * 70).springify().damping(18)}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={row.label}
+                accessibilityLabel={t(row.labelKey)}
                 onPress={() => onRow(row.key)}
                 style={({ pressed }) => [
                   styles.row,
@@ -216,9 +214,9 @@ export default function ProfileScreen() {
                   <Ionicons name={row.icon} size={20} color={Colors.primaryStrong} />
                 </View>
                 <View style={styles.rowText}>
-                  <Text style={styles.rowLabel}>{row.label}</Text>
+                  <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
                   <Text variant="caption" numberOfLines={1}>
-                    {row.caption}
+                    {t(row.capKey)}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
@@ -231,11 +229,11 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.delay(280).springify().damping(18)}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="ออกจากระบบ"
+            accessibilityLabel={t('account.logout')}
             onPress={confirmLogout}
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.rowPressed]}>
             <Ionicons name="log-out-outline" size={20} color={Colors.dangerStrong} />
-            <Text style={styles.logoutText}>ออกจากระบบ</Text>
+            <Text style={styles.logoutText}>{t('account.logout')}</Text>
           </Pressable>
         </Animated.View>
 
@@ -243,10 +241,10 @@ export default function ProfileScreen() {
         <Animated.View entering={FadeInDown.delay(340).springify().damping(18)}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="ลบบัญชี"
+            accessibilityLabel={t('account.delete')}
             onPress={confirmDelete}
             style={({ pressed }) => [styles.deleteBtn, pressed && styles.rowPressed]}>
-            <Text style={styles.deleteText}>ลบบัญชี</Text>
+            <Text style={styles.deleteText}>{t('account.delete')}</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>

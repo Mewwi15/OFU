@@ -15,10 +15,12 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { getPushEnabled, setPushEnabled } from '@/lib/data/notifications';
+import { useT } from '@/lib/i18n';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [push, setPush] = useState<boolean | null>(null); // null = loading
   const [saving, setSaving] = useState(false);
 
@@ -43,18 +45,18 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title="ตั้งค่าการแจ้งเตือน"
+        title={t('settings.title')}
         style={styles.header}
-        left={<IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />}
+        left={<IconButton icon="chevron-back" accessibilityLabel="back" onPress={() => router.back()} />}
       />
 
       <View style={styles.content}>
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowText}>
-              <Text style={styles.rowLabel}>ข่าวสารและโปรโมชัน</Text>
+              <Text style={styles.rowLabel}>{t('settings.promoLabel')}</Text>
               <Text variant="caption" style={styles.rowCaption}>
-                รับแจ้งเตือนดีล ส่วนลด และข่าวสารจากร้าน
+                {t('settings.promoCap')}
               </Text>
             </View>
             {push === null ? (
@@ -71,7 +73,7 @@ export default function SettingsScreen() {
         </View>
 
         <Text variant="caption" style={styles.note}>
-          การแจ้งเตือนสถานะคำสั่งซื้อจะส่งให้เสมอ เพื่อให้คุณติดตามออเดอร์ได้ตลอด
+          {t('settings.note')}
         </Text>
       </View>
     </View>
