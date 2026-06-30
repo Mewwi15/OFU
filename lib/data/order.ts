@@ -251,6 +251,20 @@ export async function getOrderByNumber(orderNumber: string): Promise<TrackedOrde
   return data ? toTracked(data as unknown as OrderRow) : null;
 }
 
+/** Submit a 1–5 rating for a delivered order (submit_rating RPC). */
+export async function submitRating(
+  orderNumber: string,
+  rating: number,
+  comment?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('submit_rating', {
+    p_order_number: orderNumber,
+    p_rating: rating,
+    p_comment: comment ?? undefined,
+  });
+  if (error) throw error;
+}
+
 /** Map a place_order error (RAISE message = the code) to friendly Thai. */
 export function orderErrorMessage(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? '';

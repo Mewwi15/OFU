@@ -23,6 +23,7 @@ import { TrackingMapView } from '@/components/order/TrackingMapView';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Spacing } from '@/constants/theme';
+import { submitRating as submitRatingApi } from '@/lib/data/order';
 import { useOrder } from '@/store/order';
 
 export default function OrderTrackingScreen() {
@@ -32,7 +33,6 @@ export default function OrderTrackingScreen() {
   const activeLoading = useOrder((s) => s.activeLoading);
   const loadActive = useOrder((s) => s.loadActive);
   const setStatus = useOrder((s) => s.setStatus);
-  const submitRating = useOrder((s) => s.submitRating);
 
   const [submitted, setSubmitted] = useState(false);
 
@@ -52,8 +52,8 @@ export default function OrderTrackingScreen() {
   const openHelp = () =>
     Alert.alert('ศูนย์ช่วยเหลือ', 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.');
 
-  const onSubmitRating = (stars: number, comment: string) => {
-    submitRating(stars, comment);
+  const onSubmitRating = async (stars: number, comment: string) => {
+    if (active) await submitRatingApi(active.id, stars, comment).catch(() => {});
     setSubmitted(true);
   };
 
