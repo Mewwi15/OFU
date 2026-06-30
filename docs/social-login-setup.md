@@ -8,8 +8,8 @@ The app code is wired and ready; activating each provider only needs its keys.
   OAuth (PKCE) opened in an `expo-web-browser` auth session, then
   `exchangeCodeForSession`. Success flips the gate via the auth store's
   `onAuthStateChange`.
-- Login screen: the **Google** and **Apple** buttons call it. **LINE** still
-  shows "เร็วๆ นี้" (see below — not a native Supabase provider).
+- Login screen: the **Google** and **Apple** buttons call it. **LINE was removed**
+  (not a native Supabase provider — see below).
 - Supabase client uses `flowType: 'pkce'`.
 - Redirect URL `myrnapp://auth-callback` is allow-listed in `supabase/config.toml`
   (`auth.additional_redirect_urls`); app scheme is `myrnapp`.
@@ -43,15 +43,14 @@ The app code is wired and ready; activating each provider only needs its keys.
    social logins are offered. The current web-OAuth path works; swapping iOS to
    native is a later refinement.
 
-## LINE — needs a custom flow
+## LINE — removed (custom flow needed to re-add)
 
-LINE is **not** a built-in Supabase OAuth provider. Options for later:
+LINE is **not** a built-in Supabase OAuth provider, so the button was removed.
+To add it back later, build one of:
 
 - LINE Login (LIFF / OAuth) → an Edge Function that verifies LINE's id_token and
   mints a Supabase session (`auth.admin` + a custom token), or
 - a third-party bridge (e.g. WorkOS) as the Supabase provider.
-
-Until then the LINE button stays "เร็วๆ นี้".
 
 ## After enabling
 

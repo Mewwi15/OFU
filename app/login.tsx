@@ -2,7 +2,7 @@
  * Login — `/login`.
  *
  * The auth gate's entry screen. Two steps: enter a Thai mobile number → request
- * an OTP → enter the 6-digit code, plus LINE / Apple / Google social options.
+ * an OTP → enter the 6-digit code, plus Apple / Google social options.
  * Frontend-first: no real OTP is sent and any 6-digit code is accepted; this UI
  * sits in front of the planned Supabase Auth (phone OTP + social). PDPA consent
  * line per product requirements. Tokens-only, zero emoji (social marks use real
@@ -31,7 +31,7 @@ import { authRepo, signInWithOAuthProvider, toE164Thai } from '@/lib/data/auth';
 import { useAuth } from '@/store/auth';
 
 /** External brand colors for the social buttons (exempt from design tokens). */
-const BRAND = { line: '#06C755', apple: '#000000', google: '#FFFFFF' } as const;
+const BRAND = { apple: '#000000', google: '#FFFFFF' } as const;
 
 const OTP_LENGTH = 6;
 
@@ -131,10 +131,6 @@ export default function LoginScreen() {
     }
   };
 
-  // LINE isn't a native Supabase provider — needs a custom flow (later).
-  const lineSoon = () =>
-    Alert.alert('เร็วๆ นี้', 'การเข้าสู่ระบบด้วย LINE จะเปิดให้ใช้งานเร็วๆ นี้');
-
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -201,13 +197,6 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.socials}>
-              <SocialButton
-                label="ดำเนินการต่อด้วย LINE"
-                icon="chatbubble-ellipses"
-                bg={BRAND.line}
-                fg={Colors.textOnPrimary}
-                onPress={lineSoon}
-              />
               <SocialButton
                 label="ดำเนินการต่อด้วย Apple"
                 icon="logo-apple"
