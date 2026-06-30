@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 
 import { TabBar } from '@/components/navigation/TabBar';
+import { registerForPush } from '@/lib/push';
 import { useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
 import { useNotifications } from '@/store/notifications';
@@ -18,6 +19,7 @@ export default function TabLayout() {
     loadAddresses();
     loadShop();
     loadNotifications();
+    void registerForPush();
   }, [loadCatalog, loadAddresses, loadShop, loadNotifications]);
 
   return (
