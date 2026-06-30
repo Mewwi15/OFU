@@ -109,6 +109,8 @@ export default function RootLayout() {
               <Stack.Screen name="order/chat" />
               <Stack.Screen name="account/edit" />
               <Stack.Screen name="account/settings" />
+              <Stack.Screen name="account/language" />
+              <Stack.Screen name="account/legal" />
               <Stack.Screen name="notifications" />
             </Stack.Protected>
           </Stack>

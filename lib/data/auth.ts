@@ -13,6 +13,34 @@ import { supabase } from '@/lib/supabase/client';
 // Lets the auth browser tab close itself and hand control back to the app.
 WebBrowser.maybeCompleteAuthSession();
 
+/** The signed-in identity (for the account screen). */
+export type AccountIdentity = {
+  id: string;
+  /** 'google' | 'phone' | … (auth provider used to sign in). */
+  provider: string;
+  email: string | null;
+  phone: string | null;
+};
+
+export async function getAccountIdentity(): Promise<AccountIdentity | null> {
+  const { data } = await supabase.auth.getUser();
+  const u = data.user;
+  if (!u) return null;
+  return {
+    id: u.id,
+    provider: (u.app_metadata?.provider as string) ?? 'phone',
+    email: u.email ?? null,
+    phone: u.phone ?? null,
+  };
+}
+
+/** PDPA erasure: anonymize the account on the backend, then sign out. */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.rpc('delete_my_account');
+  if (error) throw error;
+  await supabase.auth.signOut();
+}
+
 /** OAuth providers Supabase supports natively (LINE needs a custom flow). */
 export type OAuthProvider = 'google' | 'apple';
 

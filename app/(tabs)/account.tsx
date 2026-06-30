@@ -8,7 +8,8 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,8 +19,17 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { deleteAccount, getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useAuth } from '@/store/auth';
 import { useLock } from '@/store/lock';
+
+/** "Google · a@b.com" / "เบอร์โทร · 081…" for the login-account row. */
+function loginAccountLabel(id: AccountIdentity | null): string {
+  if (!id) return '—';
+  if (id.provider === 'google') return `Google · ${id.email ?? ''}`.trim();
+  if (id.provider === 'phone' || id.phone) return `เบอร์โทร · ${id.phone ?? ''}`.trim();
+  return id.provider;
+}
 
 const AVATAR_SIZE = 64;
 
@@ -34,6 +44,8 @@ const MENU_ROWS: MenuRow[] = [
   { key: 'orders', label: 'คำสั่งซื้อของฉัน', caption: 'ดูออเดอร์ที่ผ่านมาและกำลังดำเนินการ', icon: 'receipt-outline' },
   { key: 'address', label: 'ที่อยู่จัดส่ง', caption: 'จัดการที่อยู่สำหรับจัดส่งสินค้า', icon: 'location-outline' },
   { key: 'settings', label: 'ตั้งค่าการแจ้งเตือน', caption: 'ข่าวสารและโปรโมชัน', icon: 'notifications-outline' },
+  { key: 'language', label: 'เปลี่ยนภาษา', caption: 'ภาษาไทย / English', icon: 'language-outline' },
+  { key: 'legal', label: 'ข้อมูลทางกฎหมาย', caption: 'ข้อกำหนดและนโยบายความเป็นส่วนตัว', icon: 'document-text-outline' },
   { key: 'help', label: 'ศูนย์ช่วยเหลือ', caption: 'ติดต่อเราหรือคำถามที่พบบ่อย', icon: 'help-buoy-outline' },
 ];
 
@@ -43,6 +55,15 @@ export default function ProfileScreen() {
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const resetLock = useLock((s) => s.resetLock);
+  const [identity, setIdentity] = useState<AccountIdentity | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      getAccountIdentity()
+        .then(setIdentity)
+        .catch(() => {});
+    }, []),
+  );
 
   const onRow = (key: string) => {
     switch (key) {
@@ -55,10 +76,39 @@ export default function ProfileScreen() {
       case 'settings':
         router.push('/account/settings');
         break;
+      case 'language':
+        router.push('/account/language');
+        break;
+      case 'legal':
+        router.push('/account/legal');
+        break;
       case 'help':
         Alert.alert('ศูนย์ช่วยเหลือ', 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.');
         break;
     }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'ลบบัญชี',
+      'ข้อมูลส่วนตัวของคุณจะถูกลบถาวรและออกจากระบบทันที (ประวัติคำสั่งซื้อจะถูกเก็บแบบไม่ระบุตัวตนตามกฎหมาย) — ดำเนินการต่อหรือไม่?',
+      [
+        { text: 'ยกเลิก', style: 'cancel' },
+        {
+          text: 'ลบบัญชี',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              await resetLock();
+              logout();
+            } catch {
+              Alert.alert('ลบบัญชีไม่สำเร็จ', 'กรุณาลองใหม่อีกครั้ง');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const confirmLogout = () => {
@@ -107,18 +157,10 @@ export default function ProfileScreen() {
               <Text variant="title" numberOfLines={1}>
                 {user.name}
               </Text>
-              {user.phone ? (
-                <View style={styles.metaRow}>
-                  <Ionicons name="call-outline" size={13} color={Colors.textMuted} />
-                  <Text variant="caption" numberOfLines={1}>
-                    {user.phone}
-                  </Text>
-                </View>
-              ) : null}
               <View style={styles.metaRow}>
-                <Ionicons name="mail-outline" size={13} color={Colors.textMuted} />
+                <Ionicons name="card-outline" size={13} color={Colors.textMuted} />
                 <Text variant="caption" numberOfLines={1}>
-                  {user.email || 'ยังไม่ได้เพิ่มอีเมล'}
+                  รหัสสมาชิก {identity ? identity.id.slice(0, 8).toUpperCase() : '—'}
                 </Text>
               </View>
             </View>
@@ -131,6 +173,28 @@ export default function ProfileScreen() {
             <Ionicons name="create-outline" size={16} color={Colors.primaryStrong} />
             <Text style={styles.editText}>แก้ไขโปรไฟล์</Text>
           </PressableScale>
+        </Animated.View>
+
+        {/* Identity info */}
+        <Animated.View
+          entering={FadeInDown.delay(80).springify().damping(18)}
+          style={styles.infoCard}>
+          <View style={styles.infoRow}>
+            <Text variant="caption" style={styles.infoLabel}>
+              เบอร์มือถือ
+            </Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {user.phone || identity?.phone || 'ยังไม่ได้เพิ่ม'}
+            </Text>
+          </View>
+          <View style={[styles.infoRow, styles.infoDivider]}>
+            <Text variant="caption" style={styles.infoLabel}>
+              บัญชีที่ใช้เข้าสู่ระบบ
+            </Text>
+            <Text style={styles.infoValue} numberOfLines={1}>
+              {loginAccountLabel(identity)}
+            </Text>
+          </View>
         </Animated.View>
 
         {/* Menu */}
@@ -172,6 +236,17 @@ export default function ProfileScreen() {
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.rowPressed]}>
             <Ionicons name="log-out-outline" size={20} color={Colors.dangerStrong} />
             <Text style={styles.logoutText}>ออกจากระบบ</Text>
+          </Pressable>
+        </Animated.View>
+
+        {/* Delete account (PDPA) */}
+        <Animated.View entering={FadeInDown.delay(340).springify().damping(18)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="ลบบัญชี"
+            onPress={confirmDelete}
+            style={({ pressed }) => [styles.deleteBtn, pressed && styles.rowPressed]}>
+            <Text style={styles.deleteText}>ลบบัญชี</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -283,5 +358,44 @@ const styles = StyleSheet.create({
   logoutText: {
     ...Typography.button,
     color: Colors.dangerStrong,
+  },
+
+  infoCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.lg,
+    ...Shadow.card,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  infoDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  infoLabel: {
+    color: Colors.textMuted,
+  },
+  infoValue: {
+    ...Typography.bodyStrong,
+    color: Colors.text,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+
+  deleteBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    marginTop: Spacing.xs,
+  },
+  deleteText: {
+    ...Typography.body,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });
