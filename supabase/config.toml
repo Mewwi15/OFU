@@ -270,6 +270,17 @@ max_frequency = "5s"
 [auth.sms.test_otp]
 66812345678 = "123456"
 
+# ── Production SMS — route OTPs through the send-sms-hook → Thai aggregator ────
+# Local dev keeps the dummy [auth.sms.twilio] + [auth.sms.test_otp] so the test
+# number works offline. In PRODUCTION: deploy supabase/functions/send-sms-hook,
+# DISABLE [auth.sms.twilio] below, set the env (SMS_API_URL / SMS_API_KEY /
+# SMS_SENDER + SEND_SMS_HOOK_SECRET), then uncomment + enable this hook.
+# See docs/sms-otp-setup.md.
+# [auth.hook.send_sms]
+# enabled = true
+# uri = "https://<project-ref>.supabase.co/functions/v1/send-sms-hook"
+# secret = "env(SEND_SMS_HOOK_SECRET)"
+
 # Configure logged in session timeouts.
 # [auth.sessions]
 # Force log out after the specified duration.
