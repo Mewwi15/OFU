@@ -1,4 +1,4 @@
-import { Card, Title } from '@tremor/react';
+import { Card, Empty, Typography } from 'antd';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './auth';
@@ -7,6 +7,7 @@ import { Broadcast } from './pages/Broadcast';
 import { Login } from './pages/Login';
 import { Pos } from './pages/Pos';
 import { Products } from './pages/Products';
+import { Reports } from './pages/Reports';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { ready, session, isAdmin } = useAuth();
@@ -28,6 +29,7 @@ export default function App() {
         }>
         <Route index element={<Navigate to="/pos" replace />} />
         <Route path="/pos" element={<Pos />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
@@ -42,9 +44,11 @@ export default function App() {
 function Placeholder({ title }: { title: string }) {
   return (
     <>
-      <Title className="!text-2xl mb-6">{title}</Title>
+      <Typography.Title level={3} style={{ marginBottom: 16 }}>
+        {title}
+      </Typography.Title>
       <Card>
-        <p className="text-center text-tremor-content py-8">เร็วๆ นี้</p>
+        <Empty description="เร็วๆ นี้" />
       </Card>
     </>
   );

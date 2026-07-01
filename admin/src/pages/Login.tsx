@@ -1,24 +1,23 @@
-import { Button, Card, TextInput } from '@tremor/react';
+import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
 
+const { Title, Text } = Typography;
+
 export function Login() {
   const { session, isAdmin, ready, signIn } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (ready && session && isAdmin) return <Navigate to="/products" replace />;
+  if (ready && session && isAdmin) return <Navigate to="/pos" replace />;
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onFinish = async (v: { email: string; password: string }) => {
     setBusy(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      await signIn(v.email.trim(), v.password);
     } catch {
       setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     } finally {
@@ -27,35 +26,28 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-5">
-      <Card className="max-w-sm w-full">
-        <div className="text-center mb-6 text-2xl font-semibold">
-          อู้ฟู่ <span className="text-tremor-brand">· แอดมิน</span>
+    <div className="min-h-screen flex items-center justify-center p-5" style={{ background: '#FBF2EC' }}>
+      <Card style={{ maxWidth: 380, width: '100%' }} styles={{ body: { padding: 28 } }}>
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[#F15929] text-white grid place-items-center text-xl font-semibold">
+            อ
+          </div>
+          <Title level={4} style={{ margin: 0 }}>อู้ฟู่ แอดมิน</Title>
+          <Text type="secondary">เข้าสู่ระบบเพื่อจัดการร้าน</Text>
         </div>
-        <form onSubmit={onSubmit} className="space-y-1">
-          <label className="text-tremor-label text-tremor-content">อีเมล</label>
-          <TextInput
-            type="email"
-            value={email}
-            onValueChange={setEmail}
-            placeholder="admin@oofoo.local"
-            autoComplete="username"
-          />
-          <label className="text-tremor-label text-tremor-content pt-2 block">รหัสผ่าน</label>
-          <TextInput
-            type="password"
-            value={password}
-            onValueChange={setPassword}
-            autoComplete="current-password"
-          />
-          <Button type="submit" loading={busy} className="w-full !mt-6">
+        <Form layout="vertical" requiredMark={false} onFinish={onFinish} initialValues={{ email: '', password: '' }}>
+          <Form.Item name="email" label="อีเมล" rules={[{ required: true, message: 'กรอกอีเมล' }]}>
+            <Input type="email" size="large" placeholder="admin@oofoo.local" autoComplete="username" />
+          </Form.Item>
+          <Form.Item name="password" label="รหัสผ่าน" rules={[{ required: true, message: 'กรอกรหัสผ่าน' }]}>
+            <Input.Password size="large" autoComplete="current-password" />
+          </Form.Item>
+          {error ? <Alert type="error" showIcon message={error} className="mb-3" /> : null}
+          {ready && session && !isAdmin ? <Alert type="warning" showIcon message="บัญชีนี้ไม่ใช่แอดมิน" className="mb-3" /> : null}
+          <Button type="primary" htmlType="submit" size="large" block loading={busy}>
             เข้าสู่ระบบ
           </Button>
-          {ready && session && !isAdmin ? (
-            <p className="text-red-600 text-tremor-default pt-2">บัญชีนี้ไม่ใช่แอดมิน</p>
-          ) : null}
-          {error ? <p className="text-red-600 text-tremor-default pt-2">{error}</p> : null}
-        </form>
+        </Form>
       </Card>
     </div>
   );

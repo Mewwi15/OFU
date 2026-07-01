@@ -1,8 +1,10 @@
-import { Select, SelectItem, Textarea, TextInput } from '@tremor/react';
-import { RiCheckLine, RiMegaphoneLine } from '@remixicon/react';
+import { RiMegaphoneLine } from '@remixicon/react';
+import { App, Alert, Button, Card, Form, Input, Select, Typography } from 'antd';
 import { useState } from 'react';
 
 import { apiError, broadcastNotification, type BroadcastResult } from '../lib/api';
+
+const { Title, Text } = Typography;
 
 const CATEGORIES = [
   { value: 'promo', label: 'โปรโมชัน' },
@@ -11,83 +13,70 @@ const CATEGORIES = [
 ];
 
 export function Broadcast() {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [category, setCategory] = useState('promo');
+  const { modal, message } = App.useApp();
+  const [form] = Form.useForm();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BroadcastResult | null>(null);
 
-  const send = async () => {
-    if (!title.trim()) {
-      setError('กรุณากรอกหัวข้อ');
-      return;
-    }
-    if (!confirm('ส่งแจ้งเตือนนี้หาลูกค้าทุกคน?')) return;
-    setBusy(true);
-    setError(null);
-    setResult(null);
-    try {
-      const r = await broadcastNotification({ title: title.trim(), body: body.trim() || undefined, category });
-      setResult(r);
-      setTitle('');
-      setBody('');
-    } catch (e) {
-      setError(apiError(e));
-    } finally {
-      setBusy(false);
-    }
+  const onFinish = (v: { title: string; body?: string; category: string }) => {
+    modal.confirm({
+      title: 'ส่งแจ้งเตือนนี้หาลูกค้าทุกคน?',
+      content: v.title,
+      okText: 'ส่ง',
+      cancelText: 'ยกเลิก',
+      onOk: async () => {
+        setBusy(true);
+        setResult(null);
+        try {
+          const r = await broadcastNotification({
+            title: v.title.trim(),
+            body: v.body?.trim() || undefined,
+            category: v.category,
+          });
+          setResult(r);
+          form.resetFields();
+        } catch (e) {
+          message.error(apiError(e));
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold">ส่งแจ้งเตือน</h1>
-        <p className="text-sm text-gray-400 mt-0.5">ส่งโปรโมชันหรือประกาศ — เข้าฟีดในแอป + เด้งบนมือถือลูกค้าทุกคน</p>
+      <div className="mb-4">
+        <Title level={3} style={{ margin: 0 }}>ส่งแจ้งเตือน</Title>
+        <Text type="secondary">ส่งโปรโมชันหรือประกาศ — เข้าฟีดในแอป + เด้งบนมือถือลูกค้าทุกคน</Text>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 max-w-2xl">
+      <Card style={{ maxWidth: 640 }}>
         {result ? (
-          <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-5">
-            <RiCheckLine className="w-5 h-5 text-emerald-600 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-emerald-800">ส่งแล้ว</p>
-              <p className="text-emerald-700 mt-0.5">
-                เข้าฟีด {result.recipients} คน · ส่ง push {result.push} เครื่อง
-              </p>
-            </div>
-          </div>
+          <Alert
+            type="success"
+            showIcon
+            className="mb-5"
+            message="ส่งแล้ว"
+            description={`เข้าฟีด ${result.recipients} คน · ส่ง push ${result.push} เครื่อง`}
+          />
         ) : null}
 
-        <div className="mb-4">
-          <label className="text-xs text-gray-500 block mb-1">หัวข้อ</label>
-          <TextInput value={title} onValueChange={setTitle} placeholder="เช่น ลด 10% วันนี้เท่านั้น!" />
-        </div>
-        <div className="mb-4">
-          <label className="text-xs text-gray-500 block mb-1">ข้อความ</label>
-          <Textarea value={body} onValueChange={setBody} rows={3} placeholder="รายละเอียดโปรโมชัน…" />
-        </div>
-        <div className="mb-5">
-          <label className="text-xs text-gray-500 block mb-1">ประเภท</label>
-          <Select value={category} onValueChange={setCategory} enableClear={false}>
-            {CATEGORIES.map((c) => (
-              <SelectItem key={c.value} value={c.value}>
-                {c.label}
-              </SelectItem>
-            ))}
-          </Select>
-        </div>
-
-        {error ? <p className="text-red-600 text-sm mb-3">{error}</p> : null}
-
-        <button
-          onClick={() => void send()}
-          disabled={busy}
-          className="flex items-center gap-1.5 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl px-5 py-2.5 text-sm font-medium transition disabled:opacity-50">
-          <RiMegaphoneLine className="w-4 h-4" />
-          {busy ? 'กำลังส่ง…' : 'ส่งหาลูกค้าทุกคน'}
-        </button>
-      </div>
+        <Form form={form} layout="vertical" requiredMark={false} onFinish={onFinish} initialValues={{ category: 'promo' }}>
+          <Form.Item name="title" label="หัวข้อ" rules={[{ required: true, message: 'กรุณากรอกหัวข้อ' }]}>
+            <Input placeholder="เช่น ลด 10% วันนี้เท่านั้น!" />
+          </Form.Item>
+          <Form.Item name="body" label="ข้อความ">
+            <Input.TextArea rows={3} placeholder="รายละเอียดโปรโมชัน…" />
+          </Form.Item>
+          <Form.Item name="category" label="ประเภท">
+            <Select options={CATEGORIES} />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={busy} icon={<RiMegaphoneLine className="w-4 h-4" />}>
+            ส่งหาลูกค้าทุกคน
+          </Button>
+        </Form>
+      </Card>
     </>
   );
 }
