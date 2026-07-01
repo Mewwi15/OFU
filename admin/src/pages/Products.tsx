@@ -3,6 +3,7 @@ import {
   RiDeleteBinLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiImageAddLine,
   RiImageLine,
   RiPencilLine,
 } from '@remixicon/react';
@@ -21,6 +22,7 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
@@ -28,14 +30,19 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   apiError,
   archiveProduct,
+  deleteProductImage,
   deleteVariant,
   listCategories,
+  listProductImages,
   listProducts,
+  setPrimaryImage,
   setPublishState,
+  uploadProductImage,
   upsertProduct,
   upsertVariant,
   type Category,
   type Product,
+  type ProductImage,
   type Variant,
 } from '../lib/api';
 
@@ -266,6 +273,15 @@ function ProductModal({
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [busy, setBusy] = useState(false);
+  const [images, setImages] = useState<ProductImage[]>(product?.product_images as ProductImage[] ?? []);
+
+  const reloadImages = async () => {
+    if (product) setImages(await listProductImages(product.id));
+  };
+  useEffect(() => {
+    void reloadImages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id]);
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -326,6 +342,86 @@ function ProductModal({
         <Form.Item name="description" label="รายละเอียด">
           <Input.TextArea rows={3} />
         </Form.Item>
+
+        <div className="mb-1 text-sm text-[#4b443f]">รูปภาพสินค้า</div>
+        {product ? (
+          <div className="flex flex-wrap gap-3">
+            {images.map((img) => (
+              <div key={img.id} className="w-24">
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
+                  <img src={img.storage_path} alt="" className="w-full h-full object-cover" />
+                  {img.is_primary && (
+                    <span className="absolute top-1 left-1 rounded bg-tremor-brand text-white text-[10px] px-1.5 py-0.5">
+                      รูปหลัก
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  {img.is_primary ? (
+                    <span className="text-[11px] text-gray-400">รูปหลัก</span>
+                  ) : (
+                    <Button
+                      size="small"
+                      type="link"
+                      className="!px-0 !text-[11px]"
+                      onClick={async () => {
+                        try {
+                          await setPrimaryImage(img.id);
+                          await reloadImages();
+                        } catch (e) {
+                          message.error(apiError(e));
+                        }
+                      }}>
+                      ตั้งเป็นหลัก
+                    </Button>
+                  )}
+                  <Popconfirm
+                    title="ลบรูปนี้?"
+                    okText="ลบ"
+                    cancelText="ยกเลิก"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={async () => {
+                      try {
+                        await deleteProductImage(img.id);
+                        await reloadImages();
+                      } catch (e) {
+                        message.error(apiError(e));
+                      }
+                    }}>
+                    <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-3.5 h-3.5" />} />
+                  </Popconfirm>
+                </div>
+              </div>
+            ))}
+            <Upload
+              accept="image/*"
+              showUploadList={false}
+              customRequest={async ({ file, onSuccess, onError }) => {
+                try {
+                  await uploadProductImage(product.id, file as File);
+                  await reloadImages();
+                  message.success('อัปโหลดรูปแล้ว');
+                  onSuccess?.({});
+                } catch (e) {
+                  message.error(apiError(e));
+                  onError?.(e as Error);
+                }
+              }}>
+              <button
+                type="button"
+                className="w-24 h-24 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
+                <div className="text-center">
+                  <RiImageAddLine className="w-6 h-6 mx-auto" />
+                  <div className="text-[11px] mt-1">เพิ่มรูป</div>
+                </div>
+              </button>
+            </Upload>
+          </div>
+        ) : (
+          <Typography.Text type="secondary" className="text-sm">
+            บันทึกสินค้าก่อน แล้วเปิด “แก้ไข” เพื่อเพิ่มรูปภาพ
+          </Typography.Text>
+        )}
       </Form>
     </Modal>
   );

@@ -153,6 +153,35 @@ export const upsertVariant = (p: {
 export const deleteVariant = (id: string) => rpc('delete_variant', { p_id: id });
 export const deleteCategory = (id: string) => rpc('delete_category', { p_id: id });
 
+/* ── product images (upload to the public bucket, then register the row) ─────── */
+export async function uploadProductImage(productId: string, file: File, isPrimary = false) {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `${productId}/${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await supabase.storage
+    .from('product-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+  if (upErr) throw upErr;
+  const publicUrl = supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  return rpc<{ id: string }>('add_product_image', {
+    p_product_id: productId,
+    p_storage_path: publicUrl,
+    p_is_primary: isPrimary,
+  });
+}
+export const setPrimaryImage = (imageId: string) => rpc('set_primary_image', { p_image_id: imageId });
+export const deleteProductImage = (imageId: string) => rpc('delete_product_image', { p_image_id: imageId });
+
+export type ProductImage = { id: string; storage_path: string; is_primary: boolean; display_order: number };
+export async function listProductImages(productId: string): Promise<ProductImage[]> {
+  const { data, error } = await supabase
+    .from('product_images')
+    .select('id, storage_path, is_primary, display_order')
+    .eq('product_id', productId)
+    .order('display_order');
+  if (error) throw error;
+  return data as ProductImage[];
+}
+
 export const adjustStock = (variantId: string, delta: number) =>
   rpc('adjust_stock', { p_variant_id: variantId, p_delta: delta });
 

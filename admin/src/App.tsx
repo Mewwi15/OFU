@@ -4,7 +4,9 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
 import { Broadcast } from './pages/Broadcast';
+import { Categories } from './pages/Categories';
 import { Login } from './pages/Login';
+import { Orders } from './pages/Orders';
 import { Pos } from './pages/Pos';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
@@ -31,10 +33,10 @@ export default function App() {
         <Route path="/pos" element={<Pos />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
-        <Route path="/categories" element={<Placeholder title="หมวดหมู่" />} />
+        <Route path="/categories" element={<Categories />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
-        <Route path="/orders" element={<Placeholder title="ออเดอร์" />} />
+        <Route path="/orders" element={<Orders />} />
         <Route path="/payments" element={<Placeholder title="ตรวจสลิป" />} />
       </Route>
       <Route path="*" element={<Navigate to="/products" replace />} />
