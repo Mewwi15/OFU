@@ -62,6 +62,11 @@ export default function HomeScreen() {
 
   /* ----- Catalog (from Supabase) ----- */
   const products = useCatalog((s) => s.products);
+  const dbBanners = useCatalog((s) => s.banners);
+  // Admin-managed banners when present; otherwise the built-in fallback slides.
+  const slides = dbBanners.length
+    ? dbBanners.map((b) => ({ id: b.id, image: b.image, title: b.title ?? '' }))
+    : BANNER_SLIDES.map((b) => ({ id: b.id, image: b.image, title: t(b.titleKey) }));
   const bestSellers = useMemo(
     () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
     [products],
@@ -80,12 +85,12 @@ export default function HomeScreen() {
   useEffect(() => {
     if (bannerWidth === 0) return;
     const timer = setInterval(() => {
-      const next = (activeSlideRef.current + 1) % BANNER_SLIDES.length;
+      const next = (activeSlideRef.current + 1) % slides.length;
       bannerRef.current?.scrollTo({ x: next * bannerWidth, animated: true });
       setActiveSlide(next);
     }, BANNER_INTERVAL);
     return () => clearInterval(timer);
-  }, [bannerWidth]);
+  }, [bannerWidth, slides.length]);
 
   const onBannerLayout = (e: LayoutChangeEvent) =>
     setBannerWidth(e.nativeEvent.layout.width);
@@ -121,7 +126,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={onBannerScroll}
             style={StyleSheet.absoluteFill}>
-            {BANNER_SLIDES.map((slide) => (
+            {slides.map((slide) => (
               <View key={slide.id} style={{ width: bannerWidth, height: '100%' }}>
                 <Image
                   source={{ uri: slide.image }}
@@ -136,7 +141,7 @@ export default function HomeScreen() {
                 />
                 <View style={styles.bannerContent}>
                   <Text variant="title" style={{ color: Colors.textOnPrimary }}>
-                    {t(slide.titleKey)}
+                    {slide.title}
                   </Text>
                   <Button size="sm" onPress={() => {}} style={styles.bannerButton}>
                     {t('home.shopNow')}
@@ -187,7 +192,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.dots} pointerEvents="none">
-            {BANNER_SLIDES.map((slide, i) => (
+            {slides.map((slide, i) => (
               <View
                 key={slide.id}
                 style={[styles.dot, i === activeSlide && styles.dotActive]}

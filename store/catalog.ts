@@ -7,10 +7,11 @@
 import { create } from 'zustand';
 
 import type { Product } from '@/data/products';
-import { loadCatalog } from '@/lib/data/catalog';
+import { loadBanners, loadCatalog, type HomeBanner } from '@/lib/data/catalog';
 
 export type CatalogState = {
   products: Product[];
+  banners: HomeBanner[];
   loading: boolean;
   loaded: boolean;
   error: string | null;
@@ -20,6 +21,7 @@ export type CatalogState = {
 
 export const useCatalog = create<CatalogState>((set, get) => ({
   products: [],
+  banners: [],
   loading: false,
   loaded: false,
   error: null,
@@ -30,8 +32,12 @@ export const useCatalog = create<CatalogState>((set, get) => ({
     if (s.loaded && !force) return;
     set({ loading: true, error: null });
     try {
-      const products = await loadCatalog();
-      set({ products, loaded: true, loading: false });
+      // Banners are optional chrome — never let them block the catalog.
+      const [products, banners] = await Promise.all([
+        loadCatalog(),
+        loadBanners().catch(() => [] as HomeBanner[]),
+      ]);
+      set({ products, banners, loaded: true, loading: false });
     } catch {
       set({ error: 'โหลดสินค้าไม่สำเร็จ', loading: false });
     }

@@ -62,6 +62,22 @@ export async function loadCatalog(): Promise<Product[]> {
   return ((data ?? []) as unknown as Row[]).map(mapProduct).filter((p) => p.variants.length > 0);
 }
 
+/** A published home-hero banner (managed by the admin web's Banners page). */
+export type HomeBanner = { id: string; image: string; title: string | null };
+
+/** Load published banners for the app home, in admin display order. */
+export async function loadBanners(): Promise<HomeBanner[]> {
+  const { data, error } = await supabase
+    .from('banners')
+    .select('id, image_path, headline, display_order')
+    .eq('publish_state', 'published')
+    .order('display_order');
+  if (error) throw error;
+  return ((data ?? []) as { id: string; image_path: string | null; headline: string | null }[])
+    .filter((b) => !!b.image_path)
+    .map((b) => ({ id: b.id, image: b.image_path as string, title: b.headline }));
+}
+
 /** The category filter list (static UI labels; 'ทั้งหมด' = All). */
 export const CATEGORY_FILTERS: readonly Category[] = [
   'ทั้งหมด',
