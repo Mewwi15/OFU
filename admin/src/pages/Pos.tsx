@@ -4,6 +4,7 @@ import {
   RiMoneyDollarCircleLine,
   RiPrinterLine,
   RiQrCodeLine,
+  RiSplitCellsHorizontal,
   RiWallet3Line,
   RiSearchLine,
   RiShoppingBasket2Line,
@@ -46,7 +47,7 @@ type Line = {
   qty: number;
   image: string | null;
 };
-type PayMethod = 'cash' | 'promptpay' | 'store_credit';
+type PayMethod = 'cash' | 'promptpay' | 'store_credit' | 'split';
 type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -71,6 +72,7 @@ export function Pos() {
   const [creditPhone, setCreditPhone] = useState('');
   const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null);
   const [creditSearching, setCreditSearching] = useState(false);
+  const [splitCash, setSplitCash] = useState<number | ''>('');
 
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -218,6 +220,7 @@ export function Pos() {
     setCustTaxId('');
     setCreditPhone('');
     setCreditCustomer(null);
+    setSplitCash('');
     setMethod('cash');
     setQuery('');
     searchRef.current?.focus();
@@ -233,16 +236,28 @@ export function Pos() {
       setError('เครดิตร้านไม่พอ');
       return;
     }
+    if (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total)) {
+      setError('แบ่งจำนวนเงินไม่ถูกต้อง');
+      return;
+    }
+    const splitPayments =
+      method === 'split'
+        ? [
+            { method: 'cash' as const, amount: splitCash as number },
+            { method: 'promptpay' as const, amount: total - (splitCash as number) },
+          ].filter((p) => p.amount > 0)
+        : undefined;
     const input = {
       client_op_id: crypto.randomUUID(),
       items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
-      payment_method: method,
+      payment_method: (method === 'split' ? 'cash' : method) as 'cash' | 'promptpay' | 'store_credit',
       cash_tendered: method === 'cash' ? (tendered as number) : undefined,
       discount,
       customer_user_id: method === 'store_credit' ? creditCustomer?.user_id : undefined,
       tax_invoice: taxInvoice,
       customer_name: taxInvoice ? custName || undefined : undefined,
       customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
+      payments: splitPayments,
     };
     const at = new Date().toLocaleString('th-TH');
     const soldLines = lines;
@@ -508,7 +523,7 @@ export function Pos() {
               <span className="text-2xl font-bold text-tremor-brand-emphasis">{baht(total)}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>
                 เงินสด
               </PayTab>
@@ -517,6 +532,9 @@ export function Pos() {
               </PayTab>
               <PayTab active={method === 'store_credit'} onClick={() => setMethod('store_credit')} Icon={RiWallet3Line}>
                 เครดิต
+              </PayTab>
+              <PayTab active={method === 'split'} onClick={() => setMethod('split')} Icon={RiSplitCellsHorizontal}>
+                แยกจ่าย
               </PayTab>
             </div>
 
@@ -548,6 +566,14 @@ export function Pos() {
                     setCreditSearching(false);
                   }
                 }}
+              />
+            )}
+            {method === 'split' && (
+              <SplitPanel
+                total={total}
+                cash={splitCash}
+                setCash={setSplitCash}
+                promptpayTarget={shop?.promptpay_id ?? null}
               />
             )}
 
@@ -584,7 +610,8 @@ export function Pos() {
               disabled={
                 !lines.length ||
                 busy ||
-                (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total))
+                (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) ||
+                (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total))
               }
               className="w-full py-3.5 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 transition shadow-sm">
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
@@ -819,6 +846,46 @@ function StoreCreditPanel({
   );
 }
 
+function SplitPanel({
+  total,
+  cash,
+  setCash,
+  promptpayTarget,
+}: {
+  total: number;
+  cash: number | '';
+  setCash: (v: number | '') => void;
+  promptpayTarget: string | null;
+}) {
+  const cashNum = typeof cash === 'number' ? cash : 0;
+  const remainder = Math.max(0, total - cashNum);
+  return (
+    <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-tremor-content">เงินสด</span>
+        <div className="flex items-center gap-1">
+          <span className="text-tremor-content-subtle">฿</span>
+          <input
+            type="number"
+            value={cash}
+            onChange={(e) =>
+              setCash(e.target.value === '' ? '' : Math.max(0, Math.min(total, Number(e.target.value))))
+            }
+            className="w-24 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
+          />
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-tremor-content">พร้อมเพย์ (ส่วนที่เหลือ)</span>
+        <span className="font-semibold text-tremor-content-strong">{baht(remainder)}</span>
+      </div>
+      {remainder > 0 && promptpayTarget && (
+        <PromptPayPanel target={promptpayTarget} amount={remainder} name={null} />
+      )}
+    </div>
+  );
+}
+
 function VariantPicker({
   product,
   onPick,
@@ -915,7 +982,15 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           </div>
           <div className="border-t border-dashed border-black my-2" />
           <Line2
-            label={method === 'cash' ? 'เงินสด' : method === 'promptpay' ? 'พร้อมเพย์' : 'เครดิตร้าน'}
+            label={
+              method === 'cash'
+                ? 'เงินสด'
+                : method === 'promptpay'
+                  ? 'พร้อมเพย์'
+                  : method === 'store_credit'
+                    ? 'เครดิตร้าน'
+                    : 'แยกจ่าย'
+            }
             value={method === 'cash' ? sale.total + sale.change : sale.total}
           />
           {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}

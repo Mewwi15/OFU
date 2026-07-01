@@ -368,6 +368,7 @@ export type PosSaleInput = {
   customer_name?: string;
   customer_tax_id?: string;
   tax_invoice?: boolean;
+  payments?: { method: 'cash' | 'promptpay'; amount: number }[]; // split tender
 };
 export type SaleResult = {
   id: string;
@@ -497,4 +498,5 @@ export const createPosSale = (p: PosSaleInput) =>
     p_customer_name: p.customer_name ?? undefined,
     p_customer_tax_id: p.customer_tax_id ?? undefined,
     p_tax_invoice: p.tax_invoice ?? false,
+    p_payments: p.payments ?? undefined,
   });
