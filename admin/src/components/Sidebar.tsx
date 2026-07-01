@@ -2,6 +2,7 @@ import {
   RiBarChart2Line,
   RiBillLine,
   RiCashLine,
+  RiFileList3Line,
   RiImageLine,
   RiLayoutMasonryLine,
   RiLogoutBoxRLine,
@@ -19,6 +20,7 @@ export type NavItem = { to: string; label: string; Icon: typeof RiCashLine };
 
 export const NAV: NavItem[] = [
   { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
+  { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
   { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
   { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
   { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },

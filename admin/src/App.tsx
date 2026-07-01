@@ -9,6 +9,7 @@ import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
 import { Pos } from './pages/Pos';
+import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
 
@@ -32,6 +33,7 @@ export default function App() {
         }>
         <Route index element={<Navigate to="/pos" replace />} />
         <Route path="/pos" element={<Pos />} />
+        <Route path="/pos-sales" element={<PosSales />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />

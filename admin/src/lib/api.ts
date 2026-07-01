@@ -394,6 +394,39 @@ export type Dashboard = {
 export const posDashboard = (fromIso: string, toIso: string) =>
   rpc<Dashboard>('pos_dashboard', { p_from: fromIso, p_to: toIso });
 
+export type PosSale = {
+  id: string;
+  sale_number: string;
+  tax_invoice_no: string | null;
+  total: number;
+  vat_amount: number;
+  net_amount: number;
+  discount: number;
+  payment_method: PosPayMethod;
+  status: 'completed' | 'voided' | 'refunded';
+  customer_name: string | null;
+  created_at: string;
+};
+export async function listPosSales(): Promise<PosSale[]> {
+  const { data, error } = await supabase
+    .from('pos_sales')
+    .select('id, sale_number, tax_invoice_no, total, vat_amount, net_amount, discount, payment_method, status, customer_name, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data as PosSale[];
+}
+export type PosSaleItem = { id: string; product_name: string; size: string | null; unit_price: number; qty: number; line_total: number };
+export async function getPosSaleItems(saleId: string): Promise<PosSaleItem[]> {
+  const { data, error } = await supabase
+    .from('pos_sale_items')
+    .select('id, product_name, size, unit_price, qty, line_total')
+    .eq('sale_id', saleId);
+  if (error) throw error;
+  return data as PosSaleItem[];
+}
+export const refundPosSale = (saleId: string) => rpc<{ replay: boolean }>('refund_pos_sale', { p_sale_id: saleId });
+
 export const createPosSale = (p: PosSaleInput) =>
   rpc<SaleResult>('create_pos_sale', {
     p_client_op_id: p.client_op_id,
