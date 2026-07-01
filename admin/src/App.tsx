@@ -31,6 +31,7 @@ export default function App() {
         <Route path="/pos" element={<Pos />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/categories" element={<Placeholder title="หมวดหมู่" />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
         <Route path="/orders" element={<Placeholder title="ออเดอร์" />} />
