@@ -26,9 +26,9 @@ import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
-  adjustStock,
   apiError,
   archiveProduct,
+  deleteVariant,
   listCategories,
   listProducts,
   setPublishState,
@@ -36,6 +36,7 @@ import {
   upsertVariant,
   type Category,
   type Product,
+  type Variant,
 } from '../lib/api';
 
 const { Title, Text } = Typography;
@@ -276,6 +277,7 @@ function ProductModal({
         name: v.name.trim(),
         subtitle: v.subtitle?.trim() || null,
         description: v.description?.trim() || null,
+        brand: v.brand?.trim() || null,
         expected_row_version: product?.row_version,
       });
       onSaved();
@@ -302,6 +304,7 @@ function ProductModal({
         initialValues={{
           name: product?.name ?? '',
           category_id: product?.category_id ?? undefined,
+          brand: product?.brand ?? '',
           subtitle: product?.subtitle ?? '',
           description: product?.description ?? '',
         }}
@@ -309,9 +312,14 @@ function ProductModal({
         <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรุณากรอกชื่อสินค้า' }]}>
           <Input placeholder="เช่น ข้าวหอมมะลิ" />
         </Form.Item>
-        <Form.Item name="category_id" label="หมวดหมู่">
-          <Select allowClear placeholder="— ไม่ระบุ —" options={categories.map((c) => ({ value: c.id, label: c.name }))} />
-        </Form.Item>
+        <div className="grid grid-cols-2 gap-3">
+          <Form.Item name="category_id" label="หมวดหมู่">
+            <Select allowClear placeholder="— ไม่ระบุ —" options={categories.map((c) => ({ value: c.id, label: c.name }))} />
+          </Form.Item>
+          <Form.Item name="brand" label="ยี่ห้อ">
+            <Input placeholder="เช่น ตราฉัตร" />
+          </Form.Item>
+        </div>
         <Form.Item name="subtitle" label="คำโปรย">
           <Input placeholder="เช่น หอม นุ่ม คัดพิเศษ" />
         </Form.Item>
@@ -333,31 +341,12 @@ function VariantsModal({
   onChanged: () => Promise<void>;
 }) {
   const { message } = App.useApp();
-  const [form] = Form.useForm();
-  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<Variant | 'new' | null>(null);
 
-  const add = async () => {
-    const v = await form.validateFields();
-    setBusy(true);
+  const del = async (id: string) => {
     try {
-      await upsertVariant({
-        product_id: product.id,
-        size: v.size?.trim() || null,
-        price: Number(v.price),
-        stock_qty: v.stock ? Number(v.stock) : 0,
-      });
-      form.resetFields();
-      await onChanged();
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const bump = async (variantId: string, delta: number) => {
-    try {
-      await adjustStock(variantId, delta);
+      await deleteVariant(id);
+      message.success('ลบขนาดแล้ว');
       await onChanged();
     } catch (e) {
       message.error(apiError(e));
@@ -365,63 +354,193 @@ function VariantsModal({
   };
 
   return (
-    <Modal open title={`ขนาด / สต็อก — ${product.name}`} onCancel={onClose} footer={null} destroyOnHidden width={520}>
-      <Table
+    <Modal
+      open
+      title={`ขนาด / สต็อก — ${product.name}`}
+      onCancel={onClose}
+      destroyOnHidden
+      width={820}
+      footer={[
+        <Button key="add" type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
+          เพิ่มขนาด
+        </Button>,
+        <Button key="close" onClick={onClose}>
+          ปิด
+        </Button>,
+      ]}>
+      <Table<Variant>
         size="small"
         rowKey="id"
-        className="mt-2 mb-4"
+        className="mt-2"
         pagination={false}
-        locale={{ emptyText: 'ยังไม่มีขนาด' }}
+        scroll={{ x: 720 }}
+        locale={{ emptyText: 'ยังไม่มีขนาด — กด “เพิ่มขนาด”' }}
         dataSource={product.product_variants}
         columns={[
           { title: 'ขนาด', key: 'size', render: (_, v) => v.size ?? 'ปกติ' },
-          { title: 'ราคา', key: 'price', align: 'right', render: (_, v) => `฿${v.price}` },
+          { title: 'หน่วย', dataIndex: 'unit', key: 'unit', width: 70 },
+          { title: 'SKU', key: 'sku', render: (_, v) => v.sku ?? <Text type="secondary">—</Text> },
+          { title: 'บาร์โค้ด', key: 'barcode', render: (_, v) => v.barcode ?? <Text type="secondary">—</Text> },
+          {
+            title: 'ต้นทุน',
+            key: 'cost',
+            align: 'right',
+            width: 80,
+            render: (_, v) => (v.cost_price != null ? `฿${v.cost_price}` : <Text type="secondary">—</Text>),
+          },
+          { title: 'ราคา', key: 'price', align: 'right', width: 80, render: (_, v) => `฿${v.price}` },
+          {
+            title: 'กำไร',
+            key: 'margin',
+            align: 'right',
+            width: 70,
+            render: (_, v) =>
+              v.cost_price != null ? (
+                <Text type="success">฿{v.price - v.cost_price}</Text>
+              ) : (
+                <Text type="secondary">—</Text>
+              ),
+          },
           {
             title: 'สต็อก',
             key: 'stock',
             align: 'right',
-            render: (_, v) => (
-              <span>
-                {v.stock_qty}
-                {v.reserved_qty ? <Text type="secondary" className="text-xs"> (จอง {v.reserved_qty})</Text> : null}
-              </span>
-            ),
+            width: 90,
+            render: (_, v) => {
+              const low = v.stock_qty <= v.low_stock_threshold;
+              return (
+                <span>
+                  <span className={low ? 'text-amber-600 font-medium' : ''}>{v.stock_qty}</span>
+                  {v.reserved_qty ? <Text type="secondary" className="text-xs"> (จอง {v.reserved_qty})</Text> : null}
+                </span>
+              );
+            },
           },
           {
             title: '',
-            key: 'adj',
+            key: 'actions',
             align: 'right',
-            width: 110,
+            width: 90,
+            fixed: 'right',
             render: (_, v) => (
-              <Space size={4}>
-                <Button size="small" onClick={() => void bump(v.id, -1)}>
-                  −1
-                </Button>
-                <Button size="small" onClick={() => void bump(v.id, +10)}>
-                  +10
-                </Button>
+              <Space size={2}>
+                <Tooltip title="แก้ไข">
+                  <Button size="small" type="text" icon={<RiPencilLine className="w-4 h-4" />} onClick={() => setEditing(v)} />
+                </Tooltip>
+                <Popconfirm title="ลบขนาดนี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void del(v.id)}>
+                  <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-4 h-4" />} />
+                </Popconfirm>
               </Space>
             ),
           },
         ]}
       />
 
-      <Text strong>เพิ่มขนาด</Text>
-      <Form form={form} layout="inline" className="mt-2" style={{ rowGap: 8 }}>
-        <Form.Item name="size" label="ขนาด">
-          <Input placeholder="1 กก. (เว้นว่าง=ปกติ)" style={{ width: 160 }} />
-        </Form.Item>
-        <Form.Item name="price" label="ราคา" rules={[{ required: true, message: 'ใส่ราคา' }]}>
-          <InputNumber min={1} prefix="฿" style={{ width: 110 }} />
-        </Form.Item>
-        <Form.Item name="stock" label="สต็อก">
-          <InputNumber min={0} style={{ width: 90 }} />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" loading={busy} onClick={() => void add()}>
-            เพิ่ม
-          </Button>
-        </Form.Item>
+      {editing ? (
+        <VariantFormModal
+          productId={product.id}
+          variant={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            await onChanged();
+          }}
+        />
+      ) : null}
+    </Modal>
+  );
+}
+
+function VariantFormModal({
+  productId,
+  variant,
+  onClose,
+  onSaved,
+}: {
+  productId: string;
+  variant: Variant | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    setBusy(true);
+    try {
+      await upsertVariant({
+        id: variant?.id,
+        product_id: productId,
+        size: v.size?.trim() || null,
+        unit: v.unit?.trim() || 'ชิ้น',
+        sku: v.sku?.trim() || null,
+        barcode: v.barcode?.trim() || null,
+        cost_price: v.cost_price ?? null,
+        price: Number(v.price),
+        stock_qty: v.stock_qty ?? 0,
+        low_stock_threshold: v.low_stock_threshold ?? undefined,
+      });
+      await onSaved();
+    } catch (e) {
+      message.error(apiError(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      title={variant ? 'แก้ไขขนาด' : 'เพิ่มขนาด'}
+      onCancel={onClose}
+      onOk={() => void submit()}
+      okText="บันทึก"
+      cancelText="ยกเลิก"
+      confirmLoading={busy}
+      destroyOnHidden
+      width={520}>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={false}
+        className="mt-2"
+        initialValues={{
+          size: variant?.size ?? '',
+          unit: variant?.unit ?? 'ชิ้น',
+          sku: variant?.sku ?? '',
+          barcode: variant?.barcode ?? '',
+          cost_price: variant?.cost_price ?? null,
+          price: variant?.price ?? null,
+          stock_qty: variant?.stock_qty ?? 0,
+          low_stock_threshold: variant?.low_stock_threshold ?? 5,
+        }}>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Form.Item name="size" label="ขนาด (เว้นว่าง = ปกติ)">
+            <Input placeholder="เช่น 1 กก." />
+          </Form.Item>
+          <Form.Item name="unit" label="หน่วยนับ">
+            <Input placeholder="ชิ้น / กก. / ขวด" />
+          </Form.Item>
+          <Form.Item name="sku" label="รหัส SKU">
+            <Input placeholder="เช่น RICE-01" />
+          </Form.Item>
+          <Form.Item name="barcode" label="บาร์โค้ด">
+            <Input placeholder="เช่น 8850000000000" />
+          </Form.Item>
+          <Form.Item name="cost_price" label="ต้นทุน (฿)">
+            <InputNumber min={0} prefix="฿" style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="price" label="ราคาขาย (฿)" rules={[{ required: true, message: 'ใส่ราคาขาย' }]}>
+            <InputNumber min={1} prefix="฿" style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="stock_qty" label="สต็อก">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="low_stock_threshold" label="แจ้งเตือนเมื่อเหลือ">
+            <InputNumber min={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </div>
       </Form>
     </Modal>
   );

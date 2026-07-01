@@ -7,6 +7,9 @@ export function apiError(e: unknown): string {
     FORBIDDEN: 'ไม่มีสิทธิ์ทำรายการนี้',
     DUPLICATE_CATEGORY: 'มีหมวดหมู่ชื่อนี้แล้ว',
     DUPLICATE_VARIANT: 'มีขนาดนี้แล้วในสินค้านี้',
+    DUPLICATE_SKU: 'รหัส SKU นี้ถูกใช้แล้ว',
+    DUPLICATE_BARCODE: 'บาร์โค้ดนี้ถูกใช้แล้ว',
+    VARIANT_IN_USE: 'ลบขนาดนี้ไม่ได้ มีประวัติการขายแล้ว',
     BROKEN_PUBLISH: 'ต้องมีอย่างน้อย 1 ขนาด และ 1 รูป ก่อนเผยแพร่',
     INSUFFICIENT_STOCK: 'ปรับสต็อกแล้วติดลบไม่ได้',
     STALE_WRITE: 'ข้อมูลถูกแก้ไปแล้ว กรุณารีเฟรช',
@@ -38,6 +41,10 @@ export type Variant = {
   reserved_qty: number;
   available_qty: number;
   low_stock_threshold: number;
+  sku: string | null;
+  barcode: string | null;
+  cost_price: number | null;
+  unit: string;
 };
 
 export type Product = {
@@ -45,6 +52,7 @@ export type Product = {
   name: string;
   subtitle: string | null;
   description: string | null;
+  brand: string | null;
   rating: number;
   publish_state: 'draft' | 'published';
   archived_at: string | null;
@@ -77,7 +85,7 @@ export async function listProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name, subtitle, description, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold), product_images(id, storage_path, is_primary)',
+      'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, cost_price, unit), product_images(id, storage_path, is_primary)',
     )
     .is('archived_at', null)
     .order('created_at', { ascending: false });
@@ -100,6 +108,7 @@ export const upsertProduct = (p: {
   name: string;
   subtitle?: string | null;
   description?: string | null;
+  brand?: string | null;
   orderable_delivery?: boolean;
   orderable_online?: boolean;
   expected_row_version?: number;
@@ -110,6 +119,7 @@ export const upsertProduct = (p: {
     p_name: p.name,
     p_subtitle: p.subtitle ?? undefined,
     p_description: p.description ?? undefined,
+    p_brand: p.brand ?? undefined,
     p_orderable_delivery: p.orderable_delivery ?? true,
     p_orderable_online: p.orderable_online ?? true,
     p_expected_row_version: p.expected_row_version ?? undefined,
@@ -122,6 +132,10 @@ export const upsertVariant = (p: {
   price: number;
   stock_qty?: number;
   low_stock_threshold?: number;
+  sku?: string | null;
+  barcode?: string | null;
+  cost_price?: number | null;
+  unit?: string | null;
 }) =>
   rpc<{ id: string }>('upsert_variant', {
     p_id: p.id ?? undefined,
@@ -130,7 +144,14 @@ export const upsertVariant = (p: {
     p_price: p.price,
     p_stock_qty: p.stock_qty ?? undefined,
     p_low_stock_threshold: p.low_stock_threshold ?? undefined,
+    p_sku: p.sku ?? undefined,
+    p_barcode: p.barcode ?? undefined,
+    p_cost_price: p.cost_price ?? undefined,
+    p_unit: p.unit ?? undefined,
   });
+
+export const deleteVariant = (id: string) => rpc('delete_variant', { p_id: id });
+export const deleteCategory = (id: string) => rpc('delete_category', { p_id: id });
 
 export const adjustStock = (variantId: string, delta: number) =>
   rpc('adjust_stock', { p_variant_id: variantId, p_delta: delta });
@@ -302,6 +323,25 @@ export async function getShopInfo(): Promise<ShopInfo> {
     promptpay_name: s?.shops?.promptpay_name ?? null,
   };
 }
+
+export type Dashboard = {
+  onsite: {
+    count: number;
+    gross: number;
+    vat: number;
+    net: number;
+    discount: number;
+    cash: number;
+    promptpay: number;
+    store_credit: number;
+    refunds: number;
+  };
+  online: { count: number; gross: number };
+  top: { name: string; qty: number; amount: number }[];
+};
+
+export const posDashboard = (fromIso: string, toIso: string) =>
+  rpc<Dashboard>('pos_dashboard', { p_from: fromIso, p_to: toIso });
 
 export const createPosSale = (p: PosSaleInput) =>
   rpc<SaleResult>('create_pos_sale', {
