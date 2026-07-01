@@ -1,5 +1,6 @@
 import {
   RiAddLine,
+  RiCloseLine,
   RiMoneyDollarCircleLine,
   RiPrinterLine,
   RiQrCodeLine,
@@ -60,6 +61,7 @@ export function Pos() {
 
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [cartOpen, setCartOpen] = useState(false); // mobile order drawer
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -179,6 +181,7 @@ export function Pos() {
         customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
       });
       setReceipt({ sale, lines, method, at: new Date().toLocaleString('th-TH') });
+      setCartOpen(false);
       resetSale();
       setCatalog((cur) =>
         cur.map((p) => ({
@@ -211,8 +214,8 @@ export function Pos() {
   }
 
   return (
-    <div className="-m-7 p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_23rem] gap-5 h-[calc(100vh-6.5rem)]">
+    <div className="-m-4 sm:-m-6 lg:-m-7 p-4 sm:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
+      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="flex flex-col min-h-0">
           {/* shift bar */}
@@ -251,7 +254,7 @@ export function Pos() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-4 overflow-y-auto pr-1 pb-2 content-start">
+          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
             {shown.map((p) => {
               const price = p.variants[0]?.price ?? 0;
               const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
@@ -309,8 +312,16 @@ export function Pos() {
           </div>
         </div>
 
-        {/* ── right: order panel ──────────────────────────────────────────── */}
-        <div className="flex flex-col min-h-0 rounded-2xl bg-white shadow-sm">
+        {/* mobile backdrop */}
+        {cartOpen && (
+          <div className="lg:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setCartOpen(false)} />
+        )}
+
+        {/* ── right: order panel (drawer < lg, column ≥ lg) ────────────────── */}
+        <div
+          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-2xl fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
+            cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+          }`}>
           <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
             <div>
               <div className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</div>
@@ -318,11 +329,18 @@ export function Pos() {
                 {lines.reduce((s, l) => s + l.qty, 0)} ชิ้น
               </div>
             </div>
-            {lines.length > 0 && (
-              <button onClick={resetSale} className="text-xs text-tremor-content hover:text-red-600">
-                ล้างบิล
+            <div className="flex items-center gap-3">
+              {lines.length > 0 && (
+                <button onClick={resetSale} className="text-xs text-tremor-content hover:text-red-600">
+                  ล้างบิล
+                </button>
+              )}
+              <button
+                onClick={() => setCartOpen(false)}
+                className="lg:hidden w-8 h-8 grid place-items-center rounded-full text-tremor-content hover:bg-[#FBF5F1]">
+                <RiCloseLine className="w-5 h-5" />
               </button>
-            )}
+            </div>
           </div>
 
           {error && (
@@ -445,6 +463,21 @@ export function Pos() {
           </div>
         </div>
       </div>
+
+      {/* mobile: open-cart bar */}
+      {lines.length > 0 && !cartOpen && (
+        <button
+          onClick={() => setCartOpen(true)}
+          className="lg:hidden fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-tremor-brand text-white shadow-lg flex items-center justify-between px-5 py-3.5 hover:bg-tremor-brand-emphasis">
+          <span className="flex items-center gap-2 font-medium">
+            <span className="grid place-items-center min-w-[1.5rem] h-6 px-1.5 rounded-full bg-white/25 text-xs font-bold">
+              {lines.reduce((s, l) => s + l.qty, 0)}
+            </span>
+            ดูบิล
+          </span>
+          <span className="font-bold">{baht(total)}</span>
+        </button>
+      )}
 
       {picker && (
         <VariantPicker
@@ -647,7 +680,7 @@ function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> })
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   return (
-    <div className="-m-7 p-7 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] flex items-center justify-center">
+    <div className="-m-4 sm:-m-6 lg:-m-7 p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] flex items-center justify-center">
       <div className="w-full max-w-sm rounded-3xl bg-white shadow-sm p-7 text-center">
         <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-tremor-brand-faint grid place-items-center">
           <RiMoneyDollarCircleLine className="w-7 h-7 text-tremor-brand" />

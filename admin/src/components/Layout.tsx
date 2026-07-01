@@ -3,12 +3,15 @@ import {
   RiImageLine,
   RiLogoutBoxRLine,
   RiCashLine,
+  RiCloseLine,
   RiMegaphoneLine,
+  RiMenuLine,
   RiNotification3Line,
   RiSearchLine,
   RiShoppingBag3Line,
   RiStore2Line,
 } from '@remixicon/react';
+import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../auth';
@@ -27,11 +30,20 @@ export function Layout() {
   const { pathname } = useLocation();
   const current = NAV.find((n) => pathname.startsWith(n.to))?.label ?? '';
   const initials = (profile?.displayName || 'A').trim().slice(0, 2).toUpperCase();
+  const [navOpen, setNavOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800">
-      {/* Sidebar */}
-      <aside className="w-60 shrink-0 bg-white border-r border-gray-100 flex flex-col">
+      {/* mobile sidebar backdrop */}
+      {navOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setNavOpen(false)} />
+      )}
+
+      {/* Sidebar — drawer < lg, static ≥ lg */}
+      <aside
+        className={`w-60 shrink-0 bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0 ${
+          navOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}>
         <div className="h-16 flex items-center gap-2 px-5 border-b border-gray-100">
           <div className="w-8 h-8 rounded-lg bg-tremor-brand text-white grid place-items-center font-semibold">
             อ
@@ -39,12 +51,18 @@ export function Layout() {
           <span className="font-semibold text-[15px]">
             อู้ฟู่ <span className="text-gray-400 font-light">แอดมิน</span>
           </span>
+          <button
+            onClick={() => setNavOpen(false)}
+            className="lg:hidden ml-auto w-8 h-8 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-50">
+            <RiCloseLine className="w-5 h-5" />
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
+              onClick={() => setNavOpen(false)}
               className={({ isActive }) =>
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ' +
                 (isActive
@@ -68,9 +86,14 @@ export function Layout() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 shrink-0 bg-white border-b border-gray-100 flex items-center gap-4 px-7">
-          <div className="text-sm text-gray-400">
-            ร้าน อู้ฟู่ <span className="mx-1.5 text-gray-300">/</span>
+        <header className="h-16 shrink-0 bg-white border-b border-gray-100 flex items-center gap-3 px-4 sm:px-7">
+          <button
+            onClick={() => setNavOpen(true)}
+            className="lg:hidden w-9 h-9 grid place-items-center rounded-xl text-gray-500 hover:bg-gray-50 -ml-1">
+            <RiMenuLine className="w-5 h-5" />
+          </button>
+          <div className="text-sm text-gray-400 truncate">
+            <span className="hidden sm:inline">ร้าน อู้ฟู่ <span className="mx-1.5 text-gray-300">/</span></span>
             <span className="text-gray-800 font-medium">{current}</span>
           </div>
           <div className="flex-1 max-w-md ml-4 relative hidden md:block">
@@ -89,7 +112,7 @@ export function Layout() {
             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-7">
+        <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-7">
           <Outlet />
         </main>
       </div>
