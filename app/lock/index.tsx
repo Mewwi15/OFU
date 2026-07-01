@@ -18,6 +18,7 @@ import { PinPad } from '@/components/lock/PinPad';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { avatarSource } from '@/lib/avatar';
 import { useAuth } from '@/store/auth';
 import { PIN_LENGTH, useLock } from '@/store/lock';
 
@@ -101,7 +102,7 @@ export default function LockScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.x3 }]}>
       <View style={styles.header}>
-        <Image source={{ uri: user.avatar }} style={styles.avatar} contentFit="cover" transition={200} />
+        <Image source={avatarSource(user.avatar)} style={styles.avatar} contentFit="cover" transition={200} />
         <Text variant="title" style={styles.greeting}>
           สวัสดี {user.name}
         </Text>

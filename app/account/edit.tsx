@@ -29,6 +29,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { avatarSource } from '@/lib/avatar';
 import { uploadAvatar } from '@/lib/data/storage';
 import { useAuth } from '@/store/auth';
 
@@ -156,7 +157,7 @@ export default function EditProfileScreen() {
           {/* Avatar */}
           <View style={styles.avatarWrap}>
             <Image
-              source={{ uri: user.avatar }}
+              source={avatarSource(user.avatar)}
               style={styles.avatar}
               contentFit="cover"
               transition={200}

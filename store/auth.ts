@@ -23,7 +23,8 @@ export type AuthUser = {
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
 
-const FALLBACK_AVATAR = 'https://i.pravatar.cc/300?img=47';
+// Empty → the UI falls back to the bundled default avatar (see lib/avatar.ts).
+const FALLBACK_AVATAR = '';
 const GUEST: AuthUser = { name: 'คุณอู้ฟู่', phone: '', email: '', avatar: FALLBACK_AVATAR };
 
 function toUser(p: Profile | null): AuthUser {
