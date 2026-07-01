@@ -11,3 +11,21 @@ body {
   margin: 0;
   @apply bg-tremor-background-muted text-tremor-content-strong;
 }
+
+/* POS receipt: print only the receipt, isolated from the rest of the page */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #pos-receipt,
+  #pos-receipt * {
+    visibility: visible !important;
+  }
+  #pos-receipt {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 12px;
+    background: #fff;
+  }
+}

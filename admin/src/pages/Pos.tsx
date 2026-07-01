@@ -37,6 +37,8 @@ import {
   readCachedShift,
   readCachedShop,
 } from '../lib/offline';
+import { App, Button, Card, InputNumber, Modal, Statistic, Typography } from 'antd';
+
 import { promptpayPayload } from '../lib/promptpay';
 
 type Line = {
@@ -309,7 +311,7 @@ export function Pos() {
   }
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-7 p-4 sm:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
+    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
       <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="flex flex-col min-h-0">
@@ -763,155 +765,147 @@ function VariantPicker({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="font-semibold text-tremor-content-strong mb-3">{product.name} · เลือกขนาด</div>
-        <div className="space-y-2">
-          {product.variants.map((v) => (
-            <button
-              key={v.id}
-              disabled={v.stock_qty <= 0}
-              onClick={() => onPick(v)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-tremor-border hover:border-tremor-brand disabled:opacity-40">
-              <span className="text-sm text-tremor-content-strong">{v.size ?? 'ปกติ'}</span>
-              <span className="text-sm">
-                <span className="font-semibold text-tremor-content-strong">{baht(v.price)}</span>
-                <span className="text-xs text-tremor-content-subtle ml-2">คงเหลือ {v.stock_qty}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+    <Modal open title={`${product.name} · เลือกขนาด`} onCancel={onClose} footer={null} destroyOnHidden width={400}>
+      <div className="space-y-2 mt-1">
+        {product.variants.map((v) => (
+          <button
+            key={v.id}
+            disabled={v.stock_qty <= 0}
+            onClick={() => onPick(v)}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[#EFE4DD] hover:border-[#F15929] disabled:opacity-40 transition">
+            <span className="text-sm font-medium text-[#2B2320]">{v.size ?? 'ปกติ'}</span>
+            <span className="text-sm">
+              <span className="font-semibold text-[#2B2320]">{baht(v.price)}</span>
+              <span className="text-xs text-gray-400 ml-2">คงเหลือ {v.stock_qty}</span>
+            </span>
+          </button>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
 function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> }) {
-  const [float, setFloat] = useState<number | ''>('');
+  const { message } = App.useApp();
+  const [float, setFloat] = useState<number | null>(0);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-7 p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] flex items-center justify-center">
-      <div className="w-full max-w-sm rounded-3xl bg-white shadow-sm p-7 text-center">
-        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-tremor-brand-faint grid place-items-center">
-          <RiMoneyDollarCircleLine className="w-7 h-7 text-tremor-brand" />
+    <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 9rem)' }}>
+      <Card style={{ maxWidth: 360, width: '100%', textAlign: 'center' }} styles={{ body: { padding: 28 } }}>
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl grid place-items-center" style={{ background: '#FDEEE7' }}>
+          <RiMoneyDollarCircleLine className="w-7 h-7" style={{ color: '#F15929' }} />
         </div>
-        <div className="text-lg font-semibold text-tremor-content-strong mb-1">เปิดกะขาย</div>
-        <p className="text-sm text-tremor-content mb-5">ใส่จำนวนเงินสดตั้งต้นในลิ้นชักเพื่อเริ่มขาย</p>
-        {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
-        <div className="flex items-center gap-2 justify-center mb-5">
-          <span className="text-tremor-content-subtle text-lg">฿</span>
-          <input
-            type="number"
-            min={0}
-            autoFocus
-            value={float}
-            onChange={(e) => setFloat(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-            placeholder="0"
-            className="w-36 text-right text-lg rounded-xl border border-tremor-border px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
-          />
-        </div>
-        <button
-          disabled={busy}
+        <Typography.Title level={4} style={{ margin: 0 }}>เปิดกะขาย</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
+          ใส่จำนวนเงินสดตั้งต้นในลิ้นชักเพื่อเริ่มขาย
+        </Typography.Paragraph>
+        <InputNumber
+          size="large"
+          min={0}
+          prefix="฿"
+          value={float}
+          onChange={(v) => setFloat(typeof v === 'number' ? v : 0)}
+          style={{ width: '100%', margin: '8px 0 20px' }}
+          autoFocus
+        />
+        <Button
+          type="primary"
+          size="large"
+          block
+          loading={busy}
           onClick={async () => {
             setBusy(true);
-            setErr(null);
             try {
-              await onOpen(typeof float === 'number' ? float : 0);
+              await onOpen(float ?? 0);
             } catch (e) {
-              setErr(apiError(e));
+              message.error(apiError(e));
             } finally {
               setBusy(false);
             }
-          }}
-          className="w-full py-3 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis disabled:opacity-50 shadow-sm">
-          {busy ? 'กำลังเปิด…' : 'เปิดกะ'}
-        </button>
-      </div>
+          }}>
+          เปิดกะ
+        </Button>
+      </Card>
     </div>
   );
 }
 
 function CloseShiftButton({ shift, setShift }: { shift: Shift; setShift: (s: Shift | null) => void }) {
+  const { message } = App.useApp();
   const [open, setOpen] = useState(false);
-  const [counted, setCounted] = useState<number | ''>('');
+  const [counted, setCounted] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Shift | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+
+  const doClose = async () => {
+    setBusy(true);
+    try {
+      setResult(await closeShift(shift.id, counted ?? 0));
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const finish = () => {
+    setOpen(false);
+    setResult(null);
+    setShift(null);
+    cacheShift(null);
+  };
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="text-sm px-4 py-1.5 rounded-full bg-white shadow-sm text-tremor-content-emphasis hover:text-tremor-brand">
+      <Button shape="round" onClick={() => setOpen(true)}>
         ปิดกะ
-      </button>
-      {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            {result ? (
-              <div className="text-center">
-                <div className="text-lg font-semibold text-tremor-content-strong mb-3">ปิดกะแล้ว</div>
-                <div className="space-y-1 text-sm text-left">
-                  <Row label="เงินตั้งต้น" value={baht(result.opening_float)} />
-                  <Row label="ควรมี (ต้น + ขายสด)" value={baht(result.expected_cash ?? 0)} />
-                  <Row label="นับได้" value={baht(result.counted_cash ?? 0)} />
-                  <div className="flex items-center justify-between pt-2 border-t border-tremor-border">
-                    <span className="font-semibold">ส่วนต่าง</span>
-                    <span className={`font-bold ${(result.over_short ?? 0) < 0 ? 'text-red-600' : 'text-green-700'}`}>
-                      {(result.over_short ?? 0) >= 0 ? '+' : ''}
-                      {baht(result.over_short ?? 0)}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setOpen(false);
-                    setShift(null);
-                    cacheShift(null);
-                  }}
-                  className="mt-5 w-full py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis">
-                  เสร็จสิ้น
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="text-lg font-semibold text-tremor-content-strong mb-1">ปิดกะ</div>
-                <p className="text-sm text-tremor-content mb-4">นับเงินสดในลิ้นชักแล้วกรอกยอด</p>
-                {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-tremor-content-subtle">฿</span>
-                  <input
-                    type="number"
-                    min={0}
-                    autoFocus
-                    value={counted}
-                    onChange={(e) => setCounted(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-                    className="flex-1 text-right rounded-xl border border-tremor-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
-                  />
-                </div>
-                <button
-                  disabled={busy || counted === ''}
-                  onClick={async () => {
-                    setBusy(true);
-                    setErr(null);
-                    try {
-                      const s = await closeShift(shift.id, typeof counted === 'number' ? counted : 0);
-                      setResult(s);
-                    } catch (e) {
-                      setErr(apiError(e));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                  className="w-full py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis disabled:opacity-50">
-                  {busy ? 'กำลังปิด…' : 'ปิดกะ'}
-                </button>
-              </>
-            )}
+      </Button>
+      <Modal
+        open={open}
+        title={result ? 'ปิดกะแล้ว' : 'ปิดกะ'}
+        destroyOnHidden
+        onCancel={() => (result ? finish() : setOpen(false))}
+        footer={
+          result
+            ? [<Button key="ok" type="primary" block onClick={finish}>เสร็จสิ้น</Button>]
+            : [
+                <Button key="c" onClick={() => setOpen(false)}>ยกเลิก</Button>,
+                <Button key="ok" type="primary" loading={busy} disabled={counted == null} onClick={() => void doClose()}>
+                  ปิดกะ
+                </Button>,
+              ]
+        }>
+        {result ? (
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-3 gap-2">
+              <Statistic title="เงินตั้งต้น" value={result.opening_float} prefix="฿" />
+              <Statistic title="ควรมี" value={result.expected_cash ?? 0} prefix="฿" />
+              <Statistic title="นับได้" value={result.counted_cash ?? 0} prefix="฿" />
+            </div>
+            <div
+              className="rounded-xl p-3 flex items-center justify-between"
+              style={{ background: (result.over_short ?? 0) < 0 ? '#FDECEC' : '#EAF6EF' }}>
+              <span className="font-medium">ส่วนต่าง</span>
+              <span className="font-bold" style={{ color: (result.over_short ?? 0) < 0 ? '#C9252B' : '#017A3A' }}>
+                {(result.over_short ?? 0) >= 0 ? '+' : ''}
+                {baht(result.over_short ?? 0)}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="pt-1">
+            <Typography.Paragraph type="secondary">นับเงินสดในลิ้นชักแล้วกรอกยอดที่นับได้</Typography.Paragraph>
+            <InputNumber
+              size="large"
+              min={0}
+              prefix="฿"
+              value={counted}
+              onChange={(v) => setCounted(typeof v === 'number' ? v : null)}
+              style={{ width: '100%' }}
+              autoFocus
+            />
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
@@ -919,9 +913,20 @@ function CloseShiftButton({ shift, setShift }: { shift: Shift; setShift: (s: Shi
 function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopInfo; onClose: () => void }) {
   const { sale, lines, method, at } = data;
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 print:bg-white print:p-0">
-      <div className="bg-white rounded-2xl w-full max-w-xs print:max-w-none print:rounded-none">
-        <div id="pos-receipt" className="p-5 font-mono text-[13px] text-black leading-relaxed">
+    <Modal
+      open
+      onCancel={onClose}
+      width={340}
+      destroyOnHidden
+      footer={[
+        <Button key="print" icon={<RiPrinterLine className="w-4 h-4" />} onClick={() => window.print()}>
+          พิมพ์บิล
+        </Button>,
+        <Button key="next" type="primary" onClick={onClose}>
+          ขายต่อ
+        </Button>,
+      ]}>
+      <div id="pos-receipt" className="font-mono text-[13px] text-black leading-relaxed pt-1">
           <div className="text-center mb-2">
             <div className="text-base font-bold">{shop.receipt_header || shop.name}</div>
             {shop.vat_registered && shop.tax_id && (
@@ -977,19 +982,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}
           <div className="text-center text-[11px] mt-3">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
         </div>
-        <div className="flex gap-2 p-4 border-t border-tremor-border print:hidden">
-          <button
-            onClick={() => window.print()}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border border-tremor-border font-medium text-tremor-content-emphasis hover:bg-[#FBF5F1]">
-            <RiPrinterLine className="w-4 h-4" />
-            พิมพ์บิล
-          </button>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis">
-            ขายต่อ
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -106,7 +106,6 @@ export function Layout() {
 
       <Drawer
         placement="left"
-        width={260}
         open={!isDesktop && drawerOpen}
         onClose={() => setDrawerOpen(false)}
         styles={{ body: { padding: 0 }, header: { display: 'none' } }}>

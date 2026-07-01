@@ -57,7 +57,7 @@ export function Broadcast() {
             type="success"
             showIcon
             className="mb-5"
-            message="ส่งแล้ว"
+            title="ส่งแล้ว"
             description={`เข้าฟีด ${result.recipients} คน · ส่ง push ${result.push} เครื่อง`}
           />
         ) : null}

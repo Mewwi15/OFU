@@ -42,8 +42,8 @@ export function Login() {
           <Form.Item name="password" label="รหัสผ่าน" rules={[{ required: true, message: 'กรอกรหัสผ่าน' }]}>
             <Input.Password size="large" autoComplete="current-password" />
           </Form.Item>
-          {error ? <Alert type="error" showIcon message={error} className="mb-3" /> : null}
-          {ready && session && !isAdmin ? <Alert type="warning" showIcon message="บัญชีนี้ไม่ใช่แอดมิน" className="mb-3" /> : null}
+          {error ? <Alert type="error" showIcon title={error} className="mb-3" /> : null}
+          {ready && session && !isAdmin ? <Alert type="warning" showIcon title="บัญชีนี้ไม่ใช่แอดมิน" className="mb-3" /> : null}
           <Button type="primary" htmlType="submit" size="large" block loading={busy}>
             เข้าสู่ระบบ
           </Button>
