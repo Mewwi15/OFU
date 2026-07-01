@@ -5,6 +5,7 @@ import { useAuth } from './auth';
 import { Layout } from './components/Layout';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
+import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
 import { Pos } from './pages/Pos';
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
+        <Route path="/featured" element={<Featured />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
         <Route path="/orders" element={<Orders />} />

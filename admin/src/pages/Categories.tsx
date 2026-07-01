@@ -1,24 +1,14 @@
 import { RiAddLine, RiDeleteBinLine, RiPencilLine } from '@remixicon/react';
-import {
-  App,
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Popconfirm,
-  Space,
-  Table,
-  Tooltip,
-  Typography,
-} from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 
+import { DndTable, DragHandle } from '../components/DndTable';
 import {
   apiError,
   deleteCategory,
   listCategories,
+  reorderCategories,
   upsertCategory,
   type Category,
 } from '../lib/api';
@@ -34,8 +24,7 @@ export function Categories() {
   async function load() {
     setLoading(true);
     try {
-      const c = await listCategories();
-      setCategories(c);
+      setCategories(await listCategories());
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -45,6 +34,16 @@ export function Categories() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function onReorder(next: Category[]) {
+    setCategories(next); // optimistic
+    try {
+      await reorderCategories(next.map((c) => c.id));
+    } catch (e) {
+      message.error(apiError(e));
+      void load();
+    }
+  }
 
   async function onDelete(c: Category) {
     try {
@@ -57,40 +56,19 @@ export function Categories() {
   }
 
   const columns: ColumnsType<Category> = [
-    {
-      title: 'ชื่อหมวดหมู่',
-      key: 'name',
-      render: (_, c) => <span className="font-medium text-[#2B2320]">{c.name}</span>,
-    },
-    {
-      title: 'ลำดับ',
-      dataIndex: 'display_order',
-      key: 'display_order',
-      width: 120,
-      align: 'right',
-      render: (v: number) => <Text type="secondary">{v}</Text>,
-    },
+    { title: '', key: 'drag', width: 48, render: () => <DragHandle /> },
+    { title: 'ชื่อหมวดหมู่', key: 'name', render: (_, c) => <span className="font-medium text-[#2B2320]">{c.name}</span> },
     {
       title: 'จัดการ',
       key: 'actions',
-      width: 120,
+      width: 110,
       align: 'right',
       render: (_, c) => (
         <Space size={4}>
           <Tooltip title="แก้ไข">
-            <Button
-              size="small"
-              type="text"
-              icon={<RiPencilLine className="w-[17px] h-[17px]" />}
-              onClick={() => setEditing(c)}
-            />
+            <Button size="small" type="text" icon={<RiPencilLine className="w-[17px] h-[17px]" />} onClick={() => setEditing(c)} />
           </Tooltip>
-          <Popconfirm
-            title="ลบหมวดหมู่นี้?"
-            okText="ลบ"
-            cancelText="ยกเลิก"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => void onDelete(c)}>
+          <Popconfirm title="ลบหมวดหมู่นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(c)}>
             <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-[17px] h-[17px]" />} />
           </Popconfirm>
         </Space>
@@ -105,26 +83,26 @@ export function Categories() {
           <Title level={3} style={{ margin: 0 }}>
             หมวดหมู่
           </Title>
-          <Text type="secondary">ทั้งหมด {categories.length} หมวดหมู่</Text>
+          <Text type="secondary">ลากเพื่อจัดลำดับที่แสดงในแอป · ทั้งหมด {categories.length} หมวดหมู่</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
           เพิ่มหมวดหมู่
         </Button>
       </div>
 
-      <Table<Category>
-        rowKey="id"
+      <DndTable<Category>
+        items={categories}
+        onReorder={onReorder}
         loading={loading}
         columns={columns}
-        dataSource={categories}
-        pagination={{ pageSize: 12, hideOnSinglePage: true }}
-        scroll={{ x: 480 }}
-        style={{ background: '#fff', borderRadius: 16 }}
+        scroll={{ x: 420 }}
+        style={{ background: '#fff', borderRadius: 12 }}
       />
 
       {editing ? (
         <CategoryModal
           category={editing === 'new' ? null : editing}
+          defaultOrder={categories.length}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -138,10 +116,12 @@ export function Categories() {
 
 function CategoryModal({
   category,
+  defaultOrder,
   onClose,
   onSaved,
 }: {
   category: Category | null;
+  defaultOrder: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -156,7 +136,7 @@ function CategoryModal({
       await upsertCategory({
         id: category?.id,
         name: v.name.trim(),
-        display_order: v.display_order ?? 0,
+        display_order: category?.display_order ?? defaultOrder,
       });
       message.success(category ? 'บันทึกหมวดหมู่แล้ว' : 'เพิ่มหมวดหมู่แล้ว');
       onSaved();
@@ -176,20 +156,9 @@ function CategoryModal({
       cancelText="ยกเลิก"
       confirmLoading={busy}
       destroyOnHidden>
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={false}
-        initialValues={{
-          name: category?.name ?? '',
-          display_order: category?.display_order ?? 0,
-        }}
-        className="mt-2">
+      <Form form={form} layout="vertical" requiredMark={false} initialValues={{ name: category?.name ?? '' }} className="mt-2">
         <Form.Item name="name" label="ชื่อหมวดหมู่" rules={[{ required: true, message: 'กรอกชื่อหมวดหมู่' }]}>
           <Input placeholder="เช่น ข้าวสาร" />
-        </Form.Item>
-        <Form.Item name="display_order" label="ลำดับการแสดง">
-          <InputNumber min={0} style={{ width: '100%' }} />
         </Form.Item>
       </Form>
     </Modal>

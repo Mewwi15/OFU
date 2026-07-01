@@ -152,6 +152,28 @@ export const upsertVariant = (p: {
 
 export const deleteVariant = (id: string) => rpc('delete_variant', { p_id: id });
 export const deleteCategory = (id: string) => rpc('delete_category', { p_id: id });
+export const reorderCategories = (ids: string[]) => rpc('reorder_categories', { p_ids: ids });
+
+/* ── app layout: featured sections (customer-app home) ──────────────────────── */
+export type FeaturedSection = {
+  id: string;
+  title: string;
+  display_order: number;
+  publish_state: 'draft' | 'published';
+  see_all_target_type: string | null;
+  see_all_target_id: string | null;
+};
+export async function listFeaturedSections(): Promise<FeaturedSection[]> {
+  const { data, error } = await supabase
+    .from('featured_sections')
+    .select('id, title, display_order, publish_state, see_all_target_type, see_all_target_id')
+    .order('display_order');
+  if (error) throw error;
+  return data as FeaturedSection[];
+}
+export const reorderFeaturedSections = (ids: string[]) => rpc('reorder_featured_sections', { p_ids: ids });
+export const setFeaturedPublish = (id: string, published: boolean) =>
+  rpc('set_featured_publish', { p_id: id, p_published: published });
 
 /* ── product images (upload to the public bucket, then register the row) ─────── */
 export async function uploadProductImage(productId: string, file: File, isPrimary = false) {
