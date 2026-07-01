@@ -90,14 +90,21 @@ inventory** (an on-site sale decrements the same stock as online).
 - tax-invoice / receipt number sequence(s)
 - new `stock_movements` reason: `pos_sale` / `pos_refund`
 
-## Open questions (please confirm)
-1. **Multi-branch** now, or single shop for v1? (affects stock/reports/tax branch)
-2. **Members / loyalty points** in v1, or just the store-credit wallet?
-3. **Split payment** (cash + QR in one bill) needed in v1?
-4. **Prices VAT-inclusive** (typical Thai retail) — correct?
-5. **Thermal printer** model/brand? (decides WebUSB vs print agent vs browser print)
-6. **Barcodes**: do products already have barcodes, or do we generate/assign them?
-7. On-site sales: reuse `orders` (add channel) or a separate `pos_sales` table?
+## Decisions (confirmed)
+1. ✅ **Single shop** for v1.
+2. ✅ **No members/loyalty** in v1 — just the **store-credit wallet** (for the
+   store-credit payment method).
+3. ✅ **No split payment** in v1 (one payment method per sale) — split → P3.
+4. ✅ **Prices are VAT-inclusive** (Thai retail); receipts back out the 7% VAT.
+5. ⏳ Thermal printer model — owner to check. **Not blocking P1**: P1 prints a
+   58/80mm receipt template via the browser; native ESC/POS integration → P3.
+6. ⏳ Do products have barcodes — owner to check. **Not blocking P1**: add a
+   `barcode` field now; the scanner reads it; populate/generate barcodes later.
+7. ✅ On-site sales use a **dedicated `pos_sales` + `pos_sale_items`** (separate
+   lifecycle from delivery orders), sharing stock + reports.
+
+Cashier access: add a **`cashier`** admin tier (POS + own shift only); owner/admin
+keep full back-office.
 
 ## Suggested phasing
 - **P1 (online-only core POS)**: sell screen (scan/grid → cart → cash/QR →
