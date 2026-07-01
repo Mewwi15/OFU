@@ -21,28 +21,17 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { categories, type Category } from '@/data/products';
+import { useT } from '@/lib/i18n';
 import { useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
 const TAB_BAR_CLEARANCE = 96;
 
-/** Promo banner heading each curated section. */
-const SECTION_BANNERS = {
-  trending: {
-    title: 'กำลังมาแรง',
-    subtitle: 'สินค้าที่คนสั่งเยอะที่สุดสัปดาห์นี้',
-    image: 'https://picsum.photos/seed/oofoo-trend/900/360',
-  },
-  promo: {
-    title: 'ลดสูงสุด 40%',
-    subtitle: 'ดีลคุ้มประจำวัน เฉพาะวันนี้',
-    image: 'https://picsum.photos/seed/oofoo-promo/900/360',
-  },
-  hot: {
-    title: 'เรตติ้งสูงสุด',
-    subtitle: 'คัดจากรีวิวลูกค้าตัวจริง',
-    image: 'https://picsum.photos/seed/oofoo-hot/900/360',
-  },
+/** Background image for the promo banner heading each curated section. */
+const SECTION_BANNER_IMAGES = {
+  trending: 'https://picsum.photos/seed/oofoo-trend/900/360',
+  promo: 'https://picsum.photos/seed/oofoo-promo/900/360',
+  hot: 'https://picsum.photos/seed/oofoo-hot/900/360',
 } as const;
 
 /** Whether an arbitrary string is one of our canonical categories. */
@@ -57,6 +46,7 @@ function isCategory(value: string | undefined): value is Category {
  * shows a flat filtered grid. Can arrive pre-filtered via a `category` param.
  */
 export default function CatalogScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
@@ -129,7 +119,7 @@ export default function CatalogScreen() {
             <View style={styles.heroTitleWrap} />
             <IconButton
               icon="bag-outline"
-              accessibilityLabel="ตะกร้า"
+              accessibilityLabel={t('search.cart')}
               onPress={() => router.push('/cart')}
             />
           </View>
@@ -139,13 +129,13 @@ export default function CatalogScreen() {
           <SearchBar
             value={query}
             onChangeText={setQuery}
-            placeholder="ค้นหาสินค้า"
+            placeholder={t('search.placeholder')}
             rightIcon={
               <Pressable
                 onPress={() => {}}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="ค้นหาด้วยเสียง">
+                accessibilityLabel={t('search.voiceSearch')}>
                 <Ionicons name="mic-outline" size={20} color={Colors.primary} />
               </Pressable>
             }
@@ -188,16 +178,28 @@ export default function CatalogScreen() {
           /* Curated view: a promo banner heading each horizontal rail, then a
              vertical recommended grid */
           <>
-            <PromoBanner {...SECTION_BANNERS.trending} />
-            <ProductRail title="สินค้าติดกระแส" data={trending} />
-            <PromoBanner {...SECTION_BANNERS.promo} />
-            <ProductRail title="โปรโมชั่น" data={promotions} />
-            <PromoBanner {...SECTION_BANNERS.hot} />
-            <ProductRail title="มาแรงประจำสัปดาห์" data={hotWeekly} />
+            <PromoBanner
+              title={t('search.trendingBannerTitle')}
+              subtitle={t('search.trendingBannerSub')}
+              image={SECTION_BANNER_IMAGES.trending}
+            />
+            <ProductRail title={t('search.railTrending')} data={trending} />
+            <PromoBanner
+              title={t('search.promoBannerTitle')}
+              subtitle={t('search.promoBannerSub')}
+              image={SECTION_BANNER_IMAGES.promo}
+            />
+            <ProductRail title={t('search.railPromo')} data={promotions} />
+            <PromoBanner
+              title={t('search.hotBannerTitle')}
+              subtitle={t('search.hotBannerSub')}
+              image={SECTION_BANNER_IMAGES.hot}
+            />
+            <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
 
             <View style={styles.gridSection}>
               <Text variant="subtitle" style={styles.gridTitle}>
-                แนะนำสำหรับคุณ
+                {t('search.recommended')}
               </Text>
               <View style={styles.grid}>
                 {products.map((product, i) => (
@@ -223,12 +225,12 @@ export default function CatalogScreen() {
               <Ionicons name="search" size={40} color={Colors.primary} />
             </View>
             <Text variant="subtitle" style={styles.emptyTitle}>
-              ไม่พบสินค้าที่ค้นหา
+              {t('search.noResults')}
             </Text>
             <Text
               variant="body"
               style={[{ color: Colors.textMuted }, styles.emptyBody]}>
-              ลองค้นหาด้วยคำอื่นหรือเลือกหมวดหมู่อื่นดูนะคะ
+              {t('search.noResultsHint')}
             </Text>
           </View>
           )}

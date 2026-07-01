@@ -21,17 +21,15 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { type NotificationKind } from '@/data/fulfillment';
+import { useT } from '@/lib/i18n';
 import { unreadCount, useNotifications } from '@/store/notifications';
 
 type Filter = 'all' | NotificationKind;
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'ทั้งหมด' },
-  { key: 'order', label: 'คำสั่งซื้อ' },
-  { key: 'promo', label: 'โปรโมชั่น' },
-];
+const FILTERS: Filter[] = ['all', 'order', 'promo'];
 
 export default function NotificationsScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<Filter>('all');
@@ -56,16 +54,16 @@ export default function NotificationsScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title="การแจ้งเตือน"
+        title={t('notif.title')}
         style={styles.header}
         left={
-          <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
+          <IconButton icon="chevron-back" accessibilityLabel={t('common.back')} onPress={() => router.back()} />
         }
         right={
           unread > 0 ? (
             <IconButton
               icon="checkmark-done"
-              accessibilityLabel="อ่านทั้งหมด"
+              accessibilityLabel={t('notif.markAllRead')}
               onPress={() => void markAllRead()}
             />
           ) : undefined
@@ -78,8 +76,13 @@ export default function NotificationsScreen() {
         showsHorizontalScrollIndicator={false}
         style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}>
-        {FILTERS.map((f) => (
-          <Chip key={f.key} label={f.label} active={f.key === filter} onPress={() => setFilter(f.key)} />
+        {FILTERS.map((key) => (
+          <Chip
+            key={key}
+            label={t(`notif.filter.${key}`)}
+            active={key === filter}
+            onPress={() => setFilter(key)}
+          />
         ))}
       </ScrollView>
 
@@ -95,7 +98,7 @@ export default function NotificationsScreen() {
               layout={LinearTransition.springify()}>
               <PressableScale
                 accessibilityRole="button"
-                accessibilityLabel={`อ่าน ${n.title}`}
+                accessibilityLabel={`${t('notif.readItem')} ${n.title}`}
                 scaleTo={0.98}
                 onPress={() => n.unread && markRead(n.id)}
                 style={styles.row}>
@@ -131,7 +134,7 @@ export default function NotificationsScreen() {
 
         {items.length === 0 ? (
           <Text variant="body" style={styles.empty}>
-            ยังไม่มีการแจ้งเตือนในหมวดนี้
+            {t('notif.empty')}
           </Text>
         ) : null}
       </ScrollView>

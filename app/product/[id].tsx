@@ -22,17 +22,19 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { useCart } from '@/store/cart';
 import { findProduct, useCatalog } from '@/store/catalog';
 
 /** At-a-glance promises shown under the price. */
 const PERKS = [
-  { icon: 'bicycle-outline', label: 'ส่งไว' },
-  { icon: 'leaf-outline', label: 'ของสดคัดพิเศษ' },
-  { icon: 'shield-checkmark-outline', label: 'การันตีคุณภาพ' },
+  { icon: 'bicycle-outline', label: 'product.perkFast' },
+  { icon: 'leaf-outline', label: 'product.perkFresh' },
+  { icon: 'shield-checkmark-outline', label: 'product.perkQuality' },
 ] as const;
 
 export default function ProductDetailsScreen() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -54,7 +56,7 @@ export default function ProductDetailsScreen() {
   const backButton = (
     <IconButton
       icon="chevron-back"
-      accessibilityLabel="ย้อนกลับ"
+      accessibilityLabel={t('common.back')}
       onPress={() => router.back()}
     />
   );
@@ -72,7 +74,7 @@ export default function ProductDetailsScreen() {
             color={Colors.textMuted}
           />
           <Text variant="subtitle" style={{ color: Colors.textMuted }}>
-            ไม่พบสินค้านี้
+            {t('product.notFound')}
           </Text>
         </View>
       </View>
@@ -156,7 +158,7 @@ export default function ProductDetailsScreen() {
               <View key={perk.label} style={styles.perk}>
                 <Ionicons name={perk.icon} size={16} color={Colors.primaryStrong} />
                 <Text variant="caption" style={styles.perkLabel}>
-                  {perk.label}
+                  {t(perk.label)}
                 </Text>
               </View>
             ))}
@@ -166,7 +168,7 @@ export default function ProductDetailsScreen() {
 
           {/* Description */}
           <Text variant="subtitle" style={styles.sectionLabel}>
-            รายละเอียด
+            {t('product.description')}
           </Text>
           <Text
             variant="body"
@@ -176,7 +178,7 @@ export default function ProductDetailsScreen() {
           </Text>
           <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={Spacing.sm}>
             <Text variant="caption" style={styles.readMore}>
-              {expanded ? 'ย่อ' : 'อ่านเพิ่มเติม'}
+              {expanded ? t('product.collapse') : t('product.readMore')}
             </Text>
           </Pressable>
         </Animated.View>
@@ -193,16 +195,16 @@ export default function ProductDetailsScreen() {
         style={[styles.actionBar, { paddingBottom: insets.bottom + Spacing.md }]}>
         <QuantityStepper value={qty} onChange={setQty} max={99} />
         <Button onPress={handleAddToCart} style={styles.addButton}>
-          {`เพิ่มลงตะกร้า · ${money(total)}`}
+          {`${t('product.addToCart')} · ${money(total)}`}
         </Button>
       </Animated.View>
 
       {showToast ? (
         <Toast
           key={toastKey}
-          message="เพิ่มลงตะกร้าแล้ว"
+          message={t('product.addedToCart')}
           subtitle={`${product.name} × ${qty}`}
-          actionLabel="ดูตะกร้า"
+          actionLabel={t('product.viewCart')}
           onAction={() => {
             setShowToast(false);
             router.push('/cart');

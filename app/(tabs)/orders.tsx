@@ -21,21 +21,22 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { OrderStatus, TrackedOrder } from '@/data/fulfillment';
 import { getReorderItems, TERMINAL } from '@/lib/data/order';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { useCart } from '@/store/cart';
 import { useCatalog } from '@/store/catalog';
 import { useOrder } from '@/store/order';
 
 type StatusTone = 'active' | 'done' | 'fail';
 
-const STATUS_META: Record<OrderStatus, { label: string; tone: StatusTone }> = {
-  preparing: { label: 'กำลังเตรียม', tone: 'active' },
-  picked_up: { label: 'Flash รับแล้ว', tone: 'active' },
-  in_transit: { label: 'กำลังขนส่ง', tone: 'active' },
-  out_for_delivery: { label: 'กำลังจัดส่ง', tone: 'active' },
-  delivered: { label: 'ส่งสำเร็จ', tone: 'done' },
-  delivery_failed: { label: 'นำจ่ายไม่สำเร็จ', tone: 'fail' },
-  returned: { label: 'ตีกลับ', tone: 'fail' },
-  cancelled: { label: 'ยกเลิก', tone: 'fail' },
+const STATUS_META: Record<OrderStatus, { tone: StatusTone }> = {
+  preparing: { tone: 'active' },
+  picked_up: { tone: 'active' },
+  in_transit: { tone: 'active' },
+  out_for_delivery: { tone: 'active' },
+  delivered: { tone: 'done' },
+  delivery_failed: { tone: 'fail' },
+  returned: { tone: 'fail' },
+  cancelled: { tone: 'fail' },
 };
 
 const TONE_BADGE: Record<StatusTone, object> = {
@@ -59,6 +60,7 @@ function OrderRow({
   onPress?: () => void;
   onReorder?: () => void;
 }) {
+  const t = useT();
   const meta = STATUS_META[order.status];
   const Row = (
     <View style={styles.row}>
@@ -72,23 +74,23 @@ function OrderRow({
           </Text>
           <View style={[styles.badge, TONE_BADGE[meta.tone]]}>
             <Text style={[styles.badgeText, { color: TONE_TEXT[meta.tone] }]}>
-              {meta.label}
+              {t(`orders.status.${order.status}`)}
             </Text>
           </View>
         </View>
         <Text variant="caption" numberOfLines={1}>
-          {order.itemCount} ชิ้น · {money(order.total)}
+          {order.itemCount} {t('orders.itemsUnit')} · {money(order.total)}
           {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
         </Text>
       </View>
       {onReorder ? (
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`สั่งซ้ำ ${order.id}`}
+          accessibilityLabel={`${t('orders.reorderA11y')} ${order.id}`}
           hitSlop={8}
           onPress={onReorder}
           style={styles.reorderPill}>
-          <Text style={styles.reorderText}>สั่งซ้ำ</Text>
+          <Text style={styles.reorderText}>{t('orders.reorder')}</Text>
         </PressableScale>
       ) : onPress ? (
         <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
@@ -100,7 +102,7 @@ function OrderRow({
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`ติดตามคำสั่งซื้อ ${order.id}`}
+      accessibilityLabel={`${t('orders.trackA11y')} ${order.id}`}
       onPress={onPress}
       scaleTo={0.98}
       style={styles.card}>
@@ -110,6 +112,7 @@ function OrderRow({
 }
 
 export default function OrdersScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const list = useOrder((s) => s.list);
@@ -139,10 +142,10 @@ export default function OrdersScreen() {
       if (added > 0) {
         router.push('/cart');
       } else {
-        Alert.alert('สั่งซ้ำไม่ได้', 'สินค้าในออเดอร์นี้ไม่พร้อมจำหน่ายแล้ว');
+        Alert.alert(t('orders.reorderFailTitle'), t('orders.reorderFailBody'));
       }
     } catch {
-      Alert.alert('เกิดข้อผิดพลาด', 'ไม่สามารถสั่งซ้ำได้ กรุณาลองใหม่');
+      Alert.alert(t('orders.errorTitle'), t('orders.reorderErrorBody'));
     }
   };
 
@@ -152,7 +155,7 @@ export default function OrdersScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
-      <ScreenHeader title="คำสั่งซื้อของฉัน" style={styles.header} />
+      <ScreenHeader title={t('orders.title')} style={styles.header} />
 
       {isEmpty ? (
         <View style={[styles.empty, { paddingBottom: 110 + insets.bottom }]}>
@@ -160,10 +163,10 @@ export default function OrdersScreen() {
             <Ionicons name="receipt-outline" size={40} color={Colors.primaryStrong} />
           </View>
           <Text variant="title" style={styles.emptyTitle}>
-            ยังไม่มีคำสั่งซื้อ
+            {t('orders.emptyTitle')}
           </Text>
           <Text variant="body" style={styles.emptyBody}>
-            เมื่อคุณสั่งซื้อ ออเดอร์จะมาแสดงที่นี่
+            {t('orders.emptyBody')}
           </Text>
         </View>
       ) : (
@@ -175,7 +178,7 @@ export default function OrdersScreen() {
           ]}>
           {ongoing.length > 0 ? (
             <Animated.View entering={FadeInDown.springify().damping(18)}>
-              <Text style={styles.eyebrow}>กำลังดำเนินการ</Text>
+              <Text style={styles.eyebrow}>{t('orders.ongoing')}</Text>
               <View style={styles.stack}>
                 {ongoing.map((order) => (
                   <OrderRow key={order.id} order={order} onPress={() => router.push(`/order/${order.id}`)} />
@@ -186,7 +189,7 @@ export default function OrdersScreen() {
 
           {history.length > 0 ? (
             <Animated.View entering={FadeInDown.delay(80).springify().damping(18)}>
-              <Text style={[styles.eyebrow, ongoing.length > 0 && styles.eyebrowTop]}>ที่ผ่านมา</Text>
+              <Text style={[styles.eyebrow, ongoing.length > 0 && styles.eyebrowTop]}>{t('orders.past')}</Text>
               <View style={styles.stack}>
                 {history.map((order, i) => (
                   <Animated.View
