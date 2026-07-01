@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
+import { Banners } from './pages/Banners';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
 import { Featured } from './pages/Featured';
@@ -41,7 +42,7 @@ export default function App() {
         <Route path="/featured" element={<Featured />} />
         <Route path="/store-credit" element={<StoreCredit />} />
         <Route path="/broadcast" element={<Broadcast />} />
-        <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
+        <Route path="/banners" element={<Banners />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/payments" element={<Placeholder title="ตรวจสลิป" />} />
       </Route>

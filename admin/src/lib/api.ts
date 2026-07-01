@@ -175,6 +175,56 @@ export const reorderFeaturedSections = (ids: string[]) => rpc('reorder_featured_
 export const setFeaturedPublish = (id: string, published: boolean) =>
   rpc('set_featured_publish', { p_id: id, p_published: published });
 
+/* ── banners (app home hero) ────────────────────────────────────────────────── */
+export type Banner = {
+  id: string;
+  image_path: string | null;
+  headline: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  display_order: number;
+  publish_state: 'draft' | 'published';
+};
+export async function listBanners(): Promise<Banner[]> {
+  const { data, error } = await supabase
+    .from('banners')
+    .select('id, image_path, headline, cta_label, cta_url, display_order, publish_state')
+    .order('display_order');
+  if (error) throw error;
+  return data as Banner[];
+}
+export const upsertBanner = (p: {
+  id?: string;
+  image_path?: string | null;
+  headline?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  display_order?: number;
+  publish_state?: 'draft' | 'published';
+}) =>
+  rpc<{ id: string }>('upsert_banner', {
+    p_id: p.id ?? undefined,
+    p_image_path: p.image_path ?? undefined,
+    p_headline: p.headline ?? undefined,
+    p_cta_label: p.cta_label ?? undefined,
+    p_cta_url: p.cta_url ?? undefined,
+    p_display_order: p.display_order ?? 0,
+    p_publish_state: p.publish_state ?? 'draft',
+  });
+export const deleteBanner = (id: string) => rpc('delete_banner', { p_id: id });
+export const reorderBanners = (ids: string[]) => rpc('reorder_banners', { p_ids: ids });
+
+/** Upload a banner image to the public bucket, return its public URL. */
+export async function uploadBannerImage(file: File): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `banners/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('product-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+  if (error) throw error;
+  return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+}
+
 /* ── product images (upload to the public bucket, then register the row) ─────── */
 export async function uploadProductImage(productId: string, file: File, isPrimary = false) {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
