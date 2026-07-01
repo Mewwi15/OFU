@@ -11,6 +11,7 @@ import { StyleSheet, View } from 'react-native';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 
 export type PromoBannerProps = {
   title: string;
@@ -25,9 +26,10 @@ export function PromoBanner({
   title,
   subtitle,
   image,
-  cta = 'ดูเลย',
+  cta,
   onPress,
 }: PromoBannerProps) {
+  const t = useT();
   return (
     <PressableScale
       accessibilityRole="button"
@@ -58,7 +60,7 @@ export function PromoBanner({
           {subtitle}
         </Text>
         <View style={styles.cta}>
-          <Text style={styles.ctaText}>{cta}</Text>
+          <Text style={styles.ctaText}>{cta ?? t('widget.viewNow')}</Text>
         </View>
       </View>
     </PressableScale>

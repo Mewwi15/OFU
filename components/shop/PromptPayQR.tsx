@@ -21,6 +21,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { promptPayPayload } from '@/lib/promptpay';
 
 const QR_SIZE = 196;
@@ -45,6 +46,7 @@ type Props = {
 };
 
 export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props) {
+  const t = useT();
   const payload = promptPayPayload(target, amount);
 
   return (
@@ -52,7 +54,7 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
       {/* Header band */}
       <View style={styles.band}>
         <Ionicons name="qr-code" size={18} color={Colors.textOnPrimary} />
-        <Text style={styles.bandText}>พร้อมเพย์ · Thai QR Payment</Text>
+        <Text style={styles.bandText}>{t('qr.header')}</Text>
       </View>
 
       {/* QR */}
@@ -66,7 +68,7 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
             ecl="M"
           />
         </View>
-        <Text style={styles.amountLabel}>ยอดที่ต้องชำระ</Text>
+        <Text style={styles.amountLabel}>{t('qr.amountDue')}</Text>
         <Text style={styles.amount}>{money(amount)}</Text>
       </View>
 
@@ -75,7 +77,7 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
       {/* Account row */}
       <View style={styles.accountRow}>
         <View style={styles.accountInfo}>
-          <Text variant="caption">ชื่อบัญชี</Text>
+          <Text variant="caption">{t('qr.accountName')}</Text>
           <Text style={styles.accountName} numberOfLines={1}>
             {displayName}
           </Text>
@@ -83,11 +85,11 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
         </View>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="คัดลอกหมายเลขพร้อมเพย์"
+          accessibilityLabel={t('qr.copyNumberA11y')}
           onPress={onCopyNumber}
           style={styles.copyBtn}>
           <Ionicons name="copy-outline" size={16} color={Colors.primaryStrong} />
-          <Text style={styles.copyText}>คัดลอก</Text>
+          <Text style={styles.copyText}>{t('qr.copy')}</Text>
         </PressableScale>
       </View>
     </View>

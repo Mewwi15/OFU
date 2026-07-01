@@ -9,6 +9,7 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { Text } from '@/components/ui/text';
 import { Colors, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
+import { useT } from '@/lib/i18n';
 
 export type ProductRailProps = {
   title: string;
@@ -21,13 +22,14 @@ export type ProductRailProps = {
 const CARD_WIDTH = 168;
 
 export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
+  const t = useT();
   return (
     <View style={styles.section}>
       <View style={styles.head}>
         <Text variant="subtitle">{title}</Text>
         {onSeeAll ? (
           <Pressable onPress={onSeeAll} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.seeAll}>ดูทั้งหมด</Text>
+            <Text style={styles.seeAll}>{t('widget.seeAll')}</Text>
           </Pressable>
         ) : null}
       </View>

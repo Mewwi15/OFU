@@ -3,9 +3,10 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 
 export type ShopBadgeProps = {
-  /** Label text. Defaults to "ช้อป". */
+  /** Label text. Defaults to the localized "Shop". */
   label?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -14,7 +15,9 @@ export type ShopBadgeProps = {
  * Small coral pill with a bag icon + label. Designed to overlap the
  * bottom-left of product images (the parent positions it absolutely).
  */
-export function ShopBadge({ label = 'ช้อป', style }: ShopBadgeProps) {
+export function ShopBadge({ label, style }: ShopBadgeProps) {
+  const t = useT();
+  const text = label ?? t('ui.shop');
   return (
     <View style={[styles.badge, style]}>
       <Ionicons
@@ -24,7 +27,7 @@ export function ShopBadge({ label = 'ช้อป', style }: ShopBadgeProps) {
         style={styles.icon}
       />
       <Text variant="caption" style={{ color: Colors.textOnPrimary }}>
-        {label}
+        {text}
       </Text>
     </View>
   );

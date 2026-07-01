@@ -35,6 +35,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { TrackedOrder } from '@/data/fulfillment';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 
 const MAX_STARS = 5;
 
@@ -48,6 +49,7 @@ function RatingStar({
   selected: boolean;
   onPress: (value: number) => void;
 }) {
+  const t = useT();
   const scale = useSharedValue(1);
 
   // Pop with a staggered cascade whenever this star becomes filled.
@@ -65,7 +67,7 @@ function RatingStar({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`ให้ ${index + 1} ดาว`}
+      accessibilityLabel={`${t('track.giveStarsPrefix')}${index + 1} ${t('track.starsUnit')}`}
       hitSlop={6}
       onPress={() => onPress(index + 1)}
       style={styles.starHit}>
@@ -90,6 +92,7 @@ type Props = {
 
 export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
 
@@ -105,11 +108,11 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
           { paddingTop: insets.top + Spacing.sm, paddingBottom: insets.bottom + Spacing.x2 },
         ]}>
         <View style={styles.header}>
-          <IconButton icon="close" accessibilityLabel="ปิด" onPress={onClose} />
+          <IconButton icon="close" accessibilityLabel={t('track.close')} onPress={onClose} />
         </View>
 
         <Text variant="title" style={styles.title}>
-          ขอบคุณที่อุดหนุนนะ!
+          {t('track.thankYou')}
         </Text>
 
         {/* Order-complete card */}
@@ -127,10 +130,10 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
           </View>
           <View style={styles.orderBottom}>
             <View style={styles.orderLeft}>
-              <Text variant="caption">ยอดที่ชำระ · {money(order.total)}</Text>
+              <Text variant="caption">{t('track.amountPaid')} · {money(order.total)}</Text>
               <View style={styles.deliveredRow}>
                 <Ionicons name="checkmark-circle" size={18} color={Colors.accentStrong} />
-                <Text style={styles.deliveredText}>จัดส่งสำเร็จ</Text>
+                <Text style={styles.deliveredText}>{t('track.deliveredSuccess')}</Text>
               </View>
             </View>
             <View style={styles.orderIcon}>
@@ -142,13 +145,13 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
         {/* Delivery details */}
         <Animated.View entering={FadeInDown.delay(160).springify().damping(18)} style={styles.detailCard}>
           <View style={styles.detailRow}>
-            <Text variant="caption">ที่อยู่</Text>
+            <Text variant="caption">{t('track.addressLabel')}</Text>
             <Text style={styles.detailValue} numberOfLines={1}>
               {order.addressLine}
             </Text>
           </View>
           <View style={[styles.detailRow, styles.detailRowGap]}>
-            <Text variant="caption">ส่งถึงเมื่อ</Text>
+            <Text variant="caption">{t('track.deliveredAtLabel')}</Text>
             <Text style={styles.detailValue}>{order.deliveredAt ?? '-'}</Text>
           </View>
 
@@ -157,7 +160,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
           <View style={styles.deliveredByRow}>
             <Image source={{ uri: order.rider.avatar }} style={styles.riderAvatar} contentFit="cover" />
             <View style={styles.riderInfo}>
-              <Text variant="caption">จัดส่งโดยไรเดอร์อู้ฟู่</Text>
+              <Text variant="caption">{t('track.deliveredByRider')}</Text>
               <View style={styles.riderNameRow}>
                 <Text style={styles.riderName} numberOfLines={1}>
                   {order.rider.name}
@@ -167,14 +170,14 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
             </View>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="แชทกับไรเดอร์"
+              accessibilityLabel={t('track.chatRiderA11y')}
               onPress={onChat}
               style={styles.riderAction}>
               <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primaryStrong} />
             </PressableScale>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="โทรหาไรเดอร์"
+              accessibilityLabel={t('track.callRiderA11y')}
               onPress={onCall}
               style={styles.riderAction}>
               <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
@@ -185,7 +188,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
         {/* Rating */}
         <Animated.View entering={FadeInDown.delay(240).springify().damping(18)} style={styles.ratingCard}>
           <Text variant="subtitle" style={styles.ratingTitle}>
-            ให้คะแนนประสบการณ์
+            {t('track.rateExperience')}
           </Text>
           <View style={styles.starsRow}>
             {Array.from({ length: MAX_STARS }).map((_, i) => (
@@ -196,7 +199,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
           <TextInput
             value={comment}
             onChangeText={setComment}
-            placeholder="เล่าให้เราฟังหน่อย..."
+            placeholder={t('track.ratingPlaceholder')}
             placeholderTextColor={Colors.textMuted}
             multiline
             style={styles.commentInput}
@@ -204,11 +207,11 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
 
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="ส่งคะแนน"
+            accessibilityLabel={t('track.submitRatingA11y')}
             disabled={stars === 0}
             onPress={() => onSubmit(stars, comment.trim())}
             style={[styles.submitBtn, stars === 0 && styles.submitBtnOff]}>
-            <Text style={styles.submitText}>ส่งคะแนน</Text>
+            <Text style={styles.submitText}>{t('track.submitRating')}</Text>
           </PressableScale>
         </Animated.View>
       </ScrollView>

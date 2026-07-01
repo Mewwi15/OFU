@@ -23,37 +23,39 @@ import { Button } from '@/components/ui/button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 import { useLock } from '@/store/lock';
 
 type Slide = {
   id: string;
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
 };
 
 const SLIDES: Slide[] = [
   {
     id: 's1',
     icon: 'leaf-outline',
-    title: 'ของสดของดี ส่งถึงบ้าน',
-    body: 'คัดผัก ผลไม้ และของใช้ในบ้านคุณภาพดี ส่งตรงจากร้านอู้ฟู่ทุกวัน',
+    titleKey: 'onboarding.slide1Title',
+    bodyKey: 'onboarding.slide1Body',
   },
   {
     id: 's2',
     icon: 'bicycle-outline',
-    title: 'สั่งง่าย ส่งไว',
-    body: 'เลือกของที่ชอบ จ่ายสะดวกทั้งปลายทางและพร้อมเพย์ ติดตามไรเดอร์ได้สด ๆ',
+    titleKey: 'onboarding.slide2Title',
+    bodyKey: 'onboarding.slide2Body',
   },
   {
     id: 's3',
     icon: 'shield-checkmark-outline',
-    title: 'ปลอดภัย มั่นใจทุกออเดอร์',
-    body: 'ไรเดอร์พนักงานอู้ฟู่ ดูแลของถึงมือคุณ พร้อมล็อกแอปด้วย PIN ส่วนตัว',
+    titleKey: 'onboarding.slide3Title',
+    bodyKey: 'onboarding.slide3Body',
   },
 ];
 
 export default function OnboardingScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const completeOnboarding = useLock((s) => s.completeOnboarding);
 
@@ -85,10 +87,10 @@ export default function OnboardingScreen() {
         {!isLast ? (
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="ข้าม"
+            accessibilityLabel={t('onboarding.skip')}
             hitSlop={10}
             onPress={() => completeOnboarding()}>
-            <Text style={styles.skip}>ข้าม</Text>
+            <Text style={styles.skip}>{t('onboarding.skip')}</Text>
           </PressableScale>
         ) : null}
       </View>
@@ -107,10 +109,10 @@ export default function OnboardingScreen() {
                 <Ionicons name={slide.icon} size={92} color={Colors.primaryStrong} />
               </View>
               <Text variant="title" style={styles.title}>
-                {slide.title}
+                {t(slide.titleKey)}
               </Text>
               <Text variant="body" style={styles.body}>
-                {slide.body}
+                {t(slide.bodyKey)}
               </Text>
             </View>
           ))}
@@ -126,7 +128,7 @@ export default function OnboardingScreen() {
         </View>
         <Animated.View entering={FadeIn.duration(200)} style={styles.ctaWrap}>
           <Button onPress={next} style={styles.cta}>
-            {isLast ? 'เริ่มใช้งาน' : 'ถัดไป'}
+            {isLast ? t('onboarding.getStarted') : t('onboarding.next')}
           </Button>
         </Animated.View>
       </View>

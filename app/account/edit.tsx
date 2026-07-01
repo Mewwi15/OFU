@@ -31,6 +31,7 @@ import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
 import { uploadAvatar } from '@/lib/data/storage';
+import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
 type FieldProps = {
@@ -80,6 +81,7 @@ function Field({
 }
 
 export default function EditProfileScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const user = useAuth((s) => s.user);
@@ -93,7 +95,7 @@ export default function EditProfileScreen() {
   const pickAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('ต้องการสิทธิ์เข้าถึงรูปภาพ', 'อนุญาตการเข้าถึงรูปภาพเพื่อเปลี่ยนรูปโปรไฟล์');
+      Alert.alert(t('editProfile.photoPermTitle'), t('editProfile.photoPermBody'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -109,7 +111,7 @@ export default function EditProfileScreen() {
       const url = await uploadAvatar(result.assets[0].base64);
       await updateProfile({ avatar: url });
     } catch {
-      Alert.alert('อัปโหลดไม่สำเร็จ', 'ไม่สามารถเปลี่ยนรูปโปรไฟล์ได้ กรุณาลองใหม่');
+      Alert.alert(t('editProfile.avatarFailed'), t('editProfile.avatarFailedBody'));
     } finally {
       setAvatarBusy(false);
     }
@@ -139,10 +141,10 @@ export default function EditProfileScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title="แก้ไขโปรไฟล์"
+        title={t('editProfile.title')}
         style={styles.header}
         left={
-          <IconButton icon="chevron-back" accessibilityLabel="ย้อนกลับ" onPress={() => router.back()} />
+          <IconButton icon="chevron-back" accessibilityLabel={t('common.back')} onPress={() => router.back()} />
         }
       />
 
@@ -164,7 +166,7 @@ export default function EditProfileScreen() {
             />
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="เปลี่ยนรูปโปรไฟล์"
+              accessibilityLabel={t('editProfile.changePhoto')}
               disabled={avatarBusy}
               onPress={() => void pickAvatar()}
               style={styles.avatarEdit}>
@@ -177,24 +179,24 @@ export default function EditProfileScreen() {
           </View>
 
           <Field
-            label="ชื่อ"
+            label={t('editProfile.name')}
             icon="person-outline"
             value={name}
             onChangeText={setName}
-            placeholder="ชื่อของคุณ"
+            placeholder={t('editProfile.namePlaceholder')}
           />
           <Field
-            label="เบอร์โทรศัพท์"
+            label={t('editProfile.phone')}
             icon="call-outline"
             value={user.phone}
             onChangeText={() => {}}
             placeholder="—"
             keyboardType="phone-pad"
             readOnly
-            hint="เบอร์ที่ใช้เข้าสู่ระบบ เปลี่ยนไม่ได้"
+            hint={t('editProfile.phoneHint')}
           />
           <Field
-            label="อีเมล"
+            label={t('editProfile.email')}
             icon="mail-outline"
             value={email}
             onChangeText={setEmail}
@@ -208,20 +210,20 @@ export default function EditProfileScreen() {
         <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.sm }]}>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="บันทึก"
+            accessibilityLabel={t('editProfile.save')}
             disabled={!canSave}
             onPress={onSave}
             style={[styles.saveBtn, !canSave && styles.saveBtnOff]}>
-            <Text style={styles.saveText}>บันทึก</Text>
+            <Text style={styles.saveText}>{t('editProfile.save')}</Text>
           </PressableScale>
         </View>
       </KeyboardAvoidingView>
 
       {saved ? (
         <Toast
-          message="บันทึกโปรไฟล์แล้ว"
+          message={t('editProfile.savedToast')}
           onAction={finish}
-          actionLabel="เสร็จสิ้น"
+          actionLabel={t('editProfile.done')}
           onHide={finish}
           duration={1600}
         />

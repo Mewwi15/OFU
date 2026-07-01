@@ -29,10 +29,12 @@ import {
   submitRating as submitRatingApi,
   subscribeOrder,
 } from '@/lib/data/order';
+import { useT } from '@/lib/i18n';
 import { useOrder } from '@/store/order';
 
 export default function OrderTrackingScreen() {
   const router = useRouter();
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const active = useOrder((s) => s.active);
   const activeLoading = useOrder((s) => s.activeLoading);
@@ -60,8 +62,7 @@ export default function OrderTrackingScreen() {
   const callRider = () => {
     if (active) Linking.openURL(`tel:${active.rider.phone}`).catch(() => {});
   };
-  const openHelp = () =>
-    Alert.alert('ศูนย์ช่วยเหลือ', 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.');
+  const openHelp = () => Alert.alert(t('track.helpTitle'), t('track.helpBody'));
 
   const onSubmitRating = async (stars: number, comment: string) => {
     if (active) await submitRatingApi(active.id, stars, comment).catch(() => {});
@@ -70,17 +71,17 @@ export default function OrderTrackingScreen() {
 
   const onCancel = () => {
     if (!active) return;
-    Alert.alert('ยกเลิกออเดอร์', `ต้องการยกเลิกออเดอร์ ${active.id} ?`, [
-      { text: 'ไม่ใช่', style: 'cancel' },
+    Alert.alert(t('track.cancelOrder'), `${t('track.cancelConfirmPrefix')}${active.id} ?`, [
+      { text: t('track.no'), style: 'cancel' },
       {
-        text: 'ยกเลิกออเดอร์',
+        text: t('track.cancelOrder'),
         style: 'destructive',
         onPress: async () => {
           try {
             await cancelOrder(active.id);
             await loadActive(active.id);
           } catch (e) {
-            Alert.alert('ยกเลิกไม่สำเร็จ', orderErrorMessage(e));
+            Alert.alert(t('track.cancelFailed'), orderErrorMessage(e));
           }
         },
       },
@@ -96,11 +97,11 @@ export default function OrderTrackingScreen() {
     return (
       <View style={styles.guard}>
         <Text variant="subtitle" style={styles.guardTitle}>
-          {activeLoading ? 'กำลังโหลดคำสั่งซื้อ…' : 'ไม่พบคำสั่งซื้อนี้'}
+          {activeLoading ? t('track.loadingOrder') : t('track.orderNotFound')}
         </Text>
         {activeLoading ? null : (
           <Text variant="body" style={styles.guardBody} onPress={goHome}>
-            กลับหน้าหลัก
+            {t('track.backHome')}
           </Text>
         )}
       </View>
@@ -112,10 +113,10 @@ export default function OrderTrackingScreen() {
     return (
       <View style={styles.guard}>
         <Text variant="subtitle" style={styles.guardTitle}>
-          คำสั่งซื้อ {active.id} ถูกยกเลิก
+          {t('track.orderPrefix')}{active.id}{t('track.orderCancelledSuffix')}
         </Text>
         <Text variant="body" style={styles.guardBody} onPress={goHome}>
-          กลับหน้าหลัก
+          {t('track.backHome')}
         </Text>
       </View>
     );
@@ -166,9 +167,9 @@ export default function OrderTrackingScreen() {
 
       {submitted ? (
         <Toast
-          message="ขอบคุณสำหรับคะแนน"
-          subtitle="ความเห็นของคุณช่วยให้ร้านอู้ฟู่ดีขึ้น"
-          actionLabel="เสร็จสิ้น"
+          message={t('track.ratingThanks')}
+          subtitle={t('track.ratingThanksSub')}
+          actionLabel={t('track.done')}
           onAction={finishRating}
           onHide={finishRating}
           duration={2600}

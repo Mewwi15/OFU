@@ -14,28 +14,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBadge } from '@/components/navigation/CartBadge';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 type TabMeta = {
-  /** Thai label shown under the icon (also the accessibility label). */
-  label: string;
+  /** i18n key for the label shown under the icon (also the accessibility label). */
+  labelKey: string;
   active: IconName;
   inactive: IconName;
   /** Render as the raised, prominent centre button (FAB-style). */
   raised?: boolean;
 };
 
-/** Per-route icon pair + Thai label, keyed by the route file name. */
+/** Per-route icon pair + label key, keyed by the route file name. */
 const TABS: Record<string, TabMeta> = {
-  index: { label: 'หน้าหลัก', active: 'home', inactive: 'home-outline' },
-  search: { label: 'สินค้า', active: 'grid', inactive: 'grid-outline' },
-  orders: { label: 'คำสั่งซื้อ', active: 'receipt', inactive: 'receipt-outline', raised: true },
-  cart: { label: 'ตะกร้า', active: 'cart', inactive: 'cart-outline' },
-  account: { label: 'บัญชี', active: 'person', inactive: 'person-outline' },
+  index: { labelKey: 'tab.home', active: 'home', inactive: 'home-outline' },
+  search: { labelKey: 'tab.products', active: 'grid', inactive: 'grid-outline' },
+  orders: { labelKey: 'tab.orders', active: 'receipt', inactive: 'receipt-outline', raised: true },
+  cart: { labelKey: 'tab.cart', active: 'cart', inactive: 'cart-outline' },
+  account: { labelKey: 'tab.account', active: 'person', inactive: 'person-outline' },
 };
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const t = useT();
   const insets = useSafeAreaInsets();
 
   return (
@@ -53,6 +55,8 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
           // Skip any route we don't have metadata for (defensive).
           if (!meta) return null;
+
+          const label = t(meta.labelKey);
 
           const onPress = () => {
             if (Platform.OS !== 'web') {
@@ -80,7 +84,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 key={route.key}
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel ?? meta.label}
+                accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
                 onPress={onPress}
                 onLongPress={onLongPress}
                 style={styles.raisedItem}>
@@ -98,7 +102,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                     styles.raisedLabel,
                     { color: isFocused ? Colors.primaryStrong : Colors.textMuted },
                   ]}>
-                  {meta.label}
+                  {label}
                 </Text>
               </Pressable>
             );
@@ -112,7 +116,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={
-                options.tabBarAccessibilityLabel ?? meta.label
+                options.tabBarAccessibilityLabel ?? label
               }
               onPress={onPress}
               onLongPress={onLongPress}
@@ -140,7 +144,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   styles.label,
                   { color: isFocused ? Colors.primaryStrong : Colors.textMuted },
                 ]}>
-                {meta.label}
+                {label}
               </Text>
             </Pressable>
           );

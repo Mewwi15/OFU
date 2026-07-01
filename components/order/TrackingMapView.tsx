@@ -26,6 +26,7 @@ import {
   stageIndexFor,
   type TrackedOrder,
 } from '@/data/fulfillment';
+import { useT } from '@/lib/i18n';
 import { useRiderRoute } from '@/lib/useRiderRoute';
 
 // Fixed camera, biased south of the route midpoint so the path sits in the map
@@ -49,6 +50,7 @@ type Props = {
 
 export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArrived }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const activeIndex = stageIndexFor(order.status);
 
   // Live rider movement along the route + branded marker artwork.
@@ -62,7 +64,7 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
         <AppleMaps.View
           style={StyleSheet.absoluteFill}
           cameraPosition={CAMERA}
-          markers={[{ coordinates: DELIVERY_DESTINATION, title: 'จุดหมาย' }]}
+          markers={[{ coordinates: DELIVERY_DESTINATION, title: t('track.destination') }]}
           annotations={
             riderIcon
               ? [{ coordinates: position, icon: riderIcon, title: order.rider.name }]
@@ -78,7 +80,7 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
             riderIcon
               ? { coordinates: position, icon: riderIcon, title: order.rider.name }
               : { coordinates: position, title: order.rider.name },
-            { coordinates: DELIVERY_DESTINATION, title: 'จุดหมาย' },
+            { coordinates: DELIVERY_DESTINATION, title: t('track.destination') },
           ]}
           polylines={[{ coordinates: DELIVERY_ROUTE, color: Colors.primary, width: 5 }]}
         />
@@ -91,17 +93,17 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
         pointerEvents="box-none">
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="ปิด"
+          accessibilityLabel={t('track.close')}
           onPress={onClose}
           style={styles.roundBtn}>
           <Ionicons name="close" size={22} color={Colors.text} />
         </PressableScale>
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="ช่วยเหลือ"
+          accessibilityLabel={t('track.help')}
           onPress={onHelp}
           style={styles.helpBtn}>
-          <Text style={styles.helpText}>ช่วยเหลือ</Text>
+          <Text style={styles.helpText}>{t('track.help')}</Text>
         </PressableScale>
       </Animated.View>
 
@@ -112,10 +114,12 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
         <View style={styles.headerRow}>
           <View style={styles.headerText}>
             <Text variant="title" style={styles.sheetTitle}>
-              {arrived ? 'ไรเดอร์ถึงแล้ว' : 'กำลังไปหาคุณ'}
+              {arrived ? t('track.riderArrived') : t('track.riderOnTheWay')}
             </Text>
             <Text style={styles.arriving}>
-              {arrived ? 'มารับสินค้าได้เลย' : `กำลังมา · เหลืออีก ~${minutesLeft} นาที`}
+              {arrived
+                ? t('track.comePickUp')
+                : `${t('track.arrivingPrefix')}~${minutesLeft} ${t('track.minutesUnit')}`}
             </Text>
           </View>
           <RiderIllustration size={104} />
@@ -130,14 +134,16 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
         <DeliveryStepper stages={DELIVERY_STAGES} activeIndex={activeIndex} />
 
         <Text variant="caption" style={styles.stepHint}>
-          ให้เวลา{order.rider.name.split(' ')[0]}สักครู่ในการนำส่งถึงมือคุณ
+          {t('track.giveRiderTimePrefix')}
+          {order.rider.name.split(' ')[0]}
+          {t('track.giveRiderTimeSuffix')}
         </Text>
 
         {/* Rider row */}
         <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.riderRow}>
           <Image source={{ uri: order.rider.avatar }} style={styles.riderAvatar} contentFit="cover" />
           <View style={styles.riderInfo}>
-            <Text variant="caption">ไรเดอร์อู้ฟู่</Text>
+            <Text variant="caption">{t('track.oofooRider')}</Text>
             <View style={styles.riderNameRow}>
               <Text style={styles.riderName} numberOfLines={1}>
                 {order.rider.name}
@@ -147,14 +153,14 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
           </View>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="แชทกับไรเดอร์"
+            accessibilityLabel={t('track.chatRiderA11y')}
             onPress={onChat}
             style={styles.riderAction}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primaryStrong} />
           </PressableScale>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="โทรหาไรเดอร์"
+            accessibilityLabel={t('track.callRiderA11y')}
             onPress={onCall}
             style={styles.riderAction}>
             <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
@@ -163,10 +169,10 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
 
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="ยืนยันว่าได้รับสินค้าแล้ว"
+          accessibilityLabel={t('track.confirmReceivedA11y')}
           onPress={onArrived}
           style={styles.cta}>
-          <Text style={styles.ctaText}>ได้รับสินค้าแล้ว</Text>
+          <Text style={styles.ctaText}>{t('track.receivedGoods')}</Text>
         </PressableScale>
       </Animated.View>
     </View>

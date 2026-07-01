@@ -18,11 +18,13 @@ import { Button } from '@/components/ui/button';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 import { PIN_LENGTH, useLock } from '@/store/lock';
 
 type Step = 'create' | 'confirm' | 'biometric';
 
 export default function LockSetupScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const setPin = useLock((s) => s.setPin);
   const setBiometricEnabled = useLock((s) => s.setBiometricEnabled);
@@ -34,7 +36,7 @@ export default function LockSetupScreen() {
 
   const [bioAvailable, setBioAvailable] = useState(false);
   const [bioIcon, setBioIcon] = useState<keyof typeof Ionicons.glyphMap>('finger-print');
-  const [bioLabel, setBioLabel] = useState('ไบโอเมทริก');
+  const [bioLabel, setBioLabel] = useState(t('lock.biometric'));
 
   useEffect(() => {
     (async () => {
@@ -49,7 +51,7 @@ export default function LockSetupScreen() {
           LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION,
         );
         setBioIcon(isFace ? 'scan-outline' : 'finger-print');
-        setBioLabel(isFace ? 'Face ID' : 'ลายนิ้วมือ');
+        setBioLabel(isFace ? 'Face ID' : t('lock.fingerprint'));
       }
     })();
   }, []);
@@ -94,20 +96,24 @@ export default function LockSetupScreen() {
 
   const enableBiometric = async () => {
     const res = await LocalAuthentication.authenticateAsync({
-      promptMessage: `ยืนยันด้วย${bioLabel}เพื่อเปิดใช้งาน`,
-      cancelLabel: 'ยกเลิก',
+      promptMessage: `${t('lock.bioPromptPrefix')}${bioLabel}${t('lock.bioPromptSuffix')}`,
+      cancelLabel: t('common.cancel'),
     });
     finalize(res.success);
   };
 
   const heading =
-    step === 'create' ? 'ตั้งรหัส PIN' : step === 'confirm' ? 'ยืนยันรหัส PIN' : 'ปลดล็อกให้เร็วขึ้น';
+    step === 'create'
+      ? t('lock.setPin')
+      : step === 'confirm'
+        ? t('lock.confirmPin')
+        : t('lock.unlockFaster');
   const sub =
     step === 'create'
-      ? `ตั้งรหัส ${PIN_LENGTH} หลักไว้ล็อกแอปของคุณ`
+      ? `${t('lock.createSubPrefix')}${PIN_LENGTH}${t('lock.createSubSuffix')}`
       : step === 'confirm'
-        ? 'กรอกรหัสเดิมอีกครั้งเพื่อยืนยัน'
-        : `เปิดใช้ ${bioLabel} เพื่อปลดล็อกแอปได้เร็วขึ้น`;
+        ? t('lock.confirmSub')
+        : `${t('lock.enablePrefix')}${bioLabel}${t('lock.bioSubSuffix')}`;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.x2 }]}>
@@ -125,20 +131,20 @@ export default function LockSetupScreen() {
         <Text variant="body" style={styles.sub}>
           {sub}
         </Text>
-        {error ? <Text style={styles.errorText}>รหัสไม่ตรงกัน ลองใหม่อีกครั้ง</Text> : null}
+        {error ? <Text style={styles.errorText}>{t('lock.pinMismatch')}</Text> : null}
       </View>
 
       {step === 'biometric' ? (
         <View style={[styles.bioActions, { paddingBottom: insets.bottom + Spacing.x2 }]}>
           <Button onPress={enableBiometric} style={styles.bioBtn}>
-            {`เปิดใช้ ${bioLabel}`}
+            {`${t('lock.enablePrefix')}${bioLabel}`}
           </Button>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="ข้ามไปก่อน"
+            accessibilityLabel={t('lock.skipForNow')}
             onPress={() => finalize(false)}
             style={styles.skipBtn}>
-            <Text style={styles.skipText}>ข้ามไปก่อน</Text>
+            <Text style={styles.skipText}>{t('lock.skipForNow')}</Text>
           </PressableScale>
         </View>
       ) : (

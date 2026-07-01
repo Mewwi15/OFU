@@ -28,6 +28,7 @@ import {
   type TrackedOrder,
 } from '@/data/fulfillment';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 
 /** Owner-illustrated 3D clay art per parcel stage (transparent PNGs). */
 const PARCEL_ART: Record<string, ReturnType<typeof require>> = {
@@ -51,6 +52,7 @@ type Props = {
 
 export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   const activeIndex = parcelStageIndexFor(order.status);
@@ -60,7 +62,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
     ? EXCEPTION_META[order.status]
     : undefined;
   const activeStage = PARCEL_STAGES[activeIndex];
-  const heroLabel = exceptionMeta?.label ?? activeStage?.label ?? 'กำลังดำเนินการ';
+  const heroLabel = exceptionMeta?.label ?? activeStage?.label ?? t('track.inProgress');
   const heroArt = activeStage ? PARCEL_ART[activeStage.key] : undefined;
   const trackingNo = order.trackingNo ?? '-';
 
@@ -83,9 +85,9 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
-        <IconButton icon="close" accessibilityLabel="ปิด" onPress={onClose} />
-        <Text variant="subtitle">ติดตามพัสดุ</Text>
-        <IconButton icon="help-circle-outline" accessibilityLabel="ช่วยเหลือ" onPress={onHelp} />
+        <IconButton icon="close" accessibilityLabel={t('track.close')} onPress={onClose} />
+        <Text variant="subtitle">{t('track.parcelTitle')}</Text>
+        <IconButton icon="help-circle-outline" accessibilityLabel={t('track.help')} onPress={onHelp} />
       </View>
 
       <ScrollView
@@ -125,8 +127,8 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
             {exceptionMeta
               ? exceptionMeta.message
               : delivered
-                ? 'ขอบคุณที่ใช้บริการอู้ฟู่'
-                : `พัสดุของคุณ · ${order.etaText}`}
+                ? t('track.thankYouService')
+                : `${t('track.yourParcel')} · ${order.etaText}`}
           </Text>
         </Animated.View>
 
@@ -138,17 +140,17 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
             </View>
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
-                ขนส่งโดย
+                {t('track.shippedBy')}
               </Text>
               <Text style={styles.courierName}>{order.courier ?? 'Flash Express'}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="ติดตามบนเว็บ Flash"
+              accessibilityLabel={t('track.trackOnFlashWebA11y')}
               hitSlop={8}
               onPress={openFlash}
               style={styles.flashLink}>
-              <Text style={styles.flashLinkText}>ติดตามบน Flash</Text>
+              <Text style={styles.flashLinkText}>{t('track.trackOnFlash')}</Text>
               <Ionicons name="open-outline" size={14} color={Colors.primaryStrong} />
             </Pressable>
           </View>
@@ -156,13 +158,13 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
           <View style={styles.trackNoRow}>
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
-                เลขพัสดุ
+                {t('track.trackingNo')}
               </Text>
               <Text style={styles.trackNo}>{trackingNo}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="คัดลอกเลขพัสดุ"
+              accessibilityLabel={t('track.copyTrackingA11y')}
               hitSlop={8}
               onPress={copyTracking}
               style={styles.copyBtn}>
@@ -171,7 +173,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
                 size={15}
                 color={Colors.primaryStrong}
               />
-              <Text style={styles.copyText}>{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</Text>
+              <Text style={styles.copyText}>{copied ? t('track.copied') : t('track.copy')}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -229,11 +231,11 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
                   </Text>
                   {failedHere ? (
                     <Text variant="caption" style={styles.stageFailed}>
-                      หยุดที่ขั้นตอนนี้
+                      {t('track.stoppedHere')}
                     </Text>
                   ) : active ? (
                     <Text variant="caption" style={styles.stageNow}>
-                      สถานะปัจจุบัน
+                      {t('track.currentStatus')}
                     </Text>
                   ) : null}
                 </View>
@@ -248,7 +250,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
             <Ionicons name="location-outline" size={18} color={Colors.primaryStrong} />
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
-                จัดส่งถึง · {order.addressLabel}
+                {t('track.deliverToLabel')} · {order.addressLabel}
               </Text>
               <Text variant="body" style={styles.infoValue}>
                 {order.addressLine}
@@ -260,11 +262,11 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
             <Ionicons name="receipt-outline" size={18} color={Colors.primaryStrong} />
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
-                {order.id} · {order.itemCount} ชิ้น
+                {order.id} · {order.itemCount} {t('track.itemsUnit')}
               </Text>
               <Text variant="body" style={styles.infoValue}>
-                ยอดชำระ {money(order.total)}
-                {order.placedAtLabel ? ` · สั่งเมื่อ ${order.placedAtLabel}` : ''}
+                {t('track.amountDue')} {money(order.total)}
+                {order.placedAtLabel ? ` · ${t('track.orderedAt')} ${order.placedAtLabel}` : ''}
               </Text>
             </View>
           </View>
@@ -275,18 +277,18 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
         {exception ? (
           <View style={styles.footerStack}>
-            <Button onPress={onHelp}>ติดต่อร้านอู้ฟู่</Button>
+            <Button onPress={onHelp}>{t('track.contactShop')}</Button>
             <Button variant="secondary" onPress={openFlash}>
-              ติดตามบน Flash
+              {t('track.trackOnFlash')}
             </Button>
           </View>
         ) : delivered ? (
-          <Button onPress={onDone}>เสร็จสิ้น</Button>
+          <Button onPress={onDone}>{t('track.done')}</Button>
         ) : order.status === 'out_for_delivery' ? (
-          <Button onPress={onArrived}>ฉันได้รับพัสดุแล้ว</Button>
+          <Button onPress={onArrived}>{t('track.receivedParcel')}</Button>
         ) : (
           <Button variant="secondary" onPress={openFlash}>
-            ติดตามสถานะบน Flash
+            {t('track.trackStatusOnFlash')}
           </Button>
         )}
       </View>

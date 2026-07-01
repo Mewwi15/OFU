@@ -17,6 +17,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { TrackedOrder } from '@/data/fulfillment';
+import { useT } from '@/lib/i18n';
 
 type Props = {
   order: TrackedOrder;
@@ -28,16 +29,17 @@ type Props = {
 
 export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
       <View style={styles.header}>
-        <IconButton icon="close" accessibilityLabel="ปิด" onPress={onClose} />
+        <IconButton icon="close" accessibilityLabel={t('track.close')} onPress={onClose} />
       </View>
 
       <View style={styles.body}>
         <Text variant="title" style={styles.title}>
-          รอสักครู่นะ กำลังจัดเตรียมให้อยู่!
+          {t('track.preparingTitle')}
         </Text>
 
         {/* Shop / status card */}
@@ -50,13 +52,13 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
               {order.shopName}
             </Text>
             <Breathing amount={0.05} duration={1300} style={styles.statusPill}>
-              <Text style={styles.statusPillText}>กำลังเตรียมสินค้า</Text>
+              <Text style={styles.statusPillText}>{t('track.preparingBadge')}</Text>
             </Breathing>
           </View>
 
           <View style={styles.etaRow}>
             <View style={styles.etaLeft}>
-              <Text variant="caption">เวลาจัดส่งโดยประมาณ</Text>
+              <Text variant="caption">{t('track.etaLabel')}</Text>
               <Text style={styles.etaValue}>{order.etaText}</Text>
             </View>
             <Breathing style={styles.etaIcon}>
@@ -69,23 +71,23 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
         <Animated.View entering={FadeInDown.delay(160).springify().damping(18)} style={styles.banner}>
           <Ionicons name="leaf" size={18} color={Colors.accentStrong} />
           <Text variant="body" style={styles.bannerText}>
-            ร้านอู้ฟู่กำลังจัดเตรียมออเดอร์ของคุณ ของสดใหม่กำลังมา!
+            {t('track.preparingBanner')}
           </Text>
         </Animated.View>
 
         {/* Free-delivery upsell */}
         <Animated.View entering={FadeInDown.delay(240).springify().damping(18)} style={styles.promoCard}>
           <View style={styles.promoBody}>
-            <Text style={styles.promoTitle}>ปลดล็อกส่งฟรี!</Text>
+            <Text style={styles.promoTitle}>{t('track.unlockFreeDelivery')}</Text>
             <Text variant="caption" style={styles.promoSub}>
-              รับดีลและส่วนลดพิเศษเพิ่มเติมอีกเพียบ
+              {t('track.promoUpsellSub')}
             </Text>
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="ดูดีลเพิ่มเติม"
+              accessibilityLabel={t('track.viewMoreDealsA11y')}
               onPress={onExplore}
               style={styles.promoBtn}>
-              <Text style={styles.promoBtnText}>ดูเลย</Text>
+              <Text style={styles.promoBtnText}>{t('track.viewNow')}</Text>
             </PressableScale>
           </View>
           <View style={styles.promoIcon}>
@@ -97,10 +99,10 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
       {onCancel ? (
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="ยกเลิกออเดอร์"
+          accessibilityLabel={t('track.cancelOrderA11y')}
           onPress={onCancel}
           style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>ยกเลิกออเดอร์</Text>
+          <Text style={styles.cancelText}>{t('track.cancelOrder')}</Text>
         </PressableScale>
       ) : null}
 
@@ -110,9 +112,9 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
           <Ionicons name="home" size={18} color={Colors.primaryStrong} />
         </View>
         <View style={styles.footerText}>
-          <Text variant="caption">จัดส่งไปที่</Text>
+          <Text variant="caption">{t('track.deliverTo')}</Text>
           <Text style={styles.footerAddr} numberOfLines={1}>
-            {order.addressLabel} · คาดว่าถึงใน {order.etaShort}
+            {order.addressLabel} · {t('track.etaArriveIn')} {order.etaShort}
           </Text>
         </View>
       </View>

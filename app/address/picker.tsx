@@ -39,6 +39,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useMode } from '@/store/mode';
 
@@ -64,7 +65,7 @@ function parcelPartsFrom(a: Location.LocationGeocodedAddress): ParcelParts {
 /** Bangkok (สุขุมวิท) — fallback centre when there's no address yet. */
 const DEFAULT_CENTER: LatLng = { latitude: 13.7236, longitude: 100.5686 };
 const DEFAULT_ZOOM = 16;
-const LABELS = ['บ้าน', 'ที่ทำงาน', 'อื่นๆ'];
+const LABEL_KEYS = ['address.labelHome', 'address.labelWork', 'address.labelOther'] as const;
 
 /** Build a readable Thai address line from a reverse-geocode result. */
 function formatLine(a: Location.LocationGeocodedAddress): string {
@@ -91,6 +92,7 @@ function formatLine(a: Location.LocationGeocodedAddress): string {
 }
 
 export default function AddressPickerScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -119,7 +121,7 @@ export default function AddressPickerScreen() {
 
   const [line, setLine] = useState(editing?.line ?? '');
   const [geocoding, setGeocoding] = useState(false);
-  const [label, setLabel] = useState(editing?.label ?? LABELS[0]);
+  const [label, setLabel] = useState(editing?.label ?? t(LABEL_KEYS[0]));
   const [recipient, setRecipient] = useState(editing?.recipient ?? '');
   const [phone, setPhone] = useState(editing?.phone ?? '');
   const [detail, setDetail] = useState(editing?.detail ?? '');
@@ -312,10 +314,7 @@ export default function AddressPickerScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'ต้องการสิทธิ์ตำแหน่ง',
-          'กรุณาอนุญาตให้แอปเข้าถึงตำแหน่ง เพื่อปักหมุดที่อยู่ปัจจุบัน',
-        );
+        Alert.alert(t('address.locPermTitle'), t('address.locPermBody'));
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
@@ -328,10 +327,7 @@ export default function AddressPickerScreen() {
     } catch {
       // GPS can reject if location is momentarily unavailable (cold start,
       // weak signal). Tell the user instead of leaking an unhandled rejection.
-      Alert.alert(
-        'หาตำแหน่งไม่สำเร็จ',
-        'ลองอีกครั้ง หรือเลื่อนแผนที่เพื่อปักหมุดเอง',
-      );
+      Alert.alert(t('address.locateFailed'), t('address.locateFailedBody'));
     } finally {
       setLocating(false);
     }
@@ -363,7 +359,7 @@ export default function AddressPickerScreen() {
       });
       router.back();
     } catch {
-      Alert.alert('บันทึกไม่สำเร็จ', 'ไม่สามารถบันทึกที่อยู่ได้ กรุณาลองใหม่');
+      Alert.alert(t('address.saveFailed'), t('address.saveFailedBody'));
     }
   };
 
@@ -394,7 +390,7 @@ export default function AddressPickerScreen() {
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.mapFallback]}>
             <Text style={{ color: Colors.textMuted }}>
-              แผนที่ใช้ได้บน iOS / Android
+              {t('address.mapUnavailable')}
             </Text>
           </View>
         )}
@@ -409,7 +405,7 @@ export default function AddressPickerScreen() {
         <View style={[styles.topBar, { top: insets.top + Spacing.sm }]}>
           <IconButton
             icon="chevron-back"
-            accessibilityLabel="ย้อนกลับ"
+            accessibilityLabel={t('common.back')}
             onPress={() => router.back()}
           />
           <View style={styles.searchBar}>
@@ -417,7 +413,7 @@ export default function AddressPickerScreen() {
             <TextInput
               value={query}
               onChangeText={onQueryChange}
-              placeholder="ค้นหาที่อยู่ หรือสถานที่"
+              placeholder={t('address.searchPlaceholder')}
               placeholderTextColor={Colors.textMuted}
               style={styles.searchInput}
               returnKeyType="search"
@@ -428,7 +424,7 @@ export default function AddressPickerScreen() {
             ) : query.length > 0 ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="ล้างการค้นหา"
+                accessibilityLabel={t('address.clearSearch')}
                 hitSlop={8}
                 onPress={dismissSearch}>
                 <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
@@ -462,7 +458,7 @@ export default function AddressPickerScreen() {
         {/* Current-location FAB */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="ใช้ตำแหน่งปัจจุบัน"
+          accessibilityLabel={t('address.useCurrentLocation')}
           onPress={useMyLocation}
           style={styles.locFab}>
           {locating ? (
@@ -491,12 +487,12 @@ export default function AddressPickerScreen() {
             <Ionicons name="location-sharp" size={18} color={Colors.primary} />
             <View style={styles.lineTextWrap}>
               <Text variant="caption" style={{ color: Colors.textMuted }}>
-                ตำแหน่งที่ปักหมุด
+                {t('address.pinnedLocation')}
               </Text>
               <TextInput
                 value={line}
                 onChangeText={setLine}
-                placeholder="เลื่อนหรือแตะแผนที่ เพื่อปักหมุด"
+                placeholder={t('address.pinHint')}
                 placeholderTextColor={Colors.textMuted}
                 multiline
                 style={styles.lineInput}
@@ -507,14 +503,15 @@ export default function AddressPickerScreen() {
 
           {/* Label chips */}
           <Text variant="caption" style={styles.fieldLabel}>
-            ป้ายกำกับ
+            {t('address.labelField')}
           </Text>
           <View style={styles.chips}>
-            {LABELS.map((l) => {
+            {LABEL_KEYS.map((key) => {
+              const l = t(key);
               const active = l === label;
               return (
                 <PressableScale
-                  key={l}
+                  key={key}
                   onPress={() => setLabel(l)}
                   style={[styles.chip, active && styles.chipActive]}>
                   <Text
@@ -533,19 +530,19 @@ export default function AddressPickerScreen() {
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
               <Text variant="caption" style={styles.fieldLabel}>
-                ชื่อผู้รับ
+                {t('address.recipient')}
               </Text>
               <TextInput
                 value={recipient}
                 onChangeText={setRecipient}
-                placeholder="ชื่อ-นามสกุล"
+                placeholder={t('address.recipientPlaceholder')}
                 placeholderTextColor={Colors.textMuted}
                 style={styles.input}
               />
             </View>
             <View style={styles.fieldCol}>
               <Text variant="caption" style={styles.fieldLabel}>
-                เบอร์โทร
+                {t('address.phone')}
               </Text>
               <TextInput
                 value={phone}
@@ -560,12 +557,12 @@ export default function AddressPickerScreen() {
 
           {/* Detail */}
           <Text variant="caption" style={styles.fieldLabel}>
-            รายละเอียดเพิ่มเติม (บ้านเลขที่ / ชั้น / จุดสังเกต)
+            {t('address.detail')}
           </Text>
           <TextInput
             value={detail}
             onChangeText={setDetail}
-            placeholder="เช่น คอนโด ABC ชั้น 8 ห้อง 812"
+            placeholder={t('address.detailPlaceholder')}
             placeholderTextColor={Colors.textMuted}
             style={styles.input}
           />
@@ -576,34 +573,34 @@ export default function AddressPickerScreen() {
               <View style={styles.parcelHead}>
                 <Ionicons name="cube-outline" size={16} color={Colors.primaryStrong} />
                 <Text style={styles.parcelHeadText}>
-                  ข้อมูลสำหรับจัดส่งพัสดุ (Flash Express)
+                  {t('address.parcelHead')}
                 </Text>
               </View>
               <Text variant="caption" style={styles.parcelHint}>
-                ระบบเติมให้อัตโนมัติจากหมุด ตรวจสอบและแก้ไขให้ถูกต้องก่อนบันทึก
+                {t('address.parcelHint')}
               </Text>
 
               <View style={styles.fieldRow}>
                 <View style={styles.fieldCol}>
                   <Text variant="caption" style={styles.fieldLabel}>
-                    ตำบล / แขวง
+                    {t('address.subDistrict')}
                   </Text>
                   <TextInput
                     value={subDistrict}
                     onChangeText={setSubDistrict}
-                    placeholder="เช่น คลองเตย"
+                    placeholder={t('address.districtExample')}
                     placeholderTextColor={Colors.textMuted}
                     style={styles.input}
                   />
                 </View>
                 <View style={styles.fieldCol}>
                   <Text variant="caption" style={styles.fieldLabel}>
-                    อำเภอ / เขต
+                    {t('address.district')}
                   </Text>
                   <TextInput
                     value={district}
                     onChangeText={setDistrict}
-                    placeholder="เช่น คลองเตย"
+                    placeholder={t('address.districtExample')}
                     placeholderTextColor={Colors.textMuted}
                     style={styles.input}
                   />
@@ -613,24 +610,24 @@ export default function AddressPickerScreen() {
               <View style={styles.fieldRow}>
                 <View style={styles.fieldCol}>
                   <Text variant="caption" style={styles.fieldLabel}>
-                    จังหวัด
+                    {t('address.province')}
                   </Text>
                   <TextInput
                     value={province}
                     onChangeText={setProvince}
-                    placeholder="เช่น กรุงเทพมหานคร"
+                    placeholder={t('address.provincePlaceholder')}
                     placeholderTextColor={Colors.textMuted}
                     style={styles.input}
                   />
                 </View>
                 <View style={styles.fieldCol}>
                   <Text variant="caption" style={styles.fieldLabel}>
-                    รหัสไปรษณีย์
+                    {t('address.postalCode')}
                   </Text>
                   <TextInput
                     value={postalCode}
-                    onChangeText={(t) => setPostalCode(t.replace(/\D/g, '').slice(0, 5))}
-                    placeholder="5 หลัก"
+                    onChangeText={(v) => setPostalCode(v.replace(/\D/g, '').slice(0, 5))}
+                    placeholder={t('address.postalPlaceholder')}
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="number-pad"
                     maxLength={5}
@@ -642,7 +639,7 @@ export default function AddressPickerScreen() {
           ) : null}
 
           <Button onPress={onSave} disabled={!canSave} style={styles.saveBtn}>
-            บันทึกที่อยู่
+            {t('address.save')}
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>

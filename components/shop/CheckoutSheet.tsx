@@ -33,6 +33,7 @@ import SwipeButton from 'rn-swipe-button';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import type { CartItem } from '@/store/cart';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -96,6 +97,7 @@ export function CheckoutSheet({
   mode,
   verb,
 }: Props) {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const [sheetH, setSheetH] = useState(560);
@@ -146,7 +148,7 @@ export function CheckoutSheet({
       <GestureHandlerRootView style={styles.root}>
         <AnimatedPressable
           accessibilityRole="button"
-          accessibilityLabel="ปิด"
+          accessibilityLabel={t('sheet.close')}
           onPress={onClose}
           style={[styles.backdrop, backdropStyle]}
         />
@@ -161,7 +163,7 @@ export function CheckoutSheet({
           </GestureDetector>
 
           <Text variant="subtitle" style={styles.title}>
-            สรุปคำสั่งซื้อ
+            {t('sheet.orderSummary')}
           </Text>
 
           {/* Selected lines */}
@@ -181,16 +183,18 @@ export function CheckoutSheet({
 
           <View style={styles.sumRow}>
             <Text variant="body" style={styles.sumMuted}>
-              ยอดรวมสินค้า
+              {t('sheet.subtotal')}
             </Text>
             <Text style={styles.sumValue}>{money(subtotal)}</Text>
           </View>
           <View style={[styles.sumRow, styles.sumGap]}>
             <Text variant="body" style={styles.sumMuted}>
-              {mode === 'delivery' ? 'ค่าจัดส่ง' : 'ค่าส่ง Flash'}
+              {mode === 'delivery' ? t('sheet.deliveryFee') : t('sheet.flashFee')}
             </Text>
             {deliveryFee === 0 ? (
-              <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>ฟรี</Text>
+              <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
+                {t('sheet.free')}
+              </Text>
             ) : (
               <Text variant="body" style={{ color: Colors.text }}>
                 {money(deliveryFee)}
@@ -201,12 +205,12 @@ export function CheckoutSheet({
           <View style={styles.hairline} />
 
           <View style={styles.totalRow}>
-            <Text variant="subtitle">รวมทั้งหมด</Text>
+            <Text variant="subtitle">{t('sheet.total')}</Text>
             <Text style={styles.grandTotal}>{money(total)}</Text>
           </View>
 
           {/* Slide to confirm */}
-          <SlideToConfirm label={`รูดเพื่อ${verb}`} onConfirm={onConfirm} />
+          <SlideToConfirm label={`${t('sheet.slidePrefix')}${verb}`} onConfirm={onConfirm} />
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>

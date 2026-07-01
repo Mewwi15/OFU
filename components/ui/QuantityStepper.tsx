@@ -12,6 +12,7 @@ import Animated, {
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 
 export type QuantityStepperProps = {
   value: number;
@@ -45,6 +46,7 @@ export function QuantityStepper({
   onRemove,
   style,
 }: QuantityStepperProps) {
+  const t = useT();
   const canDecrement = value > min;
   const canIncrement = max === undefined || value < max;
   // At the floor, a removable stepper deletes the line instead of decrementing.
@@ -78,7 +80,7 @@ export function QuantityStepper({
     <View style={[styles.row, style]}>
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel={showTrash ? 'ลบสินค้า' : 'ลดจำนวน'}
+        accessibilityLabel={showTrash ? t('ui.removeItem') : t('ui.decrease')}
         hitSlop={6}
         disabled={!showTrash && !canDecrement}
         onPress={onMinus}
@@ -102,7 +104,7 @@ export function QuantityStepper({
 
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel="เพิ่มจำนวน"
+        accessibilityLabel={t('ui.increase')}
         hitSlop={6}
         disabled={!canIncrement}
         onPress={increment}

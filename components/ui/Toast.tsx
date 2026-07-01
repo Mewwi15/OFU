@@ -19,6 +19,7 @@ import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -46,6 +47,7 @@ export function Toast({
   onHide,
   duration = 2800,
 }: ToastProps) {
+  const t = useT();
   useEffect(() => {
     const timer = setTimeout(onHide, duration);
     return () => clearTimeout(timer);
@@ -56,7 +58,7 @@ export function Toast({
       <AnimatedPressable
         entering={FadeIn.duration(180)}
         exiting={FadeOut.duration(200)}
-        accessibilityLabel="ปิด"
+        accessibilityLabel={t('ui.close')}
         onPress={onHide}
         style={styles.backdrop}
       />
@@ -67,7 +69,7 @@ export function Toast({
         style={styles.card}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="ปิด"
+          accessibilityLabel={t('ui.close')}
           hitSlop={10}
           onPress={onHide}
           style={styles.close}>

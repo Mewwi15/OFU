@@ -25,6 +25,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { cartItemId, useCart } from '@/store/cart';
 
 export type ProductListItemVariant = 'cart';
@@ -69,6 +70,7 @@ export function ProductListItem({
   onRemove,
   style,
 }: ProductListItemProps) {
+  const t = useT();
   const router = useRouter();
 
   const setQty = useCart((s) => s.setQty);
@@ -93,7 +95,7 @@ export function ProductListItem({
         <Checkbox
           checked={selected}
           onPress={onToggleSelect}
-          accessibilityLabel={selected ? 'นำออกจากการเลือก' : 'เลือกสินค้านี้'}
+          accessibilityLabel={selected ? t('widget.deselectItem') : t('widget.selectItem')}
         />
       ) : null}
 

@@ -34,6 +34,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { MOCK_RIDER } from '@/data/fulfillment';
+import { useT } from '@/lib/i18n';
 import { useChat } from '@/store/chat';
 import { useOrder } from '@/store/order';
 
@@ -42,6 +43,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export default function ChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const messages = useChat((s) => s.messages);
   const send = useChat((s) => s.send);
   const riderReply = useChat((s) => s.riderReply);
@@ -86,7 +88,7 @@ export default function ChatScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <IconButton icon="close" accessibilityLabel="ปิด" onPress={() => router.back()} />
+        <IconButton icon="close" accessibilityLabel={t('track.close')} onPress={() => router.back()} />
         <View style={styles.headerCenter}>
           <View style={styles.headerNameRow}>
             <Text variant="subtitle" numberOfLines={1} style={styles.headerName}>
@@ -95,12 +97,12 @@ export default function ChatScreen() {
             <Ionicons name="shield-checkmark" size={15} color={Colors.primaryStrong} />
           </View>
           <Text variant="caption" style={styles.headerRole}>
-            ไรเดอร์อู้ฟู่
+            {t('track.oofooRider')}
           </Text>
         </View>
         <IconButton
           icon="call"
-          accessibilityLabel="โทรหาไรเดอร์"
+          accessibilityLabel={t('track.callRiderA11y')}
           onPress={() => Linking.openURL(`tel:${rider.phone}`).catch(() => {})}
         />
       </View>
@@ -143,7 +145,7 @@ export default function ChatScreen() {
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="พิมพ์ข้อความ..."
+            placeholder={t('track.messagePlaceholder')}
             placeholderTextColor={Colors.textMuted}
             style={styles.input}
             returnKeyType="send"
@@ -151,7 +153,7 @@ export default function ChatScreen() {
           />
           <AnimatedPressable
             accessibilityRole="button"
-            accessibilityLabel="ส่งข้อความ"
+            accessibilityLabel={t('track.sendMessageA11y')}
             disabled={!hasDraft}
             onPress={onSend}
             style={[styles.sendBtn, sendStyle]}>
