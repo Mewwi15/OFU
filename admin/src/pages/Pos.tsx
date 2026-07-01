@@ -13,31 +13,25 @@ import QRCode from 'qrcode';
 
 import {
   apiError,
-  closeShift,
   createPosSale,
-  getOpenShift,
   getShopInfo,
   listPosCatalog,
-  openShift,
   type PosProduct,
   type PosVariant,
   type SaleResult,
-  type Shift,
   type ShopInfo,
 } from '../lib/api';
 import {
   cacheCatalog,
-  cacheShift,
   cacheShop,
   enqueueSale,
   flushQueue,
   isNetworkError,
   queueCount,
   readCachedCatalog,
-  readCachedShift,
   readCachedShop,
 } from '../lib/offline';
-import { App, Button, Card, InputNumber, Modal, Statistic, Typography } from 'antd';
+import { Button, Modal } from 'antd';
 
 import { promptpayPayload } from '../lib/promptpay';
 
@@ -56,7 +50,6 @@ const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 export function Pos() {
   const [shop, setShop] = useState<ShopInfo | null>(null);
-  const [shift, setShift] = useState<Shift | null>(null);
   const [catalog, setCatalog] = useState<PosProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,22 +92,18 @@ export function Pos() {
   useEffect(() => {
     (async () => {
       try {
-        const [s, sh, c] = await Promise.all([getShopInfo(), getOpenShift(), listPosCatalog()]);
+        const [s, c] = await Promise.all([getShopInfo(), listPosCatalog()]);
         setShop(s);
         cacheShop(s);
-        setShift(sh);
-        cacheShift(sh);
         setCatalog(c);
         cacheCatalog(c);
       } catch (e) {
         if (isNetworkError(e)) {
-          // offline: fall back to the last cached catalog / shop / shift
+          // offline: fall back to the last cached catalog / shop
           const cc = readCachedCatalog();
           const cs = readCachedShop();
-          const csh = readCachedShift();
           if (cc) setCatalog(cc);
           if (cs) setShop(cs);
-          setShift(csh);
           setOnline(false);
           if (!cc) setError('ออฟไลน์ และยังไม่มีข้อมูลที่แคชไว้ — เชื่อมต่อครั้งแรกออนไลน์ก่อน');
         } else {
@@ -298,37 +287,20 @@ export function Pos() {
   if (loading)
     return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
 
-  if (!shift) {
-    return (
-      <OpenShiftGate
-        onOpen={async (float) => {
-          const s = await openShift(float);
-          setShift(s);
-          cacheShift(s);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
       <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="flex flex-col min-h-0">
-          {/* shift bar */}
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-sm min-w-0">
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${online ? 'bg-green-500' : 'bg-amber-500'}`}
-                title={online ? 'ออนไลน์' : 'ออฟไลน์'}
-              />
-              <span className="text-sm text-tremor-content-emphasis truncate">
-                <span className="hidden sm:inline">กะเปิดอยู่ · </span>เงินต้นกะ{' '}
-                <span className="font-semibold text-tremor-content-strong">{baht(shift.opening_float)}</span>
-                {!online && <span className="text-amber-600"> · ออฟไลน์</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+          {/* status bar — only when offline or has queued sales */}
+          {(!online || pending > 0) && (
+            <div className="flex items-center gap-2 mb-3">
+              {!online && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  ออฟไลน์ — ขายต่อได้ ระบบจะซิงค์ให้เมื่อกลับมาออนไลน์
+                </span>
+              )}
               {pending > 0 && (
                 <button
                   onClick={() => void doFlush()}
@@ -339,9 +311,8 @@ export function Pos() {
                   รอซิงค์ {pending}
                 </button>
               )}
-              <CloseShiftButton shift={shift} setShift={setShift} />
             </div>
-          </div>
+          )}
 
           <div className="relative mb-4">
             <RiSearchLine className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-tremor-content-subtle" />
@@ -782,131 +753,6 @@ function VariantPicker({
         ))}
       </div>
     </Modal>
-  );
-}
-
-function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> }) {
-  const { message } = App.useApp();
-  const [float, setFloat] = useState<number | null>(0);
-  const [busy, setBusy] = useState(false);
-  return (
-    <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 9rem)' }}>
-      <Card style={{ maxWidth: 360, width: '100%', textAlign: 'center' }} styles={{ body: { padding: 28 } }}>
-        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl grid place-items-center" style={{ background: '#FDEEE7' }}>
-          <RiMoneyDollarCircleLine className="w-7 h-7" style={{ color: '#F15929' }} />
-        </div>
-        <Typography.Title level={4} style={{ margin: 0 }}>เปิดกะขาย</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>
-          ใส่จำนวนเงินสดตั้งต้นในลิ้นชักเพื่อเริ่มขาย
-        </Typography.Paragraph>
-        <InputNumber
-          size="large"
-          min={0}
-          prefix="฿"
-          value={float}
-          onChange={(v) => setFloat(typeof v === 'number' ? v : 0)}
-          style={{ width: '100%', margin: '8px 0 20px' }}
-          autoFocus
-        />
-        <Button
-          type="primary"
-          size="large"
-          block
-          loading={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await onOpen(float ?? 0);
-            } catch (e) {
-              message.error(apiError(e));
-            } finally {
-              setBusy(false);
-            }
-          }}>
-          เปิดกะ
-        </Button>
-      </Card>
-    </div>
-  );
-}
-
-function CloseShiftButton({ shift, setShift }: { shift: Shift; setShift: (s: Shift | null) => void }) {
-  const { message } = App.useApp();
-  const [open, setOpen] = useState(false);
-  const [counted, setCounted] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<Shift | null>(null);
-
-  const doClose = async () => {
-    setBusy(true);
-    try {
-      setResult(await closeShift(shift.id, counted ?? 0));
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const finish = () => {
-    setOpen(false);
-    setResult(null);
-    setShift(null);
-    cacheShift(null);
-  };
-
-  return (
-    <>
-      <Button shape="round" onClick={() => setOpen(true)}>
-        ปิดกะ
-      </Button>
-      <Modal
-        open={open}
-        title={result ? 'ปิดกะแล้ว' : 'ปิดกะ'}
-        destroyOnHidden
-        onCancel={() => (result ? finish() : setOpen(false))}
-        footer={
-          result
-            ? [<Button key="ok" type="primary" block onClick={finish}>เสร็จสิ้น</Button>]
-            : [
-                <Button key="c" onClick={() => setOpen(false)}>ยกเลิก</Button>,
-                <Button key="ok" type="primary" loading={busy} disabled={counted == null} onClick={() => void doClose()}>
-                  ปิดกะ
-                </Button>,
-              ]
-        }>
-        {result ? (
-          <div className="space-y-3 pt-1">
-            <div className="grid grid-cols-3 gap-2">
-              <Statistic title="เงินตั้งต้น" value={result.opening_float} prefix="฿" />
-              <Statistic title="ควรมี" value={result.expected_cash ?? 0} prefix="฿" />
-              <Statistic title="นับได้" value={result.counted_cash ?? 0} prefix="฿" />
-            </div>
-            <div
-              className="rounded-xl p-3 flex items-center justify-between"
-              style={{ background: (result.over_short ?? 0) < 0 ? '#FDECEC' : '#EAF6EF' }}>
-              <span className="font-medium">ส่วนต่าง</span>
-              <span className="font-bold" style={{ color: (result.over_short ?? 0) < 0 ? '#C9252B' : '#017A3A' }}>
-                {(result.over_short ?? 0) >= 0 ? '+' : ''}
-                {baht(result.over_short ?? 0)}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="pt-1">
-            <Typography.Paragraph type="secondary">นับเงินสดในลิ้นชักแล้วกรอกยอดที่นับได้</Typography.Paragraph>
-            <InputNumber
-              size="large"
-              min={0}
-              prefix="฿"
-              value={counted}
-              onChange={(v) => setCounted(typeof v === 'number' ? v : null)}
-              style={{ width: '100%' }}
-              autoFocus
-            />
-          </div>
-        )}
-      </Modal>
-    </>
   );
 }
 
