@@ -169,6 +169,10 @@ function BannerModal({
 
   const submit = async () => {
     const v = await form.validateFields();
+    if (!image) {
+      message.error('กรุณาอัปโหลดรูปแบนเนอร์ก่อนบันทึก');
+      return;
+    }
     setBusy(true);
     try {
       await upsertBanner({
