@@ -200,7 +200,10 @@ function BannerModal({
         className="mt-2"
         initialValues={{ headline: banner?.headline ?? '', cta_label: banner?.cta_label ?? '', cta_url: banner?.cta_url ?? '' }}>
         <div className="mb-3">
-          <div className="text-sm mb-1 text-[#4b443f]">รูปแบนเนอร์</div>
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-sm text-[#4b443f]">รูปแบนเนอร์</span>
+            <span className="text-xs text-gray-400">แนะนำ 1440×960 (3:2) แนวนอน · วางเนื้อหาสำคัญไว้กลางภาพ</span>
+          </div>
           {image ? (
             <div className="relative w-full">
               <img src={image} alt="" className="w-full h-32 object-cover rounded-lg border border-[#F0EAE6]" />
