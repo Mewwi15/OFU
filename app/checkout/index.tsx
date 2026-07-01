@@ -42,6 +42,7 @@ import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/l
 import { uploadSlip } from '@/lib/data/storage';
 import { useShop } from '@/store/shop';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { type PaymentMethod } from '@/lib/payment';
 import { selectedAddress, useAddress } from '@/store/address';
 import { cartCount, cartSubtotal, selectedItems, useCart } from '@/store/cart';
@@ -50,31 +51,32 @@ import { useOrder } from '@/store/order';
 
 type Status = 'idle' | 'verifying' | 'success';
 
-/** A selectable payment method row. */
+/** A selectable payment method row. Text is resolved via i18n at render. */
 type MethodOption = {
   key: PaymentMethod;
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  caption: string;
+  titleKey: string;
+  captionKey: string;
 };
 
 const PROMPTPAY_OPTION: MethodOption = {
   key: 'promptpay',
   icon: 'qr-code-outline',
-  title: 'พร้อมเพย์ / โอนเงิน',
-  caption: 'สแกน QR แล้วแนบสลิปการโอน',
+  titleKey: 'checkout.method.promptpay.title',
+  captionKey: 'checkout.method.promptpay.caption',
 };
 
 const COD_OPTION: MethodOption = {
   key: 'cod',
   icon: 'cash-outline',
-  title: 'เก็บเงินปลายทาง',
-  caption: 'ชำระเงินสดกับไรเดอร์เมื่อรับของ',
+  titleKey: 'checkout.method.cod.title',
+  captionKey: 'checkout.method.cod.caption',
 };
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const items = useCart((s) => s.items);
   const selectedIds = useCart((s) => s.selectedIds);
@@ -108,19 +110,20 @@ export default function CheckoutScreen() {
 
   const needsSlip = method === 'promptpay';
   const canConfirm = !needsSlip || !!slipUri;
-  const ctaLabel = method === 'cod' ? 'ยืนยันสั่งซื้อ' : 'ยืนยันการชำระเงิน';
+  const ctaLabel =
+    method === 'cod' ? t('checkout.confirmOrder') : t('checkout.confirmPayment');
 
   /* ----- Guard: nothing to pay for (e.g. opened with an empty selection) ---- */
   if (chosen.length === 0 && status !== 'success') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <ScreenHeader
-          title="ชำระเงิน"
+          title={t('checkout.title')}
           style={styles.header}
           left={
             <IconButton
               icon="chevron-back"
-              accessibilityLabel="ย้อนกลับ"
+              accessibilityLabel={t('common.back')}
               onPress={() => router.back()}
             />
           }
@@ -128,10 +131,10 @@ export default function CheckoutScreen() {
         <View style={styles.guard}>
           <Ionicons name="cart-outline" size={40} color={Colors.primaryStrong} />
           <Text variant="subtitle" style={styles.guardTitle}>
-            ไม่มีรายการให้ชำระ
+            {t('checkout.emptyTitle')}
           </Text>
           <Text variant="body" style={styles.guardBody}>
-            กลับไปเลือกสินค้าในตะกร้าก่อนนะ
+            {t('checkout.emptyBody')}
           </Text>
         </View>
       </View>
@@ -146,10 +149,7 @@ export default function CheckoutScreen() {
   const pickSlip = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(
-        'ต้องการสิทธิ์เข้าถึงรูปภาพ',
-        'อนุญาตการเข้าถึงรูปภาพเพื่อแนบสลิปการโอนเงิน',
-      );
+      Alert.alert(t('checkout.permTitle'), t('checkout.permBody'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -167,11 +167,11 @@ export default function CheckoutScreen() {
   const onConfirm = async () => {
     if (status === 'verifying') return;
     if (needsSlip && !slipUri) {
-      Alert.alert('ยังไม่ได้แนบสลิป', 'กรุณาแนบสลิปการโอนเงินก่อนยืนยัน');
+      Alert.alert(t('checkout.noSlipTitle'), t('checkout.noSlipBody'));
       return;
     }
     if (!address) {
-      Alert.alert('ยังไม่มีที่อยู่จัดส่ง', 'กรุณาเลือกที่อยู่ก่อนสั่งซื้อ');
+      Alert.alert(t('checkout.noAddressTitle'), t('checkout.noAddressBody'));
       return;
     }
     if (chosen.length === 0) return;
@@ -192,8 +192,8 @@ export default function CheckoutScreen() {
           await attachSlip(order.id, path, order.total);
         } catch {
           Alert.alert(
-            'อัปโหลดสลิปไม่สำเร็จ',
-            'ออเดอร์ถูกสร้างแล้ว แต่แนบสลิปไม่สำเร็จ กรุณาแนบสลิปใหม่จากหน้าคำสั่งซื้อ',
+            t('checkout.slipUploadFailedTitle'),
+            t('checkout.slipUploadFailedBody'),
           );
         }
       }
@@ -204,7 +204,7 @@ export default function CheckoutScreen() {
       setStatus('success');
     } catch (e) {
       setStatus('idle');
-      Alert.alert('สั่งซื้อไม่สำเร็จ', orderErrorMessage(e));
+      Alert.alert(t('checkout.orderFailedTitle'), orderErrorMessage(e));
     }
   };
 
@@ -220,12 +220,12 @@ export default function CheckoutScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScreenHeader
-        title="ชำระเงิน"
+        title={t('checkout.title')}
         style={styles.header}
         left={
           <IconButton
             icon="chevron-back"
-            accessibilityLabel="ย้อนกลับ"
+            accessibilityLabel={t('common.back')}
             onPress={() => router.back()}
           />
         }
@@ -239,7 +239,7 @@ export default function CheckoutScreen() {
         ]}>
         {/* Amount due */}
         <View style={styles.amountCard}>
-          <Text variant="caption">ยอดที่ต้องชำระ</Text>
+          <Text variant="caption">{t('checkout.amountDue')}</Text>
           <Text style={styles.amountValue}>{money(total)}</Text>
           <View style={styles.amountMeta}>
             <Ionicons
@@ -248,23 +248,24 @@ export default function CheckoutScreen() {
               color={Colors.textMuted}
             />
             <Text variant="caption" style={styles.amountMetaText}>
-              {count} ชิ้น · {mode === 'delivery' ? 'จัดส่งถึงบ้าน' : 'ส่งผ่าน Flash Express'}
+              {count} {t('checkout.itemsUnit')} ·{' '}
+              {mode === 'delivery' ? t('checkout.homeDelivery') : t('checkout.flashDelivery')}
             </Text>
           </View>
 
           {/* Breakdown */}
           <View style={styles.breakdown}>
             <View style={styles.breakRow}>
-              <Text variant="caption">ยอดรวมสินค้า</Text>
+              <Text variant="caption">{t('checkout.subtotal')}</Text>
               <Text style={styles.breakValue}>{money(subtotal)}</Text>
             </View>
             <View style={[styles.breakRow, styles.breakRowGap]}>
               <Text variant="caption">
-                {mode === 'delivery' ? 'ค่าจัดส่ง' : 'ค่าส่ง Flash'}
+                {mode === 'delivery' ? t('checkout.deliveryFee') : t('checkout.flashFee')}
               </Text>
               {deliveryFee === 0 ? (
                 <Text style={[styles.breakValue, { color: Colors.accentStrong }]}>
-                  ฟรี
+                  {t('checkout.free')}
                 </Text>
               ) : (
                 <Text style={styles.breakValue}>{money(deliveryFee)}</Text>
@@ -272,7 +273,10 @@ export default function CheckoutScreen() {
             </View>
             {promoDiscount > 0 ? (
               <View style={[styles.breakRow, styles.breakRowGap]}>
-                <Text variant="caption">ส่วนลด{promo ? ` (${promo})` : ''}</Text>
+                <Text variant="caption">
+                  {t('checkout.discount')}
+                  {promo ? ` (${promo})` : ''}
+                </Text>
                 <Text style={[styles.breakValue, { color: Colors.accentStrong }]}>
                   -{money(promoDiscount)}
                 </Text>
@@ -297,7 +301,7 @@ export default function CheckoutScreen() {
         </View>
 
         {/* Payment method */}
-        <Text style={styles.eyebrow}>วิธีชำระเงิน</Text>
+        <Text style={styles.eyebrow}>{t('checkout.paymentMethod')}</Text>
         <View style={styles.methodCard}>
           {methods.map((m, i) => {
             const active = m.key === method;
@@ -306,7 +310,7 @@ export default function CheckoutScreen() {
                 {i > 0 ? <View style={styles.insetHairline} /> : null}
                 <PressableScale
                   accessibilityRole="button"
-                  accessibilityLabel={m.title}
+                  accessibilityLabel={t(m.titleKey)}
                   scaleTo={0.99}
                   onPress={() => setMethod(m.key)}
                   style={styles.methodRow}>
@@ -318,8 +322,8 @@ export default function CheckoutScreen() {
                     />
                   </View>
                   <View style={styles.methodBody}>
-                    <Text style={styles.methodTitle}>{m.title}</Text>
-                    <Text variant="caption">{m.caption}</Text>
+                    <Text style={styles.methodTitle}>{t(m.titleKey)}</Text>
+                    <Text variant="caption">{t(m.captionKey)}</Text>
                   </View>
                   <Ionicons
                     name={active ? 'radio-button-on' : 'radio-button-off'}
@@ -342,7 +346,7 @@ export default function CheckoutScreen() {
               onCopyNumber={copyNumber}
             />
 
-            <Text style={[styles.eyebrow, styles.eyebrowTop]}>แนบสลิปการโอนเงิน</Text>
+            <Text style={[styles.eyebrow, styles.eyebrowTop]}>{t('checkout.attachSlip')}</Text>
             {slipUri ? (
               <View style={styles.slipCard}>
                 <Image
@@ -358,23 +362,23 @@ export default function CheckoutScreen() {
                       size={16}
                       color={Colors.accentStrong}
                     />
-                    <Text style={styles.slipDoneText}>แนบสลิปแล้ว</Text>
+                    <Text style={styles.slipDoneText}>{t('checkout.slipAttached')}</Text>
                   </View>
-                  <Text variant="caption">ระบบจะตรวจสอบยอดเงินให้อัตโนมัติ</Text>
+                  <Text variant="caption">{t('checkout.slipAutoVerify')}</Text>
                   <PressableScale
                     accessibilityRole="button"
-                    accessibilityLabel="เปลี่ยนรูปสลิป"
+                    accessibilityLabel={t('checkout.changeSlipImage')}
                     hitSlop={8}
                     onPress={pickSlip}
                     style={styles.slipChange}>
                     <Ionicons name="image-outline" size={14} color={Colors.primaryStrong} />
-                    <Text style={styles.slipChangeText}>เปลี่ยนรูป</Text>
+                    <Text style={styles.slipChangeText}>{t('checkout.changeImage')}</Text>
                   </PressableScale>
                 </View>
                 <IconButton
                   icon="close"
                   size={32}
-                  accessibilityLabel="ลบสลิป"
+                  accessibilityLabel={t('checkout.removeSlip')}
                   color={Colors.textMuted}
                   onPress={() => setSlipUri(null)}
                 />
@@ -382,16 +386,16 @@ export default function CheckoutScreen() {
             ) : (
               <PressableScale
                 accessibilityRole="button"
-                accessibilityLabel="แนบสลิปการโอนเงิน"
+                accessibilityLabel={t('checkout.attachSlip')}
                 scaleTo={0.98}
                 onPress={pickSlip}
                 style={styles.slipDrop}>
                 <View style={styles.slipDropIcon}>
                   <Ionicons name="cloud-upload-outline" size={24} color={Colors.primaryStrong} />
                 </View>
-                <Text style={styles.slipDropTitle}>แตะเพื่อแนบสลิป</Text>
+                <Text style={styles.slipDropTitle}>{t('checkout.tapToAttach')}</Text>
                 <Text variant="caption" style={styles.slipDropCaption}>
-                  เลือกรูปสลิปการโอนจากแกลเลอรี
+                  {t('checkout.pickFromGallery')}
                 </Text>
               </PressableScale>
             )}
@@ -400,7 +404,7 @@ export default function CheckoutScreen() {
           <View style={styles.codNote}>
             <Ionicons name="information-circle-outline" size={18} color={Colors.primaryStrong} />
             <Text variant="caption" style={styles.codNoteText}>
-              เตรียมเงินสด {money(total)} ชำระกับไรเดอร์เมื่อรับสินค้าได้เลย
+              {t('checkout.prepareCash')} {money(total)} {t('checkout.payRiderOnReceive')}
             </Text>
           </View>
         )}
@@ -414,7 +418,7 @@ export default function CheckoutScreen() {
         ]}>
         {needsSlip && !slipUri ? (
           <Text variant="caption" style={styles.confirmHint}>
-            แนบสลิปการโอนเพื่อยืนยันการชำระเงิน
+            {t('checkout.attachSlipHint')}
           </Text>
         ) : null}
         <PressableScale
@@ -433,9 +437,9 @@ export default function CheckoutScreen() {
         <Animated.View entering={FadeIn.duration(150)} style={styles.verifyOverlay}>
           <View style={styles.verifyCard}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.verifyText}>กำลังตรวจสอบการชำระเงิน</Text>
+            <Text style={styles.verifyText}>{t('checkout.verifying')}</Text>
             <Text variant="caption" style={styles.verifySub}>
-              สักครู่นะ กำลังยืนยันยอดเงิน
+              {t('checkout.verifyingSub')}
             </Text>
           </View>
         </Animated.View>
@@ -444,13 +448,13 @@ export default function CheckoutScreen() {
       {/* Success */}
       {status === 'success' ? (
         <Toast
-          message="ชำระเงินสำเร็จ"
+          message={t('checkout.paidSuccess')}
           subtitle={
             method === 'cod'
-              ? 'รับออเดอร์แล้ว เตรียมเงินสดไว้รับของได้เลย'
-              : 'ยืนยันยอดเรียบร้อย ขอบคุณที่อุดหนุนร้านอู้ฟู่'
+              ? t('checkout.successCod')
+              : t('checkout.successPrepay')
           }
-          actionLabel="เสร็จสิ้น"
+          actionLabel={t('checkout.done')}
           onAction={finishSuccess}
           onHide={finishSuccess}
           duration={3200}
@@ -460,8 +464,8 @@ export default function CheckoutScreen() {
       {/* Copied toast */}
       {copied ? (
         <Toast
-          message="คัดลอกแล้ว"
-          subtitle="วางหมายเลขพร้อมเพย์ในแอปธนาคารได้เลย"
+          message={t('checkout.copied')}
+          subtitle={t('checkout.copiedSub')}
           onHide={() => setCopied(false)}
           duration={1600}
         />

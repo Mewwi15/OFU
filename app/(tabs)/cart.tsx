@@ -38,6 +38,7 @@ import { type Product } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { validatePromo } from '@/lib/data/order';
 import { money } from '@/lib/format';
+import { useT } from '@/lib/i18n';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
@@ -57,10 +58,10 @@ import {
   useMode,
 } from '@/store/mode';
 
-/** Payment hint shown per mode (the two flows differ on payment). */
+/** Payment hint i18n key per mode (the two flows differ on payment). */
 const PAYMENT_HINT = {
-  delivery: 'ชำระปลายทาง หรือโอนเมื่อรับของ',
-  online: 'ชำระออนไลน์ PromptPay/โอน + แนบสลิป',
+  delivery: 'cart.payHintDelivery',
+  online: 'cart.payHintOnline',
 } as const;
 
 const PAYMENT_ICON = {
@@ -80,6 +81,7 @@ const CHECKOUT_BAR_HEIGHT = 80;
 /* ----------------------------------------------------------------------- */
 
 function FreeShipBlock({ subtotal }: { subtotal: number }) {
+  const t = useT();
   const progress = Math.min(1, subtotal / FREE_DELIVERY_MIN);
   const remaining = Math.max(0, FREE_DELIVERY_MIN - subtotal);
   const reached = remaining === 0;
@@ -100,12 +102,13 @@ function FreeShipBlock({ subtotal }: { subtotal: number }) {
         />
         {reached ? (
           <Text style={[styles.shipText, { color: Colors.accentStrong }]}>
-            คุณได้รับสิทธิ์ส่งฟรีแล้ว
+            {t('cart.freeShipEarned')}
           </Text>
         ) : (
           <Text style={styles.shipText}>
-            ซื้ออีก{' '}
-            <Text style={styles.shipAmount}>{money(remaining)}</Text> รับส่งฟรี
+            {t('cart.buyMorePrefix')}{' '}
+            <Text style={styles.shipAmount}>{money(remaining)}</Text>{' '}
+            {t('cart.buyMoreSuffix')}
           </Text>
         )}
       </View>
@@ -133,10 +136,11 @@ function AddOnRail({
   items: Product[];
   onAdd: (product: Product) => void;
 }) {
+  const t = useT();
   if (items.length === 0) return null;
   return (
     <>
-      <Text style={[styles.eyebrow, styles.eyebrowTop]}>ซื้อเพิ่มเติม</Text>
+      <Text style={[styles.eyebrow, styles.eyebrowTop]}>{t('cart.addOnRail')}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -157,7 +161,7 @@ function AddOnRail({
               <Text style={styles.addonPrice}>{money(p.price)}</Text>
               <PressableScale
                 accessibilityRole="button"
-                accessibilityLabel={`เพิ่ม ${p.name} ลงตะกร้า`}
+                accessibilityLabel={`${t('cart.addProductA11yPrefix')} ${p.name} ${t('cart.addProductA11ySuffix')}`}
                 hitSlop={7}
                 onPress={() => onAdd(p)}
                 style={styles.addonAdd}>
@@ -176,6 +180,7 @@ function AddOnRail({
 /* ----------------------------------------------------------------------- */
 
 export default function CartScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -215,7 +220,7 @@ export default function CartScreen() {
   const canCheckout =
     !nothingSelected && shopOpen && !belowMin && !needsParcel;
 
-  const checkoutVerb = mode === 'delivery' ? 'สั่งซื้อ' : 'ชำระเงิน';
+  const checkoutVerb = mode === 'delivery' ? t('cart.checkoutOrder') : t('cart.checkoutPay');
   const checkoutLabel =
     selectedCount > 0 ? `${checkoutVerb} (${selectedCount})` : checkoutVerb;
 
@@ -242,30 +247,41 @@ export default function CartScreen() {
       const res = await validatePromo(code, subtotal, mode);
       if (res.valid) {
         setAppliedPromo({ code, discount: res.discount });
-        Alert.alert('ใช้โค้ดสำเร็จ', res.messageTh || `รับส่วนลด ${money(res.discount)}`);
+        Alert.alert(
+          t('cart.promoSuccessTitle'),
+          res.messageTh || `${t('cart.discountReceived')} ${money(res.discount)}`,
+        );
       } else {
         setAppliedPromo(null);
-        Alert.alert('โค้ดใช้ไม่ได้', res.messageTh || 'โค้ดส่วนลดไม่ถูกต้อง');
+        Alert.alert(t('cart.promoInvalidTitle'), res.messageTh || t('cart.promoInvalidBody'));
       }
     } catch {
-      Alert.alert('เกิดข้อผิดพลาด', 'ตรวจสอบโค้ดไม่สำเร็จ กรุณาลองใหม่');
+      Alert.alert(t('cart.promoErrorTitle'), t('cart.promoErrorBody'));
     } finally {
       setPromoBusy(false);
     }
   };
 
   const confirmRemoveLine = (item: CartItem) => {
-    Alert.alert('ลบสินค้า', `ลบ "${item.product.name}" ออกจากตะกร้า?`, [
-      { text: 'ยกเลิก', style: 'cancel' },
-      { text: 'ลบ', style: 'destructive', onPress: () => removeLine(item.id) },
-    ]);
+    Alert.alert(
+      t('cart.removeTitle'),
+      `${t('cart.removeLinePrefix')}"${item.product.name}"${t('cart.removeLineSuffix')}`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('cart.delete'), style: 'destructive', onPress: () => removeLine(item.id) },
+      ],
+    );
   };
 
   const confirmRemoveSelected = () => {
-    Alert.alert('ลบสินค้า', `ลบสินค้าที่เลือก ${selectedCount} ชิ้นออกจากตะกร้า?`, [
-      { text: 'ยกเลิก', style: 'cancel' },
-      { text: 'ลบ', style: 'destructive', onPress: () => removeSelected() },
-    ]);
+    Alert.alert(
+      t('cart.removeTitle'),
+      `${t('cart.removeSelectedPrefix')}${selectedCount}${t('cart.removeSelectedSuffix')}`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('cart.delete'), style: 'destructive', onPress: () => removeSelected() },
+      ],
+    );
   };
 
   const openCheckout = () => {
@@ -287,10 +303,10 @@ export default function CartScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScreenHeader title="ตะกร้าของฉัน" style={styles.header} />
+      <ScreenHeader title={t('cart.title')} style={styles.header} />
       {!isEmpty ? (
         <Text variant="caption" style={styles.headerCount}>
-          {items.length} รายการ
+          {items.length} {t('cart.itemsUnit')}
         </Text>
       ) : null}
 
@@ -300,13 +316,13 @@ export default function CartScreen() {
             <Ionicons name="bag-handle-outline" size={40} color={Colors.primaryStrong} />
           </View>
           <Text variant="title" style={styles.emptyTitle}>
-            ตะกร้าว่างเปล่า
+            {t('cart.emptyTitle')}
           </Text>
           <Text variant="body" style={styles.emptyBody}>
-            ยังไม่มีสินค้าในตะกร้า เลือกของสดใหม่กันก่อนนะ
+            {t('cart.emptyBody')}
           </Text>
           <Button onPress={goShopping} style={styles.emptyButton}>
-            เลือกซื้อสินค้า
+            {t('cart.shopNow')}
           </Button>
         </View>
       ) : (
@@ -329,7 +345,7 @@ export default function CartScreen() {
               <View style={styles.closedBanner}>
                 <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
                 <Text style={styles.closedText}>
-                  ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {shopHoursLabel(shopHours)}
+                  {t('cart.closedNotice')} {shopHoursLabel(shopHours)}
                 </Text>
               </View>
             ) : null}
@@ -342,7 +358,7 @@ export default function CartScreen() {
               <View style={styles.deliveryCard}>
                 <PressableScale
                   accessibilityRole="button"
-                  accessibilityLabel="เลือกที่อยู่จัดส่ง"
+                  accessibilityLabel={t('cart.selectAddressA11y')}
                   onPress={() => router.push(address ? '/address' : '/address/picker')}
                   scaleTo={0.98}
                   style={styles.addrRow}>
@@ -353,7 +369,7 @@ export default function CartScreen() {
                     {address ? (
                       <>
                         <Text style={styles.addrTitle} numberOfLines={1}>
-                          จัดส่งถึง · {address.label}
+                          {t('cart.deliverTo')} · {address.label}
                         </Text>
                         <Text variant="caption" numberOfLines={1}>
                           {address.recipient} · {address.phone}
@@ -364,8 +380,8 @@ export default function CartScreen() {
                       </>
                     ) : (
                       <>
-                        <Text style={styles.addrTitle}>เพิ่มที่อยู่จัดส่ง</Text>
-                        <Text variant="caption">ปักหมุดบนแผนที่เพื่อจัดส่งถึงบ้าน</Text>
+                        <Text style={styles.addrTitle}>{t('cart.addAddress')}</Text>
+                        <Text variant="caption">{t('cart.addAddressCap')}</Text>
                       </>
                     )}
                   </View>
@@ -379,7 +395,7 @@ export default function CartScreen() {
               <View style={styles.deliveryCard}>
                 <PressableScale
                   accessibilityRole="button"
-                  accessibilityLabel="ที่อยู่จัดส่งพัสดุ"
+                  accessibilityLabel={t('cart.parcelAddressA11y')}
                   onPress={() => router.push(address ? '/address' : '/address/picker')}
                   scaleTo={0.98}
                   style={styles.addrRow}>
@@ -390,7 +406,7 @@ export default function CartScreen() {
                     {address && !needsParcel ? (
                       <>
                         <Text style={styles.addrTitle} numberOfLines={1}>
-                          ส่ง Flash · {address.label}
+                          {t('cart.flashTo')} · {address.label}
                         </Text>
                         <Text variant="caption" numberOfLines={1}>
                           {address.recipient} · {address.phone}
@@ -407,16 +423,16 @@ export default function CartScreen() {
                     ) : address ? (
                       <>
                         <Text style={[styles.addrTitle, styles.addrWarn]} numberOfLines={1}>
-                          ข้อมูลพัสดุไม่ครบ
+                          {t('cart.parcelIncomplete')}
                         </Text>
                         <Text variant="caption">
-                          แตะเพื่อเพิ่มจังหวัด/รหัสไปรษณีย์ สำหรับส่ง Flash
+                          {t('cart.parcelIncompleteCap')}
                         </Text>
                       </>
                     ) : (
                       <>
-                        <Text style={styles.addrTitle}>เพิ่มที่อยู่จัดส่งพัสดุ</Text>
-                        <Text variant="caption">กรอกที่อยู่ + รหัสไปรษณีย์ เพื่อส่ง Flash ทั่วไทย</Text>
+                        <Text style={styles.addrTitle}>{t('cart.addParcelAddress')}</Text>
+                        <Text variant="caption">{t('cart.addParcelAddressCap')}</Text>
                       </>
                     )}
                   </View>
@@ -426,16 +442,16 @@ export default function CartScreen() {
             )}
 
             {/* Items ledger */}
-            <Text style={styles.eyebrow}>รายการสินค้า · {items.length} ชิ้น</Text>
+            <Text style={styles.eyebrow}>{t('cart.itemsEyebrow')} · {items.length} {t('cart.unitPieces')}</Text>
             <View style={styles.itemsCard}>
               {/* Select-all header */}
               <View style={styles.selectAllRow}>
                 <Checkbox
                   checked={allSelected}
                   onPress={() => selectAll(!allSelected)}
-                  accessibilityLabel="เลือกทั้งหมด"
+                  accessibilityLabel={t('cart.selectAll')}
                 />
-                <Text style={styles.selectAllText}>เลือกทั้งหมด</Text>
+                <Text style={styles.selectAllText}>{t('cart.selectAll')}</Text>
                 <Text variant="caption" style={styles.selectAllCount}>
                   ({items.length})
                 </Text>
@@ -443,12 +459,12 @@ export default function CartScreen() {
                 {selectedCount > 0 ? (
                   <PressableScale
                     accessibilityRole="button"
-                    accessibilityLabel="ลบสินค้าที่เลือก"
+                    accessibilityLabel={t('cart.removeSelectedA11y')}
                     hitSlop={8}
                     onPress={confirmRemoveSelected}
                     style={styles.deleteSel}>
                     <Ionicons name="trash-outline" size={16} color={Colors.dangerStrong} />
-                    <Text style={styles.deleteSelText}>ลบที่เลือก</Text>
+                    <Text style={styles.deleteSelText}>{t('cart.deleteSelected')}</Text>
                   </PressableScale>
                 ) : null}
               </View>
@@ -479,7 +495,7 @@ export default function CartScreen() {
             <AddOnRail items={suggestions} onAdd={onAddSuggestion} />
 
             {/* Summary */}
-            <Text style={[styles.eyebrow, styles.eyebrowTop]}>สรุปคำสั่งซื้อ</Text>
+            <Text style={[styles.eyebrow, styles.eyebrowTop]}>{t('cart.summaryEyebrow')}</Text>
             <View style={styles.summaryCard}>
               {/* Promo field (inset) */}
               <View style={styles.promoField}>
@@ -487,7 +503,7 @@ export default function CartScreen() {
                 <TextInput
                   value={promo}
                   onChangeText={setPromo}
-                  placeholder="กรอกโค้ดส่วนลด"
+                  placeholder={t('cart.promoPlaceholder')}
                   placeholderTextColor={Colors.textMuted}
                   style={styles.promoInput}
                   autoCapitalize="characters"
@@ -500,7 +516,11 @@ export default function CartScreen() {
                   disabled={promoBusy}
                   onPress={onApply}>
                   <Text style={styles.promoApply}>
-                    {promoBusy ? 'กำลังตรวจ…' : appliedPromo ? 'ใช้แล้ว' : 'ใช้โค้ด'}
+                    {promoBusy
+                      ? t('cart.promoChecking')
+                      : appliedPromo
+                        ? t('cart.promoApplied')
+                        : t('cart.applyCode')}
                   </Text>
                 </PressableScale>
               </View>
@@ -510,18 +530,18 @@ export default function CartScreen() {
               {/* Breakdown */}
               <View style={styles.sumRow}>
                 <Text variant="body" style={styles.sumLabel}>
-                  ยอดรวมสินค้า ({selectedCount} ชิ้น)
+                  {t('cart.subtotalLabel')} ({selectedCount} {t('cart.unitPieces')})
                 </Text>
                 <Text style={styles.sumValue}>{money(subtotal)}</Text>
               </View>
 
               <View style={[styles.sumRow, styles.sumRowGap]}>
                 <Text variant="body" style={styles.sumLabel}>
-                  {mode === 'delivery' ? 'ค่าจัดส่ง' : 'ค่าส่ง Flash'}
+                  {mode === 'delivery' ? t('cart.deliveryFee') : t('cart.flashFee')}
                 </Text>
                 {deliveryFee === 0 ? (
                   <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
-                    ฟรี
+                    {t('cart.free')}
                   </Text>
                 ) : (
                   <Text variant="body" style={{ color: Colors.text }}>
@@ -533,7 +553,7 @@ export default function CartScreen() {
               {appliedPromo ? (
                 <View style={[styles.sumRow, styles.sumRowGap]}>
                   <Text variant="body" style={styles.sumLabel}>
-                    ส่วนลด ({appliedPromo.code})
+                    {t('cart.discountLabel')} ({appliedPromo.code})
                   </Text>
                   <Text style={[styles.sumValue, { color: Colors.accentStrong }]}>
                     -{money(discount)}
@@ -545,14 +565,14 @@ export default function CartScreen() {
               <View style={styles.payRow}>
                 <Ionicons name={PAYMENT_ICON[mode]} size={14} color={Colors.textMuted} />
                 <Text variant="caption" style={styles.payText}>
-                  {PAYMENT_HINT[mode]}
+                  {t(PAYMENT_HINT[mode])}
                 </Text>
               </View>
 
               <View style={styles.summaryHairline} />
 
               <View style={styles.sumRow}>
-                <Text variant="subtitle">รวมทั้งหมด</Text>
+                <Text variant="subtitle">{t('cart.total')}</Text>
                 <Text style={styles.grandTotal}>{money(total)}</Text>
               </View>
             </View>
@@ -570,14 +590,14 @@ export default function CartScreen() {
                 style={[styles.checkoutLabel, !canCheckout && !nothingSelected && styles.checkoutLabelWarn]}
                 numberOfLines={1}>
                 {!shopOpen
-                  ? `ปิดอยู่ · ${shopHoursLabel(shopHours)}`
+                  ? `${t('cart.closedShort')} · ${shopHoursLabel(shopHours)}`
                   : belowMin
-                    ? `สั่งขั้นต่ำ ฿${MIN_ORDER} · ขาดอีก ${money(minShortfall)}`
+                    ? `${t('cart.minOrderPrefix')}${MIN_ORDER} · ${t('cart.shortBy')} ${money(minShortfall)}`
                     : nothingSelected
-                      ? 'ยังไม่ได้เลือกสินค้า'
+                      ? t('cart.nothingSelected')
                       : needsParcel
-                        ? 'เพิ่มที่อยู่จัดส่งพัสดุก่อน'
-                        : `รวมที่เลือก · ${selectedCount} ชิ้น`}
+                        ? t('cart.needParcelAddress')
+                        : `${t('cart.selectedTotal')} · ${selectedCount} ${t('cart.unitPieces')}`}
               </Text>
               <View style={styles.checkoutTotalRow}>
                 <Text style={styles.checkoutTotal}>
@@ -586,7 +606,7 @@ export default function CartScreen() {
                 {!nothingSelected && mode === 'delivery' && deliveryFee === 0 ? (
                   <View style={styles.freeShipPill}>
                     <Ionicons name="bicycle" size={12} color={Colors.accentStrong} />
-                    <Text style={styles.freeShipPillText}>ส่งฟรี</Text>
+                    <Text style={styles.freeShipPillText}>{t('cart.freeShip')}</Text>
                   </View>
                 ) : null}
               </View>

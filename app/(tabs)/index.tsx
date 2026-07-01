@@ -23,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories, type Category } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
+import { useT } from '@/lib/i18n';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
@@ -35,17 +36,17 @@ const BANNER_SLIDES = [
   {
     id: 'b1',
     image: 'https://picsum.photos/seed/oofoo-promo1/900/600',
-    title: 'ลดสูงสุด 40%\nช้อปเลยวันนี้!',
+    titleKey: 'home.banner1Title',
   },
   {
     id: 'b2',
     image: 'https://picsum.photos/seed/oofoo-promo2/900/600',
-    title: 'ส่งฟรี!\nเมื่อสั่งครบ 200฿',
+    titleKey: 'home.banner2Title',
   },
   {
     id: 'b3',
     image: 'https://picsum.photos/seed/oofoo-promo3/900/600',
-    title: 'ของสดใหม่ทุกวัน\nคัดพิเศษเพื่อคุณ',
+    titleKey: 'home.banner3Title',
   },
 ];
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
@@ -57,6 +58,7 @@ export default function HomeScreen() {
   const address = useAddress(selectedAddress);
   const shopOpen = useShopOpen();
   const shop = useShop((s) => s.info);
+  const t = useT();
 
   /* ----- Catalog (from Supabase) ----- */
   const products = useCatalog((s) => s.products);
@@ -134,10 +136,10 @@ export default function HomeScreen() {
                 />
                 <View style={styles.bannerContent}>
                   <Text variant="title" style={{ color: Colors.textOnPrimary }}>
-                    {slide.title}
+                    {t(slide.titleKey)}
                   </Text>
                   <Button size="sm" onPress={() => {}} style={styles.bannerButton}>
-                    ช้อปเลย
+                    {t('home.shopNow')}
                   </Button>
                 </View>
               </View>
@@ -150,7 +152,7 @@ export default function HomeScreen() {
             pointerEvents="box-none">
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="เปลี่ยนที่อยู่จัดส่ง"
+              accessibilityLabel={t('home.changeAddress')}
               style={styles.locLeft}
               onPress={() => router.push('/address')}>
               <View style={styles.locPin}>
@@ -162,11 +164,12 @@ export default function HomeScreen() {
               </View>
               <View style={styles.locText}>
                 <Text variant="caption" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  จัดส่งไปที่{address ? ` · ${address.label}` : ''}
+                  {t('home.deliverTo')}
+                  {address ? ` · ${address.label}` : ''}
                 </Text>
                 <View style={styles.locAddrRow}>
                   <Text numberOfLines={1} style={styles.locAddr}>
-                    {address ? address.line : 'เพิ่มที่อยู่จัดส่ง'}
+                    {address ? address.line : t('home.addAddress')}
                   </Text>
                   <Ionicons
                     name="chevron-down"
@@ -178,7 +181,7 @@ export default function HomeScreen() {
             </Pressable>
             <IconButton
               icon="notifications-outline"
-              accessibilityLabel="การแจ้งเตือน"
+              accessibilityLabel={t('home.notifications')}
               onPress={() => router.push('/notifications')}
             />
           </View>
@@ -198,12 +201,12 @@ export default function HomeScreen() {
           {/* Search entry — tapping opens the full catalog */}
           <PressableScale
             accessibilityRole="search"
-            accessibilityLabel="ค้นหาสินค้า"
+            accessibilityLabel={t('home.searchProducts')}
             onPress={() => openCatalog()}
             scaleTo={0.98}
             style={styles.searchEntry}>
             <Ionicons name="search" size={20} color={Colors.textMuted} />
-            <Text style={styles.searchPlaceholder}>ค้นหาสินค้า</Text>
+            <Text style={styles.searchPlaceholder}>{t('home.searchProducts')}</Text>
             <Ionicons name="mic-outline" size={20} color={Colors.primary} />
           </PressableScale>
 
@@ -212,7 +215,7 @@ export default function HomeScreen() {
             <View style={styles.closedBanner}>
               <Ionicons name="moon-outline" size={18} color={Colors.dangerStrong} />
               <Text style={styles.closedText}>
-                ขณะนี้ร้านปิดทำการ · เปิดให้สั่ง {shopHoursLabel(shop.hours)}
+                {t('home.shopClosed')} {shopHoursLabel(shop.hours)}
               </Text>
             </View>
           ) : null}
@@ -238,13 +241,21 @@ export default function HomeScreen() {
           </ScrollView>
 
           {/* Curated rails */}
-          <ProductRail title="ขายดี" data={bestSellers} onSeeAll={() => openCatalog()} />
           <ProductRail
-            title="แนะนำสำหรับคุณ"
+            title={t('home.bestSellers')}
+            data={bestSellers}
+            onSeeAll={() => openCatalog()}
+          />
+          <ProductRail
+            title={t('home.recommended')}
             data={recommended}
             onSeeAll={() => openCatalog()}
           />
-          <ProductRail title="มาใหม่" data={newArrivals} onSeeAll={() => openCatalog()} />
+          <ProductRail
+            title={t('home.newArrivals')}
+            data={newArrivals}
+            onSeeAll={() => openCatalog()}
+          />
         </View>
       </ScrollView>
     </View>
