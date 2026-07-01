@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -62,6 +63,20 @@ export default function HomeScreen() {
 
   /* ----- Catalog (from Supabase) ----- */
   const products = useCatalog((s) => s.products);
+  const reloadCatalog = useCatalog((s) => s.load);
+  const [refreshing, setRefreshing] = useState(false);
+  // Re-fetch the catalog whenever Home regains focus, so admin changes (new
+  // products, prices, banners) show up without restarting the app.
+  useFocusEffect(
+    useCallback(() => {
+      void reloadCatalog(true);
+    }, [reloadCatalog]),
+  );
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reloadCatalog(true);
+    setRefreshing(false);
+  }, [reloadCatalog]);
   const dbBanners = useCatalog((s) => s.banners);
   // Admin-managed banners when present; otherwise the built-in fallback slides.
   const slides = dbBanners.length
@@ -116,6 +131,7 @@ export default function HomeScreen() {
     <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
         contentContainerStyle={{
           paddingBottom: TAB_BAR_CLEARANCE + insets.bottom,
         }}>
