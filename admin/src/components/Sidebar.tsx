@@ -10,6 +10,7 @@ import {
   RiPriceTag3Line,
   RiShoppingBag3Line,
   RiStore2Line,
+  RiWallet3Line,
 } from '@remixicon/react';
 import { Button, Menu } from 'antd';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -28,6 +29,7 @@ export const NAV: NavItem[] = [
   { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
   { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
   { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
+  { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
   { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
 ];
 

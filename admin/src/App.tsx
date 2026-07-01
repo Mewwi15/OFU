@@ -12,6 +12,7 @@ import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
+import { StoreCredit } from './pages/StoreCredit';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { ready, session, isAdmin } = useAuth();
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/featured" element={<Featured />} />
+        <Route path="/store-credit" element={<StoreCredit />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />
         <Route path="/orders" element={<Orders />} />

@@ -427,6 +427,15 @@ export async function getPosSaleItems(saleId: string): Promise<PosSaleItem[]> {
 }
 export const refundPosSale = (saleId: string) => rpc<{ replay: boolean }>('refund_pos_sale', { p_sale_id: saleId });
 
+/* ── store credit ────────────────────────────────────────────────────────────── */
+export type Customer = { user_id: string; display_name: string | null; phone: string | null; balance: number };
+export const findCustomerByPhone = (phone: string) =>
+  rpc<Customer | null>('find_customer_by_phone', { p_phone: phone });
+export const topupStoreCredit = (userId: string, amount: number, note?: string) =>
+  rpc<{ balance: number }>('topup_store_credit', { p_user_id: userId, p_amount: amount, p_note: note ?? undefined });
+export type CreditEntry = { id: string; delta: number; reason: string; created_at: string };
+export const listStoreCredit = (userId: string) => rpc<CreditEntry[]>('list_store_credit', { p_user_id: userId });
+
 export const createPosSale = (p: PosSaleInput) =>
   rpc<SaleResult>('create_pos_sale', {
     p_client_op_id: p.client_op_id,

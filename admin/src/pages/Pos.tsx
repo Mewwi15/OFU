@@ -4,6 +4,7 @@ import {
   RiMoneyDollarCircleLine,
   RiPrinterLine,
   RiQrCodeLine,
+  RiWallet3Line,
   RiSearchLine,
   RiShoppingBasket2Line,
   RiSubtractLine,
@@ -14,8 +15,10 @@ import QRCode from 'qrcode';
 import {
   apiError,
   createPosSale,
+  findCustomerByPhone,
   getShopInfo,
   listPosCatalog,
+  type Customer,
   type PosProduct,
   type PosVariant,
   type SaleResult,
@@ -43,7 +46,7 @@ type Line = {
   qty: number;
   image: string | null;
 };
-type PayMethod = 'cash' | 'promptpay';
+type PayMethod = 'cash' | 'promptpay' | 'store_credit';
 type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -65,6 +68,9 @@ export function Pos() {
   const [taxInvoice, setTaxInvoice] = useState(false);
   const [custName, setCustName] = useState('');
   const [custTaxId, setCustTaxId] = useState('');
+  const [creditPhone, setCreditPhone] = useState('');
+  const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null);
+  const [creditSearching, setCreditSearching] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -210,6 +216,9 @@ export function Pos() {
     setTaxInvoice(false);
     setCustName('');
     setCustTaxId('');
+    setCreditPhone('');
+    setCreditCustomer(null);
+    setMethod('cash');
     setQuery('');
     searchRef.current?.focus();
   }
@@ -220,12 +229,17 @@ export function Pos() {
       setError('เงินที่รับมาไม่พอ');
       return;
     }
+    if (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) {
+      setError('เครดิตร้านไม่พอ');
+      return;
+    }
     const input = {
       client_op_id: crypto.randomUUID(),
       items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
       payment_method: method,
       cash_tendered: method === 'cash' ? (tendered as number) : undefined,
       discount,
+      customer_user_id: method === 'store_credit' ? creditCustomer?.user_id : undefined,
       tax_invoice: taxInvoice,
       customer_name: taxInvoice ? custName || undefined : undefined,
       customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
@@ -494,12 +508,15 @@ export function Pos() {
               <span className="text-2xl font-bold text-tremor-brand-emphasis">{baht(total)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>
                 เงินสด
               </PayTab>
               <PayTab active={method === 'promptpay'} onClick={() => setMethod('promptpay')} Icon={RiQrCodeLine}>
                 พร้อมเพย์
+              </PayTab>
+              <PayTab active={method === 'store_credit'} onClick={() => setMethod('store_credit')} Icon={RiWallet3Line}>
+                เครดิต
               </PayTab>
             </div>
 
@@ -508,6 +525,30 @@ export function Pos() {
             )}
             {method === 'promptpay' && (
               <PromptPayPanel target={shop?.promptpay_id ?? null} amount={total} name={shop?.promptpay_name} />
+            )}
+            {method === 'store_credit' && (
+              <StoreCreditPanel
+                phone={creditPhone}
+                setPhone={setCreditPhone}
+                customer={creditCustomer}
+                searching={creditSearching}
+                total={total}
+                onSearch={async () => {
+                  const p = creditPhone.trim();
+                  if (!p) return;
+                  setCreditSearching(true);
+                  try {
+                    const c = await findCustomerByPhone(p);
+                    setCreditCustomer(c);
+                    if (!c) setError('ไม่พบลูกค้าที่ใช้เบอร์นี้');
+                    else setError(null);
+                  } catch (e) {
+                    setError(apiError(e));
+                  } finally {
+                    setCreditSearching(false);
+                  }
+                }}
+              />
             )}
 
             {shop?.vat_registered && (
@@ -540,7 +581,11 @@ export function Pos() {
 
             <button
               onClick={checkout}
-              disabled={!lines.length || busy}
+              disabled={
+                !lines.length ||
+                busy ||
+                (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total))
+              }
               className="w-full py-3.5 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 transition shadow-sm">
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
             </button>
@@ -726,6 +771,54 @@ function PromptPayPanel({
   );
 }
 
+function StoreCreditPanel({
+  phone,
+  setPhone,
+  customer,
+  searching,
+  total,
+  onSearch,
+}: {
+  phone: string;
+  setPhone: (v: string) => void;
+  customer: Customer | null;
+  searching: boolean;
+  total: number;
+  onSearch: () => void;
+}) {
+  const enough = customer != null && customer.balance >= total;
+  return (
+    <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
+      <div className="flex gap-2">
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+          placeholder="เบอร์โทรลูกค้า"
+          className="flex-1 rounded-lg border border-tremor-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
+        />
+        <button
+          onClick={onSearch}
+          disabled={searching}
+          className="rounded-lg bg-tremor-brand text-white text-sm font-medium px-3 disabled:opacity-50 hover:bg-tremor-brand-emphasis">
+          {searching ? '…' : 'ค้นหา'}
+        </button>
+      </div>
+      {customer && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium text-tremor-content-strong">{customer.display_name || customer.phone}</span>
+          <span className={enough ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
+            คงเหลือ {baht(customer.balance)}
+          </span>
+        </div>
+      )}
+      {customer && !enough && (
+        <div className="text-xs text-red-600">เครดิตไม่พอสำหรับยอด {baht(total)}</div>
+      )}
+    </div>
+  );
+}
+
 function VariantPicker({
   product,
   onPick,
@@ -822,7 +915,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           </div>
           <div className="border-t border-dashed border-black my-2" />
           <Line2
-            label={method === 'cash' ? 'เงินสด' : 'พร้อมเพย์'}
+            label={method === 'cash' ? 'เงินสด' : method === 'promptpay' ? 'พร้อมเพย์' : 'เครดิตร้าน'}
             value={method === 'cash' ? sale.total + sale.change : sale.total}
           />
           {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}
