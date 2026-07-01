@@ -8,7 +8,7 @@ import {
   RiShoppingBasket2Line,
   RiSubtractLine,
 } from '@remixicon/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
 import {
@@ -25,6 +25,18 @@ import {
   type Shift,
   type ShopInfo,
 } from '../lib/api';
+import {
+  cacheCatalog,
+  cacheShift,
+  cacheShop,
+  enqueueSale,
+  flushQueue,
+  isNetworkError,
+  queueCount,
+  readCachedCatalog,
+  readCachedShift,
+  readCachedShop,
+} from '../lib/offline';
 import { promptpayPayload } from '../lib/promptpay';
 
 type Line = {
@@ -36,7 +48,7 @@ type Line = {
   image: string | null;
 };
 type PayMethod = 'cash' | 'promptpay';
-type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string };
+type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -62,22 +74,72 @@ export function Pos() {
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [cartOpen, setCartOpen] = useState(false); // mobile order drawer
+  const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const [pending, setPending] = useState(0); // queued offline sales
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const doFlush = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    const { synced, remaining } = await flushQueue(createPosSale);
+    setPending(remaining);
+    if (synced > 0) {
+      // pull fresh server stock after syncing queued sales
+      try {
+        const c = await listPosCatalog();
+        setCatalog(c);
+        cacheCatalog(c);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
       try {
         const [s, sh, c] = await Promise.all([getShopInfo(), getOpenShift(), listPosCatalog()]);
         setShop(s);
+        cacheShop(s);
         setShift(sh);
+        cacheShift(sh);
         setCatalog(c);
+        cacheCatalog(c);
       } catch (e) {
-        setError(apiError(e));
+        if (isNetworkError(e)) {
+          // offline: fall back to the last cached catalog / shop / shift
+          const cc = readCachedCatalog();
+          const cs = readCachedShop();
+          const csh = readCachedShift();
+          if (cc) setCatalog(cc);
+          if (cs) setShop(cs);
+          setShift(csh);
+          setOnline(false);
+          if (!cc) setError('ออฟไลน์ และยังไม่มีข้อมูลที่แคชไว้ — เชื่อมต่อครั้งแรกออนไลน์ก่อน');
+        } else {
+          setError(apiError(e));
+        }
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  // online/offline listeners + flush queued sales on reconnect
+  useEffect(() => {
+    setPending(queueCount());
+    const goOnline = () => {
+      setOnline(true);
+      void doFlush();
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    if (typeof navigator !== 'undefined' && navigator.onLine) void doFlush();
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, [doFlush]);
 
   const categories = useMemo(() => {
     const map = new Map<string, string>();
@@ -167,33 +229,65 @@ export function Pos() {
       setError('เงินที่รับมาไม่พอ');
       return;
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const sale = await createPosSale({
-        client_op_id: crypto.randomUUID(),
-        items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
-        payment_method: method,
-        cash_tendered: method === 'cash' ? (tendered as number) : undefined,
-        discount,
-        tax_invoice: taxInvoice,
-        customer_name: taxInvoice ? custName || undefined : undefined,
-        customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
-      });
-      setReceipt({ sale, lines, method, at: new Date().toLocaleString('th-TH') });
-      setCartOpen(false);
-      resetSale();
+    const input = {
+      client_op_id: crypto.randomUUID(),
+      items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
+      payment_method: method,
+      cash_tendered: method === 'cash' ? (tendered as number) : undefined,
+      discount,
+      tax_invoice: taxInvoice,
+      customer_name: taxInvoice ? custName || undefined : undefined,
+      customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
+    };
+    const at = new Date().toLocaleString('th-TH');
+    const soldLines = lines;
+
+    const reflectStock = () =>
       setCatalog((cur) =>
         cur.map((p) => ({
           ...p,
           variants: p.variants.map((v) => {
-            const l = lines.find((x) => x.variantId === v.id);
+            const l = soldLines.find((x) => x.variantId === v.id);
             return l ? { ...v, stock_qty: v.stock_qty - l.qty } : v;
           }),
         })),
       );
+
+    setBusy(true);
+    setError(null);
+    try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline');
+      const sale = await createPosSale(input);
+      setReceipt({ sale, lines: soldLines, method, at });
+      setCartOpen(false);
+      resetSale();
+      reflectStock();
+      void doFlush();
     } catch (e) {
-      setError(apiError(e));
+      if (isNetworkError(e)) {
+        // offline: queue for idempotent sync, print a provisional receipt
+        enqueueSale({ input, total, at: Date.now() });
+        setPending(queueCount());
+        setOnline(false);
+        const provisional: SaleResult = {
+          id: '',
+          sale_number: 'ออฟไลน์',
+          tax_invoice_no: null,
+          subtotal,
+          discount,
+          total,
+          vat_amount: vat,
+          net_amount: net,
+          change,
+          replay: false,
+        };
+        setReceipt({ sale: provisional, lines: soldLines, method, at, offline: true });
+        setCartOpen(false);
+        resetSale();
+        reflectStock();
+      } else {
+        setError(apiError(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -208,6 +302,7 @@ export function Pos() {
         onOpen={async (float) => {
           const s = await openShift(float);
           setShift(s);
+          cacheShift(s);
         }}
       />
     );
@@ -219,15 +314,31 @@ export function Pos() {
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="flex flex-col min-h-0">
           {/* shift bar */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              <span className="text-sm text-tremor-content-emphasis">
-                กะเปิดอยู่ · เงินต้นกะ{' '}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-sm min-w-0">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${online ? 'bg-green-500' : 'bg-amber-500'}`}
+                title={online ? 'ออนไลน์' : 'ออฟไลน์'}
+              />
+              <span className="text-sm text-tremor-content-emphasis truncate">
+                <span className="hidden sm:inline">กะเปิดอยู่ · </span>เงินต้นกะ{' '}
                 <span className="font-semibold text-tremor-content-strong">{baht(shift.opening_float)}</span>
+                {!online && <span className="text-amber-600"> · ออฟไลน์</span>}
               </span>
             </div>
-            <CloseShiftButton shift={shift} setShift={setShift} />
+            <div className="flex items-center gap-2 shrink-0">
+              {pending > 0 && (
+                <button
+                  onClick={() => void doFlush()}
+                  disabled={!online}
+                  title="ซิงค์บิลที่ค้าง"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm disabled:opacity-60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  รอซิงค์ {pending}
+                </button>
+              )}
+              <CloseShiftButton shift={shift} setShift={setShift} />
+            </div>
           </div>
 
           <div className="relative mb-4">
@@ -757,6 +868,7 @@ function CloseShiftButton({ shift, setShift }: { shift: Shift; setShift: (s: Shi
                   onClick={() => {
                     setOpen(false);
                     setShift(null);
+                    cacheShift(null);
                   }}
                   className="mt-5 w-full py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis">
                   เสร็จสิ้น
@@ -824,6 +936,11 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
             <span>{at}</span>
           </div>
           {sale.tax_invoice_no && <div className="text-[11px]">เลขใบกำกับ {sale.tax_invoice_no}</div>}
+          {data.offline && (
+            <div className="mt-1 text-[11px] text-center border border-dashed border-black rounded py-0.5">
+              บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์
+            </div>
+          )}
           <div className="border-t border-dashed border-black my-2" />
           {lines.map((l) => (
             <div key={l.variantId} className="mb-1">
