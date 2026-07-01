@@ -16,6 +16,14 @@ export function apiError(e: unknown): string {
     NOT_IN_VERIFYING: 'ออเดอร์ไม่ได้อยู่ระหว่างตรวจสอบ',
     ILLEGAL_TRANSITION: 'เปลี่ยนสถานะนี้ไม่ได้',
     ALREADY_TERMINAL: 'ออเดอร์จบแล้ว',
+    NO_OPEN_SHIFT: 'ยังไม่ได้เปิดกะ กรุณาเปิดกะก่อนขาย',
+    SHIFT_ALREADY_OPEN: 'มีกะที่เปิดอยู่แล้ว',
+    SHIFT_CLOSED: 'กะนี้ปิดแล้ว',
+    OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
+    INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
+    INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
+    EMPTY_SALE: 'ยังไม่มีสินค้าในบิล',
+    CUSTOMER_REQUIRED: 'ต้องเลือกลูกค้าสำหรับเครดิตร้าน',
   };
   return th[msg] ?? msg;
 }
@@ -140,4 +148,167 @@ export const broadcastNotification = (p: { title: string; body?: string; categor
     p_title: p.title,
     p_body: p.body ?? undefined,
     p_category: p.category ?? 'promo',
+  });
+
+/* ── POS (on-site) ─────────────────────────────────────────────────────────── */
+
+export type PosVariant = {
+  id: string;
+  size: string | null;
+  price: number;
+  stock_qty: number;
+  barcode: string | null;
+};
+export type PosProduct = {
+  id: string;
+  name: string;
+  category_id: string | null;
+  category_name: string | null;
+  image: string | null;
+  variants: PosVariant[];
+};
+
+/** Published products + variants (with barcode + live stock) for the sell grid. */
+export async function listPosCatalog(): Promise<PosProduct[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select(
+      'id, name, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode)',
+    )
+    .is('archived_at', null)
+    .eq('publish_state', 'published')
+    .order('name');
+  if (error) throw error;
+  type Row = {
+    id: string;
+    name: string;
+    category_id: string | null;
+    categories: { name: string } | null;
+    product_images: { storage_path: string; is_primary: boolean }[] | null;
+    product_variants: PosVariant[] | null;
+  };
+  return (data as unknown as Row[]).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category_id: p.category_id,
+    category_name: p.categories?.name ?? null,
+    image:
+      (p.product_images?.find((i) => i.is_primary) ?? p.product_images?.[0])?.storage_path ?? null,
+    variants: p.product_variants ?? [],
+  }));
+}
+
+export type Shift = {
+  id: string;
+  opening_float: number;
+  opened_at: string;
+  closed_at: string | null;
+  counted_cash: number | null;
+  expected_cash: number | null;
+  over_short: number | null;
+};
+
+export const openShift = (opening_float: number) =>
+  rpc<Shift>('open_shift', { p_opening_float: opening_float });
+export const closeShift = (id: string, counted: number) =>
+  rpc<Shift>('close_shift', { p_shift_id: id, p_counted_cash: counted });
+
+export async function getOpenShift(): Promise<Shift | null> {
+  // Scope to the current cashier — create_pos_sale requires an open shift for
+  // auth.uid(), so the UI must track this cashier's shift, not any shop shift.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('pos_shifts')
+    .select('*')
+    .eq('cashier_user_id', user.id)
+    .is('closed_at', null)
+    .order('opened_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Shift | null;
+}
+
+export type PosPayMethod = 'cash' | 'promptpay' | 'store_credit';
+export type PosSaleInput = {
+  client_op_id: string;
+  items: { variant_id: string; qty: number; line_discount?: number }[];
+  payment_method: PosPayMethod;
+  cash_tendered?: number;
+  discount?: number;
+  customer_user_id?: string;
+  customer_name?: string;
+  customer_tax_id?: string;
+  tax_invoice?: boolean;
+};
+export type SaleResult = {
+  id: string;
+  sale_number: string;
+  tax_invoice_no: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
+  vat_amount: number;
+  net_amount: number;
+  change: number;
+  replay: boolean;
+};
+
+export type ShopInfo = {
+  name: string;
+  vat_registered: boolean;
+  vat_rate: number;
+  tax_id: string | null;
+  branch_code: string;
+  receipt_header: string | null;
+  receipt_footer: string | null;
+  promptpay_id: string | null;
+  promptpay_name: string | null;
+};
+
+export async function getShopInfo(): Promise<ShopInfo> {
+  const { data, error } = await supabase
+    .from('shop_settings')
+    .select(
+      'vat_registered, vat_rate, tax_id, branch_code, receipt_header, receipt_footer, shops(name, promptpay_id, promptpay_name)',
+    )
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const s = data as unknown as {
+    vat_registered: boolean;
+    vat_rate: number;
+    tax_id: string | null;
+    branch_code: string;
+    receipt_header: string | null;
+    receipt_footer: string | null;
+    shops: { name: string; promptpay_id: string | null; promptpay_name: string | null } | null;
+  } | null;
+  return {
+    name: s?.shops?.name ?? 'ร้านค้า',
+    vat_registered: s?.vat_registered ?? false,
+    vat_rate: Number(s?.vat_rate ?? 7),
+    tax_id: s?.tax_id ?? null,
+    branch_code: s?.branch_code ?? '00000',
+    receipt_header: s?.receipt_header ?? null,
+    receipt_footer: s?.receipt_footer ?? null,
+    promptpay_id: s?.shops?.promptpay_id ?? null,
+    promptpay_name: s?.shops?.promptpay_name ?? null,
+  };
+}
+
+export const createPosSale = (p: PosSaleInput) =>
+  rpc<SaleResult>('create_pos_sale', {
+    p_client_op_id: p.client_op_id,
+    p_items: p.items,
+    p_payment_method: p.payment_method,
+    p_cash_tendered: p.cash_tendered ?? undefined,
+    p_discount: p.discount ?? 0,
+    p_customer_user_id: p.customer_user_id ?? undefined,
+    p_customer_name: p.customer_name ?? undefined,
+    p_customer_tax_id: p.customer_tax_id ?? undefined,
+    p_tax_invoice: p.tax_invoice ?? false,
   });

@@ -5,6 +5,7 @@ import { useAuth } from './auth';
 import { Layout } from './components/Layout';
 import { Broadcast } from './pages/Broadcast';
 import { Login } from './pages/Login';
+import { Pos } from './pages/Pos';
 import { Products } from './pages/Products';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,8 @@ export default function App() {
             <Layout />
           </Protected>
         }>
-        <Route index element={<Navigate to="/products" replace />} />
+        <Route index element={<Navigate to="/pos" replace />} />
+        <Route path="/pos" element={<Pos />} />
         <Route path="/products" element={<Products />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Placeholder title="แบนเนอร์" />} />

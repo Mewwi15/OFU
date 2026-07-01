@@ -2,6 +2,7 @@ import {
   RiBillLine,
   RiImageLine,
   RiLogoutBoxRLine,
+  RiCashLine,
   RiMegaphoneLine,
   RiNotification3Line,
   RiSearchLine,
@@ -13,6 +14,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 const NAV = [
+  { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
   { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
   { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
   { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
