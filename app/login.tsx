@@ -28,6 +28,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { authRepo, signInWithOAuthProvider, toE164Thai } from '@/lib/data/auth';
+import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
 /** External brand colors for the social buttons (exempt from design tokens). */
@@ -82,6 +83,7 @@ export default function LoginScreen() {
   const [socialBusy, setSocialBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const otpRef = useRef<TextInput>(null);
+  const t = useT();
 
   const phoneValid = phone.length === 10;
   const codeValid = code.length === OTP_LENGTH;
@@ -96,7 +98,7 @@ export default function LoginScreen() {
       setStep('otp');
       setTimeout(() => otpRef.current?.focus(), 250);
     } catch {
-      setError('ส่งรหัส OTP ไม่สำเร็จ ลองใหม่อีกครั้ง');
+      setError(t('login.otpSendFailed'));
     } finally {
       setBusy(false);
     }
@@ -111,7 +113,7 @@ export default function LoginScreen() {
       // Record PDPA consent given at sign-in; the auth gate routes into the app.
       await authRepo.grantConsent('data_processing', 'v1').catch(() => {});
     } catch {
-      setError('รหัส OTP ไม่ถูกต้อง');
+      setError(t('login.otpInvalid'));
       setCode('');
     } finally {
       setBusy(false);
@@ -125,7 +127,7 @@ export default function LoginScreen() {
       // Success flips the gate via the auth store's onAuthStateChange.
       await signInWithOAuthProvider(provider);
     } catch {
-      Alert.alert('เข้าสู่ระบบไม่สำเร็จ', 'ไม่สามารถเข้าสู่ระบบด้วยโซเชียลได้ กรุณาลองใหม่');
+      Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
     } finally {
       setSocialBusy(false);
     }
@@ -150,23 +152,23 @@ export default function LoginScreen() {
             contentFit="contain"
           />
           <Text variant="title" style={styles.welcome}>
-            ยินดีต้อนรับสู่ อู้ฟู่
+            {t('login.welcome')}
           </Text>
           <Text variant="body" style={styles.tagline}>
-            ของสดของดี ส่งถึงบ้าน
+            {t('login.tagline')}
           </Text>
         </View>
 
         {step === 'phone' ? (
           <>
-            <Text style={styles.label}>เบอร์โทรศัพท์</Text>
+            <Text style={styles.label}>{t('login.phoneLabel')}</Text>
             <View style={styles.phoneField}>
               <View style={styles.dialCode}>
                 <Text style={styles.dialCodeText}>+66</Text>
               </View>
               <TextInput
                 value={formatPhone(phone)}
-                onChangeText={(t) => setPhone(digitsOnly(t))}
+                onChangeText={(v) => setPhone(digitsOnly(v))}
                 placeholder="081-234-5678"
                 placeholderTextColor={Colors.textMuted}
                 keyboardType="number-pad"
@@ -179,11 +181,11 @@ export default function LoginScreen() {
 
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="ขอรหัส OTP"
+              accessibilityLabel={t('login.requestOtp')}
               disabled={!phoneValid || busy}
               onPress={requestOtp}
               style={[styles.primaryBtn, (!phoneValid || busy) && styles.primaryBtnOff]}>
-              <Text style={styles.primaryText}>{busy ? 'กำลังส่ง…' : 'ขอรหัส OTP'}</Text>
+              <Text style={styles.primaryText}>{busy ? t('login.sending') : t('login.requestOtp')}</Text>
             </PressableScale>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -191,14 +193,14 @@ export default function LoginScreen() {
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
               <Text variant="caption" style={styles.dividerText}>
-                หรือเข้าสู่ระบบด้วย
+                {t('login.orSignInWith')}
               </Text>
               <View style={styles.divider} />
             </View>
 
             <View style={styles.socials}>
               <SocialButton
-                label="ดำเนินการต่อด้วย Google"
+                label={t('login.continueGoogle')}
                 icon="logo-google"
                 bg={BRAND.google}
                 fg={Colors.text}
@@ -211,19 +213,19 @@ export default function LoginScreen() {
           <>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="ย้อนกลับ"
+              accessibilityLabel={t('common.back')}
               hitSlop={10}
               onPress={() => setStep('phone')}
               style={styles.backRow}>
               <Ionicons name="chevron-back" size={20} color={Colors.text} />
-              <Text style={styles.backText}>เปลี่ยนเบอร์</Text>
+              <Text style={styles.backText}>{t('login.changePhone')}</Text>
             </Pressable>
 
             <Text variant="subtitle" style={styles.otpTitle}>
-              กรอกรหัส OTP
+              {t('login.enterOtp')}
             </Text>
             <Text variant="body" style={styles.otpSub}>
-              ส่งรหัส 6 หลักไปที่ {formatPhone(phone)}
+              {t('login.otpSentTo')}{formatPhone(phone)}
             </Text>
 
             {/* OTP cells backed by one hidden input */}
@@ -252,30 +254,30 @@ export default function LoginScreen() {
 
             <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="ยืนยันรหัส"
+              accessibilityLabel={t('login.verifyCode')}
               disabled={!codeValid || busy}
               onPress={confirmOtp}
               style={[styles.primaryBtn, (!codeValid || busy) && styles.primaryBtnOff]}>
-              <Text style={styles.primaryText}>{busy ? 'กำลังตรวจสอบ…' : 'ยืนยัน'}</Text>
+              <Text style={styles.primaryText}>{busy ? t('login.verifying') : t('login.verify')}</Text>
             </PressableScale>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="ขอรหัสใหม่"
+              accessibilityLabel={t('login.resendA11y')}
               hitSlop={8}
               onPress={() => setCode('')}
               style={styles.resend}>
-              <Text style={styles.resendText}>ขอรหัสใหม่อีกครั้ง</Text>
+              <Text style={styles.resendText}>{t('login.resend')}</Text>
             </Pressable>
           </>
         )}
 
         {/* PDPA consent */}
         <Text variant="caption" style={styles.consent}>
-          การเข้าสู่ระบบถือว่าคุณยอมรับ{' '}
-          <Text style={styles.consentLink}>ข้อกำหนดการใช้งาน</Text> และ{' '}
-          <Text style={styles.consentLink}>นโยบายความเป็นส่วนตัว</Text>
+          {t('login.consentPrefix')}{' '}
+          <Text style={styles.consentLink}>{t('login.terms')}</Text> {t('common.and')}{' '}
+          <Text style={styles.consentLink}>{t('login.privacy')}</Text>
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
