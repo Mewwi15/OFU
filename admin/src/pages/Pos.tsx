@@ -1,9 +1,10 @@
 import {
   RiAddLine,
-  RiDeleteBin6Line,
   RiMoneyDollarCircleLine,
+  RiPrinterLine,
   RiQrCodeLine,
   RiSearchLine,
+  RiShoppingBasket2Line,
   RiSubtractLine,
 } from '@remixicon/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -91,6 +92,12 @@ export function Pos() {
     });
   }, [catalog, cat, query]);
 
+  const qtyByVariant = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const l of lines) m.set(l.variantId, l.qty);
+    return m;
+  }, [lines]);
+
   /* ── cart ops ──────────────────────────────────────────────────────────── */
   function addVariant(p: PosProduct, v: PosVariant) {
     setLines((cur) => {
@@ -124,7 +131,6 @@ export function Pos() {
     if (e.key !== 'Enter') return;
     const code = query.trim();
     if (!code) return;
-    // barcode scanner: exact barcode match → add + clear
     for (const p of catalog) {
       const v = p.variants.find((x) => x.barcode && x.barcode === code);
       if (v) {
@@ -174,7 +180,6 @@ export function Pos() {
       });
       setReceipt({ sale, lines, method, at: new Date().toLocaleString('th-TH') });
       resetSale();
-      // reflect stock locally (best-effort; server is source of truth)
       setCatalog((cur) =>
         cur.map((p) => ({
           ...p,
@@ -191,7 +196,8 @@ export function Pos() {
     }
   }
 
-  if (loading) return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
+  if (loading)
+    return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
 
   if (!shift) {
     return (
@@ -205,24 +211,24 @@ export function Pos() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)]">
-      {/* shift bar */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-tremor-content">
-          กะเปิดอยู่ · เงินต้นกะ <span className="font-semibold text-tremor-content-strong">{baht(shift.opening_float)}</span>
-        </div>
-        <CloseShiftButton shift={shift} setShift={setShift} />
-      </div>
-
-      {error && (
-        <div className="mb-3 rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_22rem] gap-4 flex-1 min-h-0">
-        {/* ── left: search + grid ─────────────────────────────────────────── */}
+    <div className="-m-7 p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_23rem] gap-5 h-[calc(100vh-6.5rem)]">
+        {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="flex flex-col min-h-0">
-          <div className="relative mb-3">
-            <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-tremor-content-subtle" />
+          {/* shift bar */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm text-tremor-content-emphasis">
+                กะเปิดอยู่ · เงินต้นกะ{' '}
+                <span className="font-semibold text-tremor-content-strong">{baht(shift.opening_float)}</span>
+              </span>
+            </div>
+            <CloseShiftButton shift={shift} setShift={setShift} />
+          </div>
+
+          <div className="relative mb-4">
+            <RiSearchLine className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-tremor-content-subtle" />
             <input
               ref={searchRef}
               autoFocus
@@ -230,48 +236,71 @@ export function Pos() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKey}
               placeholder="สแกนบาร์โค้ด หรือค้นหาสินค้า…"
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-tremor-border bg-white text-tremor-content-strong focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-transparent bg-white shadow-sm text-tremor-content-strong placeholder:text-tremor-content-subtle focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
             />
           </div>
 
-          <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-            <Chip active={cat === null} onClick={() => setCat(null)}>
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 shrink-0">
+            <Pill active={cat === null} onClick={() => setCat(null)}>
               ทั้งหมด
-            </Chip>
+            </Pill>
             {categories.map((c) => (
-              <Chip key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>
+              <Pill key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>
                 {c.name}
-              </Chip>
+              </Pill>
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto pr-1 content-start">
+          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-4 overflow-y-auto pr-1 pb-2 content-start">
             {shown.map((p) => {
               const price = p.variants[0]?.price ?? 0;
               const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
+              const single = p.variants.length === 1 ? p.variants[0] : null;
+              const inCart = single ? qtyByVariant.get(single.id) ?? 0 : 0;
               return (
-                <button
+                <div
                   key={p.id}
-                  onClick={() => pick(p)}
-                  disabled={stock <= 0}
-                  className="text-left rounded-xl border border-tremor-border bg-white overflow-hidden hover:border-emerald-400 hover:shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed">
-                  <div className="aspect-square bg-tremor-background-muted">
+                  className={`rounded-2xl bg-white shadow-sm border border-transparent p-3 flex flex-col transition ${
+                    stock <= 0 ? 'opacity-40' : 'hover:shadow-md'
+                  }`}>
+                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-[#F6ECE5] mb-2.5 grid place-items-center">
                     {p.image ? (
                       <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                    ) : null}
+                    ) : (
+                      <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
+                    )}
                   </div>
-                  <div className="p-2">
-                    <div className="text-sm font-medium text-tremor-content-strong line-clamp-2 leading-snug">
-                      {p.name}
-                    </div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-emerald-700">
-                        {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
-                      </span>
-                      <span className="text-xs text-tremor-content-subtle">คงเหลือ {stock}</span>
-                    </div>
+                  <div className="text-[15px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
+                    {p.name}
                   </div>
-                </button>
+                  <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
+                    {p.subtitle ?? p.category_name ?? ''}
+                  </div>
+                  <div className="mt-2.5 flex items-center justify-between">
+                    <span className="text-[17px] font-bold text-tremor-content-strong">
+                      {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
+                    </span>
+                    {single && inCart > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <StepBtn onClick={() => setQty(single.id, inCart - 1)}>
+                          <RiSubtractLine className="w-4 h-4" />
+                        </StepBtn>
+                        <span className="w-5 text-center text-sm font-semibold">{inCart}</span>
+                        <StepBtn brand onClick={() => addVariant(p, single)}>
+                          <RiAddLine className="w-4 h-4" />
+                        </StepBtn>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => pick(p)}
+                        disabled={stock <= 0}
+                        className="inline-flex items-center gap-1 rounded-full bg-tremor-brand text-white text-sm font-medium pl-2.5 pr-3 py-1.5 hover:bg-tremor-brand-emphasis disabled:opacity-40 transition">
+                        <RiAddLine className="w-4 h-4" />
+                        เพิ่ม
+                      </button>
+                    )}
+                  </div>
+                </div>
               );
             })}
             {shown.length === 0 && (
@@ -280,10 +309,15 @@ export function Pos() {
           </div>
         </div>
 
-        {/* ── right: cart + checkout ──────────────────────────────────────── */}
-        <div className="flex flex-col min-h-0 rounded-2xl border border-tremor-border bg-white">
-          <div className="px-4 py-3 border-b border-tremor-border flex items-center justify-between">
-            <span className="font-semibold text-tremor-content-strong">บิลปัจจุบัน</span>
+        {/* ── right: order panel ──────────────────────────────────────────── */}
+        <div className="flex flex-col min-h-0 rounded-2xl bg-white shadow-sm">
+          <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
+            <div>
+              <div className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</div>
+              <div className="text-xs text-tremor-content-subtle">
+                {lines.reduce((s, l) => s + l.qty, 0)} ชิ้น
+              </div>
+            </div>
             {lines.length > 0 && (
               <button onClick={resetSale} className="text-xs text-tremor-content hover:text-red-600">
                 ล้างบิล
@@ -291,14 +325,26 @@ export function Pos() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          {error && (
+            <div className="mx-4 mt-3 rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-2">
             {lines.length === 0 ? (
-              <div className="text-center text-tremor-content-subtle py-16 text-sm">
+              <div className="flex flex-col items-center justify-center h-full text-tremor-content-subtle text-sm gap-2 py-16">
+                <RiShoppingBasket2Line className="w-10 h-10 text-[#E7D8CE]" />
                 เลือกสินค้าเพื่อเริ่มบิล
               </div>
             ) : (
               lines.map((l) => (
-                <div key={l.variantId} className="flex items-center gap-2 px-4 py-2 border-b border-tremor-border/60">
+                <div key={l.variantId} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#FBF5F1]">
+                  <div className="w-11 h-11 rounded-lg overflow-hidden bg-[#F6ECE5] grid place-items-center shrink-0">
+                    {l.image ? (
+                      <img src={l.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-tremor-content-strong truncate">{l.name}</div>
                     <div className="text-xs text-tremor-content-subtle">
@@ -306,30 +352,25 @@ export function Pos() {
                       {baht(l.unitPrice)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <StepBtn onClick={() => setQty(l.variantId, l.qty - 1)}>
                       <RiSubtractLine className="w-4 h-4" />
                     </StepBtn>
-                    <span className="w-7 text-center text-sm font-semibold">{l.qty}</span>
-                    <StepBtn onClick={() => setQty(l.variantId, l.qty + 1)}>
+                    <span className="w-6 text-center text-sm font-semibold">{l.qty}</span>
+                    <StepBtn brand onClick={() => setQty(l.variantId, l.qty + 1)}>
                       <RiAddLine className="w-4 h-4" />
                     </StepBtn>
                   </div>
-                  <div className="w-16 text-right text-sm font-semibold text-tremor-content-strong">
+                  <div className="w-16 text-right text-sm font-bold text-tremor-content-strong">
                     {baht(l.unitPrice * l.qty)}
                   </div>
-                  <button
-                    onClick={() => setQty(l.variantId, 0)}
-                    className="text-tremor-content-subtle hover:text-red-600">
-                    <RiDeleteBin6Line className="w-4 h-4" />
-                  </button>
                 </div>
               ))
             )}
           </div>
 
           {/* totals + pay */}
-          <div className="border-t border-tremor-border p-4 space-y-3">
+          <div className="border-t border-tremor-border p-4 space-y-2.5">
             <Row label="ยอดรวม" value={baht(subtotal)} />
             <div className="flex items-center justify-between text-sm">
               <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
@@ -340,21 +381,18 @@ export function Pos() {
                   min={0}
                   value={discount || ''}
                   onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-20 text-right rounded-md border border-tremor-border px-2 py-1"
+                  className="w-20 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
                 />
               </div>
             </div>
-            {shop?.vat_registered && (
-              <Row label={`ราคาก่อน VAT`} value={baht(net)} subtle />
-            )}
+            {shop?.vat_registered && <Row label="ราคาก่อน VAT" value={baht(net)} subtle />}
             {shop?.vat_registered && <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />}
-            <div className="flex items-center justify-between pt-1 border-t border-tremor-border">
+            <div className="flex items-center justify-between pt-2 border-t border-tremor-border">
               <span className="font-semibold text-tremor-content-strong">ยอดสุทธิ</span>
-              <span className="text-xl font-bold text-emerald-700">{baht(total)}</span>
+              <span className="text-2xl font-bold text-tremor-brand-emphasis">{baht(total)}</span>
             </div>
 
-            {/* payment method */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 pt-1">
               <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>
                 เงินสด
               </PayTab>
@@ -364,24 +402,19 @@ export function Pos() {
             </div>
 
             {method === 'cash' && (
-              <CashPay
-                total={total}
-                tendered={tendered}
-                setTendered={setTendered}
-                change={change}
-              />
+              <CashPay total={total} tendered={tendered} setTendered={setTendered} change={change} />
             )}
             {method === 'promptpay' && (
               <PromptPayPanel target={shop?.promptpay_id ?? null} amount={total} name={shop?.promptpay_name} />
             )}
 
             {shop?.vat_registered && (
-              <label className="flex items-center gap-2 text-sm text-tremor-content">
+              <label className="flex items-center gap-2 text-sm text-tremor-content pt-0.5">
                 <input
                   type="checkbox"
                   checked={taxInvoice}
                   onChange={(e) => setTaxInvoice(e.target.checked)}
-                  className="rounded"
+                  className="rounded text-tremor-brand focus:ring-tremor-brand-muted"
                 />
                 ออกใบกำกับภาษีเต็มรูป
               </label>
@@ -392,13 +425,13 @@ export function Pos() {
                   value={custName}
                   onChange={(e) => setCustName(e.target.value)}
                   placeholder="ชื่อลูกค้า"
-                  className="w-full rounded-md border border-tremor-border px-3 py-1.5 text-sm"
+                  className="w-full rounded-lg border border-tremor-border px-3 py-1.5 text-sm"
                 />
                 <input
                   value={custTaxId}
                   onChange={(e) => setCustTaxId(e.target.value)}
                   placeholder="เลขประจำตัวผู้เสียภาษี"
-                  className="w-full rounded-md border border-tremor-border px-3 py-1.5 text-sm"
+                  className="w-full rounded-lg border border-tremor-border px-3 py-1.5 text-sm"
                 />
               </div>
             )}
@@ -406,7 +439,7 @@ export function Pos() {
             <button
               onClick={checkout}
               disabled={!lines.length || busy}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40 transition">
+              className="w-full py-3.5 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 transition shadow-sm">
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
             </button>
           </div>
@@ -423,9 +456,7 @@ export function Pos() {
           onClose={() => setPicker(null)}
         />
       )}
-      {receipt && shop && (
-        <ReceiptModal data={receipt} shop={shop} onClose={() => setReceipt(null)} />
-      )}
+      {receipt && shop && <ReceiptModal data={receipt} shop={shop} onClose={() => setReceipt(null)} />}
     </div>
   );
 }
@@ -441,25 +472,29 @@ function Row({ label, value, subtle }: { label: string; value: string; subtle?: 
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
-      className={`whitespace-nowrap px-3 py-1.5 rounded-full text-sm border transition ${
+      className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition ${
         active
-          ? 'bg-emerald-600 text-white border-emerald-600'
-          : 'bg-white text-tremor-content border-tremor-border hover:border-emerald-400'
+          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand'
+          : 'bg-white text-tremor-content-emphasis border-transparent shadow-sm hover:text-tremor-brand'
       }`}>
       {children}
     </button>
   );
 }
 
-function StepBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function StepBtn({ onClick, children, brand }: { onClick: () => void; children: React.ReactNode; brand?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="w-7 h-7 flex items-center justify-center rounded-md border border-tremor-border text-tremor-content hover:bg-tremor-background-muted">
+      className={`w-7 h-7 flex items-center justify-center rounded-full transition ${
+        brand
+          ? 'bg-tremor-brand text-white hover:bg-tremor-brand-emphasis'
+          : 'border border-tremor-border text-tremor-content-emphasis hover:bg-[#FBF5F1]'
+      }`}>
       {children}
     </button>
   );
@@ -479,10 +514,10 @@ function PayTab({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition ${
+      className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium border transition ${
         active
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-500'
-          : 'bg-white text-tremor-content border-tremor-border hover:border-emerald-300'
+          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand'
+          : 'bg-white text-tremor-content border-tremor-border hover:border-tremor-brand-subtle'
       }`}>
       <Icon className="w-4 h-4" />
       {children}
@@ -512,7 +547,7 @@ function CashPay({
             type="number"
             value={tendered}
             onChange={(e) => setTendered(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-            className="w-24 text-right rounded-md border border-tremor-border px-2 py-1"
+            className="w-24 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
           />
         </div>
       </div>
@@ -521,7 +556,7 @@ function CashPay({
           <button
             key={i}
             onClick={() => setTendered(v)}
-            className="py-1.5 rounded-md border border-tremor-border text-sm hover:bg-tremor-background-muted">
+            className="py-1.5 rounded-lg border border-tremor-border text-sm text-tremor-content-emphasis hover:border-tremor-brand-subtle hover:text-tremor-brand">
             {v === total ? 'พอดี' : baht(v)}
           </button>
         ))}
@@ -529,7 +564,7 @@ function CashPay({
       {typeof tendered === 'number' && tendered >= total && (
         <div className="flex items-center justify-between text-sm pt-1">
           <span className="text-tremor-content">เงินทอน</span>
-          <span className="font-semibold text-emerald-700">{baht(change)}</span>
+          <span className="font-semibold text-green-700">{baht(change)}</span>
         </div>
       )}
     </div>
@@ -563,11 +598,13 @@ function PromptPayPanel({
       </div>
     );
   return (
-    <div className="flex flex-col items-center gap-1 py-1">
-      {uri ? <img src={uri} alt="PromptPay QR" className="w-44 h-44" /> : <div className="w-44 h-44" />}
+    <div className="flex flex-col items-center gap-1 py-2 rounded-xl bg-[#FBF5F1]">
+      {uri ? <img src={uri} alt="PromptPay QR" className="w-40 h-40" /> : <div className="w-40 h-40" />}
       <div className="text-sm font-semibold text-tremor-content-strong">{baht(amount)}</div>
       {name && <div className="text-xs text-tremor-content-subtle">{name}</div>}
-      <div className="text-xs text-tremor-content-subtle">ให้ลูกค้าสแกนแล้วกด “ชำระเงิน” เมื่อได้รับเงิน</div>
+      <div className="text-xs text-tremor-content-subtle px-4 text-center">
+        ให้ลูกค้าสแกน แล้วกด “ชำระเงิน” เมื่อได้รับเงิน
+      </div>
     </div>
   );
 }
@@ -583,7 +620,7 @@ function VariantPicker({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-4 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="font-semibold text-tremor-content-strong mb-3">{product.name} · เลือกขนาด</div>
         <div className="space-y-2">
           {product.variants.map((v) => (
@@ -591,10 +628,10 @@ function VariantPicker({
               key={v.id}
               disabled={v.stock_qty <= 0}
               onClick={() => onPick(v)}
-              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg border border-tremor-border hover:border-emerald-400 disabled:opacity-40">
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-tremor-border hover:border-tremor-brand disabled:opacity-40">
               <span className="text-sm text-tremor-content-strong">{v.size ?? 'ปกติ'}</span>
               <span className="text-sm">
-                <span className="font-semibold text-emerald-700">{baht(v.price)}</span>
+                <span className="font-semibold text-tremor-content-strong">{baht(v.price)}</span>
                 <span className="text-xs text-tremor-content-subtle ml-2">คงเหลือ {v.stock_qty}</span>
               </span>
             </button>
@@ -610,13 +647,16 @@ function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> })
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   return (
-    <div className="flex items-center justify-center h-[60vh]">
-      <div className="w-full max-w-sm rounded-2xl border border-tremor-border bg-white p-6 text-center">
+    <div className="-m-7 p-7 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] flex items-center justify-center">
+      <div className="w-full max-w-sm rounded-3xl bg-white shadow-sm p-7 text-center">
+        <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-tremor-brand-faint grid place-items-center">
+          <RiMoneyDollarCircleLine className="w-7 h-7 text-tremor-brand" />
+        </div>
         <div className="text-lg font-semibold text-tremor-content-strong mb-1">เปิดกะขาย</div>
-        <p className="text-sm text-tremor-content mb-4">ใส่จำนวนเงินสดตั้งต้นในลิ้นชักเพื่อเริ่มขาย</p>
+        <p className="text-sm text-tremor-content mb-5">ใส่จำนวนเงินสดตั้งต้นในลิ้นชักเพื่อเริ่มขาย</p>
         {err && <div className="mb-3 text-sm text-red-600">{err}</div>}
-        <div className="flex items-center gap-2 justify-center mb-4">
-          <span className="text-tremor-content-subtle">฿</span>
+        <div className="flex items-center gap-2 justify-center mb-5">
+          <span className="text-tremor-content-subtle text-lg">฿</span>
           <input
             type="number"
             min={0}
@@ -624,7 +664,7 @@ function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> })
             value={float}
             onChange={(e) => setFloat(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
             placeholder="0"
-            className="w-32 text-right rounded-lg border border-tremor-border px-3 py-2"
+            className="w-36 text-right text-lg rounded-xl border border-tremor-border px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
           />
         </div>
         <button
@@ -640,7 +680,7 @@ function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> })
               setBusy(false);
             }
           }}
-          className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50">
+          className="w-full py-3 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis disabled:opacity-50 shadow-sm">
           {busy ? 'กำลังเปิด…' : 'เปิดกะ'}
         </button>
       </div>
@@ -648,14 +688,7 @@ function OpenShiftGate({ onOpen }: { onOpen: (float: number) => Promise<void> })
   );
 }
 
-function CloseShiftButton({
-  shift,
-  setShift,
-}: {
-  shift: Shift;
-  onClosed?: (s: Shift) => void;
-  setShift: (s: Shift | null) => void;
-}) {
+function CloseShiftButton({ shift, setShift }: { shift: Shift; setShift: (s: Shift | null) => void }) {
   const [open, setOpen] = useState(false);
   const [counted, setCounted] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
@@ -666,7 +699,7 @@ function CloseShiftButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-sm px-3 py-1.5 rounded-lg border border-tremor-border text-tremor-content hover:bg-tremor-background-muted">
+        className="text-sm px-4 py-1.5 rounded-full bg-white shadow-sm text-tremor-content-emphasis hover:text-tremor-brand">
         ปิดกะ
       </button>
       {open && (
@@ -681,10 +714,7 @@ function CloseShiftButton({
                   <Row label="นับได้" value={baht(result.counted_cash ?? 0)} />
                   <div className="flex items-center justify-between pt-2 border-t border-tremor-border">
                     <span className="font-semibold">ส่วนต่าง</span>
-                    <span
-                      className={`font-bold ${
-                        (result.over_short ?? 0) < 0 ? 'text-red-600' : 'text-emerald-700'
-                      }`}>
+                    <span className={`font-bold ${(result.over_short ?? 0) < 0 ? 'text-red-600' : 'text-green-700'}`}>
                       {(result.over_short ?? 0) >= 0 ? '+' : ''}
                       {baht(result.over_short ?? 0)}
                     </span>
@@ -695,7 +725,7 @@ function CloseShiftButton({
                     setOpen(false);
                     setShift(null);
                   }}
-                  className="mt-5 w-full py-2.5 rounded-xl bg-emerald-600 text-white font-semibold">
+                  className="mt-5 w-full py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis">
                   เสร็จสิ้น
                 </button>
               </div>
@@ -712,7 +742,7 @@ function CloseShiftButton({
                     autoFocus
                     value={counted}
                     onChange={(e) => setCounted(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-                    className="flex-1 text-right rounded-lg border border-tremor-border px-3 py-2"
+                    className="flex-1 text-right rounded-xl border border-tremor-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
                   />
                 </div>
                 <button
@@ -729,7 +759,7 @@ function CloseShiftButton({
                       setBusy(false);
                     }
                   }}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                  className="w-full py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis disabled:opacity-50">
                   {busy ? 'กำลังปิด…' : 'ปิดกะ'}
                 </button>
               </>
@@ -764,7 +794,10 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           <div className="border-t border-dashed border-black my-2" />
           {lines.map((l) => (
             <div key={l.variantId} className="mb-1">
-              <div>{l.name}{l.size ? ` (${l.size})` : ''}</div>
+              <div>
+                {l.name}
+                {l.size ? ` (${l.size})` : ''}
+              </div>
               <div className="flex justify-between">
                 <span>
                   {l.qty} x {l.unitPrice}
@@ -787,15 +820,21 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
             <span>{sale.total}</span>
           </div>
           <div className="border-t border-dashed border-black my-2" />
-          <Line2 label={method === 'cash' ? 'เงินสด' : 'พร้อมเพย์'} value={method === 'cash' ? sale.total + sale.change : sale.total} />
+          <Line2
+            label={method === 'cash' ? 'เงินสด' : 'พร้อมเพย์'}
+            value={method === 'cash' ? sale.total + sale.change : sale.total}
+          />
           {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}
           <div className="text-center text-[11px] mt-3">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
         </div>
         <div className="flex gap-2 p-4 border-t border-tremor-border print:hidden">
-          <button onClick={() => window.print()} className="flex-1 py-2.5 rounded-xl border border-tremor-border font-medium hover:bg-tremor-background-muted">
-            พิมพ์
+          <button
+            onClick={() => window.print()}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border border-tremor-border font-medium text-tremor-content-emphasis hover:bg-[#FBF5F1]">
+            <RiPrinterLine className="w-4 h-4" />
+            พิมพ์บิล
           </button>
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-2xl bg-tremor-brand text-white font-semibold hover:bg-tremor-brand-emphasis">
             ขายต่อ
           </button>
         </div>

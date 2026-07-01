@@ -162,6 +162,7 @@ export type PosVariant = {
 export type PosProduct = {
   id: string;
   name: string;
+  subtitle: string | null;
   category_id: string | null;
   category_name: string | null;
   image: string | null;
@@ -173,7 +174,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode)',
+      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode)',
     )
     .is('archived_at', null)
     .eq('publish_state', 'published')
@@ -182,6 +183,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
   type Row = {
     id: string;
     name: string;
+    subtitle: string | null;
     category_id: string | null;
     categories: { name: string } | null;
     product_images: { storage_path: string; is_primary: boolean }[] | null;
@@ -190,6 +192,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
   return (data as unknown as Row[]).map((p) => ({
     id: p.id,
     name: p.name,
+    subtitle: p.subtitle,
     category_id: p.category_id,
     category_name: p.categories?.name ?? null,
     image:
