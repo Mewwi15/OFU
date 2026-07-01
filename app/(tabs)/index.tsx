@@ -21,7 +21,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { categories, type Category } from '@/data/products';
+import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
 import { useShopOpen } from '@/lib/useShopOpen';
@@ -67,6 +67,10 @@ export default function HomeScreen() {
   const slides = dbBanners.length
     ? dbBanners.map((b) => ({ id: b.id, image: b.image, title: b.title ?? '' }))
     : BANNER_SLIDES.map((b) => ({ id: b.id, image: b.image, title: t(b.titleKey) }));
+  const dbCategories = useCatalog((s) => s.categories);
+  const featuredRows = useCatalog((s) => s.featured);
+  // Admin categories (in their display order) when available; else the static list.
+  const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
   const bestSellers = useMemo(
     () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
     [products],
@@ -101,7 +105,7 @@ export default function HomeScreen() {
   };
 
   /** Open the full catalog tab, optionally pre-filtered by category. */
-  const openCatalog = (category?: Category) =>
+  const openCatalog = (category?: string) =>
     router.push(
       category && category !== 'ทั้งหมด'
         ? `/search?category=${encodeURIComponent(category)}`
@@ -230,7 +234,7 @@ export default function HomeScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.catRow}>
-            {categories.map((cat) => (
+            {catList.map((cat) => (
               <PressableScale
                 key={cat}
                 accessibilityRole="button"
@@ -244,6 +248,17 @@ export default function HomeScreen() {
               </PressableScale>
             ))}
           </ScrollView>
+
+          {/* Admin-managed featured rows (จัดหน้าแอป) */}
+          {featuredRows.map((row) => {
+            const rowProducts = row.productIds
+              .map((id) => products.find((p) => p.id === id))
+              .filter((p): p is (typeof products)[number] => !!p);
+            if (rowProducts.length === 0) return null;
+            return (
+              <ProductRail key={row.id} title={row.title} data={rowProducts} onSeeAll={() => openCatalog()} />
+            );
+          })}
 
           {/* Curated rails */}
           <ProductRail

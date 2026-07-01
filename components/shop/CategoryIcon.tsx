@@ -10,15 +10,14 @@
 
 import { Image } from 'expo-image';
 
-import type { Category } from '@/data/products';
-
 type Props = {
-  category: Category;
+  category: string;
   size?: number;
 };
 
-/** Per-category illustrated tile (PNG, transparent rounded corners). */
-const TILES: Record<Category, ReturnType<typeof require>> = {
+/** Per-category illustrated tile (PNG, transparent rounded corners). Unknown
+ *  (admin-added) categories fall back to the "all" basket tile. */
+const TILES: Record<string, ReturnType<typeof require>> = {
   ทั้งหมด: require('@/assets/images/categories/cat-all.png'),
   ของสด: require('@/assets/images/categories/cat-fresh.png'),
   เครื่องดื่ม: require('@/assets/images/categories/cat-drinks.png'),

@@ -78,6 +78,33 @@ export async function loadBanners(): Promise<HomeBanner[]> {
     .map((b) => ({ id: b.id, image: b.image_path as string, title: b.headline }));
 }
 
+/** Category names in the admin's display order (drives the app's filter chips). */
+export async function loadCategoryNames(): Promise<string[]> {
+  const { data, error } = await supabase.from('categories').select('name, display_order').order('display_order');
+  if (error) throw error;
+  return ((data ?? []) as { name: string }[]).map((c) => c.name).filter(Boolean);
+}
+
+/** A published featured row (title + its products' ids) for the app home. */
+export type FeaturedRow = { id: string; title: string; productIds: string[] };
+export async function loadFeatured(): Promise<FeaturedRow[]> {
+  const { data, error } = await supabase
+    .from('featured_sections')
+    .select('id, title, display_order, featured_section_items(product_id, display_order)')
+    .eq('publish_state', 'published')
+    .order('display_order');
+  if (error) throw error;
+  type Row = { id: string; title: string; featured_section_items: { product_id: string; display_order: number }[] | null };
+  return ((data ?? []) as unknown as Row[]).map((s) => ({
+    id: s.id,
+    title: s.title,
+    productIds: (s.featured_section_items ?? [])
+      .slice()
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((i) => i.product_id),
+  }));
+}
+
 /** The category filter list (static UI labels; 'ทั้งหมด' = All). */
 export const CATEGORY_FILTERS: readonly Category[] = [
   'ทั้งหมด',

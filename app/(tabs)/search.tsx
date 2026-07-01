@@ -20,7 +20,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { categories, type Category } from '@/data/products';
+import { categories } from '@/data/products';
 import { useT } from '@/lib/i18n';
 import { useCatalog } from '@/store/catalog';
 
@@ -33,11 +33,6 @@ const SECTION_BANNER_IMAGES = {
   promo: 'https://picsum.photos/seed/oofoo-promo/900/360',
   hot: 'https://picsum.photos/seed/oofoo-hot/900/360',
 } as const;
-
-/** Whether an arbitrary string is one of our canonical categories. */
-function isCategory(value: string | undefined): value is Category {
-  return !!value && (categories as readonly string[]).includes(value);
-}
 
 /**
  * Catalog ("สินค้าทั้งหมด"): a search bar + category chips. By default it shows
@@ -55,16 +50,16 @@ export default function CatalogScreen() {
   const { category } = useLocalSearchParams<{ category?: string }>();
 
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<Category>(
-    isCategory(category) ? category : 'ทั้งหมด',
-  );
+  const [activeCategory, setActiveCategory] = useState<string>(category ?? 'ทั้งหมด');
 
   // Sync the filter when arriving with a (new) category param from home.
   useEffect(() => {
-    if (isCategory(category)) setActiveCategory(category);
+    if (category) setActiveCategory(category);
   }, [category]);
 
   const products = useCatalog((s) => s.products);
+  const dbCategories = useCatalog((s) => s.categories);
+  const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
   const trending = useMemo(() => products.slice(0, 6), [products]);
   const promotions = useMemo(
     () => [...products].sort((a, b) => a.price - b.price).slice(0, 6),
@@ -147,7 +142,7 @@ export default function CatalogScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.catRow}
             style={styles.chipsScroll}>
-            {categories.map((cat) => {
+            {catList.map((cat) => {
               const active = cat === activeCategory;
               return (
                 <PressableScale
