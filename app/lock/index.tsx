@@ -19,6 +19,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
+import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 import { PIN_LENGTH, useLock } from '@/store/lock';
 
@@ -30,6 +31,7 @@ export default function LockScreen() {
   const unlock = useLock((s) => s.unlock);
   const resetLock = useLock((s) => s.resetLock);
   const biometricEnabled = useLock((s) => s.biometricEnabled);
+  const t = useT();
 
   const [entry, setEntry] = useState('');
   const [error, setError] = useState(false);
@@ -39,8 +41,8 @@ export default function LockScreen() {
 
   const runBiometric = useCallback(async () => {
     const res = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'ปลดล็อก อู้ฟู่',
-      cancelLabel: 'ใช้ PIN',
+      promptMessage: t('lock.unlockPrompt'),
+      cancelLabel: t('lock.usePin'),
     });
     if (res.success) unlock();
   }, [unlock]);
@@ -86,10 +88,10 @@ export default function LockScreen() {
   };
 
   const confirmLogout = () => {
-    Alert.alert('ออกจากระบบ', 'ต้องการออกจากระบบและล้างรหัส PIN ใช่ไหม?', [
-      { text: 'ยกเลิก', style: 'cancel' },
+    Alert.alert(t('account.logout'), t('lock.logoutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'ออกจากระบบ',
+        text: t('account.logout'),
         style: 'destructive',
         onPress: async () => {
           await resetLock();
@@ -104,10 +106,10 @@ export default function LockScreen() {
       <View style={styles.header}>
         <Image source={avatarSource(user.avatar)} style={styles.avatar} contentFit="cover" transition={200} />
         <Text variant="title" style={styles.greeting}>
-          สวัสดี {user.name}
+          {t('lock.greeting')} {user.name}
         </Text>
         <Text variant="body" style={styles.sub}>
-          {error ? 'รหัส PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง' : 'กรอกรหัส PIN เพื่อเข้าใช้งาน'}
+          {error ? t('lock.pinWrong') : t('lock.enterToUnlock')}
         </Text>
       </View>
 
@@ -124,10 +126,10 @@ export default function LockScreen() {
 
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel="ออกจากระบบ"
+        accessibilityLabel={t('account.logout')}
         onPress={confirmLogout}
         style={[styles.logout, { paddingBottom: insets.bottom + Spacing.lg }]}>
-        <Text style={styles.logoutText}>ออกจากระบบ</Text>
+        <Text style={styles.logoutText}>{t('account.logout')}</Text>
       </PressableScale>
     </View>
   );

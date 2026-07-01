@@ -179,7 +179,7 @@ export default function ProfileScreen() {
           </View>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel="แก้ไขโปรไฟล์"
+            accessibilityLabel={t('account.editProfile')}
             onPress={() => router.push('/account/edit')}
             style={styles.editBtn}>
             <Image source={ICON.edit} style={styles.editIcon} contentFit="contain" />

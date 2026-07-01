@@ -437,6 +437,20 @@ const th: Dict = {
   'ui.decrease': 'ลดจำนวน',
   'ui.increase': 'เพิ่มจำนวน',
   'ui.shop': 'ช้อป',
+
+  'addressList.deleteTitle': 'ลบที่อยู่',
+  'addressList.deletePrefix': 'ลบ ',
+  'addressList.deleteSuffix': ' ใช่ไหม?',
+  'addressList.delete': 'ลบ',
+  'addressList.editA11y': 'แก้ไขที่อยู่',
+  'addressList.edit': 'แก้ไข',
+  'addressList.addNew': 'เพิ่มที่อยู่ใหม่',
+  'lock.unlockPrompt': 'ปลดล็อก อู้ฟู่',
+  'lock.usePin': 'ใช้ PIN',
+  'lock.logoutConfirm': 'ต้องการออกจากระบบและล้างรหัส PIN ใช่ไหม?',
+  'lock.greeting': 'สวัสดี',
+  'lock.pinWrong': 'รหัส PIN ไม่ถูกต้อง ลองใหม่อีกครั้ง',
+  'lock.enterToUnlock': 'กรอกรหัส PIN เพื่อเข้าใช้งาน',
 };
 
 const en: Dict = {
@@ -868,6 +882,20 @@ const en: Dict = {
   'ui.decrease': 'Decrease quantity',
   'ui.increase': 'Increase quantity',
   'ui.shop': 'Shop',
+
+  'addressList.deleteTitle': 'Delete address',
+  'addressList.deletePrefix': 'Delete ',
+  'addressList.deleteSuffix': '?',
+  'addressList.delete': 'Delete',
+  'addressList.editA11y': 'Edit address',
+  'addressList.edit': 'Edit',
+  'addressList.addNew': 'Add new address',
+  'lock.unlockPrompt': 'Unlock Oofoo',
+  'lock.usePin': 'Use PIN',
+  'lock.logoutConfirm': 'Sign out and clear your PIN?',
+  'lock.greeting': 'Hello',
+  'lock.pinWrong': 'Incorrect PIN, please try again',
+  'lock.enterToUnlock': 'Enter your PIN to continue',
 };
 
 const TABLE: Record<Lang, Dict> = { th, en };

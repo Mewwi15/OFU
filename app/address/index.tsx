@@ -16,11 +16,13 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useT } from '@/lib/i18n';
 import { useAddress, type Address } from '@/store/address';
 
 export default function AddressBookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   const addresses = useAddress((s) => s.addresses);
   const selectedId = useAddress((s) => s.selectedId);
@@ -28,10 +30,14 @@ export default function AddressBookScreen() {
   const remove = useAddress((s) => s.remove);
 
   const confirmDelete = (item: Address) => {
-    Alert.alert('ลบที่อยู่', `ลบ "${item.label}" ใช่ไหม?`, [
-      { text: 'ยกเลิก', style: 'cancel' },
-      { text: 'ลบ', style: 'destructive', onPress: () => remove(item.id) },
-    ]);
+    Alert.alert(
+      t('addressList.deleteTitle'),
+      `${t('addressList.deletePrefix')}"${item.label}"${t('addressList.deleteSuffix')}`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('addressList.delete'), style: 'destructive', onPress: () => remove(item.id) },
+      ],
+    );
   };
 
   return (
@@ -40,10 +46,10 @@ export default function AddressBookScreen() {
       <View style={styles.header}>
         <IconButton
           icon="chevron-back"
-          accessibilityLabel="ย้อนกลับ"
+          accessibilityLabel={t('common.back')}
           onPress={() => router.back()}
         />
-        <Text variant="subtitle">ที่อยู่จัดส่ง</Text>
+        <Text variant="subtitle">{t('account.menu.address')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -94,21 +100,21 @@ export default function AddressBookScreen() {
               <View style={styles.cardActions}>
                 <PressableScale
                   accessibilityRole="button"
-                  accessibilityLabel="แก้ไขที่อยู่"
+                  accessibilityLabel={t('addressList.editA11y')}
                   onPress={() => router.push(`/address/picker?id=${item.id}`)}
                   style={styles.actionBtn}>
                   <Ionicons name="create-outline" size={16} color={Colors.text} />
-                  <Text style={styles.actionText}>แก้ไข</Text>
+                  <Text style={styles.actionText}>{t('addressList.edit')}</Text>
                 </PressableScale>
                 {addresses.length > 1 ? (
                   <PressableScale
                     accessibilityRole="button"
-                    accessibilityLabel="ลบที่อยู่"
+                    accessibilityLabel={t('addressList.deleteTitle')}
                     onPress={() => confirmDelete(item)}
                     style={styles.actionBtn}>
                     <Ionicons name="trash-outline" size={16} color={Colors.dangerStrong} />
                     <Text style={[styles.actionText, { color: Colors.dangerStrong }]}>
-                      ลบ
+                      {t('addressList.delete')}
                     </Text>
                   </PressableScale>
                 ) : null}
@@ -124,7 +130,7 @@ export default function AddressBookScreen() {
           scaleTo={0.98}
           style={styles.addCard}>
           <Ionicons name="add-circle-outline" size={22} color={Colors.primaryStrong} />
-          <Text style={styles.addText}>เพิ่มที่อยู่ใหม่</Text>
+          <Text style={styles.addText}>{t('addressList.addNew')}</Text>
         </PressableScale>
       </ScrollView>
     </View>
