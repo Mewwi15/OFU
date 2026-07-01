@@ -1,11 +1,12 @@
-import { Badge, Select, SelectItem, Textarea, TextInput } from '@tremor/react';
+import { Select, SelectItem, Textarea, TextInput } from '@tremor/react';
 import {
   RiAddLine,
   RiDeleteBinLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiImageLine,
   RiPencilLine,
-  RiStarFill,
+  RiSearchLine,
 } from '@remixicon/react';
 import { useEffect, useState, type ReactNode } from 'react';
 
@@ -32,6 +33,8 @@ export function Products() {
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
   const [variantsFor, setVariantsFor] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [catFilter, setCatFilter] = useState('');
 
   async function load() {
     setLoading(true);
@@ -70,82 +73,98 @@ export function Products() {
     }
   }
 
+  const shown = products.filter((p) => {
+    if (catFilter && p.category_id !== catFilter) return false;
+    const q = query.trim().toLowerCase();
+    if (q && !p.name.toLowerCase().includes(q) && !(p.subtitle ?? '').toLowerCase().includes(q))
+      return false;
+    return true;
+  });
+
+  const rowProps = {
+    onVariants: setVariantsFor,
+    onEdit: (p: Product) => setEditing(p),
+    onToggle: (p: Product) => void togglePublish(p),
+    onArchive: (p: Product) => void onArchive(p),
+  };
+
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-semibold">สินค้า</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{products.length} รายการ</p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">สินค้า</h1>
+          <p className="text-sm text-gray-400 mt-0.5">ทั้งหมด {products.length} รายการ</p>
         </div>
         <button
           onClick={() => setEditing('new')}
-          className="flex items-center gap-1.5 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl px-4 py-2.5 text-sm font-medium transition">
+          className="flex items-center gap-1.5 bg-tremor-brand hover:bg-tremor-brand-emphasis text-white rounded-xl px-4 py-2.5 text-sm font-medium transition shadow-sm">
           <RiAddLine className="w-4 h-4" />
           เพิ่มสินค้า
         </button>
       </div>
+
+      {/* toolbar */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="relative flex-1">
+          <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ค้นหาสินค้า…"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
+          />
+        </div>
+        <select
+          value={catFilter}
+          onChange={(e) => setCatFilter(e.target.value)}
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted">
+          <option value="">ทุกหมวดหมู่</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {error ? <p className="text-red-600 text-sm mb-3">{error}</p> : null}
 
       {loading ? (
         <p className="text-center text-gray-400 py-16">กำลังโหลด…</p>
-      ) : products.length === 0 ? (
-        <p className="text-center text-gray-400 py-16">ยังไม่มีสินค้า</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
-          {products.map((p) => {
-            const prices = p.product_variants.map((v) => v.price);
-            const stock = p.product_variants.reduce((s, v) => s + v.stock_qty, 0);
-            const img = primaryImage(p);
-            const published = p.publish_state === 'published';
-            return (
-              <div
-                key={p.id}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-                <div className="relative aspect-[4/3] bg-gray-100">
-                  {img ? (
-                    <img src={img} alt={p.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full grid place-items-center text-gray-300 text-sm">ไม่มีรูป</div>
-                  )}
-                  <span className="absolute top-2.5 right-2.5">
-                    <Badge color={published ? 'emerald' : 'gray'}>{published ? 'เผยแพร่' : 'ร่าง'}</Badge>
-                  </span>
-                </div>
-                <div className="p-4 flex flex-col flex-1">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <Badge color="orange">{p.categories?.name ?? 'ไม่ระบุ'}</Badge>
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                      <RiStarFill className="w-3.5 h-3.5 text-amber-400" />
-                      {p.rating.toFixed(1)}
-                    </span>
-                  </div>
-                  <h3 className="font-medium leading-snug line-clamp-2 min-h-[2.6em]">{p.name}</h3>
-                  <div className="flex gap-5 mt-3 mb-4">
-                    <Stat label="ราคาเริ่ม" value={prices.length ? `฿${Math.min(...prices)}` : '—'} />
-                    <Stat label="สต็อก" value={String(stock)} />
-                    <Stat label="ขนาด" value={String(p.product_variants.length)} className="ml-auto text-right" />
-                  </div>
-                  <div className="flex gap-2 mt-auto">
-                    <button
-                      onClick={() => setVariantsFor(p)}
-                      className="flex-1 bg-gray-900 hover:bg-gray-800 text-white rounded-xl py-2.5 text-sm font-medium transition">
-                      ขนาด & สต็อก
-                    </button>
-                    <IconBtn title="แก้ไข" onClick={() => setEditing(p)}>
-                      <RiPencilLine className="w-[18px] h-[18px]" />
-                    </IconBtn>
-                    <IconBtn title={published ? 'ซ่อน' : 'เผยแพร่'} onClick={() => void togglePublish(p)}>
-                      {published ? <RiEyeOffLine className="w-[18px] h-[18px]" /> : <RiEyeLine className="w-[18px] h-[18px]" />}
-                    </IconBtn>
-                    <IconBtn title="ลบ" danger onClick={() => void onArchive(p)}>
-                      <RiDeleteBinLine className="w-[18px] h-[18px]" />
-                    </IconBtn>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      ) : shown.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center text-gray-400 py-16">
+          {products.length === 0 ? 'ยังไม่มีสินค้า' : 'ไม่พบสินค้าที่ค้นหา'}
         </div>
+      ) : (
+        <>
+          {/* desktop table */}
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs font-medium text-gray-400 border-b border-gray-100">
+                  <th className="px-5 py-3 font-medium">สินค้า</th>
+                  <th className="px-3 py-3 font-medium">หมวดหมู่</th>
+                  <th className="px-3 py-3 font-medium text-right">ราคา</th>
+                  <th className="px-3 py-3 font-medium text-right">สต็อก</th>
+                  <th className="px-3 py-3 font-medium text-center">สถานะ</th>
+                  <th className="px-5 py-3 font-medium text-right">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {shown.map((p) => (
+                  <ProductRow key={p.id} p={p} {...rowProps} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* mobile stacked cards */}
+          <div className="md:hidden space-y-3">
+            {shown.map((p) => (
+              <ProductCardMobile key={p.id} p={p} {...rowProps} />
+            ))}
+          </div>
+        </>
       )}
 
       {editing ? (
@@ -167,11 +186,136 @@ export function Products() {
   );
 }
 
-function Stat({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+type RowActions = {
+  onVariants: (p: Product) => void;
+  onEdit: (p: Product) => void;
+  onToggle: (p: Product) => void;
+  onArchive: (p: Product) => void;
+};
+
+function priceText(p: Product): string {
+  const prices = p.product_variants.map((v) => v.price);
+  if (!prices.length) return '—';
+  const lo = Math.min(...prices);
+  const hi = Math.max(...prices);
+  return lo === hi ? `฿${lo}` : `฿${lo}–${hi}`;
+}
+const totalStock = (p: Product) => p.product_variants.reduce((s, v) => s + v.stock_qty, 0);
+const isLow = (p: Product) => p.product_variants.some((v) => v.stock_qty <= v.low_stock_threshold);
+
+function StatusPill({ published }: { published: boolean }) {
+  return published ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 text-green-700 text-xs font-medium px-2.5 py-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+      เผยแพร่
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium px-2.5 py-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+      ร่าง
+    </span>
+  );
+}
+
+function Thumb({ p, size }: { p: Product; size: string }) {
+  const img = primaryImage(p);
   return (
-    <div className={className}>
-      <div className="text-xs text-gray-400">{label}</div>
-      <div className="font-medium text-gray-800">{value}</div>
+    <div className={`${size} rounded-lg overflow-hidden bg-gray-100 shrink-0 grid place-items-center`}>
+      {img ? (
+        <img src={img} alt={p.name} className="w-full h-full object-cover" />
+      ) : (
+        <RiImageLine className="w-5 h-5 text-gray-300" />
+      )}
+    </div>
+  );
+}
+
+function RowActionButtons({ p, onVariants, onEdit, onToggle, onArchive }: { p: Product } & RowActions) {
+  const published = p.publish_state === 'published';
+  return (
+    <div className="flex items-center justify-end gap-1.5">
+      <button
+        onClick={() => onVariants(p)}
+        className="rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs font-medium px-3 py-2 whitespace-nowrap">
+        ขนาด / สต็อก
+      </button>
+      <IconBtn title="แก้ไข" onClick={() => onEdit(p)}>
+        <RiPencilLine className="w-[18px] h-[18px]" />
+      </IconBtn>
+      <IconBtn title={published ? 'ซ่อน' : 'เผยแพร่'} onClick={() => onToggle(p)}>
+        {published ? <RiEyeOffLine className="w-[18px] h-[18px]" /> : <RiEyeLine className="w-[18px] h-[18px]" />}
+      </IconBtn>
+      <IconBtn title="ลบ" danger onClick={() => onArchive(p)}>
+        <RiDeleteBinLine className="w-[18px] h-[18px]" />
+      </IconBtn>
+    </div>
+  );
+}
+
+function ProductRow({ p, ...actions }: { p: Product } & RowActions) {
+  const stock = totalStock(p);
+  const low = isLow(p);
+  return (
+    <tr className="hover:bg-gray-50/60">
+      <td className="px-5 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Thumb p={p} size="w-11 h-11" />
+          <div className="min-w-0">
+            <div className="font-medium text-gray-800 truncate">{p.name}</div>
+            {p.subtitle ? <div className="text-xs text-gray-400 truncate">{p.subtitle}</div> : null}
+          </div>
+        </div>
+      </td>
+      <td className="px-3 py-3 text-gray-500">{p.categories?.name ?? '—'}</td>
+      <td className="px-3 py-3 text-right font-medium text-gray-800 whitespace-nowrap">{priceText(p)}</td>
+      <td className="px-3 py-3 text-right whitespace-nowrap">
+        <span
+          className={
+            stock === 0 ? 'text-red-600 font-medium' : low ? 'text-amber-600 font-medium' : 'text-gray-700'
+          }>
+          {stock}
+        </span>
+        <span className="text-gray-300 text-xs"> · {p.product_variants.length} ขนาด</span>
+      </td>
+      <td className="px-3 py-3 text-center">
+        <StatusPill published={p.publish_state === 'published'} />
+      </td>
+      <td className="px-5 py-3">
+        <RowActionButtons p={p} {...actions} />
+      </td>
+    </tr>
+  );
+}
+
+function ProductCardMobile({ p, ...actions }: { p: Product } & RowActions) {
+  const stock = totalStock(p);
+  const low = isLow(p);
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+      <div className="flex items-start gap-3">
+        <Thumb p={p} size="w-14 h-14" />
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-gray-800 truncate">{p.name}</div>
+          {p.subtitle ? <div className="text-xs text-gray-400 truncate">{p.subtitle}</div> : null}
+          <div className="flex items-center gap-2 mt-1.5">
+            <StatusPill published={p.publish_state === 'published'} />
+            <span className="text-xs text-gray-400">{p.categories?.name ?? '—'}</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50 text-sm">
+        <span className="font-medium text-gray-800">{priceText(p)}</span>
+        <span className="text-gray-500">
+          สต็อก{' '}
+          <span className={stock === 0 ? 'text-red-600 font-medium' : low ? 'text-amber-600 font-medium' : ''}>
+            {stock}
+          </span>{' '}
+          · {p.product_variants.length} ขนาด
+        </span>
+      </div>
+      <div className="mt-3">
+        <RowActionButtons p={p} {...actions} />
+      </div>
     </div>
   );
 }
