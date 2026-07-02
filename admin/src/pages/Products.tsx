@@ -25,6 +25,7 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import ImgCrop from 'antd-img-crop';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -393,29 +394,31 @@ function ProductModal({
                 </div>
               </div>
             ))}
-            <Upload
-              accept="image/*"
-              showUploadList={false}
-              customRequest={async ({ file, onSuccess, onError }) => {
-                try {
-                  await uploadProductImage(product.id, file as File);
-                  await reloadImages();
-                  message.success('อัปโหลดรูปแล้ว');
-                  onSuccess?.({});
-                } catch (e) {
-                  message.error(apiError(e));
-                  onError?.(e as Error);
-                }
-              }}>
-              <button
-                type="button"
-                className="w-24 h-24 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
-                <div className="text-center">
-                  <RiImageAddLine className="w-6 h-6 mx-auto" />
-                  <div className="text-[11px] mt-1">เพิ่มรูป</div>
-                </div>
-              </button>
-            </Upload>
+            <ImgCrop aspect={1} showGrid rotationSlider modalTitle="ครอบตัดรูปสินค้า (1:1)" modalOk="ใช้รูปนี้" modalCancel="ยกเลิก">
+              <Upload
+                accept="image/*"
+                showUploadList={false}
+                customRequest={async ({ file, onSuccess, onError }) => {
+                  try {
+                    await uploadProductImage(product.id, file as File);
+                    await reloadImages();
+                    message.success('อัปโหลดรูปแล้ว');
+                    onSuccess?.({});
+                  } catch (e) {
+                    message.error(apiError(e));
+                    onError?.(e as Error);
+                  }
+                }}>
+                <button
+                  type="button"
+                  className="w-24 h-24 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
+                  <div className="text-center">
+                    <RiImageAddLine className="w-6 h-6 mx-auto" />
+                    <div className="text-[11px] mt-1">เพิ่มรูป</div>
+                  </div>
+                </button>
+              </Upload>
+            </ImgCrop>
           </div>
         ) : (
           <Typography.Text type="secondary" className="text-sm">
