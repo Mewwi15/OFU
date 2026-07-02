@@ -164,8 +164,8 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Clean full-bleed banner — image only */}
-        <View style={[styles.hero, { height: 200 }]} onLayout={onBannerLayout}>
+        {/* Clean rounded banner card — image only */}
+        <View style={[styles.hero, { height: 168 }]} onLayout={onBannerLayout}>
           <ScrollView
             ref={bannerRef}
             horizontal
@@ -278,11 +278,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   hero: {
-    width: '100%',
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.xs,
+    borderRadius: Radius.xl,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
+    ...Shadow.float,
   },
   topBar: {
     backgroundColor: Colors.background,
