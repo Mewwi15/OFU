@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -135,10 +134,38 @@ export default function HomeScreen() {
         contentContainerStyle={{
           paddingBottom: TAB_BAR_CLEARANCE + insets.bottom,
         }}>
-        {/* Full-bleed hero banner: overlaid header on top, search floating below */}
-        <View
-          style={[styles.hero, { height: insets.top + 250 }]}
-          onLayout={onBannerLayout}>
+        {/* Location + notifications bar — on the app background, above the banner */}
+        <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('home.changeAddress')}
+            style={styles.locLeft}
+            onPress={() => router.push('/address')}>
+            <View style={styles.locPin}>
+              <Ionicons name="location-sharp" size={18} color={Colors.primary} />
+            </View>
+            <View style={styles.locText}>
+              <Text variant="caption" style={{ color: Colors.textMuted }}>
+                {t('home.deliverTo')}
+                {address ? ` · ${address.label}` : ''}
+              </Text>
+              <View style={styles.locAddrRow}>
+                <Text numberOfLines={1} style={styles.locAddr}>
+                  {address ? address.line : t('home.addAddress')}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={Colors.text} />
+              </View>
+            </View>
+          </Pressable>
+          <IconButton
+            icon="notifications-outline"
+            accessibilityLabel={t('home.notifications')}
+            onPress={() => router.push('/notifications')}
+          />
+        </View>
+
+        {/* Clean full-bleed banner — image only */}
+        <View style={[styles.hero, { height: 200 }]} onLayout={onBannerLayout}>
           <ScrollView
             ref={bannerRef}
             horizontal
@@ -155,63 +182,12 @@ export default function HomeScreen() {
                   transition={300}
                   cachePolicy="memory-disk"
                 />
-                {/* Pure image — only a subtle top scrim so the overlaid location
-                    header (deliver-to + bell) stays readable on bright banners. */}
-                <LinearGradient
-                  colors={['rgba(0,0,0,0.32)', 'rgba(0,0,0,0)']}
-                  locations={[0, 0.4]}
-                  style={StyleSheet.absoluteFill}
-                />
               </View>
             ))}
           </ScrollView>
-
-          {/* Overlaid location header (white, on the hero) */}
-          <View
-            style={[styles.heroHeader, { paddingTop: insets.top + Spacing.sm }]}
-            pointerEvents="box-none">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('home.changeAddress')}
-              style={styles.locLeft}
-              onPress={() => router.push('/address')}>
-              <View style={styles.locPin}>
-                <Ionicons
-                  name="location-sharp"
-                  size={18}
-                  color={Colors.textOnPrimary}
-                />
-              </View>
-              <View style={styles.locText}>
-                <Text variant="caption" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  {t('home.deliverTo')}
-                  {address ? ` · ${address.label}` : ''}
-                </Text>
-                <View style={styles.locAddrRow}>
-                  <Text numberOfLines={1} style={styles.locAddr}>
-                    {address ? address.line : t('home.addAddress')}
-                  </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={16}
-                    color={Colors.textOnPrimary}
-                  />
-                </View>
-              </View>
-            </Pressable>
-            <IconButton
-              icon="notifications-outline"
-              accessibilityLabel={t('home.notifications')}
-              onPress={() => router.push('/notifications')}
-            />
-          </View>
-
           <View style={styles.dots} pointerEvents="none">
             {slides.map((slide, i) => (
-              <View
-                key={slide.id}
-                style={[styles.dot, i === activeSlide && styles.dotActive]}
-              />
+              <View key={slide.id} style={[styles.dot, i === activeSlide && styles.dotActive]} />
             ))}
           </View>
         </View>
@@ -308,12 +284,10 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
   },
-  heroHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  topBar: {
+    backgroundColor: Colors.background,
     paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -328,7 +302,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: Colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -343,7 +317,7 @@ const styles = StyleSheet.create({
   locAddr: {
     fontFamily: 'Mitr_500Medium',
     fontSize: 15,
-    color: Colors.textOnPrimary,
+    color: Colors.text,
   },
   searchEntry: {
     marginTop: -26,
@@ -386,7 +360,7 @@ const styles = StyleSheet.create({
   },
   dots: {
     position: 'absolute',
-    bottom: 78,
+    bottom: 40,
     right: Spacing.lg,
     flexDirection: 'row',
     gap: Spacing.xs,
