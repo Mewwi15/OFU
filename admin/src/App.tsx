@@ -1,4 +1,3 @@
-import { Card, Empty, Typography } from 'antd';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { useAuth } from './auth';
@@ -9,6 +8,7 @@ import { Categories } from './pages/Categories';
 import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
+import { Payments } from './pages/Payments';
 import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
@@ -44,22 +44,9 @@ export default function App() {
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Banners />} />
         <Route path="/orders" element={<Orders />} />
-        <Route path="/payments" element={<Placeholder title="ตรวจสลิป" />} />
+        <Route path="/payments" element={<Payments />} />
       </Route>
-      <Route path="*" element={<Navigate to="/products" replace />} />
+      <Route path="*" element={<Navigate to="/pos" replace />} />
     </Routes>
-  );
-}
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <>
-      <Typography.Title level={3} style={{ marginBottom: 16 }}>
-        {title}
-      </Typography.Title>
-      <Card>
-        <Empty description="เร็วๆ นี้" />
-      </Card>
-    </>
   );
 }
