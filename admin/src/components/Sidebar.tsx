@@ -18,20 +18,44 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 export type NavItem = { to: string; label: string; Icon: typeof RiCashLine };
+export type NavGroup = { title: string; items: NavItem[] };
 
-export const NAV: NavItem[] = [
-  { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
-  { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
-  { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
-  { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
-  { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
-  { to: '/featured', label: 'จัดหน้าแอป', Icon: RiLayoutMasonryLine },
-  { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
-  { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
-  { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
-  { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
-  { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
+/** Sidebar grouped into zones: on-site, online, catalog/app, overview. */
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    title: 'หน้าร้าน',
+    items: [
+      { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
+      { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
+    ],
+  },
+  {
+    title: 'ออนไลน์',
+    items: [
+      { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
+      { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
+    ],
+  },
+  {
+    title: 'จัดการแอป',
+    items: [
+      { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
+      { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
+      { to: '/featured', label: 'จัดหน้าแอป', Icon: RiLayoutMasonryLine },
+      { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
+      { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
+    ],
+  },
+  {
+    title: 'ภาพรวม',
+    items: [
+      { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
+      { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
+    ],
+  },
 ];
+
+export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 export const currentNavLabel = (pathname: string) =>
   NAV.find((n) => pathname.startsWith(n.to))?.label ?? '';
@@ -68,10 +92,15 @@ export function Sidebar({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
           nav(key);
           onNavigate?.();
         }}
-        items={NAV.map((n) => ({
-          key: n.to,
-          icon: <n.Icon className="w-[18px] h-[18px]" />,
-          label: n.label,
+        items={NAV_GROUPS.map((g) => ({
+          type: 'group' as const,
+          key: g.title,
+          label: g.title,
+          children: g.items.map((n) => ({
+            key: n.to,
+            icon: <n.Icon className="w-[18px] h-[18px]" />,
+            label: n.label,
+          })),
         }))}
       />
       <div className="p-3 border-t border-[#F0EAE6]">
