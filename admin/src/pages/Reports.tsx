@@ -2,7 +2,7 @@ import { RiRefund2Line, RiShoppingBag3Line, RiStore2Line } from '@remixicon/reac
 import { App, Card, Col, Progress, Row, Segmented, Statistic, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiError, posDashboard, type Dashboard } from '../lib/api';
+import { apiError, listLowStock, posDashboard, type Dashboard, type LowStockItem } from '../lib/api';
 
 const { Title, Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -25,6 +25,7 @@ export function Reports() {
   const [range, setRange] = useState<RangeKey>('today');
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -38,6 +39,17 @@ export function Reports() {
       alive = false;
     };
   }, [range, message]);
+
+  // Low/out-of-stock is range-independent — load once.
+  useEffect(() => {
+    let alive = true;
+    listLowStock()
+      .then((rows) => alive && setLowStock(rows))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const totalGross = useMemo(() => (data ? data.onsite.gross + data.online.gross : 0), [data]);
   const pct = (v: number, t: number) => (t > 0 ? Math.round((v / t) * 100) : 0);
@@ -136,6 +148,42 @@ export function Reports() {
             { title: 'สินค้า', dataIndex: 'name', key: 'name' },
             { title: 'จำนวน', dataIndex: 'qty', key: 'qty', align: 'right', width: 100, render: (q: number) => `${q} ชิ้น` },
             { title: 'ยอดขาย', dataIndex: 'amount', key: 'amount', align: 'right', width: 120, render: (a: number) => <span className="font-medium">{baht(a)}</span> },
+          ]}
+        />
+      </Card>
+
+      <Card title={`สต็อกใกล้หมด / หมด${lowStock.length ? ` (${lowStock.length})` : ''}`} className="mt-4">
+        <Table<LowStockItem>
+          size="small"
+          rowKey={(r) => r.product_name + (r.size ?? '')}
+          pagination={{ pageSize: 8, hideOnSinglePage: true }}
+          locale={{ emptyText: 'สต็อกเพียงพอทุกรายการ 👍' }}
+          dataSource={lowStock}
+          columns={[
+            {
+              title: 'สินค้า',
+              key: 'name',
+              render: (_, r) => (r.size ? `${r.product_name} (${r.size})` : r.product_name),
+            },
+            {
+              title: 'คงเหลือ',
+              key: 'stock',
+              align: 'right',
+              width: 120,
+              render: (_, r) => (
+                <Tag color={r.stock_qty <= 0 ? 'error' : 'warning'} bordered={false}>
+                  {r.stock_qty <= 0 ? 'หมด' : `เหลือ ${r.stock_qty}`}
+                </Tag>
+              ),
+            },
+            {
+              title: 'แจ้งเตือนที่',
+              dataIndex: 'threshold',
+              key: 'threshold',
+              align: 'right',
+              width: 110,
+              render: (t: number) => <span className="text-gray-400">≤ {t}</span>,
+            },
           ]}
         />
       </Card>

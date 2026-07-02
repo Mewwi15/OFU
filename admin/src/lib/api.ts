@@ -445,6 +445,9 @@ export type Dashboard = {
 export const posDashboard = (fromIso: string, toIso: string) =>
   rpc<Dashboard>('pos_dashboard', { p_from: fromIso, p_to: toIso });
 
+export type LowStockItem = { product_name: string; size: string | null; stock_qty: number; threshold: number };
+export const listLowStock = () => rpc<LowStockItem[]>('low_stock_items', {});
+
 export type PosSale = {
   id: string;
   sale_number: string;
