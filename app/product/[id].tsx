@@ -83,6 +83,7 @@ export default function ProductDetailsScreen() {
 
   const imageHeight = Math.round(width * 0.92);
   const total = product.price * qty;
+  const soldOut = product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
 
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -90,6 +91,7 @@ export default function ProductDetailsScreen() {
   };
 
   const handleAddToCart = () => {
+    if (soldOut) return;
     add(product, { qty });
     setToastKey((k) => k + 1);
     setShowToast(true);
@@ -194,8 +196,8 @@ export default function ProductDetailsScreen() {
         entering={FadeInUp.delay(120).duration(380)}
         style={[styles.actionBar, { paddingBottom: insets.bottom + Spacing.md }]}>
         <QuantityStepper value={qty} onChange={setQty} max={99} />
-        <Button onPress={handleAddToCart} style={styles.addButton}>
-          {`${t('product.addToCart')} · ${money(total)}`}
+        <Button onPress={handleAddToCart} disabled={soldOut} style={styles.addButton}>
+          {soldOut ? 'สินค้าหมด' : `${t('product.addToCart')} · ${money(total)}`}
         </Button>
       </Animated.View>
 
