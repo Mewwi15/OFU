@@ -135,7 +135,7 @@ export default function HomeScreen() {
           paddingBottom: TAB_BAR_CLEARANCE + insets.bottom,
         }}>
         {/* Location + notifications bar — on the app background, above the banner */}
-        <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top + Spacing.md }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('home.changeAddress')}
@@ -164,8 +164,8 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Clean rounded banner card — image only */}
-        <View style={[styles.hero, { height: 168 }]} onLayout={onBannerLayout}>
+        {/* Full-bleed banner — image only, rounded bottom */}
+        <View style={[styles.hero, { height: 200 }]} onLayout={onBannerLayout}>
           <ScrollView
             ref={bannerRef}
             horizontal
@@ -278,17 +278,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   hero: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.xs,
-    borderRadius: Radius.xl,
+    width: '100%',
+    marginTop: Spacing.md,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
-    ...Shadow.float,
+    borderRadius: Radius.xl,
   },
   topBar: {
     backgroundColor: Colors.background,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingBottom: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -321,7 +320,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   searchEntry: {
-    marginTop: -26,
+    marginTop: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
