@@ -282,7 +282,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
-    borderRadius: Radius.xl,
   },
   topBar: {
     backgroundColor: Colors.background,
