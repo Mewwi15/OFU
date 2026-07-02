@@ -155,8 +155,11 @@ export default function HomeScreen() {
                   transition={300}
                   cachePolicy="memory-disk"
                 />
+                {/* Neutral bottom scrim only (no orange tint) — keeps the real
+                    image colours; darkens just the bottom so the text stays readable. */}
                 <LinearGradient
-                  colors={['rgba(241,89,41,0.12)', 'rgba(45,20,12,0.86)']}
+                  colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
+                  locations={[0.45, 1]}
                   style={StyleSheet.absoluteFill}
                 />
                 <View style={styles.bannerContent}>
