@@ -155,21 +155,13 @@ export default function HomeScreen() {
                   transition={300}
                   cachePolicy="memory-disk"
                 />
-                {/* Neutral bottom scrim only (no orange tint) — keeps the real
-                    image colours; darkens just the bottom so the text stays readable. */}
+                {/* Pure image — only a subtle top scrim so the overlaid location
+                    header (deliver-to + bell) stays readable on bright banners. */}
                 <LinearGradient
-                  colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
-                  locations={[0.45, 1]}
+                  colors={['rgba(0,0,0,0.32)', 'rgba(0,0,0,0)']}
+                  locations={[0, 0.4]}
                   style={StyleSheet.absoluteFill}
                 />
-                <View style={styles.bannerContent}>
-                  <Text variant="title" style={{ color: Colors.textOnPrimary }}>
-                    {slide.title}
-                  </Text>
-                  <Button size="sm" onPress={() => {}} style={styles.bannerButton}>
-                    {t('home.shopNow')}
-                  </Button>
-                </View>
               </View>
             ))}
           </ScrollView>
