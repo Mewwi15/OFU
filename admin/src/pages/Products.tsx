@@ -312,6 +312,8 @@ function ProductModal({
   const [form] = Form.useForm();
   const [busy, setBusy] = useState(false);
   const [images, setImages] = useState<ProductImage[]>(product?.product_images as ProductImage[] ?? []);
+  // Images picked while creating a NEW product (no id yet) — uploaded on save.
+  const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
 
   const reloadImages = async () => {
     if (product) setImages(await listProductImages(product.id));
@@ -320,6 +322,12 @@ function ProductModal({
     void reloadImages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
+
+  const removePending = (i: number) =>
+    setPending((cur) => {
+      URL.revokeObjectURL(cur[i].url);
+      return cur.filter((_, idx) => idx !== i);
+    });
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -334,10 +342,11 @@ function ProductModal({
         brand: v.brand?.trim() || null,
         expected_row_version: product?.row_version,
       });
+      const productId = product?.id ?? res.id;
       // One product = one price/stock: upsert the product's single stock record.
       await upsertVariant({
         id: product?.product_variants?.[0]?.id,
-        product_id: product?.id ?? res.id,
+        product_id: productId,
         size: null,
         unit: v.unit?.trim() || 'ชิ้น',
         sku: v.sku?.trim() || null,
@@ -347,6 +356,9 @@ function ProductModal({
         stock_qty: v.stock_qty ?? 0,
         low_stock_threshold: v.low_stock_threshold ?? undefined,
       });
+      // Upload any images staged while creating (new products can't upload until they exist).
+      for (const p of pending) await uploadProductImage(productId, p.file);
+      pending.forEach((p) => URL.revokeObjectURL(p.url));
       onSaved();
     } catch (e) {
       message.error(apiError(e));
@@ -429,9 +441,8 @@ function ProductModal({
         </div>
 
         <div className="mb-1 text-sm text-[#4b443f]">รูปภาพสินค้า</div>
-        {product ? (
-          <div className="flex flex-wrap gap-3">
-            {images.map((img) => (
+        <div className="flex flex-wrap gap-3">
+          {images.map((img) => (
               <div key={img.id} className="w-24">
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
                   <img src={img.storage_path} alt="" className="w-full h-full object-cover" />
@@ -478,15 +489,37 @@ function ProductModal({
                 </div>
               </div>
             ))}
+            {pending.map((p, i) => (
+              <div key={p.url} className="w-24">
+                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
+                  <img src={p.url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removePending(i)}
+                    title="ลบรูป"
+                    className="absolute top-1 right-1 w-5 h-5 grid place-items-center rounded-full bg-black/55 text-white text-xs leading-none hover:bg-black/75">
+                    ×
+                  </button>
+                </div>
+                <div className="text-[11px] text-gray-400 mt-1 text-center">
+                  {images.length === 0 && i === 0 ? 'รูปหลัก' : 'รอบันทึก'}
+                </div>
+              </div>
+            ))}
             <ImgCrop aspect={1} showGrid rotationSlider modalTitle="ครอบตัดรูปสินค้า (1:1)" modalOk="ใช้รูปนี้" modalCancel="ยกเลิก">
               <Upload
                 accept="image/*"
                 showUploadList={false}
                 customRequest={async ({ file, onSuccess, onError }) => {
                   try {
-                    await uploadProductImage(product.id, file as File);
-                    await reloadImages();
-                    message.success('อัปโหลดรูปแล้ว');
+                    if (product) {
+                      await uploadProductImage(product.id, file as File);
+                      await reloadImages();
+                      message.success('อัปโหลดรูปแล้ว');
+                    } else {
+                      const f = file as File;
+                      setPending((cur) => [...cur, { file: f, url: URL.createObjectURL(f) }]);
+                    }
                     onSuccess?.({});
                   } catch (e) {
                     message.error(apiError(e));
@@ -504,11 +537,6 @@ function ProductModal({
               </Upload>
             </ImgCrop>
           </div>
-        ) : (
-          <Typography.Text type="secondary" className="text-sm">
-            บันทึกสินค้าก่อน แล้วเปิด “แก้ไข” เพื่อเพิ่มรูปภาพ
-          </Typography.Text>
-        )}
       </Form>
     </Modal>
   );
