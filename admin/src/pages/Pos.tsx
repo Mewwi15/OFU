@@ -141,9 +141,14 @@ export function Pos() {
   }, [doFlush]);
 
   const categories = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of catalog) if (p.category_id) map.set(p.category_id, p.category_name ?? '—');
-    return [...map.entries()].map(([id, name]) => ({ id, name }));
+    const map = new Map<string, { name: string; count: number }>();
+    for (const p of catalog) {
+      if (!p.category_id) continue;
+      const cur = map.get(p.category_id);
+      if (cur) cur.count++;
+      else map.set(p.category_id, { name: p.category_name ?? '—', count: 1 });
+    }
+    return [...map.entries()].map(([id, v]) => ({ id, ...v }));
   }, [catalog]);
 
   const shown = useMemo(() => {
@@ -356,12 +361,12 @@ export function Pos() {
             />
           </div>
 
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 shrink-0">
-            <Pill active={cat === null} onClick={() => setCat(null)}>
+          <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+            <Pill active={cat === null} onClick={() => setCat(null)} count={catalog.length}>
               ทั้งหมด
             </Pill>
             {categories.map((c) => (
-              <Pill key={c.id} active={cat === c.id} onClick={() => setCat(c.id)}>
+              <Pill key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} count={c.count}>
                 {c.name}
               </Pill>
             ))}
@@ -661,16 +666,34 @@ function Row({ label, value, subtle }: { label: string; value: string; subtle?: 
   );
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Pill({
+  active,
+  onClick,
+  count,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  count?: number;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
-      className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition ${
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition ${
         active
           ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand'
           : 'bg-white text-tremor-content-emphasis border-transparent shadow-sm hover:text-tremor-brand'
       }`}>
       {children}
+      {count != null && (
+        <span
+          className={`min-w-[20px] px-1.5 py-0.5 rounded-full text-[11px] font-semibold leading-none ${
+            active ? 'bg-tremor-brand text-white' : 'bg-[#F3EDE9] text-tremor-content-subtle'
+          }`}>
+          {count}
+        </span>
+      )}
     </button>
   );
 }
