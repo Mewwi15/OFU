@@ -1,7 +1,8 @@
-import { RiEyeLine, RiRefreshLine } from '@remixicon/react';
+import { RiEyeLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import {
   App,
   Button,
+  Card,
   Descriptions,
   Divider,
   Drawer,
@@ -10,14 +11,16 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Segmented,
   Select,
   Space,
+  Statistic,
   Table,
   Tag,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
   advanceOrder,
@@ -80,7 +83,7 @@ const PAYMENT_STATUS: Record<PaymentStatus, { label: string; color: string }> = 
 const orderStatusTag = (s: OrderStatus) => {
   const m = ORDER_STATUS[s] ?? { label: s, color: 'default' };
   return (
-    <Tag color={m.color} bordered={false}>
+    <Tag color={m.color} variant="filled">
       {m.label}
     </Tag>
   );
@@ -88,11 +91,31 @@ const orderStatusTag = (s: OrderStatus) => {
 const paymentStatusTag = (s: PaymentStatus) => {
   const m = PAYMENT_STATUS[s] ?? { label: s, color: 'default' };
   return (
-    <Tag color={m.color} bordered={false}>
+    <Tag color={m.color} variant="filled">
       {m.label}
     </Tag>
   );
 };
+
+// Coarse status buckets for the filter + summary — the raw list has ~15 statuses.
+const BUCKET: Record<OrderStatus, 'action' | 'shipping' | 'done' | 'cancelled'> = {
+  placed: 'action',
+  awaiting_payment: 'action',
+  slip_uploaded: 'action',
+  payment_verifying: 'action',
+  confirmed: 'action',
+  preparing: 'action',
+  assigned_to_rider: 'shipping',
+  picked_up: 'shipping',
+  in_transit: 'shipping',
+  out_for_delivery: 'shipping',
+  delivered: 'done',
+  returned: 'cancelled',
+  cancelled: 'cancelled',
+  payment_rejected: 'cancelled',
+  delivery_failed: 'cancelled',
+};
+const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 
 const SLIP_REJECT_OPTIONS: { value: SlipRejectReason; label: string }[] = [
   { value: 'amount_mismatch', label: 'ยอดเงินไม่ตรง' },
@@ -122,6 +145,9 @@ export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [query, setQuery] = useState('');
+  const [bucket, setBucket] = useState<string>('all');
+  const [mode, setMode] = useState<string>('all');
 
   async function load() {
     setLoading(true);
@@ -139,25 +165,55 @@ export function Orders() {
     void load();
   }, []);
 
+  const summary = useMemo(() => {
+    let slip = 0,
+      action = 0,
+      shipping = 0,
+      todayRevenue = 0;
+    for (const o of orders) {
+      if (isSlipPending(o)) slip++;
+      const b = BUCKET[o.order_status];
+      if (b === 'action') action++;
+      else if (b === 'shipping') shipping++;
+      if (b !== 'cancelled' && isToday(o.placed_at)) todayRevenue += o.total;
+    }
+    return { slip, action, shipping, todayRevenue };
+  }, [orders]);
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (bucket !== 'all' && BUCKET[o.order_status] !== bucket) return false;
+      if (mode !== 'all' && o.shop_mode !== mode) return false;
+      if (q && !o.order_number.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [orders, query, bucket, mode]);
+
   const columns: ColumnsType<Order> = [
     {
       title: 'เลขที่',
       dataIndex: 'order_number',
       key: 'order_number',
-      render: (v: string) => <span className="font-medium text-[#2B2320]">{v}</span>,
+      render: (v: string) => <span className="font-semibold text-[#2B2320]">{v}</span>,
     },
     {
       title: 'ช่องทาง',
       key: 'shop_mode',
       width: 110,
-      render: (_, o) => <Text type="secondary">{SHOP_MODE_LABEL[o.shop_mode]}</Text>,
+      render: (_, o) => (
+        <Tag color={o.shop_mode === 'delivery' ? 'geekblue' : 'cyan'} variant="filled">
+          {SHOP_MODE_LABEL[o.shop_mode]}
+        </Tag>
+      ),
     },
     {
       title: 'ยอดรวม',
       key: 'total',
       width: 110,
       align: 'right',
-      render: (_, o) => <span className="font-medium text-[#2B2320]">{baht(o.total)}</span>,
+      sorter: (a, b) => a.total - b.total,
+      render: (_, o) => <span className="font-semibold text-[#2B2320]">{baht(o.total)}</span>,
     },
     {
       title: 'สถานะ',
@@ -174,17 +230,25 @@ export function Orders() {
     {
       title: 'เวลา',
       key: 'placed_at',
-      width: 140,
-      render: (_, o) => <Text type="secondary">{fmtTime(o.placed_at)}</Text>,
+      width: 130,
+      render: (_, o) => {
+        const d = new Date(o.placed_at);
+        return (
+          <div className="leading-tight">
+            <div className="text-[#2B2320]">{d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div className="text-xs text-gray-400">{d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short' })}</div>
+          </div>
+        );
+      },
     },
     {
       title: '',
       key: 'actions',
-      width: 70,
+      width: 64,
       align: 'right',
       fixed: 'right',
       render: (_, o) => (
-        <Button size="small" icon={<RiEyeLine className="w-4 h-4" />} onClick={() => setSelected(o)}>
+        <Button type="link" size="small" icon={<RiEyeLine className="w-4 h-4" />} onClick={() => setSelected(o)}>
           ดู
         </Button>
       ),
@@ -198,19 +262,74 @@ export function Orders() {
           <Title level={3} style={{ margin: 0 }}>
             ออเดอร์
           </Title>
-          <Text type="secondary">ออเดอร์ออนไลน์จากลูกค้า ทั้งหมด {orders.length} รายการ</Text>
+          <Text type="secondary">ออเดอร์ออนไลน์จากลูกค้า · แตะที่ออเดอร์เพื่อจัดการ</Text>
         </div>
         <Button icon={<RiRefreshLine className="w-4 h-4" />} onClick={() => void load()}>
           รีเฟรช
         </Button>
       </div>
 
+      {/* summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic
+            title="ต้องตรวจสลิป"
+            value={summary.slip}
+            suffix="รายการ"
+            styles={{ content: { color: summary.slip ? '#c5410f' : undefined, fontWeight: 700 } }}
+          />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="รอดำเนินการ" value={summary.action} suffix="รายการ" />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="กำลังจัดส่ง" value={summary.shipping} suffix="รายการ" />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="ยอดขายวันนี้" value={summary.todayRevenue} prefix="฿" styles={{ content: { fontWeight: 700 } }} />
+        </Card>
+      </div>
+
+      {/* filters */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Input
+          allowClear
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="ค้นหาเลขออเดอร์"
+          prefix={<RiSearchLine className="w-4 h-4 text-gray-400" />}
+          style={{ width: 200 }}
+        />
+        <Select
+          value={mode}
+          onChange={setMode}
+          style={{ width: 140 }}
+          options={[
+            { value: 'all', label: 'ทุกช่องทาง' },
+            { value: 'delivery', label: 'จัดส่ง' },
+            { value: 'online', label: 'ออนไลน์' },
+          ]}
+        />
+        <Segmented
+          value={bucket}
+          onChange={(v) => setBucket(v as string)}
+          options={[
+            { value: 'all', label: 'ทั้งหมด' },
+            { value: 'action', label: 'รอจัดการ' },
+            { value: 'shipping', label: 'กำลังส่ง' },
+            { value: 'done', label: 'สำเร็จ' },
+            { value: 'cancelled', label: 'ยกเลิก' },
+          ]}
+        />
+      </div>
+
       <Table<Order>
         rowKey="id"
         loading={loading}
         columns={columns}
-        dataSource={orders}
-        pagination={{ pageSize: 15, hideOnSinglePage: true }}
+        dataSource={shown}
+        onRow={(o) => ({ onClick: () => setSelected(o), style: { cursor: 'pointer' } })}
+        pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} รายการ` }}
         scroll={{ x: 820 }}
         style={{ background: '#fff', borderRadius: 16 }}
       />

@@ -83,7 +83,7 @@ export function Payments() {
         <Card loading />
       ) : orders.length === 0 ? (
         <Card>
-          <Empty description="ไม่มีสลิปรอตรวจ 🎉" />
+          <Empty description="ไม่มีสลิปรอตรวจ" />
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -96,7 +96,7 @@ export function Payments() {
                     {o.ship_recipient ?? '—'} · {o.ship_phone ?? '—'}
                   </Text>
                 </div>
-                <Tag color={PAY_STATUS[o.payment_status]?.color} bordered={false}>
+                <Tag color={PAY_STATUS[o.payment_status]?.color} variant="filled">
                   {PAY_STATUS[o.payment_status]?.label ?? o.payment_status}
                 </Tag>
               </div>
