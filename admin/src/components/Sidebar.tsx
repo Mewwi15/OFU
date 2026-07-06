@@ -77,9 +77,8 @@ function Brand({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => 
     );
   }
   return (
-    <div className="h-[60px] flex items-center gap-2 border-b border-[#F0EAE6] px-4">
-      <div className="w-8 h-8 rounded-lg bg-[#F15929] text-white grid place-items-center font-medium shrink-0">อ</div>
-      <span className="font-medium text-[15px] text-[#2B2320] whitespace-nowrap">อู้ฟู่</span>
+    <div className="h-[60px] flex items-center border-b border-[#F0EAE6] px-4">
+      <img src="/logo-oofoo.png" alt="อู้ฟู่" style={{ height: 36 }} className="object-contain" />
       {onToggle && (
         <button
           onClick={onToggle}
