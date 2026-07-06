@@ -174,6 +174,24 @@ export async function listFeaturedSections(): Promise<FeaturedSection[]> {
 export const reorderFeaturedSections = (ids: string[]) => rpc('reorder_featured_sections', { p_ids: ids });
 export const setFeaturedPublish = (id: string, published: boolean) =>
   rpc('set_featured_publish', { p_id: id, p_published: published });
+export const upsertFeaturedSection = (p: { id?: string; title: string; publish_state?: 'draft' | 'published' }) =>
+  rpc<{ id: string }>('upsert_featured_section', {
+    p_id: p.id ?? undefined,
+    p_title: p.title,
+    p_publish_state: p.publish_state ?? 'draft',
+  });
+export const setFeaturedItems = (sectionId: string, productIds: string[]) =>
+  rpc('set_featured_items', { p_section_id: sectionId, p_product_ids: productIds });
+export const deleteFeaturedSection = (id: string) => rpc('delete_featured_section', { p_id: id });
+export async function getFeaturedItems(sectionId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('featured_section_items')
+    .select('product_id, display_order')
+    .eq('section_id', sectionId)
+    .order('display_order');
+  if (error) throw error;
+  return (data as { product_id: string }[]).map((r) => r.product_id);
+}
 
 /* ── banners (app home hero) ────────────────────────────────────────────────── */
 export type Banner = {
