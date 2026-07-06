@@ -1,18 +1,30 @@
-import { RiAddLine, RiDeleteBinLine, RiPencilLine } from '@remixicon/react';
-import { App, Button, Checkbox, Empty, Form, Input, Modal, Popconfirm, Space, Switch, Tooltip, Typography } from 'antd';
+import {
+  RiAddLine,
+  RiDeleteBinLine,
+  RiImageLine,
+  RiPencilLine,
+  RiPriceTag3Line,
+  RiShoppingBasket2Line,
+} from '@remixicon/react';
+import { App, Button, Card, Checkbox, Empty, Form, Input, Modal, Popconfirm, Space, Switch, Tag, Tooltip, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { DndTable, DragHandle } from '../components/DndTable';
 import {
   apiError,
   deleteFeaturedSection,
   getFeaturedItems,
+  listBanners,
+  listCategories,
   listFeaturedSections,
   listProducts,
   reorderFeaturedSections,
   setFeaturedItems,
   setFeaturedPublish,
   upsertFeaturedSection,
+  type Banner,
+  type Category,
   type FeaturedSection,
   type Product,
 } from '../lib/api';
@@ -24,21 +36,39 @@ const primaryImage = (p: Product) =>
 
 export function Featured() {
   const { message } = App.useApp();
+  const nav = useNavigate();
   const [sections, setSections] = useState<FeaturedSection[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [items, setItems] = useState<Record<string, string[]>>({});
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [cats, setCats] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<FeaturedSection | 'new' | null>(null);
+
+  const counts = useMemo(
+    () => Object.fromEntries(Object.entries(items).map(([k, v]) => [k, v.length])),
+    [items],
+  );
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const [picking, setPicking] = useState<FeaturedSection | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      const rows = await listFeaturedSections();
+      const [rows, b, c, p] = await Promise.all([
+        listFeaturedSections(),
+        listBanners(),
+        listCategories(),
+        listProducts(),
+      ]);
       setSections(rows);
+      setBanners(b);
+      setCats(c);
+      setProducts(p);
       const entries = await Promise.all(
-        rows.map(async (s) => [s.id, (await getFeaturedItems(s.id).catch(() => [])).length] as const),
+        rows.map(async (s) => [s.id, await getFeaturedItems(s.id).catch(() => [])] as const),
       );
-      setCounts(Object.fromEntries(entries));
+      setItems(Object.fromEntries(entries));
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -77,75 +107,155 @@ export function Featured() {
     }
   }
 
+  const pubBanners = banners.filter((b) => b.publish_state === 'published');
+  const pubSections = sections.filter((s) => s.publish_state === 'published');
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            จัดหน้าแอป
-          </Title>
-          <Text type="secondary">แถวสินค้าเด่นที่โชว์บนหน้าแรกของแอป · ลากจัดลำดับ · เปิด/ปิด · เลือกสินค้าในแต่ละแถว</Text>
-        </div>
-        <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
-          สร้างแถว
-        </Button>
+      <div className="mb-4">
+        <Title level={3} style={{ margin: 0 }}>
+          จัดหน้าแอป
+        </Title>
+        <Text type="secondary">ควบคุมทุกส่วนของหน้าแรกในแอปลูกค้า — เรียงตามลำดับที่ลูกค้าเห็นจริง</Text>
       </div>
 
-      {!loading && sections.length === 0 ? (
-        <Empty description="ยังไม่มีแถวสินค้าเด่น — กด “สร้างแถว” เพื่อเริ่ม" style={{ padding: 40, background: '#fff', borderRadius: 12 }} />
-      ) : (
-        <DndTable<FeaturedSection>
-          items={sections}
-          onReorder={onReorder}
-          loading={loading}
-          scroll={{ x: 560 }}
-          style={{ background: '#fff', borderRadius: 12 }}
-          columns={[
-            { title: '', key: 'drag', width: 48, render: () => <DragHandle /> },
-            { title: 'ชื่อแถว', key: 'title', render: (_, s) => <span className="font-medium text-[#2B2320]">{s.title}</span> },
-            {
-              title: 'สินค้าในแถว',
-              key: 'items',
-              width: 160,
-              render: (_, s) => (
-                <Button size="small" onClick={() => setPicking(s)}>
-                  เลือกสินค้า ({counts[s.id] ?? 0})
-                </Button>
-              ),
-            },
-            {
-              title: 'แสดงในแอป',
-              key: 'publish',
-              width: 110,
-              align: 'center',
-              render: (_, s) => (
-                <Switch
-                  checked={s.publish_state === 'published'}
-                  onChange={(v) => void togglePublish(s, v)}
-                  checkedChildren="แสดง"
-                  unCheckedChildren="ซ่อน"
-                />
-              ),
-            },
-            {
-              title: 'จัดการ',
-              key: 'actions',
-              width: 100,
-              align: 'right',
-              render: (_, s) => (
-                <Space size={4}>
-                  <Tooltip title="เปลี่ยนชื่อ">
-                    <Button size="small" type="text" icon={<RiPencilLine className="w-[17px] h-[17px]" />} onClick={() => setEditing(s)} />
-                  </Tooltip>
-                  <Popconfirm title="ลบแถวนี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(s)}>
-                    <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-[17px] h-[17px]" />} />
-                  </Popconfirm>
-                </Space>
-              ),
-            },
-          ]}
+      <div className="lg:grid lg:grid-cols-[1fr_340px] lg:gap-5 lg:items-start">
+        {/* ── management column ─────────────────────────────────────────────── */}
+        <div>
+          {/* 1 · banners */}
+          <SectionCard
+            index={1}
+            title="แบนเนอร์"
+            desc="ภาพสไลด์บนสุดของหน้าแรก"
+            action={
+              <Button size="small" onClick={() => nav('/banners')}>
+                จัดการแบนเนอร์
+              </Button>
+            }>
+            {pubBanners.length ? (
+              <div className="flex items-center gap-2">
+                <Tag color="processing" variant="filled">
+                  {pubBanners.length} แบนเนอร์ที่แสดง
+                </Tag>
+                <div className="flex gap-1.5">
+                  {pubBanners.slice(0, 4).map((b) =>
+                    b.image_path ? (
+                      <img key={b.id} src={b.image_path} alt="" className="w-14 h-7 rounded object-cover border border-[#F0EAE6]" />
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            ) : (
+              <Text type="secondary" className="text-sm">
+                ยังไม่มีแบนเนอร์ที่แสดง — ใช้ภาพสำรองในแอป
+              </Text>
+            )}
+          </SectionCard>
+
+          {/* 2 · categories */}
+          <SectionCard
+            index={2}
+            title="หมวดหมู่ทางลัด"
+            desc="ปุ่มหมวดหมู่ใต้แบนเนอร์"
+            action={
+              <Button size="small" onClick={() => nav('/categories')}>
+                จัดการหมวดหมู่
+              </Button>
+            }>
+            {cats.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {cats.map((c) => (
+                  <Tag key={c.id} variant="filled">
+                    {c.name}
+                  </Tag>
+                ))}
+              </div>
+            ) : (
+              <Text type="secondary" className="text-sm">
+                ยังไม่มีหมวดหมู่
+              </Text>
+            )}
+          </SectionCard>
+
+          {/* 3 · featured rows */}
+          <SectionCard
+            index={3}
+            title="แถวสินค้าเด่น"
+            desc="แถวสินค้าที่คัดมาโชว์ · ลากจัดลำดับ · เปิด/ปิด"
+            action={
+              <Button type="primary" size="small" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
+                สร้างแถว
+              </Button>
+            }>
+            {!loading && sections.length === 0 ? (
+              <Empty description="ยังไม่มีแถวสินค้าเด่น — กด “สร้างแถว” เพื่อเริ่ม" style={{ padding: '24px 0' }} />
+            ) : (
+              <DndTable<FeaturedSection>
+                items={sections}
+                onReorder={onReorder}
+                loading={loading}
+                scroll={{ x: 560 }}
+                columns={[
+                  { title: '', key: 'drag', width: 40, render: () => <DragHandle /> },
+                  { title: 'ชื่อแถว', key: 'title', render: (_, s) => <span className="font-semibold text-[#2B2320]">{s.title}</span> },
+                  {
+                    title: 'สินค้า',
+                    key: 'items',
+                    width: 150,
+                    render: (_, s) => (
+                      <Button size="small" onClick={() => setPicking(s)}>
+                        เลือกสินค้า ({counts[s.id] ?? 0})
+                      </Button>
+                    ),
+                  },
+                  {
+                    title: 'แสดง',
+                    key: 'publish',
+                    width: 96,
+                    align: 'center',
+                    render: (_, s) => (
+                      <Switch
+                        checked={s.publish_state === 'published'}
+                        onChange={(v) => void togglePublish(s, v)}
+                        checkedChildren="แสดง"
+                        unCheckedChildren="ซ่อน"
+                      />
+                    ),
+                  },
+                  {
+                    title: 'จัดการ',
+                    key: 'actions',
+                    width: 130,
+                    align: 'right',
+                    render: (_, s) => (
+                      <Space size={6}>
+                        <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(s)}>
+                          แก้ชื่อ
+                        </Button>
+                        <Popconfirm title="ลบแถวนี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(s)}>
+                          <Tooltip title="ลบ">
+                            <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+                          </Tooltip>
+                        </Popconfirm>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          </SectionCard>
+        </div>
+
+        {/* ── phone preview ─────────────────────────────────────────────────── */}
+        <HomePreview
+          banner={pubBanners.find((b) => b.image_path)?.image_path ?? null}
+          categories={cats.map((c) => c.name)}
+          sections={pubSections.map((s) => ({
+            title: s.title,
+            products: (items[s.id] ?? []).map((id) => productById.get(id)).filter((p): p is Product => !!p),
+          }))}
         />
-      )}
+      </div>
 
       {editing ? (
         <SectionModal
@@ -168,6 +278,116 @@ export function Featured() {
         />
       ) : null}
     </>
+  );
+}
+
+/** One home-section block in the management column. */
+function SectionCard({
+  index,
+  title,
+  desc,
+  action,
+  children,
+}: {
+  index: number;
+  title: string;
+  desc: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card size="small" styles={{ body: { padding: 16 } }} className="mb-4">
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="w-6 h-6 grid place-items-center rounded-full bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold shrink-0">
+          {index}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-[#2B2320] leading-tight">{title}</div>
+          <div className="text-xs text-gray-400">{desc}</div>
+        </div>
+        {action}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+const previewImg = (p: Product) => primaryImage(p);
+
+/** Phone-frame preview of the customer-app home, in the real section order. */
+function HomePreview({
+  banner,
+  categories,
+  sections,
+}: {
+  banner: string | null;
+  categories: string[];
+  sections: { title: string; products: Product[] }[];
+}) {
+  return (
+    <div className="hidden lg:block sticky top-0">
+      <div className="mx-auto w-[320px] rounded-[28px] border-[6px] border-[#2B2320] bg-[#FBF2EC] overflow-hidden shadow-lg">
+        <div className="h-6 bg-[#2B2320] flex items-center justify-center">
+          <div className="w-16 h-1.5 rounded-full bg-white/30" />
+        </div>
+        <div className="max-h-[560px] overflow-y-auto pb-4">
+          {/* banner */}
+          {banner ? (
+            <img src={banner} alt="" className="w-full object-cover" style={{ aspectRatio: '2 / 1' }} />
+          ) : (
+            <div className="w-full grid place-items-center bg-[#F3EDE9] text-gray-400" style={{ aspectRatio: '2 / 1' }}>
+              <RiImageLine className="w-7 h-7" />
+            </div>
+          )}
+
+          {/* categories */}
+          {categories.length > 0 && (
+            <div className="px-3 pt-3 flex gap-3 overflow-x-auto">
+              {categories.slice(0, 6).map((c) => (
+                <div key={c} className="flex flex-col items-center gap-1 shrink-0">
+                  <div className="w-11 h-11 rounded-2xl bg-white shadow-sm grid place-items-center">
+                    <RiPriceTag3Line className="w-5 h-5 text-tremor-brand" />
+                  </div>
+                  <span className="text-[10px] text-[#2B2320] max-w-[52px] truncate">{c}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* featured rows */}
+          {sections.map((s) => (
+            <div key={s.title} className="mt-4">
+              <div className="px-3 mb-2 text-[13px] font-semibold text-[#2B2320]">{s.title}</div>
+              <div className="px-3 flex gap-2 overflow-x-auto">
+                {s.products.length === 0 ? (
+                  <span className="text-[11px] text-gray-400">ยังไม่ได้เลือกสินค้า</span>
+                ) : (
+                  s.products.slice(0, 5).map((p) => (
+                    <div key={p.id} className="w-20 shrink-0">
+                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-white shadow-sm grid place-items-center">
+                        {previewImg(p) ? (
+                          <img src={previewImg(p)!} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <RiShoppingBasket2Line className="w-6 h-6 text-tremor-brand-subtle" />
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#2B2320] mt-1 line-clamp-1">{p.name}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+
+          {sections.length === 0 && (
+            <div className="px-3 mt-6 text-center text-[11px] text-gray-400">
+              เปิดแถวสินค้าเด่นเพื่อให้แสดงตรงนี้
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="text-center text-xs text-gray-400 mt-2">ตัวอย่างหน้าแรกในแอป</div>
+    </div>
   );
 }
 
