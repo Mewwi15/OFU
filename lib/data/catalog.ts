@@ -14,6 +14,7 @@ type Row = {
   subtitle: string | null;
   description: string | null;
   rating: number | null;
+  created_at: string | null;
   categories: { name: string } | null;
   product_variants:
     | { id: string; size: string | null; price: number; available_qty: number; archived_at: string | null }[]
@@ -22,7 +23,7 @@ type Row = {
 };
 
 const SELECT =
-  'id, name, subtitle, description, rating, categories(name), ' +
+  'id, name, subtitle, description, rating, created_at, categories(name), ' +
   'product_variants(id, size, price, available_qty, archived_at), ' +
   'product_images(storage_path, is_primary, display_order)';
 
@@ -49,7 +50,15 @@ function mapProduct(r: Row): Product {
     sizes: variants.map((v) => v.size).filter((s): s is string => !!s),
     variants,
     category: (r.categories?.name ?? 'ของแห้ง') as ProductCategory,
+    createdAt: r.created_at ?? undefined,
   };
+}
+
+/** Top-selling published product ids (real POS + online sales), best first. */
+export async function loadBestsellerIds(limit = 12): Promise<string[]> {
+  const { data, error } = await supabase.rpc('home_bestseller_ids', { p_limit: limit });
+  if (error) throw error;
+  return (data as string[] | null) ?? [];
 }
 
 /** Load all published, non-archived products (with variants + images). */

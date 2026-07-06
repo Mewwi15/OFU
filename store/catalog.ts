@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import type { Product } from '@/data/products';
 import {
   loadBanners,
+  loadBestsellerIds,
   loadCatalog,
   loadCategoryNames,
   loadFeatured,
@@ -21,6 +22,8 @@ export type CatalogState = {
   banners: HomeBanner[];
   categories: string[];
   featured: FeaturedRow[];
+  /** Top-selling product ids (real sales), best first — for the "ขายดี" rail. */
+  bestsellerIds: string[];
   loading: boolean;
   loaded: boolean;
   error: string | null;
@@ -33,6 +36,7 @@ export const useCatalog = create<CatalogState>((set, get) => ({
   banners: [],
   categories: [],
   featured: [],
+  bestsellerIds: [],
   loading: false,
   loaded: false,
   error: null,
@@ -43,14 +47,15 @@ export const useCatalog = create<CatalogState>((set, get) => ({
     if (s.loaded && !force) return;
     set({ loading: true, error: null });
     try {
-      // Banners/categories/featured are optional chrome — never block the catalog.
-      const [products, banners, categories, featured] = await Promise.all([
+      // Banners/categories/featured/bestsellers are optional chrome — never block the catalog.
+      const [products, banners, categories, featured, bestsellerIds] = await Promise.all([
         loadCatalog(),
         loadBanners().catch(() => [] as HomeBanner[]),
         loadCategoryNames().catch(() => [] as string[]),
         loadFeatured().catch(() => [] as FeaturedRow[]),
+        loadBestsellerIds().catch(() => [] as string[]),
       ]);
-      set({ products, banners, categories, featured, loaded: true, loading: false });
+      set({ products, banners, categories, featured, bestsellerIds, loaded: true, loading: false });
     } catch {
       set({ error: 'โหลดสินค้าไม่สำเร็จ', loading: false });
     }

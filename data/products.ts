@@ -49,6 +49,8 @@ export type Product = {
   /** Purchasable variants (≥1; carries ids + per-size price/stock). */
   variants: ProductVariant[];
   category: ProductCategory;
+  /** ISO timestamp the product was added (drives the "มาใหม่" rail). */
+  createdAt?: string;
 };
 
 /** Category filter list for the chip rows. 'ทั้งหมด' is the All filter. */

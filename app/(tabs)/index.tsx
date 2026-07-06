@@ -83,14 +83,31 @@ export default function HomeScreen() {
     : BANNER_SLIDES.map((b) => ({ id: b.id, image: b.image, title: t(b.titleKey) }));
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);
+  const bestsellerIds = useCatalog((s) => s.bestsellerIds);
   // Admin categories (in their display order) when available; else the static list.
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
-  const bestSellers = useMemo(
+
+  // ขายดี — real units sold (POS + online); products with sales first, then fill by rating.
+  const bestSellers = useMemo(() => {
+    const rank = new Map(bestsellerIds.map((id, i) => [id, i]));
+    return [...products]
+      .sort((a, b) => {
+        const ra = rank.get(a.id) ?? Infinity;
+        const rb = rank.get(b.id) ?? Infinity;
+        return ra !== rb ? ra - rb : b.rating - a.rating;
+      })
+      .slice(0, 8);
+  }, [products, bestsellerIds]);
+  // แนะนำ — highest rated.
+  const recommended = useMemo(
     () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
     [products],
   );
-  const recommended = useMemo(() => products.slice(0, 8), [products]);
-  const newArrivals = useMemo(() => [...products].reverse().slice(0, 8), [products]);
+  // มาใหม่ — most recently added.
+  const newArrivals = useMemo(
+    () => [...products].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')).slice(0, 8),
+    [products],
+  );
 
   /* ----- Auto-rotating hero banner ----- */
   const bannerRef = useRef<ScrollView>(null);
