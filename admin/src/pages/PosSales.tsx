@@ -1,15 +1,18 @@
-import { RiRefund2Line, RiSearchLine } from '@remixicon/react';
+import { RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
 import { App, Button, Card, Drawer, Input, Popconfirm, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
+import { Receipt } from '../components/Receipt';
 import {
   apiError,
   getPosSaleItems,
+  getShopInfo,
   listPosSales,
   refundPosSale,
   type PosSale,
   type PosSaleItem,
+  type ShopInfo,
 } from '../lib/api';
 
 const { Title, Text } = Typography;
@@ -35,6 +38,7 @@ const timeParts = (iso: string) => {
 export function PosSales() {
   const { message } = App.useApp();
   const [sales, setSales] = useState<PosSale[]>([]);
+  const [shop, setShop] = useState<ShopInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<PosSale | null>(null);
   const [items, setItems] = useState<PosSaleItem[]>([]);
@@ -55,6 +59,7 @@ export function PosSales() {
   }
   useEffect(() => {
     void load();
+    getShopInfo().then(setShop).catch(() => {});
   }, []);
 
   async function openDetail(s: PosSale) {
@@ -259,6 +264,7 @@ export function PosSales() {
         onClose={() => setDetail(null)}
         size="default"
         title={detail ? `บิล ${detail.sale_number}` : ''}
+        styles={{ body: { background: '#F3EEEA' } }}
         extra={
           detail?.status === 'completed' ? (
             <Popconfirm
@@ -277,52 +283,40 @@ export function PosSales() {
               คืนเงินแล้ว
             </Tag>
           ) : null
+        }
+        footer={
+          <Button
+            type="primary"
+            block
+            size="large"
+            icon={<RiPrinterLine className="w-4 h-4" />}
+            disabled={!shop || !items.length}
+            onClick={() => window.print()}>
+            พิมพ์บิล
+          </Button>
         }>
-        {detail && (
-          <>
-            <div className="flex items-center justify-between">
-              <Text type="secondary">{new Date(detail.created_at).toLocaleString('th-TH')}</Text>
-              <Tag color={PAY[detail.payment_method]?.color} variant="filled">
-                {PAY[detail.payment_method]?.label ?? detail.payment_method}
-              </Tag>
-            </div>
-            <Table<PosSaleItem>
-              className="mt-3"
-              size="small"
-              rowKey="id"
-              pagination={false}
-              dataSource={items}
-              columns={[
-                { title: 'รายการ', key: 'name', render: (_, i) => (i.size ? `${i.product_name} (${i.size})` : i.product_name) },
-                { title: 'จำนวน', dataIndex: 'qty', key: 'qty', align: 'center', width: 70 },
-                { title: 'รวม', dataIndex: 'line_total', key: 'lt', align: 'right', width: 90, render: (v: number) => baht(v) },
-              ]}
+        {detail && shop && (
+          <div className="mx-auto max-w-[300px] bg-white rounded-lg shadow-sm px-4 py-4">
+            <Receipt
+              shop={shop}
+              saleNumber={detail.sale_number}
+              at={new Date(detail.created_at).toLocaleString('th-TH')}
+              taxInvoiceNo={detail.tax_invoice_no}
+              items={items.map((i) => ({
+                name: i.product_name,
+                size: i.size,
+                qty: i.qty,
+                unitPrice: i.unit_price,
+                lineTotal: i.line_total,
+              }))}
+              subtotal={detail.total + detail.discount}
+              discount={detail.discount}
+              vatAmount={detail.vat_amount}
+              netAmount={detail.net_amount}
+              total={detail.total}
+              paymentMethod={detail.payment_method}
             />
-            <div className="mt-4 space-y-1 text-sm">
-              {detail.discount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">ส่วนลด</span>
-                  <span>−{baht(detail.discount)}</span>
-                </div>
-              )}
-              {detail.vat_amount > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">VAT</span>
-                  <span>{baht(detail.vat_amount)}</span>
-                </div>
-              )}
-              {detail.tax_invoice_no && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">เลขใบกำกับ</span>
-                  <span>{detail.tax_invoice_no}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-semibold pt-1 border-t" style={{ borderColor: '#F0EAE6' }}>
-                <span>ยอดสุทธิ</span>
-                <span className="text-tremor-brand-emphasis">{baht(detail.total)}</span>
-              </div>
-            </div>
-          </>
+          </div>
         )}
       </Drawer>
     </>

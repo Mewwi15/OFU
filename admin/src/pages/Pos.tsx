@@ -50,6 +50,7 @@ import {
   type InputRef,
 } from 'antd';
 
+import { Receipt } from '../components/Receipt';
 import { promptpayPayload } from '../lib/promptpay';
 
 type Line = {
@@ -959,77 +960,22 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           ขายต่อ
         </Button>,
       ]}>
-      <div id="pos-receipt" className="font-mono text-[13px] text-black leading-relaxed pt-1">
-          <div className="text-center mb-2">
-            <img
-              src="/logo-oofoo.png"
-              alt=""
-              className="h-14 mx-auto mb-1 object-contain"
-              style={{ filter: 'grayscale(1) contrast(1.15)' }}
-            />
-            <div className="text-base font-bold">{shop.receipt_header || shop.name}</div>
-            {shop.vat_registered && shop.tax_id && (
-              <div className="text-[11px]">เลขผู้เสียภาษี {shop.tax_id} ({shop.branch_code})</div>
-            )}
-            <div className="text-[11px]">
-              {sale.tax_invoice_no ? 'ใบกำกับภาษี' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ'}
-            </div>
-          </div>
-          <div className="flex justify-between text-[11px]">
-            <span>เลขที่ {sale.sale_number}</span>
-            <span>{at}</span>
-          </div>
-          {sale.tax_invoice_no && <div className="text-[11px]">เลขใบกำกับ {sale.tax_invoice_no}</div>}
-          {data.offline && (
-            <div className="mt-1 text-[11px] text-center border border-dashed border-black rounded py-0.5">
-              บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์
-            </div>
-          )}
-          <div className="border-t border-dashed border-black my-2" />
-          {lines.map((l) => (
-            <div key={l.variantId} className="mb-1">
-              <div>
-                {l.name}
-                {l.size ? ` (${l.size})` : ''}
-              </div>
-              <div className="flex justify-between">
-                <span>
-                  {l.qty} x {l.unitPrice}
-                </span>
-                <span>{l.unitPrice * l.qty}</span>
-              </div>
-            </div>
-          ))}
-          <div className="border-t border-dashed border-black my-2" />
-          <Line2 label="ยอดรวม" value={sale.subtotal} />
-          {sale.discount > 0 && <Line2 label="ส่วนลด" value={-sale.discount} />}
-          {shop.vat_registered && (
-            <>
-              <Line2 label="มูลค่าก่อน VAT" value={sale.net_amount} />
-              <Line2 label={`VAT ${shop.vat_rate}%`} value={sale.vat_amount} />
-            </>
-          )}
-          <div className="flex justify-between font-bold text-sm mt-1">
-            <span>สุทธิ</span>
-            <span>{sale.total}</span>
-          </div>
-          <div className="border-t border-dashed border-black my-2" />
-          <Line2
-            label={method === 'cash' ? 'เงินสด' : 'พร้อมเพย์'}
-            value={method === 'cash' ? sale.total + sale.change : sale.total}
-          />
-          {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}
-          <div className="text-center text-[11px] mt-3">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
-        </div>
+      <Receipt
+        shop={shop}
+        saleNumber={sale.sale_number}
+        at={at}
+        taxInvoiceNo={sale.tax_invoice_no}
+        items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.qty }))}
+        subtotal={sale.subtotal}
+        discount={sale.discount}
+        vatAmount={sale.vat_amount}
+        netAmount={sale.net_amount}
+        total={sale.total}
+        paymentMethod={method}
+        cashPaid={method === 'cash' ? sale.total + sale.change : null}
+        change={method === 'cash' ? sale.change : null}
+        offline={data.offline}
+      />
     </Modal>
-  );
-}
-
-function Line2({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex justify-between">
-      <span>{label}</span>
-      <span>{value.toLocaleString('th-TH')}</span>
-    </div>
   );
 }
