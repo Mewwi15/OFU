@@ -20,11 +20,11 @@ const { Title, Text } = Typography;
 
 type PlacementMeta = { value: BannerPlacement; label: string; hint: string; multi: boolean };
 const PLACEMENTS: PlacementMeta[] = [
-  { value: 'home', label: 'หน้าแรก (สไลด์)', hint: 'สไลด์บนสุดของหน้าแรก — ใส่ได้หลายรูป ลากจัดลำดับได้', multi: true },
-  { value: 'search_hero', label: 'ค้นหา · บนสุด', hint: 'แบนเนอร์ใหญ่บนสุดของหน้าค้นหา (ใช้รูปเดียว)', multi: false },
-  { value: 'search_trending', label: 'ค้นหา · ติดกระแส', hint: 'หัวแถว “ติดกระแส” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
-  { value: 'search_promo', label: 'ค้นหา · โปรโมชั่น', hint: 'หัวแถว “โปรโมชั่น” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
-  { value: 'search_hot', label: 'ค้นหา · มาแรง', hint: 'หัวแถว “มาแรงประจำสัปดาห์” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
+  { value: 'home', label: 'หน้าแรก · สไลด์บนสุด', hint: 'สไลด์บนสุดของหน้าแรก — ใส่ได้หลายรูป ลากจัดลำดับได้', multi: true },
+  { value: 'search_hero', label: 'หน้าค้นหา · แบนเนอร์บนสุด', hint: 'แบนเนอร์ใหญ่บนสุดของหน้าค้นหา (รูปเสือ OFU) — ใช้รูปเดียว', multi: false },
+  { value: 'search_trending', label: 'หน้าค้นหา · แถบ “กำลังมาแรง”', hint: 'แถบเหนือแถว “สินค้าติดกระแส” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
+  { value: 'search_promo', label: 'หน้าค้นหา · แถบ “ลดสูงสุด 40%”', hint: 'แถบเหนือแถว “โปรโมชั่น” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
+  { value: 'search_hot', label: 'หน้าค้นหา · แถบ “เรตติ้งสูงสุด”', hint: 'แถบเหนือแถว “มาแรงประจำสัปดาห์” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
 ];
 
 export function Banners() {

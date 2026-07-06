@@ -63,11 +63,11 @@ export default function CatalogScreen() {
   const banners = useCatalog((s) => s.banners);
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 
-  // Admin-managed banners per slot; fall back to the built-in images.
+  // Admin-managed banners per slot; fall back to the built-in image + copy.
   const heroBanner = bannerFor(banners, 'search_hero');
-  const trendingImg = bannerFor(banners, 'search_trending')?.image ?? SECTION_BANNER_IMAGES.trending;
-  const promoImg = bannerFor(banners, 'search_promo')?.image ?? SECTION_BANNER_IMAGES.promo;
-  const hotImg = bannerFor(banners, 'search_hot')?.image ?? SECTION_BANNER_IMAGES.hot;
+  const trendingBanner = bannerFor(banners, 'search_trending');
+  const promoBanner = bannerFor(banners, 'search_promo');
+  const hotBanner = bannerFor(banners, 'search_hot');
   const trending = useMemo(() => products.slice(0, 6), [products]);
   const promotions = useMemo(
     () => [...products].sort((a, b) => a.price - b.price).slice(0, 6),
@@ -182,21 +182,21 @@ export default function CatalogScreen() {
              vertical recommended grid */
           <>
             <PromoBanner
-              title={t('search.trendingBannerTitle')}
+              title={trendingBanner?.title || t('search.trendingBannerTitle')}
               subtitle={t('search.trendingBannerSub')}
-              image={trendingImg}
+              image={trendingBanner?.image ?? SECTION_BANNER_IMAGES.trending}
             />
             <ProductRail title={t('search.railTrending')} data={trending} />
             <PromoBanner
-              title={t('search.promoBannerTitle')}
+              title={promoBanner?.title || t('search.promoBannerTitle')}
               subtitle={t('search.promoBannerSub')}
-              image={promoImg}
+              image={promoBanner?.image ?? SECTION_BANNER_IMAGES.promo}
             />
             <ProductRail title={t('search.railPromo')} data={promotions} />
             <PromoBanner
-              title={t('search.hotBannerTitle')}
+              title={hotBanner?.title || t('search.hotBannerTitle')}
               subtitle={t('search.hotBannerSub')}
-              image={hotImg}
+              image={hotBanner?.image ?? SECTION_BANNER_IMAGES.hot}
             />
             <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
 
