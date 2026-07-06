@@ -2,6 +2,7 @@ import {
   RiAddLine,
   RiCheckLine,
   RiCloseLine,
+  RiDeleteBin6Line,
   RiErrorWarningLine,
   RiMoneyDollarCircleLine,
   RiPrinterLine,
@@ -474,8 +475,10 @@ export function Pos() {
                   type="button"
                   onClick={() => !oos && pick(p)}
                   disabled={oos}
-                  className={`group relative text-left rounded-2xl bg-white shadow-sm border overflow-hidden transition ${
-                    inCart > 0 ? 'border-tremor-brand ring-1 ring-tremor-brand' : 'border-transparent'
+                  className={`group relative text-left rounded-2xl bg-white overflow-hidden transition border ${
+                    inCart > 0
+                      ? 'border-tremor-brand ring-1 ring-tremor-brand shadow-[0_6px_16px_-8px_rgba(241,89,41,0.45)]'
+                      : 'border-[#EFE6E0] shadow-sm'
                   } ${oos ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:-translate-y-0.5 active:translate-y-0'}`}>
                   <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center">
                     {p.image ? (
@@ -506,12 +509,12 @@ export function Pos() {
                         {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
                       </span>
                       <span
-                        className={`w-7 h-7 grid place-items-center rounded-full transition ${
+                        className={`w-8 h-8 grid place-items-center rounded-full transition ${
                           oos
                             ? 'bg-[#F3EDE9] text-tremor-content-subtle'
-                            : 'bg-tremor-brand-faint text-tremor-brand-emphasis group-hover:bg-tremor-brand group-hover:text-white'
+                            : 'bg-tremor-brand text-white shadow-sm group-hover:bg-tremor-brand-emphasis group-hover:scale-105'
                         }`}>
-                        <RiAddLine className="w-4 h-4" />
+                        <RiAddLine className="w-[18px] h-[18px]" />
                       </span>
                     </div>
                   </div>
@@ -554,15 +557,20 @@ export function Pos() {
             cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}>
           <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
-            <div>
-              <div className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</div>
-              <div className="text-xs text-tremor-content-subtle">
-                {lines.reduce((s, l) => s + l.qty, 0)} ชิ้น
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</span>
               {lines.length > 0 && (
-                <button onClick={resetSale} className="text-xs text-tremor-content hover:text-red-600">
+                <span className="min-w-[22px] h-[22px] px-1.5 grid place-items-center rounded-full bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold">
+                  {lines.reduce((s, l) => s + l.qty, 0)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              {lines.length > 0 && (
+                <button
+                  onClick={resetSale}
+                  className="inline-flex items-center gap-1 text-xs text-tremor-content hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition">
+                  <RiDeleteBin6Line className="w-3.5 h-3.5" />
                   ล้างบิล
                 </button>
               )}
@@ -619,29 +627,31 @@ export function Pos() {
           </div>
 
           {/* totals + pay */}
-          <div className="border-t border-tremor-border p-4 space-y-2.5">
-            <Row label="ยอดรวม" value={baht(subtotal)} />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
-              <div className="flex items-center gap-1">
-                <span className="text-tremor-content-subtle">฿</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={discount || ''}
-                  onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-20 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
-                />
+          <div className="border-t border-tremor-border p-4 space-y-3">
+            <div className="rounded-xl bg-[#FBF7F4] border border-[#F0E7E1] p-3.5 space-y-2">
+              <Row label="ยอดรวม" value={baht(subtotal)} />
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
+                <div className="flex items-center gap-1 rounded-lg bg-white border border-tremor-border px-2 py-0.5 focus-within:ring-2 focus-within:ring-tremor-brand-muted">
+                  <span className="text-tremor-content-subtle text-xs">฿</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={discount || ''}
+                    onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-16 text-right bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+              {shop?.vat_registered && <Row label="ราคาก่อน VAT" value={baht(net)} subtle />}
+              {shop?.vat_registered && <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />}
+              <div className="flex items-center justify-between pt-2 border-t border-[#EEE3DC]">
+                <span className="font-semibold text-tremor-content-strong">ยอดสุทธิ</span>
+                <span className="text-[26px] leading-none font-bold text-tremor-brand-emphasis">{baht(total)}</span>
               </div>
             </div>
-            {shop?.vat_registered && <Row label="ราคาก่อน VAT" value={baht(net)} subtle />}
-            {shop?.vat_registered && <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />}
-            <div className="flex items-center justify-between pt-2 border-t border-tremor-border">
-              <span className="font-semibold text-tremor-content-strong">ยอดสุทธิ</span>
-              <span className="text-2xl font-bold text-tremor-brand-emphasis">{baht(total)}</span>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>
                 เงินสด
               </PayTab>
@@ -731,8 +741,15 @@ export function Pos() {
                 (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) ||
                 (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total))
               }
-              className="w-full py-3.5 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 transition shadow-sm">
-              {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
+              className="w-full py-4 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 disabled:shadow-none transition shadow-[0_10px_22px_-8px_rgba(241,89,41,0.6)] flex items-center justify-center gap-2">
+              {busy ? (
+                'กำลังบันทึก…'
+              ) : (
+                <>
+                  <RiCheckLine className="w-5 h-5" />
+                  ชำระเงิน {baht(total)}
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -839,12 +856,17 @@ function PayTab({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium border transition ${
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition ${
         active
-          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand'
-          : 'bg-white text-tremor-content border-tremor-border hover:border-tremor-brand-subtle'
+          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand shadow-sm'
+          : 'bg-white text-tremor-content border-tremor-border hover:border-tremor-brand-subtle hover:text-tremor-content-emphasis'
       }`}>
-      <Icon className="w-4 h-4" />
+      <span
+        className={`w-7 h-7 grid place-items-center rounded-lg shrink-0 transition ${
+          active ? 'bg-tremor-brand text-white' : 'bg-[#F5EFEB] text-tremor-content-emphasis'
+        }`}>
+        <Icon className="w-4 h-4" />
+      </span>
       {children}
     </button>
   );
@@ -866,13 +888,13 @@ function CashPay({
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
         <span className="text-tremor-content">รับเงิน</span>
-        <div className="flex items-center gap-1">
-          <span className="text-tremor-content-subtle">฿</span>
+        <div className="flex items-center gap-1 rounded-lg bg-white border border-tremor-border px-2.5 py-1 focus-within:ring-2 focus-within:ring-tremor-brand-muted">
+          <span className="text-tremor-content-subtle text-xs">฿</span>
           <input
             type="number"
             value={tendered}
             onChange={(e) => setTendered(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-            className="w-24 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
+            className="w-24 text-right bg-transparent text-sm font-medium focus:outline-none"
           />
         </div>
       </div>
@@ -881,15 +903,15 @@ function CashPay({
           <button
             key={i}
             onClick={() => setTendered(v)}
-            className="py-1.5 rounded-lg border border-tremor-border text-sm text-tremor-content-emphasis hover:border-tremor-brand-subtle hover:text-tremor-brand">
+            className="py-2 rounded-lg bg-white border border-tremor-border text-sm text-tremor-content-emphasis hover:border-tremor-brand-subtle hover:text-tremor-brand transition">
             {v === total ? 'พอดี' : baht(v)}
           </button>
         ))}
       </div>
       {typeof tendered === 'number' && tendered >= total && (
-        <div className="flex items-center justify-between text-sm pt-1">
-          <span className="text-tremor-content">เงินทอน</span>
-          <span className="font-semibold text-green-700">{baht(change)}</span>
+        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm">
+          <span className="text-emerald-700">เงินทอน</span>
+          <span className="font-bold text-emerald-700">{baht(change)}</span>
         </div>
       )}
     </div>
