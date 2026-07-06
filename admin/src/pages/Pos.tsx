@@ -8,8 +8,6 @@ import {
   RiPrinterLine,
   RiQrCodeLine,
   RiQrScanLine,
-  RiSplitCellsHorizontal,
-  RiWallet3Line,
   RiSearchLine,
   RiShoppingBasket2Line,
   RiSubtractLine,
@@ -20,10 +18,8 @@ import QRCode from 'qrcode';
 import {
   apiError,
   createPosSale,
-  findCustomerByPhone,
   getShopInfo,
   listPosCatalog,
-  type Customer,
   type PosProduct,
   type PosVariant,
   type SaleResult,
@@ -64,7 +60,7 @@ type Line = {
   qty: number;
   image: string | null;
 };
-type PayMethod = 'cash' | 'promptpay' | 'store_credit' | 'split';
+type PayMethod = 'cash' | 'promptpay';
 type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -121,10 +117,6 @@ export function Pos() {
   const [taxInvoice, setTaxInvoice] = useState(false);
   const [custName, setCustName] = useState('');
   const [custTaxId, setCustTaxId] = useState('');
-  const [creditPhone, setCreditPhone] = useState('');
-  const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null);
-  const [creditSearching, setCreditSearching] = useState(false);
-  const [splitCash, setSplitCash] = useState<number | ''>('');
 
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
@@ -333,9 +325,6 @@ export function Pos() {
     setTaxInvoice(false);
     setCustName('');
     setCustTaxId('');
-    setCreditPhone('');
-    setCreditCustomer(null);
-    setSplitCash('');
     setMethod('cash');
     setQuery('');
     searchRef.current?.focus();
@@ -347,32 +336,15 @@ export function Pos() {
       setError('เงินที่รับมาไม่พอ');
       return;
     }
-    if (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) {
-      setError('เครดิตร้านไม่พอ');
-      return;
-    }
-    if (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total)) {
-      setError('แบ่งจำนวนเงินไม่ถูกต้อง');
-      return;
-    }
-    const splitPayments =
-      method === 'split'
-        ? [
-            { method: 'cash' as const, amount: splitCash as number },
-            { method: 'promptpay' as const, amount: total - (splitCash as number) },
-          ].filter((p) => p.amount > 0)
-        : undefined;
     const input = {
       client_op_id: crypto.randomUUID(),
       items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
-      payment_method: (method === 'split' ? 'cash' : method) as 'cash' | 'promptpay' | 'store_credit',
+      payment_method: method,
       cash_tendered: method === 'cash' ? (tendered as number) : undefined,
       discount,
-      customer_user_id: method === 'store_credit' ? creditCustomer?.user_id : undefined,
       tax_invoice: taxInvoice,
       customer_name: taxInvoice ? custName || undefined : undefined,
       customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
-      payments: splitPayments,
     };
     const at = new Date().toLocaleString('th-TH');
     const soldLines = lines;
@@ -714,12 +686,6 @@ export function Pos() {
               <PayTab active={method === 'promptpay'} onClick={() => setMethod('promptpay')} Icon={RiQrCodeLine}>
                 พร้อมเพย์
               </PayTab>
-              <PayTab active={method === 'store_credit'} onClick={() => setMethod('store_credit')} Icon={RiWallet3Line}>
-                เครดิต
-              </PayTab>
-              <PayTab active={method === 'split'} onClick={() => setMethod('split')} Icon={RiSplitCellsHorizontal}>
-                แยกจ่าย
-              </PayTab>
             </div>
 
             {method === 'cash' && (
@@ -727,38 +693,6 @@ export function Pos() {
             )}
             {method === 'promptpay' && (
               <PromptPayPanel target={shop?.promptpay_id ?? null} amount={total} name={shop?.promptpay_name} />
-            )}
-            {method === 'store_credit' && (
-              <StoreCreditPanel
-                phone={creditPhone}
-                setPhone={setCreditPhone}
-                customer={creditCustomer}
-                searching={creditSearching}
-                total={total}
-                onSearch={async () => {
-                  const p = creditPhone.trim();
-                  if (!p) return;
-                  setCreditSearching(true);
-                  try {
-                    const c = await findCustomerByPhone(p);
-                    setCreditCustomer(c);
-                    if (!c) setError('ไม่พบลูกค้าที่ใช้เบอร์นี้');
-                    else setError(null);
-                  } catch (e) {
-                    setError(apiError(e));
-                  } finally {
-                    setCreditSearching(false);
-                  }
-                }}
-              />
-            )}
-            {method === 'split' && (
-              <SplitPanel
-                total={total}
-                cash={splitCash}
-                setCash={setSplitCash}
-                promptpayTarget={shop?.promptpay_id ?? null}
-              />
             )}
 
             {shop?.vat_registered && (
@@ -786,11 +720,7 @@ export function Pos() {
               loading={busy}
               icon={busy ? undefined : <RiCheckLine className="w-5 h-5" />}
               onClick={checkout}
-              disabled={
-                !lines.length ||
-                (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) ||
-                (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total))
-              }
+              disabled={!lines.length}
               style={{
                 height: 52,
                 fontWeight: 600,
@@ -983,95 +913,6 @@ function PromptPayPanel({
   );
 }
 
-function StoreCreditPanel({
-  phone,
-  setPhone,
-  customer,
-  searching,
-  total,
-  onSearch,
-}: {
-  phone: string;
-  setPhone: (v: string) => void;
-  customer: Customer | null;
-  searching: boolean;
-  total: number;
-  onSearch: () => void;
-}) {
-  const enough = customer != null && customer.balance >= total;
-  return (
-    <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
-      <div className="flex gap-2">
-        <Input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-          onKeyDown={(e) => e.key === 'Enter' && onSearch()}
-          inputMode="tel"
-          maxLength={10}
-          placeholder="เบอร์โทรลูกค้า"
-        />
-        <Button type="primary" onClick={onSearch} loading={searching}>
-          ค้นหา
-        </Button>
-      </div>
-      {customer && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-tremor-content-strong">{customer.display_name || customer.phone}</span>
-          <span className={enough ? 'text-green-700 font-semibold' : 'text-red-600 font-semibold'}>
-            คงเหลือ {baht(customer.balance)}
-          </span>
-        </div>
-      )}
-      {customer && !enough && (
-        <div className="text-xs text-red-600">เครดิตไม่พอสำหรับยอด {baht(total)}</div>
-      )}
-    </div>
-  );
-}
-
-function SplitPanel({
-  total,
-  cash,
-  setCash,
-  promptpayTarget,
-}: {
-  total: number;
-  cash: number | '';
-  setCash: (v: number | '') => void;
-  promptpayTarget: string | null;
-}) {
-  const cashNum = typeof cash === 'number' ? cash : 0;
-  const remainder = Math.max(0, total - cashNum);
-  return (
-    <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-tremor-content">เงินสด</span>
-        <InputNumber
-          controls={false}
-          min={0}
-          max={total}
-          precision={0}
-          inputMode="numeric"
-          formatter={moneyFormatter}
-          parser={moneyParser}
-          onKeyDown={digitsOnlyKeyDown}
-          placeholder="฿ 0"
-          value={cash === '' ? null : cash}
-          onChange={(v) => setCash(v == null ? '' : Math.max(0, Math.min(total, Number(v))))}
-          style={{ width: 130 }}
-        />
-      </div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-tremor-content">พร้อมเพย์ (ส่วนที่เหลือ)</span>
-        <span className="font-semibold text-tremor-content-strong">{baht(remainder)}</span>
-      </div>
-      {remainder > 0 && promptpayTarget && (
-        <PromptPayPanel target={promptpayTarget} amount={remainder} name={null} />
-      )}
-    </div>
-  );
-}
-
 function VariantPicker({
   product,
   onPick,
@@ -1120,6 +961,12 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
       ]}>
       <div id="pos-receipt" className="font-mono text-[13px] text-black leading-relaxed pt-1">
           <div className="text-center mb-2">
+            <img
+              src="/logo-oofoo.png"
+              alt=""
+              className="h-14 mx-auto mb-1 object-contain"
+              style={{ filter: 'grayscale(1) contrast(1.15)' }}
+            />
             <div className="text-base font-bold">{shop.receipt_header || shop.name}</div>
             {shop.vat_registered && shop.tax_id && (
               <div className="text-[11px]">เลขผู้เสียภาษี {shop.tax_id} ({shop.branch_code})</div>
@@ -1168,15 +1015,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           </div>
           <div className="border-t border-dashed border-black my-2" />
           <Line2
-            label={
-              method === 'cash'
-                ? 'เงินสด'
-                : method === 'promptpay'
-                  ? 'พร้อมเพย์'
-                  : method === 'store_credit'
-                    ? 'เครดิตร้าน'
-                    : 'แยกจ่าย'
-            }
+            label={method === 'cash' ? 'เงินสด' : 'พร้อมเพย์'}
             value={method === 'cash' ? sale.total + sale.change : sale.total}
           />
           {method === 'cash' && <Line2 label="เงินทอน" value={sale.change} />}
