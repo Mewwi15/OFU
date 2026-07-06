@@ -326,11 +326,12 @@ function HomePreview({
 }) {
   return (
     <div className="hidden lg:block sticky top-0">
-      <div className="mx-auto w-[320px] rounded-[28px] border-[6px] border-[#2B2320] bg-[#FBF2EC] overflow-hidden shadow-lg">
-        <div className="h-6 bg-[#2B2320] flex items-center justify-center">
-          <div className="w-16 h-1.5 rounded-full bg-white/30" />
+      <Card size="small" styles={{ body: { padding: 0 } }} style={{ overflow: 'hidden' }}>
+        <div className="px-4 py-2.5 border-b border-[#F0EAE6] flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#2B2320]">ตัวอย่างหน้าแรก</span>
+          <span className="text-xs text-gray-400">มุมมองในแอป</span>
         </div>
-        <div className="max-h-[560px] overflow-y-auto pb-4">
+        <div className="bg-[#FBF2EC] max-h-[560px] overflow-y-auto pb-4">
           {/* banner */}
           {banner ? (
             <img src={banner} alt="" className="w-full object-cover" style={{ aspectRatio: '2 / 1' }} />
@@ -345,7 +346,7 @@ function HomePreview({
             <div className="px-3 pt-3 flex gap-3 overflow-x-auto">
               {categories.slice(0, 6).map((c) => (
                 <div key={c} className="flex flex-col items-center gap-1 shrink-0">
-                  <div className="w-11 h-11 rounded-2xl bg-white shadow-sm grid place-items-center">
+                  <div className="w-11 h-11 rounded-2xl bg-white border border-[#F0EAE6] grid place-items-center">
                     <RiPriceTag3Line className="w-5 h-5 text-tremor-brand" />
                   </div>
                   <span className="text-[10px] text-[#2B2320] max-w-[52px] truncate">{c}</span>
@@ -364,7 +365,7 @@ function HomePreview({
                 ) : (
                   s.products.slice(0, 5).map((p) => (
                     <div key={p.id} className="w-20 shrink-0">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-white shadow-sm grid place-items-center">
+                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-[#F0EAE6] grid place-items-center">
                         {previewImg(p) ? (
                           <img src={previewImg(p)!} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -385,8 +386,7 @@ function HomePreview({
             </div>
           )}
         </div>
-      </div>
-      <div className="text-center text-xs text-gray-400 mt-2">ตัวอย่างหน้าแรกในแอป</div>
+      </Card>
     </div>
   );
 }
