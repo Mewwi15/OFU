@@ -222,13 +222,14 @@ export function Pos() {
 
   /* ── barcode / QR scanner ──────────────────────────────────────────────── */
   // Scanner guns act as a keyboard wedge: they "type" the code fast then Enter.
-  const [scanMsg, setScanMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  type ScanTone = 'ok' | 'warn' | 'error';
+  const [scanMsg, setScanMsg] = useState<{ text: string; tone: ScanTone } | null>(null);
   const scanMsgTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  function flashScan(text: string, ok: boolean) {
-    setScanMsg({ text, ok });
+  function flashScan(text: string, tone: ScanTone) {
+    setScanMsg({ text, tone });
     clearTimeout(scanMsgTimer.current);
-    scanMsgTimer.current = setTimeout(() => setScanMsg(null), ok ? 1500 : 2800);
-    if (!ok) beep();
+    scanMsgTimer.current = setTimeout(() => setScanMsg(null), tone === 'ok' ? 1500 : 2800);
+    if (tone === 'error') beep();
   }
   function findByCode(raw: string): { p: PosProduct; v: PosVariant } | null {
     const code = raw.trim();
@@ -245,10 +246,11 @@ export function Pos() {
     if (hit) {
       addVariant(hit.p, hit.v);
       const oos = hit.v.stock_qty <= 0;
-      flashScan(`${oos ? '⚠ สต็อกหมด · ' : ''}${hit.p.name}${hit.v.size ? ' · ' + hit.v.size : ''}`, !oos);
+      const label = `${hit.p.name}${hit.v.size ? ' · ' + hit.v.size : ''}`;
+      flashScan(oos ? `${label} — สต็อกหมด` : label, oos ? 'warn' : 'ok');
       return true;
     }
-    if (fromScanner) flashScan(`ไม่พบสินค้ารหัส ${raw.trim()}`, false);
+    if (fromScanner) flashScan(`ไม่พบสินค้ารหัส ${raw.trim()}`, 'error');
     return false;
   }
   // Keep a live ref so the global listener always calls the latest closure.
@@ -406,7 +408,7 @@ export function Pos() {
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
       <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
-        <div className="flex flex-col min-h-0">
+        <div className="relative flex flex-col min-h-0">
           {/* status bar — only when offline or has queued sales */}
           {(!online || pending > 0) && (
             <div className="flex items-center gap-2 mb-3">
@@ -444,19 +446,6 @@ export function Pos() {
               <RiQrScanLine className="w-4 h-4" />
               พร้อมยิง
             </span>
-            {scanMsg && (
-              <div
-                className={`absolute left-0 right-0 top-full mt-2 z-10 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium shadow-md ${
-                  scanMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
-                }`}>
-                {scanMsg.ok ? (
-                  <RiCheckLine className="w-[18px] h-[18px] shrink-0" />
-                ) : (
-                  <RiErrorWarningLine className="w-[18px] h-[18px] shrink-0" />
-                )}
-                <span className="truncate">{scanMsg.text}</span>
-              </div>
-            )}
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4 shrink-0">
@@ -470,62 +459,88 @@ export function Pos() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
             {shown.map((p) => {
               const price = p.variants[0]?.price ?? 0;
               const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
               const single = p.variants.length === 1 ? p.variants[0] : null;
-              const inCart = single ? qtyByVariant.get(single.id) ?? 0 : 0;
+              const inCart = single
+                ? qtyByVariant.get(single.id) ?? 0
+                : p.variants.reduce((s, v) => s + (qtyByVariant.get(v.id) ?? 0), 0);
+              const oos = stock <= 0;
               return (
-                <div
+                <button
                   key={p.id}
-                  className={`rounded-2xl bg-white shadow-sm border border-transparent p-3 flex flex-col transition ${
-                    stock <= 0 ? 'opacity-40' : 'hover:shadow-md'
-                  }`}>
-                  <div className="aspect-[4/3] rounded-xl overflow-hidden bg-[#F6ECE5] mb-2.5 grid place-items-center">
+                  type="button"
+                  onClick={() => !oos && pick(p)}
+                  disabled={oos}
+                  className={`group relative text-left rounded-2xl bg-white shadow-sm border overflow-hidden transition ${
+                    inCart > 0 ? 'border-tremor-brand ring-1 ring-tremor-brand' : 'border-transparent'
+                  } ${oos ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:-translate-y-0.5 active:translate-y-0'}`}>
+                  <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center">
                     {p.image ? (
                       <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                     ) : (
                       <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
                     )}
-                  </div>
-                  <div className="text-[15px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
-                    {p.name}
-                  </div>
-                  <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
-                    {p.subtitle ?? p.category_name ?? ''}
-                  </div>
-                  <div className="mt-2.5 flex items-center justify-between">
-                    <span className="text-[17px] font-bold text-tremor-content-strong">
-                      {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
-                    </span>
-                    {single && inCart > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <StepBtn onClick={() => setQty(single.id, inCart - 1)}>
-                          <RiSubtractLine className="w-4 h-4" />
-                        </StepBtn>
-                        <span className="w-5 text-center text-sm font-semibold">{inCart}</span>
-                        <StepBtn brand onClick={() => addVariant(p, single)}>
-                          <RiAddLine className="w-4 h-4" />
-                        </StepBtn>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => pick(p)}
-                        disabled={stock <= 0}
-                        className="inline-flex items-center gap-1 rounded-full bg-tremor-brand text-white text-sm font-medium pl-2.5 pr-3 py-1.5 hover:bg-tremor-brand-emphasis disabled:opacity-40 transition">
-                        <RiAddLine className="w-4 h-4" />
-                        เพิ่ม
-                      </button>
+                    {inCart > 0 && (
+                      <span className="absolute top-2 right-2 min-w-[24px] h-6 px-1.5 grid place-items-center rounded-full bg-tremor-brand text-white text-xs font-bold shadow-md">
+                        {inCart}
+                      </span>
+                    )}
+                    {oos && (
+                      <span className="absolute top-2 left-2 rounded-full bg-black/65 text-white text-[11px] font-medium px-2 py-0.5">
+                        สต็อกหมด
+                      </span>
                     )}
                   </div>
-                </div>
+                  <div className="p-3">
+                    <div className="text-[14px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
+                      {p.name}
+                    </div>
+                    <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
+                      {p.subtitle ?? p.category_name ?? ''}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[16px] font-bold text-tremor-content-strong">
+                        {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
+                      </span>
+                      <span
+                        className={`w-7 h-7 grid place-items-center rounded-full transition ${
+                          oos
+                            ? 'bg-[#F3EDE9] text-tremor-content-subtle'
+                            : 'bg-tremor-brand-faint text-tremor-brand-emphasis group-hover:bg-tremor-brand group-hover:text-white'
+                        }`}>
+                        <RiAddLine className="w-4 h-4" />
+                      </span>
+                    </div>
+                  </div>
+                </button>
               );
             })}
             {shown.length === 0 && (
               <div className="col-span-full text-center text-tremor-content py-12">ไม่พบสินค้า</div>
             )}
           </div>
+
+          {/* scan feedback — floats above the grid, never covers search/categories */}
+          {scanMsg && (
+            <div
+              className={`pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full pl-3 pr-4 py-2.5 text-sm font-medium shadow-lg ${
+                scanMsg.tone === 'ok'
+                  ? 'bg-emerald-600 text-white'
+                  : scanMsg.tone === 'warn'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-red-600 text-white'
+              }`}>
+              {scanMsg.tone === 'ok' ? (
+                <RiCheckLine className="w-[18px] h-[18px] shrink-0" />
+              ) : (
+                <RiErrorWarningLine className="w-[18px] h-[18px] shrink-0" />
+              )}
+              <span className="max-w-[60vw] lg:max-w-md truncate">{scanMsg.text}</span>
+            </div>
+          )}
         </div>
 
         {/* mobile backdrop */}
