@@ -1,9 +1,12 @@
 import {
   RiAddLine,
+  RiCheckLine,
   RiCloseLine,
+  RiErrorWarningLine,
   RiMoneyDollarCircleLine,
   RiPrinterLine,
   RiQrCodeLine,
+  RiQrScanLine,
   RiSplitCellsHorizontal,
   RiWallet3Line,
   RiSearchLine,
@@ -51,6 +54,28 @@ type PayMethod = 'cash' | 'promptpay' | 'store_credit' | 'split';
 type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
+// Short error tone so the cashier notices a failed scan without looking at the screen.
+let audioCtx: AudioContext | null = null;
+function beep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx ??= new Ctx();
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(220, t);
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.22);
+  } catch {
+    /* audio unavailable — visual flash is enough */
+  }
+}
 
 export function Pos() {
   const [shop, setShop] = useState<ShopInfo | null>(null);
@@ -195,19 +220,75 @@ export function Pos() {
     );
   }
 
+  /* ── barcode / QR scanner ──────────────────────────────────────────────── */
+  // Scanner guns act as a keyboard wedge: they "type" the code fast then Enter.
+  const [scanMsg, setScanMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const scanMsgTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  function flashScan(text: string, ok: boolean) {
+    setScanMsg({ text, ok });
+    clearTimeout(scanMsgTimer.current);
+    scanMsgTimer.current = setTimeout(() => setScanMsg(null), ok ? 1500 : 2800);
+    if (!ok) beep();
+  }
+  function findByCode(raw: string): { p: PosProduct; v: PosVariant } | null {
+    const code = raw.trim();
+    if (!code) return null;
+    for (const p of catalog) {
+      const v = p.variants.find((x) => x.barcode === code || x.sku === code);
+      if (v) return { p, v };
+    }
+    return null;
+  }
+  /** Look up a scanned/typed code and add it to the cart. Returns true if matched. */
+  function scan(raw: string, fromScanner: boolean): boolean {
+    const hit = findByCode(raw);
+    if (hit) {
+      addVariant(hit.p, hit.v);
+      const oos = hit.v.stock_qty <= 0;
+      flashScan(`${oos ? '⚠ สต็อกหมด · ' : ''}${hit.p.name}${hit.v.size ? ' · ' + hit.v.size : ''}`, !oos);
+      return true;
+    }
+    if (fromScanner) flashScan(`ไม่พบสินค้ารหัส ${raw.trim()}`, false);
+    return false;
+  }
+  // Keep a live ref so the global listener always calls the latest closure.
+  const scanRef = useRef(scan);
+  scanRef.current = scan;
+
   function onSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return;
-    const code = query.trim();
-    if (!code) return;
-    for (const p of catalog) {
-      const v = p.variants.find((x) => x.barcode && x.barcode === code);
-      if (v) {
-        addVariant(p, v);
-        setQuery('');
+    // In the search box a match is a scan; a miss stays as a text filter.
+    if (scan(query, false)) setQuery('');
+  }
+
+  // Global keyboard-wedge capture: works even when the search box isn't focused,
+  // and never hijacks real typing in other inputs.
+  useEffect(() => {
+    const buf = { chars: '', last: 0 };
+    function editable(el: EventTarget | null) {
+      const n = el as HTMLElement | null;
+      if (!n?.tagName) return false;
+      return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (editable(e.target)) return; // let the focused field (incl. search box) handle it
+      const now = e.timeStamp;
+      if (now - buf.last > 120) buf.chars = ''; // slow gap → not a scan burst
+      buf.last = now;
+      if (e.key === 'Enter') {
+        const code = buf.chars;
+        buf.chars = '';
+        if (code.length >= 3) {
+          e.preventDefault();
+          scanRef.current(code, true);
+        }
         return;
       }
+      if (e.key.length === 1) buf.chars += e.key; // printable char
     }
-  }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const total = Math.max(0, subtotal - discount);
@@ -356,9 +437,26 @@ export function Pos() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onSearchKey}
-              placeholder="สแกนบาร์โค้ด หรือค้นหาสินค้า…"
-              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-transparent bg-white shadow-sm text-tremor-content-strong placeholder:text-tremor-content-subtle focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
+              placeholder="ยิงบาร์โค้ด/QR หรือค้นหาสินค้า…"
+              className="w-full pl-11 pr-24 py-3 rounded-2xl border border-transparent bg-white shadow-sm text-tremor-content-strong placeholder:text-tremor-content-subtle focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
             />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[11px] font-medium text-tremor-content-subtle">
+              <RiQrScanLine className="w-4 h-4" />
+              พร้อมยิง
+            </span>
+            {scanMsg && (
+              <div
+                className={`absolute left-0 right-0 top-full mt-2 z-10 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium shadow-md ${
+                  scanMsg.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                }`}>
+                {scanMsg.ok ? (
+                  <RiCheckLine className="w-[18px] h-[18px] shrink-0" />
+                ) : (
+                  <RiErrorWarningLine className="w-[18px] h-[18px] shrink-0" />
+                )}
+                <span className="truncate">{scanMsg.text}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4 shrink-0">

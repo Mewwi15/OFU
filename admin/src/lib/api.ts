@@ -298,6 +298,7 @@ export type PosVariant = {
   price: number;
   stock_qty: number;
   barcode: string | null;
+  sku: string | null;
 };
 export type PosProduct = {
   id: string;
@@ -314,7 +315,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode)',
+      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku)',
     )
     .is('archived_at', null)
     .eq('publish_state', 'published')
