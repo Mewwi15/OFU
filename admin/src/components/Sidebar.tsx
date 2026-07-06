@@ -59,8 +59,11 @@ export const NAV_GROUPS: NavGroup[] = [
 
 export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
+// Match on a path boundary so e.g. "/pos-sales" doesn't get captured by "/pos".
+const navMatches = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + '/');
+
 export const currentNavLabel = (pathname: string) =>
-  NAV.find((n) => pathname.startsWith(n.to))?.label ?? '';
+  NAV.find((n) => navMatches(pathname, n.to))?.label ?? '';
 
 function Brand({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
   // Collapsed: just the fold toggle (click to expand). Expanded: logo + name + fold toggle.
@@ -104,7 +107,7 @@ export function Sidebar({
   const nav = useNavigate();
   const { pathname } = useLocation();
   const { signOut } = useAuth();
-  const active = NAV.find((n) => pathname.startsWith(n.to))?.to ?? '/pos';
+  const active = NAV.find((n) => navMatches(pathname, n.to))?.to ?? '/pos';
 
   return (
     <div className="flex flex-col h-full">
