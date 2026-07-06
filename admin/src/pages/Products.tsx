@@ -369,13 +369,15 @@ function ProductModal({
   return (
     <Modal
       open
+      centered
       title={product ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า'}
       onCancel={onClose}
       onOk={() => void submit()}
       okText="บันทึก"
       cancelText="ยกเลิก"
       confirmLoading={busy}
-      destroyOnHidden>
+      destroyOnHidden
+      styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', paddingRight: 14 } }}>
       <Form
         form={form}
         layout="vertical"
