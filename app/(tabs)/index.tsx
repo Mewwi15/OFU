@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -181,31 +182,41 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Full-bleed banner — image only, rounded bottom */}
-        <View style={[styles.hero, { height: 200 }]} onLayout={onBannerLayout}>
-          <ScrollView
-            ref={bannerRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={onBannerScroll}
-            style={StyleSheet.absoluteFill}>
-            {slides.map((slide) => (
-              <View key={slide.id} style={{ width: bannerWidth, height: '100%' }}>
-                <Image
-                  source={{ uri: slide.image }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  transition={300}
-                  cachePolicy="memory-disk"
-                />
-              </View>
-            ))}
-          </ScrollView>
-          <View style={styles.dots} pointerEvents="none">
-            {slides.map((slide, i) => (
-              <View key={slide.id} style={[styles.dot, i === activeSlide && styles.dotActive]} />
-            ))}
+        {/* Hero banner carousel — rounded, inset, with a soft shadow */}
+        <View style={styles.heroWrap}>
+          <View style={styles.hero} onLayout={onBannerLayout}>
+            <ScrollView
+              ref={bannerRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onBannerScroll}
+              style={StyleSheet.absoluteFill}>
+              {slides.map((slide) => (
+                <View key={slide.id} style={{ width: bannerWidth, height: '100%' }}>
+                  <Image
+                    source={{ uri: slide.image }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    transition={300}
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+            {/* Bottom scrim so the dots stay readable over any image */}
+            {slides.length > 1 ? (
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.28)']}
+                style={styles.heroScrim}
+                pointerEvents="none"
+              />
+            ) : null}
+            <View style={styles.dots} pointerEvents="none">
+              {slides.map((slide, i) => (
+                <View key={slide.id} style={[styles.dot, i === activeSlide && styles.dotActive]} />
+              ))}
+            </View>
           </View>
         </View>
 
@@ -294,11 +305,25 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: Spacing.lg,
   },
-  hero: {
-    width: '100%',
+  heroWrap: {
     marginTop: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.primaryTint,
+    ...Shadow.card,
+  },
+  hero: {
+    height: 190,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
+  },
+  heroScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 56,
   },
   topBar: {
     backgroundColor: Colors.background,
@@ -376,16 +401,18 @@ const styles = StyleSheet.create({
   },
   dots: {
     position: 'absolute',
-    bottom: 40,
-    right: Spacing.lg,
+    bottom: 12,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: Spacing.xs,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.whiteAlpha,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   dotActive: {
     width: 18,
