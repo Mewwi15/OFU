@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -61,6 +61,13 @@ export default function CatalogScreen() {
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
   const banners = useCatalog((s) => s.banners);
+  const reloadCatalog = useCatalog((s) => s.load);
+  // Pull fresh catalog (incl. admin banners) each time the tab is focused.
+  useFocusEffect(
+    useCallback(() => {
+      void reloadCatalog(true);
+    }, [reloadCatalog]),
+  );
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 
   // Admin-managed banners per slot; fall back to the built-in image + copy.

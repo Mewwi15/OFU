@@ -235,7 +235,8 @@ function BannerModal({
         cta_url: v.cta_url?.trim() || null,
         placement: v.placement,
         display_order: banner?.display_order ?? defaultOrder,
-        publish_state: banner?.publish_state ?? 'draft',
+        // New banners show immediately (owner expects an added banner to appear).
+        publish_state: banner?.publish_state ?? 'published',
       });
       onSaved();
     } catch (e) {
