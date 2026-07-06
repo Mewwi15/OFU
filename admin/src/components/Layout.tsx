@@ -1,4 +1,4 @@
-import { RiMenuFoldLine, RiMenuLine, RiMenuUnfoldLine, RiNotification3Line } from '@remixicon/react';
+import { RiMenuLine, RiNotification3Line } from '@remixicon/react';
 import { Avatar, Badge, Button, Drawer, Grid, Layout as AntLayout } from 'antd';
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
@@ -27,7 +27,7 @@ export function Layout() {
           collapsed={collapsed}
           theme="light"
           style={{ height: '100vh', borderInlineEnd: '1px solid #F0EAE6', overflow: 'hidden' }}>
-          <Sidebar collapsed={collapsed} />
+          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
         </Sider>
       )}
       <AntLayout style={{ height: '100vh' }}>
@@ -39,13 +39,7 @@ export function Layout() {
             borderBottom: '1px solid #F0EAE6',
             flex: '0 0 auto',
           }}>
-          {isDesktop ? (
-            <Button
-              type="text"
-              icon={collapsed ? <RiMenuUnfoldLine className="w-5 h-5" /> : <RiMenuFoldLine className="w-5 h-5" />}
-              onClick={() => setCollapsed((c) => !c)}
-            />
-          ) : (
+          {!isDesktop && (
             <Button type="text" icon={<RiMenuLine className="w-5 h-5" />} onClick={() => setDrawerOpen(true)} />
           )}
           <span className="text-[15px] font-medium text-[#2B2320]">{currentNavLabel(pathname)}</span>

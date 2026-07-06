@@ -7,6 +7,8 @@ import {
   RiLayoutMasonryLine,
   RiLogoutBoxRLine,
   RiMegaphoneLine,
+  RiMenuFoldLine,
+  RiMenuUnfoldLine,
   RiPriceTag3Line,
   RiShoppingBag3Line,
   RiStore2Line,
@@ -60,21 +62,46 @@ export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 export const currentNavLabel = (pathname: string) =>
   NAV.find((n) => pathname.startsWith(n.to))?.label ?? '';
 
-function Brand({ collapsed }: { collapsed?: boolean }) {
+function Brand({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) {
+  // Collapsed: just the fold toggle (click to expand). Expanded: logo + name + fold toggle.
+  if (collapsed) {
+    return (
+      <div className="h-[60px] flex items-center justify-center border-b border-[#F0EAE6]">
+        <button
+          onClick={onToggle}
+          title="ขยายเมนู"
+          className="w-9 h-9 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-50">
+          <RiMenuUnfoldLine className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className={`h-[60px] flex items-center gap-2 border-b border-[#F0EAE6] ${collapsed ? 'justify-center px-0' : 'px-5'}`}>
+    <div className="h-[60px] flex items-center gap-2 border-b border-[#F0EAE6] px-4">
       <div className="w-8 h-8 rounded-lg bg-[#F15929] text-white grid place-items-center font-medium shrink-0">อ</div>
-      {!collapsed && (
-        <span className="font-medium text-[15px] text-[#2B2320] whitespace-nowrap">
-          อู้ฟู่ <span className="text-gray-400 font-light">แอดมิน</span>
-        </span>
+      <span className="font-medium text-[15px] text-[#2B2320] whitespace-nowrap">อู้ฟู่</span>
+      {onToggle && (
+        <button
+          onClick={onToggle}
+          title="ยุบเมนู"
+          className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-700">
+          <RiMenuFoldLine className="w-5 h-5" />
+        </button>
       )}
     </div>
   );
 }
 
 /** Full-height brand + nav + logout column. Used inside the desktop Sider and the mobile Drawer. */
-export function Sidebar({ collapsed, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
+export function Sidebar({
+  collapsed,
+  onToggle,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  onToggle?: () => void;
+  onNavigate?: () => void;
+}) {
   const nav = useNavigate();
   const { pathname } = useLocation();
   const { signOut } = useAuth();
@@ -82,7 +109,7 @@ export function Sidebar({ collapsed, onNavigate }: { collapsed?: boolean; onNavi
 
   return (
     <div className="flex flex-col h-full">
-      <Brand collapsed={collapsed} />
+      <Brand collapsed={collapsed} onToggle={onToggle} />
       <Menu
         mode="inline"
         inlineCollapsed={collapsed}
