@@ -1,4 +1,4 @@
-import { RiEyeLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
+import { RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import {
   App,
   Button,
@@ -250,7 +250,6 @@ export function Orders() {
       render: (_, o) => (
         <Button
           size="small"
-          icon={<RiEyeLine className="w-4 h-4" />}
           onClick={(e) => {
             e.stopPropagation();
             setSelected(o);
