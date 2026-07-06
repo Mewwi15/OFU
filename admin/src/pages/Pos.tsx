@@ -39,7 +39,20 @@ import {
   readCachedCatalog,
   readCachedShop,
 } from '../lib/offline';
-import { Button, Modal } from 'antd';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Divider,
+  Empty,
+  Input,
+  InputNumber,
+  Modal,
+  Statistic,
+  Tag,
+  type InputRef,
+} from 'antd';
 
 import { promptpayPayload } from '../lib/promptpay';
 
@@ -105,7 +118,7 @@ export function Pos() {
   const [cartOpen, setCartOpen] = useState(false); // mobile order drawer
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [pending, setPending] = useState(0); // queued offline sales
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<InputRef>(null);
 
   const doFlush = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -432,22 +445,27 @@ export function Pos() {
             </div>
           )}
 
-          <div className="relative mb-4">
-            <RiSearchLine className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-tremor-content-subtle" />
-            <input
-              ref={searchRef}
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onSearchKey}
-              placeholder="ยิงบาร์โค้ด/QR หรือค้นหาสินค้า…"
-              className="w-full pl-11 pr-24 py-3 rounded-2xl border border-transparent bg-white shadow-sm text-tremor-content-strong placeholder:text-tremor-content-subtle focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
-            />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 text-[11px] font-medium text-tremor-content-subtle">
-              <RiQrScanLine className="w-4 h-4" />
-              พร้อมยิง
-            </span>
-          </div>
+          <Input
+            ref={searchRef}
+            autoFocus
+            size="large"
+            allowClear
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKey}
+            placeholder="ยิงบาร์โค้ด/QR หรือค้นหาสินค้า…"
+            prefix={<RiSearchLine className="w-5 h-5 text-tremor-content-subtle mr-1" />}
+            suffix={
+              <Tag
+                bordered={false}
+                icon={<RiQrScanLine className="w-3.5 h-3.5" />}
+                className="!m-0 !inline-flex !items-center !gap-1 !text-[11px] !bg-[#F5EFEB] !text-tremor-content">
+                พร้อมยิง
+              </Tag>
+            }
+            className="mb-4"
+            style={{ borderRadius: 14, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+          />
 
           <div className="flex flex-wrap gap-2 mb-4 shrink-0">
             <Pill active={cat === null} onClick={() => setCat(null)} count={catalog.length}>
@@ -470,59 +488,67 @@ export function Pos() {
                 : p.variants.reduce((s, v) => s + (qtyByVariant.get(v.id) ?? 0), 0);
               const oos = stock <= 0;
               return (
-                <button
+                <Card
                   key={p.id}
-                  type="button"
+                  hoverable={!oos}
                   onClick={() => !oos && pick(p)}
-                  disabled={oos}
-                  className={`group relative text-left rounded-2xl bg-white overflow-hidden transition border ${
-                    inCart > 0
-                      ? 'border-tremor-brand ring-1 ring-tremor-brand shadow-[0_6px_16px_-8px_rgba(241,89,41,0.45)]'
-                      : 'border-[#EFE6E0] shadow-sm'
-                  } ${oos ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md hover:-translate-y-0.5 active:translate-y-0'}`}>
-                  <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center">
-                    {p.image ? (
-                      <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
-                    )}
-                    {inCart > 0 && (
-                      <span className="absolute top-2 right-2 min-w-[24px] h-6 px-1.5 grid place-items-center rounded-full bg-tremor-brand text-white text-xs font-bold shadow-md">
-                        {inCart}
-                      </span>
-                    )}
-                    {oos && (
-                      <span className="absolute top-2 left-2 rounded-full bg-black/65 text-white text-[11px] font-medium px-2 py-0.5">
-                        สต็อกหมด
-                      </span>
-                    )}
+                  styles={{ body: { padding: 12 } }}
+                  style={{
+                    cursor: oos ? 'not-allowed' : 'pointer',
+                    opacity: oos ? 0.55 : 1,
+                    borderColor: inCart > 0 ? '#f15929' : '#EFE6E0',
+                    boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(241,89,41,0.45)' : undefined,
+                  }}
+                  cover={
+                    <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center overflow-hidden rounded-t-[7px]">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
+                      )}
+                      {inCart > 0 && (
+                        <Badge
+                          count={inCart}
+                          color="#f15929"
+                          style={{ position: 'absolute', top: 8, insetInlineEnd: 8, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
+                        />
+                      )}
+                      {oos && (
+                        <Tag color="default" className="!absolute !top-2 !left-2 !m-0 !bg-black/65 !text-white !border-0">
+                          สต็อกหมด
+                        </Tag>
+                      )}
+                    </div>
+                  }>
+                  <div className="text-[14px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
+                    {p.name}
                   </div>
-                  <div className="p-3">
-                    <div className="text-[14px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
-                      {p.name}
-                    </div>
-                    <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
-                      {p.subtitle ?? p.category_name ?? ''}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[16px] font-bold text-tremor-content-strong">
-                        {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
-                      </span>
-                      <span
-                        className={`w-8 h-8 grid place-items-center rounded-full transition ${
-                          oos
-                            ? 'bg-[#F3EDE9] text-tremor-content-subtle'
-                            : 'bg-tremor-brand text-white shadow-sm group-hover:bg-tremor-brand-emphasis group-hover:scale-105'
-                        }`}>
-                        <RiAddLine className="w-[18px] h-[18px]" />
-                      </span>
-                    </div>
+                  <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
+                    {p.subtitle ?? p.category_name ?? ''}
                   </div>
-                </button>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-[16px] font-bold text-tremor-content-strong">
+                      {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
+                    </span>
+                    <Button
+                      type="primary"
+                      shape="circle"
+                      size="middle"
+                      disabled={oos}
+                      icon={<RiAddLine className="w-[18px] h-[18px]" />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!oos) pick(p);
+                      }}
+                    />
+                  </div>
+                </Card>
               );
             })}
             {shown.length === 0 && (
-              <div className="col-span-full text-center text-tremor-content py-12">ไม่พบสินค้า</div>
+              <div className="col-span-full py-12">
+                <Empty description="ไม่พบสินค้า" />
+              </div>
             )}
           </div>
 
@@ -567,18 +593,22 @@ export function Pos() {
             </div>
             <div className="flex items-center gap-1">
               {lines.length > 0 && (
-                <button
-                  onClick={resetSale}
-                  className="inline-flex items-center gap-1 text-xs text-tremor-content hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 transition">
-                  <RiDeleteBin6Line className="w-3.5 h-3.5" />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<RiDeleteBin6Line className="w-3.5 h-3.5" />}
+                  onClick={resetSale}>
                   ล้างบิล
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                type="text"
+                shape="circle"
+                className="lg:hidden"
+                icon={<RiCloseLine className="w-5 h-5" />}
                 onClick={() => setCartOpen(false)}
-                className="lg:hidden w-8 h-8 grid place-items-center rounded-full text-tremor-content hover:bg-[#FBF5F1]">
-                <RiCloseLine className="w-5 h-5" />
-              </button>
+              />
             </div>
           </div>
 
@@ -588,9 +618,12 @@ export function Pos() {
 
           <div className="flex-1 overflow-y-auto px-2">
             {lines.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-tremor-content-subtle text-sm gap-2 py-16">
-                <RiShoppingBasket2Line className="w-10 h-10 text-[#E7D8CE]" />
-                เลือกสินค้าเพื่อเริ่มบิล
+              <div className="h-full grid place-items-center">
+                <Empty
+                  image={<RiShoppingBasket2Line className="w-12 h-12 text-[#E7D8CE] mx-auto" />}
+                  imageStyle={{ height: 48 }}
+                  description={<span className="text-tremor-content-subtle">เลือกสินค้าเพื่อเริ่มบิล</span>}
+                />
               </div>
             ) : (
               lines.map((l) => (
@@ -628,26 +661,30 @@ export function Pos() {
 
           {/* totals + pay */}
           <div className="border-t border-tremor-border p-4 space-y-3">
-            <div className="rounded-xl bg-[#FBF7F4] border border-[#F0E7E1] p-3.5 space-y-2">
+            <div className="rounded-xl bg-[#FBF7F4] border border-[#F0E7E1] p-3.5">
               <Row label="ยอดรวม" value={baht(subtotal)} />
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
-                <div className="flex items-center gap-1 rounded-lg bg-white border border-tremor-border px-2 py-0.5 focus-within:ring-2 focus-within:ring-tremor-brand-muted">
-                  <span className="text-tremor-content-subtle text-xs">฿</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={discount || ''}
-                    onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-16 text-right bg-transparent text-sm focus:outline-none"
-                  />
-                </div>
+                <InputNumber
+                  min={0}
+                  size="small"
+                  controls={false}
+                  prefix="฿"
+                  value={discount || null}
+                  onChange={(v) => setDiscount(Math.max(0, Number(v) || 0))}
+                  style={{ width: 120 }}
+                />
               </div>
-              {shop?.vat_registered && <Row label="ราคาก่อน VAT" value={baht(net)} subtle />}
-              {shop?.vat_registered && <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />}
-              <div className="flex items-center justify-between pt-2 border-t border-[#EEE3DC]">
+              {shop?.vat_registered && <div className="mt-2"><Row label="ราคาก่อน VAT" value={baht(net)} subtle /></div>}
+              {shop?.vat_registered && <div className="mt-1"><Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle /></div>}
+              <Divider style={{ margin: '12px 0' }} />
+              <div className="flex items-center justify-between">
                 <span className="font-semibold text-tremor-content-strong">ยอดสุทธิ</span>
-                <span className="text-[26px] leading-none font-bold text-tremor-brand-emphasis">{baht(total)}</span>
+                <Statistic
+                  value={total}
+                  prefix="฿"
+                  valueStyle={{ color: '#c5410f', fontWeight: 700, fontSize: 26, lineHeight: 1 }}
+                />
               </div>
             </div>
 
@@ -706,51 +743,41 @@ export function Pos() {
             )}
 
             {shop?.vat_registered && (
-              <label className="flex items-center gap-2 text-sm text-tremor-content pt-0.5">
-                <input
-                  type="checkbox"
-                  checked={taxInvoice}
-                  onChange={(e) => setTaxInvoice(e.target.checked)}
-                  className="rounded text-tremor-brand focus:ring-tremor-brand-muted"
-                />
+              <Checkbox checked={taxInvoice} onChange={(e) => setTaxInvoice(e.target.checked)}>
                 ออกใบกำกับภาษีเต็มรูป
-              </label>
+              </Checkbox>
             )}
             {taxInvoice && (
               <div className="space-y-2">
-                <input
-                  value={custName}
-                  onChange={(e) => setCustName(e.target.value)}
-                  placeholder="ชื่อลูกค้า"
-                  className="w-full rounded-lg border border-tremor-border px-3 py-1.5 text-sm"
-                />
-                <input
+                <Input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="ชื่อลูกค้า" />
+                <Input
                   value={custTaxId}
                   onChange={(e) => setCustTaxId(e.target.value)}
                   placeholder="เลขประจำตัวผู้เสียภาษี"
-                  className="w-full rounded-lg border border-tremor-border px-3 py-1.5 text-sm"
                 />
               </div>
             )}
 
-            <button
+            <Button
+              type="primary"
+              block
+              size="large"
+              loading={busy}
+              icon={busy ? undefined : <RiCheckLine className="w-5 h-5" />}
               onClick={checkout}
               disabled={
                 !lines.length ||
-                busy ||
                 (method === 'store_credit' && (!creditCustomer || creditCustomer.balance < total)) ||
                 (method === 'split' && (typeof splitCash !== 'number' || splitCash < 0 || splitCash > total))
               }
-              className="w-full py-4 rounded-2xl bg-tremor-brand text-white font-semibold text-[15px] hover:bg-tremor-brand-emphasis disabled:opacity-40 disabled:shadow-none transition shadow-[0_10px_22px_-8px_rgba(241,89,41,0.6)] flex items-center justify-center gap-2">
-              {busy ? (
-                'กำลังบันทึก…'
-              ) : (
-                <>
-                  <RiCheckLine className="w-5 h-5" />
-                  ชำระเงิน {baht(total)}
-                </>
-              )}
-            </button>
+              style={{
+                height: 52,
+                fontWeight: 600,
+                borderRadius: 16,
+                boxShadow: '0 10px 22px -8px rgba(241,89,41,0.6)',
+              }}>
+              {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
+            </Button>
           </div>
         </div>
       </div>
@@ -808,38 +835,23 @@ function Pill({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition ${
-        active
-          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand'
-          : 'bg-white text-tremor-content-emphasis border-transparent shadow-sm hover:text-tremor-brand'
-      }`}>
+    <Button shape="round" onClick={onClick} type={active ? 'primary' : 'default'} style={{ fontWeight: 500 }}>
       {children}
       {count != null && (
-        <span
-          className={`min-w-[20px] px-1.5 py-0.5 rounded-full text-[11px] font-semibold leading-none ${
-            active ? 'bg-tremor-brand text-white' : 'bg-[#F3EDE9] text-tremor-content-subtle'
-          }`}>
-          {count}
-        </span>
+        <Badge
+          count={count}
+          showZero
+          overflowCount={999}
+          color={active ? 'rgba(255,255,255,0.28)' : '#EDE4DE'}
+          style={{ color: active ? '#fff' : '#8a807a', marginInlineStart: 6, fontWeight: 600, boxShadow: 'none' }}
+        />
       )}
-    </button>
+    </Button>
   );
 }
 
 function StepBtn({ onClick, children, brand }: { onClick: () => void; children: React.ReactNode; brand?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-7 h-7 flex items-center justify-center rounded-full transition ${
-        brand
-          ? 'bg-tremor-brand text-white hover:bg-tremor-brand-emphasis'
-          : 'border border-tremor-border text-tremor-content-emphasis hover:bg-[#FBF5F1]'
-      }`}>
-      {children}
-    </button>
-  );
+  return <Button size="small" shape="circle" type={brand ? 'primary' : 'default'} onClick={onClick} icon={children} />;
 }
 
 function PayTab({
@@ -854,21 +866,14 @@ function PayTab({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition ${
-        active
-          ? 'bg-tremor-brand-faint text-tremor-brand-emphasis border-tremor-brand shadow-sm'
-          : 'bg-white text-tremor-content border-tremor-border hover:border-tremor-brand-subtle hover:text-tremor-content-emphasis'
-      }`}>
-      <span
-        className={`w-7 h-7 grid place-items-center rounded-lg shrink-0 transition ${
-          active ? 'bg-tremor-brand text-white' : 'bg-[#F5EFEB] text-tremor-content-emphasis'
-        }`}>
-        <Icon className="w-4 h-4" />
-      </span>
+      type={active ? 'primary' : 'default'}
+      icon={<Icon className="w-4 h-4" />}
+      block
+      style={{ height: 44, justifyContent: 'center', fontWeight: 500 }}>
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -888,24 +893,20 @@ function CashPay({
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm">
         <span className="text-tremor-content">รับเงิน</span>
-        <div className="flex items-center gap-1 rounded-lg bg-white border border-tremor-border px-2.5 py-1 focus-within:ring-2 focus-within:ring-tremor-brand-muted">
-          <span className="text-tremor-content-subtle text-xs">฿</span>
-          <input
-            type="number"
-            value={tendered}
-            onChange={(e) => setTendered(e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
-            className="w-24 text-right bg-transparent text-sm font-medium focus:outline-none"
-          />
-        </div>
+        <InputNumber
+          prefix="฿"
+          controls={false}
+          min={0}
+          value={tendered === '' ? null : tendered}
+          onChange={(v) => setTendered(v == null ? '' : Math.max(0, Number(v)))}
+          style={{ width: 130, textAlign: 'right' }}
+        />
       </div>
       <div className="grid grid-cols-4 gap-1.5">
         {quick.map((v, i) => (
-          <button
-            key={i}
-            onClick={() => setTendered(v)}
-            className="py-2 rounded-lg bg-white border border-tremor-border text-sm text-tremor-content-emphasis hover:border-tremor-brand-subtle hover:text-tremor-brand transition">
+          <Button key={i} onClick={() => setTendered(v)} style={{ padding: '0 4px' }}>
             {v === total ? 'พอดี' : baht(v)}
-          </button>
+          </Button>
         ))}
       </div>
       {typeof tendered === 'number' && tendered >= total && (
