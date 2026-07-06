@@ -1,8 +1,6 @@
 import {
   RiAddLine,
   RiDeleteBinLine,
-  RiEyeLine,
-  RiEyeOffLine,
   RiImageAddLine,
   RiImageLine,
   RiPencilLine,
@@ -11,13 +9,17 @@ import {
   App,
   Avatar,
   Button,
+  Card,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
+  Segmented,
   Select,
   Space,
+  Statistic,
+  Switch,
   Table,
   Tag,
   Tooltip,
@@ -70,6 +72,7 @@ export function Products() {
   const [variantsFor, setVariantsFor] = useState<Product | null>(null);
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   async function load() {
     setLoading(true);
@@ -106,16 +109,35 @@ export function Products() {
     }
   }
 
+  const summary = useMemo(() => {
+    let published = 0,
+      low = 0,
+      out = 0;
+    for (const p of products) {
+      if (p.publish_state === 'published') published++;
+      const s = totalStock(p);
+      if (s === 0) out++;
+      else if (isLow(p)) low++;
+    }
+    return { total: products.length, published, low, out };
+  }, [products]);
+
   const shown = useMemo(
     () =>
       products.filter((p) => {
         if (catFilter && p.category_id !== catFilter) return false;
+        if (statusFilter === 'published' && p.publish_state !== 'published') return false;
+        if (statusFilter === 'draft' && p.publish_state !== 'draft') return false;
+        if (statusFilter === 'low') {
+          const s = totalStock(p);
+          if (!(s === 0 || isLow(p))) return false;
+        }
         const q = query.trim().toLowerCase();
         if (q && !p.name.toLowerCase().includes(q) && !(p.subtitle ?? '').toLowerCase().includes(q))
           return false;
         return true;
       }),
-    [products, catFilter, query],
+    [products, catFilter, query, statusFilter],
   );
 
   const columns: ColumnsType<Product> = [
@@ -148,64 +170,63 @@ export function Products() {
     {
       title: 'สต็อก',
       key: 'stock',
-      width: 130,
+      width: 150,
       align: 'right',
+      sorter: (a, b) => totalStock(a) - totalStock(b),
       render: (_, p) => {
         const s = totalStock(p);
-        const color = s === 0 ? 'error' : isLow(p) ? 'warning' : 'default';
+        const tone = s === 0 ? 'error' : isLow(p) ? 'warning' : null;
         return (
-          <Space size={4}>
-            <Tag color={color} bordered={false} style={{ marginInlineEnd: 0 }}>
+          <div className="leading-tight">
+            <span className={`font-semibold ${s === 0 ? 'text-red-600' : isLow(p) ? 'text-amber-600' : 'text-[#2B2320]'}`}>
               {s}
-            </Tag>
-            <Text type="secondary" className="text-xs">
-              {p.product_variants.length} ขนาด
-            </Text>
-          </Space>
+            </span>
+            {tone && (
+              <Tag color={tone} variant="filled" className="ml-1.5 !mr-0">
+                {s === 0 ? 'หมด' : 'ใกล้หมด'}
+              </Tag>
+            )}
+            {p.product_variants.length > 1 && (
+              <div className="text-xs text-gray-400">{p.product_variants.length} ขนาด</div>
+            )}
+          </div>
         );
       },
     },
     {
-      title: 'สถานะ',
+      title: 'เผยแพร่',
       key: 'status',
-      width: 110,
+      width: 96,
       align: 'center',
-      render: (_, p) =>
-        p.publish_state === 'published' ? (
-          <Tag color="success" bordered={false}>เผยแพร่</Tag>
-        ) : (
-          <Tag bordered={false}>ร่าง</Tag>
-        ),
+      render: (_, p) => (
+        <Switch
+          checked={p.publish_state === 'published'}
+          onChange={() => void togglePublish(p)}
+          checkedChildren="เปิด"
+          unCheckedChildren="ปิด"
+        />
+      ),
     },
     {
       title: 'จัดการ',
       key: 'actions',
       width: 210,
       align: 'right',
-      render: (_, p) => {
-        const published = p.publish_state === 'published';
-        return (
-          <Space size={4}>
-            <Button size="small" onClick={() => setVariantsFor(p)}>
-              ขนาด / สต็อก
-            </Button>
-            <Tooltip title="แก้ไข">
-              <Button size="small" type="text" icon={<RiPencilLine className="w-[17px] h-[17px]" />} onClick={() => setEditing(p)} />
+      render: (_, p) => (
+        <Space size={6}>
+          <Button size="small" onClick={() => setVariantsFor(p)}>
+            ขนาด / สต็อก
+          </Button>
+          <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(p)}>
+            แก้ไข
+          </Button>
+          <Popconfirm title="ลบสินค้านี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onArchive(p)}>
+            <Tooltip title="ลบ">
+              <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
             </Tooltip>
-            <Tooltip title={published ? 'ซ่อน' : 'เผยแพร่'}>
-              <Button
-                size="small"
-                type="text"
-                icon={published ? <RiEyeOffLine className="w-[17px] h-[17px]" /> : <RiEyeLine className="w-[17px] h-[17px]" />}
-                onClick={() => void togglePublish(p)}
-              />
-            </Tooltip>
-            <Popconfirm title="ลบสินค้านี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onArchive(p)}>
-              <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-[17px] h-[17px]" />} />
-            </Popconfirm>
-          </Space>
-        );
-      },
+          </Popconfirm>
+        </Space>
+      ),
     },
   ];
 
@@ -214,22 +235,49 @@ export function Products() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
           <Title level={3} style={{ margin: 0 }}>สินค้า</Title>
-          <Text type="secondary">ทั้งหมด {products.length} รายการ</Text>
+          <Text type="secondary">จัดการสินค้า ราคา สต็อก และการเผยแพร่ในแอป</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
           เพิ่มสินค้า
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <Input.Search allowClear placeholder="ค้นหาสินค้า…" onChange={(e) => setQuery(e.target.value)} className="sm:max-w-xs" />
+      {/* summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="สินค้าทั้งหมด" value={summary.total} suffix="รายการ" />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="เผยแพร่อยู่" value={summary.published} suffix="รายการ" styles={{ content: { color: '#1E9E5C', fontWeight: 700 } }} />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="ใกล้หมดสต็อก" value={summary.low} suffix="รายการ" styles={{ content: { color: summary.low ? '#D97706' : undefined, fontWeight: 700 } }} />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="หมดสต็อก" value={summary.out} suffix="รายการ" styles={{ content: { color: summary.out ? '#DC2626' : undefined, fontWeight: 700 } }} />
+        </Card>
+      </div>
+
+      {/* filters */}
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Input.Search allowClear placeholder="ค้นหาสินค้า…" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         <Select
           allowClear
           placeholder="ทุกหมวดหมู่"
-          style={{ minWidth: 180 }}
+          style={{ minWidth: 160 }}
           value={catFilter}
           onChange={setCatFilter}
           options={categories.map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Segmented
+          value={statusFilter}
+          onChange={(v) => setStatusFilter(v as string)}
+          options={[
+            { value: 'all', label: 'ทั้งหมด' },
+            { value: 'published', label: 'เผยแพร่' },
+            { value: 'draft', label: 'ร่าง' },
+            { value: 'low', label: 'ใกล้หมด/หมด' },
+          ]}
         />
       </div>
 
