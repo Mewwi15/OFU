@@ -442,7 +442,7 @@ export function Pos() {
             prefix={<RiSearchLine className="w-5 h-5 text-tremor-content-subtle mr-1" />}
             suffix={
               <Tag
-                bordered={false}
+                variant="filled"
                 icon={<RiQrScanLine className="w-3.5 h-3.5" />}
                 className="!m-0 !inline-flex !items-center !gap-1 !text-[11px] !bg-[#F5EFEB] !text-tremor-content">
                 พร้อมยิง
@@ -607,7 +607,7 @@ export function Pos() {
               <div className="h-full grid place-items-center">
                 <Empty
                   image={<RiShoppingBasket2Line className="w-12 h-12 text-[#E7D8CE] mx-auto" />}
-                  imageStyle={{ height: 48 }}
+                  styles={{ image: { height: 48 } }}
                   description={<span className="text-tremor-content-subtle">เลือกสินค้าเพื่อเริ่มบิล</span>}
                 />
               </div>
@@ -674,7 +674,7 @@ export function Pos() {
                 <Statistic
                   value={total}
                   prefix="฿"
-                  valueStyle={{ color: '#c5410f', fontWeight: 700, fontSize: 26, lineHeight: 1 }}
+                  styles={{ content: { color: '#c5410f', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
                 />
               </div>
             </div>
