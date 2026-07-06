@@ -118,5 +118,8 @@ export default {
         /^(fill-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950))$/,
     },
   ],
-  plugins: [headlessui, forms],
+  // `strategy: 'class'` so @tailwindcss/forms only styles opt-in .form-* elements.
+  // The admin is 100% Ant Design now; base-styling every native <input> made the
+  // plugin's blue focus ring leak onto antd's inner inputs (odd border on focus).
+  plugins: [headlessui, forms({ strategy: 'class' })],
 };

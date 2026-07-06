@@ -69,6 +69,19 @@ type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: str
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
+// ── numeric-only money inputs ───────────────────────────────────────────────
+// Block any key that isn't a digit (paste is still cleaned by moneyParser).
+function digitsOnlyKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  const nav = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Home', 'End', 'Enter'];
+  if (nav.includes(e.key) || e.ctrlKey || e.metaKey) return;
+  if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+}
+// ฿ + thousands separators via formatter/parser — avoids InputNumber's `prefix`
+// element, which renders a weird inner border on focus.
+const moneyFormatter = (v?: string | number) =>
+  v === undefined || v === '' ? '' : `฿ ${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const moneyParser = (v?: string) => (v ? v.replace(/[^\d]/g, '') : '');
+
 // Short error tone so the cashier notices a failed scan without looking at the screen.
 let audioCtx: AudioContext | null = null;
 function beep() {
@@ -494,13 +507,14 @@ export function Pos() {
                   onClick={() => !oos && pick(p)}
                   styles={{ body: { padding: 12 } }}
                   style={{
+                    overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
                     opacity: oos ? 0.55 : 1,
                     borderColor: inCart > 0 ? '#f15929' : '#EFE6E0',
                     boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(241,89,41,0.45)' : undefined,
                   }}
                   cover={
-                    <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center overflow-hidden rounded-t-[7px]">
+                    <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center overflow-hidden">
                       {p.image ? (
                         <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                       ) : (
@@ -667,9 +681,14 @@ export function Pos() {
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
                 <InputNumber
                   min={0}
+                  precision={0}
                   size="small"
                   controls={false}
-                  prefix="฿"
+                  inputMode="numeric"
+                  formatter={moneyFormatter}
+                  parser={moneyParser}
+                  onKeyDown={digitsOnlyKeyDown}
+                  placeholder="฿ 0"
                   value={discount || null}
                   onChange={(v) => setDiscount(Math.max(0, Number(v) || 0))}
                   style={{ width: 120 }}
@@ -752,7 +771,9 @@ export function Pos() {
                 <Input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="ชื่อลูกค้า" />
                 <Input
                   value={custTaxId}
-                  onChange={(e) => setCustTaxId(e.target.value)}
+                  onChange={(e) => setCustTaxId(e.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric"
+                  maxLength={13}
                   placeholder="เลขประจำตัวผู้เสียภาษี"
                 />
               </div>
@@ -894,12 +915,17 @@ function CashPay({
       <div className="flex items-center justify-between text-sm">
         <span className="text-tremor-content">รับเงิน</span>
         <InputNumber
-          prefix="฿"
           controls={false}
           min={0}
+          precision={0}
+          inputMode="numeric"
+          formatter={moneyFormatter}
+          parser={moneyParser}
+          onKeyDown={digitsOnlyKeyDown}
+          placeholder="฿ 0"
           value={tendered === '' ? null : tendered}
           onChange={(v) => setTendered(v == null ? '' : Math.max(0, Number(v)))}
-          style={{ width: 130, textAlign: 'right' }}
+          style={{ width: 140 }}
         />
       </div>
       <div className="grid grid-cols-4 gap-1.5">
@@ -976,19 +1002,17 @@ function StoreCreditPanel({
   return (
     <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
       <div className="flex gap-2">
-        <input
+        <Input
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => e.key === 'Enter' && onSearch()}
+          inputMode="tel"
+          maxLength={10}
           placeholder="เบอร์โทรลูกค้า"
-          className="flex-1 rounded-lg border border-tremor-border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
         />
-        <button
-          onClick={onSearch}
-          disabled={searching}
-          className="rounded-lg bg-tremor-brand text-white text-sm font-medium px-3 disabled:opacity-50 hover:bg-tremor-brand-emphasis">
-          {searching ? '…' : 'ค้นหา'}
-        </button>
+        <Button type="primary" onClick={onSearch} loading={searching}>
+          ค้นหา
+        </Button>
       </div>
       {customer && (
         <div className="flex items-center justify-between text-sm">
@@ -1022,17 +1046,20 @@ function SplitPanel({
     <div className="rounded-xl bg-[#FBF5F1] p-3 space-y-2">
       <div className="flex items-center justify-between text-sm">
         <span className="text-tremor-content">เงินสด</span>
-        <div className="flex items-center gap-1">
-          <span className="text-tremor-content-subtle">฿</span>
-          <input
-            type="number"
-            value={cash}
-            onChange={(e) =>
-              setCash(e.target.value === '' ? '' : Math.max(0, Math.min(total, Number(e.target.value))))
-            }
-            className="w-24 text-right rounded-lg border border-tremor-border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-tremor-brand-muted"
-          />
-        </div>
+        <InputNumber
+          controls={false}
+          min={0}
+          max={total}
+          precision={0}
+          inputMode="numeric"
+          formatter={moneyFormatter}
+          parser={moneyParser}
+          onKeyDown={digitsOnlyKeyDown}
+          placeholder="฿ 0"
+          value={cash === '' ? null : cash}
+          onChange={(v) => setCash(v == null ? '' : Math.max(0, Math.min(total, Number(v))))}
+          style={{ width: 130 }}
+        />
       </div>
       <div className="flex items-center justify-between text-sm">
         <span className="text-tremor-content">พร้อมเพย์ (ส่วนที่เหลือ)</span>
