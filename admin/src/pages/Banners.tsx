@@ -1,7 +1,8 @@
 import { RiAddLine, RiDeleteBinLine, RiImageAddLine, RiPencilLine } from '@remixicon/react';
-import { App, Button, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Tooltip, Typography, Upload } from 'antd';
+import { App, Button, Card, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { DndTable, DragHandle } from '../components/DndTable';
 import {
@@ -25,14 +26,13 @@ const PLACEMENTS: PlacementMeta[] = [
   { value: 'search_promo', label: 'ค้นหา · โปรโมชั่น', hint: 'หัวแถว “โปรโมชั่น” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
   { value: 'search_hot', label: 'ค้นหา · มาแรง', hint: 'หัวแถว “มาแรงประจำสัปดาห์” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
 ];
-const metaOf = (p: BannerPlacement) => PLACEMENTS.find((x) => x.value === p) ?? PLACEMENTS[0];
 
 export function Banners() {
   const { message } = App.useApp();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [placement, setPlacement] = useState<BannerPlacement>('home');
-  const [editing, setEditing] = useState<Banner | 'new' | null>(null);
+  const [editing, setEditing] = useState<Banner | null>(null);
+  const [adding, setAdding] = useState<BannerPlacement | null>(null);
 
   async function load() {
     setLoading(true);
@@ -48,16 +48,7 @@ export function Banners() {
     void load();
   }, []);
 
-  const shown = useMemo(() => banners.filter((b) => b.placement === placement), [banners, placement]);
-  const meta = metaOf(placement);
-  const countByPlacement = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const b of banners) m[b.placement] = (m[b.placement] ?? 0) + 1;
-    return m;
-  }, [banners]);
-
-  async function onReorder(next: Banner[]) {
-    // reorder within the current placement
+  async function onReorder(placement: BannerPlacement, next: Banner[]) {
     setBanners((cur) => [...cur.filter((b) => b.placement !== placement), ...next]);
     try {
       await reorderBanners(next.map((b) => b.id));
@@ -84,108 +75,124 @@ export function Banners() {
     }
   }
 
+  const columns: ColumnsType<Banner> = [
+    { title: '', key: 'drag', width: 44, render: () => <DragHandle /> },
+    {
+      title: 'รูป',
+      key: 'img',
+      width: 120,
+      render: (_, b) =>
+        b.image_path ? (
+          <img src={b.image_path} alt="" className="w-24 h-12 object-cover rounded-md border border-[#F0EAE6]" />
+        ) : (
+          <div className="w-24 h-12 rounded-md bg-[#F6ECE5] grid place-items-center text-gray-300">
+            <RiImageAddLine className="w-5 h-5" />
+          </div>
+        ),
+    },
+    { title: 'หัวข้อ', key: 'headline', render: (_, b) => b.headline || <Text type="secondary">— ไม่มีหัวข้อ —</Text> },
+    {
+      title: 'แสดงในแอป',
+      key: 'publish',
+      width: 110,
+      align: 'center',
+      render: (_, b) => (
+        <Switch
+          checked={b.publish_state === 'published'}
+          onChange={(v) => void togglePublish(b, v)}
+          checkedChildren="แสดง"
+          unCheckedChildren="ซ่อน"
+        />
+      ),
+    },
+    {
+      title: 'จัดการ',
+      key: 'actions',
+      width: 130,
+      align: 'right',
+      render: (_, b) => (
+        <Space size={6}>
+          <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(b)}>
+            แก้ไข
+          </Button>
+          <Popconfirm title="ลบแบนเนอร์นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(b)}>
+            <Tooltip title="ลบ">
+              <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            แบนเนอร์
-          </Title>
-          <Text type="secondary">จัดการแบนเนอร์ทุกจุดในแอป — เลือกตำแหน่ง แล้วเพิ่ม/แก้ไข/ลบ</Text>
-        </div>
-        <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
-          เพิ่มแบนเนอร์
-        </Button>
+      <div className="mb-4">
+        <Title level={3} style={{ margin: 0 }}>
+          แบนเนอร์
+        </Title>
+        <Text type="secondary">จัดการแบนเนอร์ทุกจุดในแอปจากที่เดียว — แยกตามตำแหน่งที่แสดง</Text>
       </div>
 
-      <div className="mb-3">
-        <Segmented
-          value={placement}
-          onChange={(v) => setPlacement(v as BannerPlacement)}
-          options={PLACEMENTS.map((p) => ({
-            value: p.value,
-            label: countByPlacement[p.value] ? `${p.label} (${countByPlacement[p.value]})` : p.label,
-          }))}
-        />
-        <div className="text-xs text-gray-400 mt-2">{meta.hint}</div>
-      </div>
-
-      {!meta.multi && shown.filter((b) => b.publish_state === 'published').length > 1 && (
-        <div className="mb-3 rounded-lg bg-amber-50 text-amber-700 text-xs px-3 py-2">
-          ตำแหน่งนี้ใช้แค่รูปเดียว — แอปจะแสดงรูปที่เปิดไว้เป็นอันแรก แนะนำให้เปิดแสดงแค่รูปเดียว
-        </div>
-      )}
-
-      <DndTable<Banner>
-        items={shown}
-        onReorder={onReorder}
-        loading={loading}
-        scroll={{ x: 560 }}
-        style={{ background: '#fff', borderRadius: 12 }}
-        locale={{ emptyText: `ยังไม่มีแบนเนอร์ในตำแหน่ง “${meta.label}” — กด “เพิ่มแบนเนอร์”` }}
-        columns={[
-          { title: '', key: 'drag', width: 48, render: () => <DragHandle /> },
-          {
-            title: 'รูป',
-            key: 'img',
-            width: 120,
-            render: (_, b) =>
-              b.image_path ? (
-                <img src={b.image_path} alt="" className="w-24 h-12 object-cover rounded-md border border-[#F0EAE6]" />
-              ) : (
-                <div className="w-24 h-12 rounded-md bg-[#F6ECE5] grid place-items-center text-gray-300">
-                  <RiImageAddLine className="w-5 h-5" />
+      {PLACEMENTS.map((pm) => {
+        const rows = banners.filter((b) => b.placement === pm.value);
+        const pubCount = rows.filter((b) => b.publish_state === 'published').length;
+        return (
+          <Card key={pm.value} size="small" styles={{ body: { padding: 16 } }} className="mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-[#2B2320]">{pm.label}</span>
+                  {rows.length > 0 && (
+                    <Tag color="processing" variant="filled">
+                      {rows.length} รูป
+                    </Tag>
+                  )}
                 </div>
-              ),
-          },
-          {
-            title: 'หัวข้อ',
-            key: 'headline',
-            render: (_, b) => b.headline || <Text type="secondary">— ไม่มีหัวข้อ —</Text>,
-          },
-          {
-            title: 'แสดงในแอป',
-            key: 'publish',
-            width: 110,
-            align: 'center',
-            render: (_, b) => (
-              <Switch
-                checked={b.publish_state === 'published'}
-                onChange={(v) => void togglePublish(b, v)}
-                checkedChildren="แสดง"
-                unCheckedChildren="ซ่อน"
-              />
-            ),
-          },
-          {
-            title: 'จัดการ',
-            key: 'actions',
-            width: 130,
-            align: 'right',
-            render: (_, b) => (
-              <Space size={6}>
-                <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(b)}>
-                  แก้ไข
-                </Button>
-                <Popconfirm title="ลบแบนเนอร์นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(b)}>
-                  <Tooltip title="ลบ">
-                    <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
-                  </Tooltip>
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
-      />
+                <div className="text-xs text-gray-400">{pm.hint}</div>
+              </div>
+              <Button size="small" type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setAdding(pm.value)}>
+                เพิ่มแบนเนอร์
+              </Button>
+            </div>
 
-      {editing ? (
+            {!pm.multi && pubCount > 1 && (
+              <div className="mb-2 rounded-lg bg-amber-50 text-amber-700 text-xs px-3 py-2">
+                ตำแหน่งนี้ใช้รูปเดียว — แอปจะแสดงรูปที่เปิดไว้เป็นอันแรก
+              </div>
+            )}
+
+            {rows.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={<span className="text-gray-400 text-sm">ยังไม่มีแบนเนอร์ในจุดนี้</span>}
+                style={{ margin: '12px 0' }}
+              />
+            ) : (
+              <DndTable<Banner>
+                items={rows}
+                onReorder={(next) => void onReorder(pm.value, next)}
+                loading={loading}
+                scroll={{ x: 520 }}
+                columns={columns}
+              />
+            )}
+          </Card>
+        );
+      })}
+
+      {editing || adding ? (
         <BannerModal
-          banner={editing === 'new' ? null : editing}
-          defaultPlacement={placement}
-          defaultOrder={shown.length}
-          onClose={() => setEditing(null)}
+          banner={editing}
+          defaultPlacement={adding ?? editing?.placement ?? 'home'}
+          defaultOrder={banners.filter((b) => b.placement === (adding ?? editing?.placement)).length}
+          onClose={() => {
+            setEditing(null);
+            setAdding(null);
+          }}
           onSaved={() => {
             setEditing(null);
+            setAdding(null);
             void load();
           }}
         />
