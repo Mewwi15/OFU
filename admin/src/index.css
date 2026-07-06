@@ -19,17 +19,44 @@ body {
   margin: 0;
 }
 @media print {
-  body * {
-    visibility: hidden !important;
+  /* The app shell (#root) is a full-height tree; keeping it in flow makes the
+     printed page as long as the whole screen → metres of blank thermal paper.
+     The receipt renders inside an antd Modal (Pos) / Drawer (PosSales) which
+     portals to <body>, OUTSIDE #root — so hiding #root keeps the receipt and
+     lets the page length collapse to the receipt's own height. */
+  #root {
+    display: none !important;
   }
-  #pos-receipt,
-  #pos-receipt * {
-    visibility: visible !important;
+  /* Flatten the modal/drawer chrome so only the receipt defines the page. */
+  .ant-modal-mask,
+  .ant-drawer-mask,
+  .ant-modal-header,
+  .ant-modal-footer,
+  .ant-modal-close,
+  .ant-drawer-header {
+    display: none !important;
+  }
+  .ant-modal-root,
+  .ant-modal-wrap,
+  .ant-modal,
+  .ant-modal-content,
+  .ant-modal-body,
+  .ant-drawer,
+  .ant-drawer-content-wrapper,
+  .ant-drawer-content,
+  .ant-drawer-body {
+    position: static !important;
+    inset: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
   }
   #pos-receipt {
-    position: fixed;
-    top: 0;
-    left: 0;
     width: 48mm;
     margin: 0;
     padding: 1.5mm 2mm; /* small quiet zone so text isn't clipped at the edges */
