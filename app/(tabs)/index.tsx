@@ -76,10 +76,10 @@ export default function HomeScreen() {
     await reloadCatalog(true);
     setRefreshing(false);
   }, [reloadCatalog]);
-  const dbBanners = useCatalog((s) => s.banners);
-  // Admin-managed banners when present; otherwise the built-in fallback slides.
-  const slides = dbBanners.length
-    ? dbBanners.map((b) => ({ id: b.id, image: b.image, title: b.title ?? '' }))
+  const homeBanners = useCatalog((s) => s.banners).filter((b) => b.placement === 'home');
+  // Admin-managed home banners when present; otherwise the built-in fallback slides.
+  const slides = homeBanners.length
+    ? homeBanners.map((b) => ({ id: b.id, image: b.image, title: b.title ?? '' }))
     : BANNER_SLIDES.map((b) => ({ id: b.id, image: b.image, title: t(b.titleKey) }));
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);

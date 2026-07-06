@@ -75,19 +75,26 @@ export async function loadCatalog(): Promise<Product[]> {
 }
 
 /** A published home-hero banner (managed by the admin web's Banners page). */
-export type HomeBanner = { id: string; image: string; title: string | null };
+export type BannerPlacement = 'home' | 'search_hero' | 'search_trending' | 'search_promo' | 'search_hot';
+export type HomeBanner = { id: string; image: string; title: string | null; placement: BannerPlacement };
 
-/** Load published banners for the app home, in admin display order. */
+/** Load ALL published banners (every placement), in admin display order. Screens
+ *  filter by `placement` for their slot (home carousel, search hero/sections). */
 export async function loadBanners(): Promise<HomeBanner[]> {
   const { data, error } = await supabase
     .from('banners')
-    .select('id, image_path, headline, display_order')
+    .select('id, image_path, headline, display_order, placement')
     .eq('publish_state', 'published')
     .order('display_order');
   if (error) throw error;
-  return ((data ?? []) as { id: string; image_path: string | null; headline: string | null }[])
+  return ((data ?? []) as { id: string; image_path: string | null; headline: string | null; placement: BannerPlacement }[])
     .filter((b) => !!b.image_path)
-    .map((b) => ({ id: b.id, image: b.image_path as string, title: b.headline }));
+    .map((b) => ({ id: b.id, image: b.image_path as string, title: b.headline, placement: b.placement ?? 'home' }));
+}
+
+/** First published banner image for a placement, or null. */
+export function bannerFor(banners: HomeBanner[], placement: BannerPlacement): HomeBanner | null {
+  return banners.find((b) => b.placement === placement) ?? null;
 }
 
 /** Category names in the admin's display order (drives the app's filter chips). */

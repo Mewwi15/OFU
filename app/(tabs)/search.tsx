@@ -21,6 +21,7 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
+import { bannerFor } from '@/lib/data/catalog';
 import { useT } from '@/lib/i18n';
 import { useCatalog } from '@/store/catalog';
 
@@ -59,7 +60,14 @@ export default function CatalogScreen() {
 
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
+  const banners = useCatalog((s) => s.banners);
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
+
+  // Admin-managed banners per slot; fall back to the built-in images.
+  const heroBanner = bannerFor(banners, 'search_hero');
+  const trendingImg = bannerFor(banners, 'search_trending')?.image ?? SECTION_BANNER_IMAGES.trending;
+  const promoImg = bannerFor(banners, 'search_promo')?.image ?? SECTION_BANNER_IMAGES.promo;
+  const hotImg = bannerFor(banners, 'search_hot')?.image ?? SECTION_BANNER_IMAGES.hot;
   const trending = useMemo(() => products.slice(0, 6), [products]);
   const promotions = useMemo(
     () => [...products].sort((a, b) => a.price - b.price).slice(0, 6),
@@ -99,7 +107,7 @@ export default function CatalogScreen() {
             copy baked in). The cart button is overlaid top-right. */}
         <View style={[styles.hero, { height: insets.top + bannerHeight }]}>
           <Image
-            source={require('../../assets/images/braner.png')}
+            source={heroBanner ? { uri: heroBanner.image } : require('../../assets/images/braner.png')}
             style={{
               position: 'absolute',
               top: insets.top,
@@ -176,19 +184,19 @@ export default function CatalogScreen() {
             <PromoBanner
               title={t('search.trendingBannerTitle')}
               subtitle={t('search.trendingBannerSub')}
-              image={SECTION_BANNER_IMAGES.trending}
+              image={trendingImg}
             />
             <ProductRail title={t('search.railTrending')} data={trending} />
             <PromoBanner
               title={t('search.promoBannerTitle')}
               subtitle={t('search.promoBannerSub')}
-              image={SECTION_BANNER_IMAGES.promo}
+              image={promoImg}
             />
             <ProductRail title={t('search.railPromo')} data={promotions} />
             <PromoBanner
               title={t('search.hotBannerTitle')}
               subtitle={t('search.hotBannerSub')}
-              image={SECTION_BANNER_IMAGES.hot}
+              image={hotImg}
             />
             <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
 

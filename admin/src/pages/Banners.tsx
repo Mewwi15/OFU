@@ -1,7 +1,7 @@
 import { RiAddLine, RiDeleteBinLine, RiImageAddLine, RiPencilLine } from '@remixicon/react';
-import { App, Button, Form, Input, Modal, Popconfirm, Space, Switch, Tooltip, Typography, Upload } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Tooltip, Typography, Upload } from 'antd';
 import ImgCrop from 'antd-img-crop';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { DndTable, DragHandle } from '../components/DndTable';
 import {
@@ -12,14 +12,26 @@ import {
   upsertBanner,
   uploadBannerImage,
   type Banner,
+  type BannerPlacement,
 } from '../lib/api';
 
 const { Title, Text } = Typography;
+
+type PlacementMeta = { value: BannerPlacement; label: string; hint: string; multi: boolean };
+const PLACEMENTS: PlacementMeta[] = [
+  { value: 'home', label: 'หน้าแรก (สไลด์)', hint: 'สไลด์บนสุดของหน้าแรก — ใส่ได้หลายรูป ลากจัดลำดับได้', multi: true },
+  { value: 'search_hero', label: 'ค้นหา · บนสุด', hint: 'แบนเนอร์ใหญ่บนสุดของหน้าค้นหา (ใช้รูปเดียว)', multi: false },
+  { value: 'search_trending', label: 'ค้นหา · ติดกระแส', hint: 'หัวแถว “ติดกระแส” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
+  { value: 'search_promo', label: 'ค้นหา · โปรโมชั่น', hint: 'หัวแถว “โปรโมชั่น” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
+  { value: 'search_hot', label: 'ค้นหา · มาแรง', hint: 'หัวแถว “มาแรงประจำสัปดาห์” ในหน้าค้นหา (ใช้รูปเดียว)', multi: false },
+];
+const metaOf = (p: BannerPlacement) => PLACEMENTS.find((x) => x.value === p) ?? PLACEMENTS[0];
 
 export function Banners() {
   const { message } = App.useApp();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [placement, setPlacement] = useState<BannerPlacement>('home');
   const [editing, setEditing] = useState<Banner | 'new' | null>(null);
 
   async function load() {
@@ -36,8 +48,17 @@ export function Banners() {
     void load();
   }, []);
 
+  const shown = useMemo(() => banners.filter((b) => b.placement === placement), [banners, placement]);
+  const meta = metaOf(placement);
+  const countByPlacement = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const b of banners) m[b.placement] = (m[b.placement] ?? 0) + 1;
+    return m;
+  }, [banners]);
+
   async function onReorder(next: Banner[]) {
-    setBanners(next);
+    // reorder within the current placement
+    setBanners((cur) => [...cur.filter((b) => b.placement !== placement), ...next]);
     try {
       await reorderBanners(next.map((b) => b.id));
     } catch (e) {
@@ -70,20 +91,38 @@ export function Banners() {
           <Title level={3} style={{ margin: 0 }}>
             แบนเนอร์
           </Title>
-          <Text type="secondary">ลากเพื่อจัดลำดับแบนเนอร์หน้าแรกของแอป · เปิด/ปิดการแสดง</Text>
+          <Text type="secondary">จัดการแบนเนอร์ทุกจุดในแอป — เลือกตำแหน่ง แล้วเพิ่ม/แก้ไข/ลบ</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>
           เพิ่มแบนเนอร์
         </Button>
       </div>
 
+      <div className="mb-3">
+        <Segmented
+          value={placement}
+          onChange={(v) => setPlacement(v as BannerPlacement)}
+          options={PLACEMENTS.map((p) => ({
+            value: p.value,
+            label: countByPlacement[p.value] ? `${p.label} (${countByPlacement[p.value]})` : p.label,
+          }))}
+        />
+        <div className="text-xs text-gray-400 mt-2">{meta.hint}</div>
+      </div>
+
+      {!meta.multi && shown.filter((b) => b.publish_state === 'published').length > 1 && (
+        <div className="mb-3 rounded-lg bg-amber-50 text-amber-700 text-xs px-3 py-2">
+          ตำแหน่งนี้ใช้แค่รูปเดียว — แอปจะแสดงรูปที่เปิดไว้เป็นอันแรก แนะนำให้เปิดแสดงแค่รูปเดียว
+        </div>
+      )}
+
       <DndTable<Banner>
-        items={banners}
+        items={shown}
         onReorder={onReorder}
         loading={loading}
         scroll={{ x: 560 }}
         style={{ background: '#fff', borderRadius: 12 }}
-        locale={{ emptyText: 'ยังไม่มีแบนเนอร์' }}
+        locale={{ emptyText: `ยังไม่มีแบนเนอร์ในตำแหน่ง “${meta.label}” — กด “เพิ่มแบนเนอร์”` }}
         columns={[
           { title: '', key: 'drag', width: 48, render: () => <DragHandle /> },
           {
@@ -121,15 +160,17 @@ export function Banners() {
           {
             title: 'จัดการ',
             key: 'actions',
-            width: 100,
+            width: 130,
             align: 'right',
             render: (_, b) => (
-              <Space size={4}>
-                <Tooltip title="แก้ไข">
-                  <Button size="small" type="text" icon={<RiPencilLine className="w-[17px] h-[17px]" />} onClick={() => setEditing(b)} />
-                </Tooltip>
+              <Space size={6}>
+                <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(b)}>
+                  แก้ไข
+                </Button>
                 <Popconfirm title="ลบแบนเนอร์นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(b)}>
-                  <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-[17px] h-[17px]" />} />
+                  <Tooltip title="ลบ">
+                    <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+                  </Tooltip>
                 </Popconfirm>
               </Space>
             ),
@@ -140,7 +181,8 @@ export function Banners() {
       {editing ? (
         <BannerModal
           banner={editing === 'new' ? null : editing}
-          defaultOrder={banners.length}
+          defaultPlacement={placement}
+          defaultOrder={shown.length}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -154,11 +196,13 @@ export function Banners() {
 
 function BannerModal({
   banner,
+  defaultPlacement,
   defaultOrder,
   onClose,
   onSaved,
 }: {
   banner: Banner | null;
+  defaultPlacement: BannerPlacement;
   defaultOrder: number;
   onClose: () => void;
   onSaved: () => void;
@@ -182,6 +226,7 @@ function BannerModal({
         headline: v.headline?.trim() || null,
         cta_label: v.cta_label?.trim() || null,
         cta_url: v.cta_url?.trim() || null,
+        placement: v.placement,
         display_order: banner?.display_order ?? defaultOrder,
         publish_state: banner?.publish_state ?? 'draft',
       });
@@ -199,7 +244,15 @@ function BannerModal({
         layout="vertical"
         requiredMark={false}
         className="mt-2"
-        initialValues={{ headline: banner?.headline ?? '', cta_label: banner?.cta_label ?? '', cta_url: banner?.cta_url ?? '' }}>
+        initialValues={{
+          headline: banner?.headline ?? '',
+          cta_label: banner?.cta_label ?? '',
+          cta_url: banner?.cta_url ?? '',
+          placement: banner?.placement ?? defaultPlacement,
+        }}>
+        <Form.Item name="placement" label="ตำแหน่งที่แสดง">
+          <Select options={PLACEMENTS.map((p) => ({ value: p.value, label: p.label }))} />
+        </Form.Item>
         <div className="mb-3">
           <div className="flex items-baseline justify-between mb-1">
             <span className="text-sm text-[#4b443f]">รูปแบนเนอร์</span>

@@ -107,7 +107,7 @@ export function Featured() {
     }
   }
 
-  const pubBanners = banners.filter((b) => b.publish_state === 'published');
+  const pubBanners = banners.filter((b) => b.publish_state === 'published' && b.placement === 'home');
   const pubSections = sections.filter((s) => s.publish_state === 'published');
 
   return (

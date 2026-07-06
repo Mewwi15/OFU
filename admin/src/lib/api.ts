@@ -198,7 +198,8 @@ export async function getFeaturedItems(sectionId: string): Promise<string[]> {
   return (data as { product_id: string }[]).map((r) => r.product_id);
 }
 
-/* ── banners (app home hero) ────────────────────────────────────────────────── */
+/* ── banners (app: every slot that shows a banner) ──────────────────────────── */
+export type BannerPlacement = 'home' | 'search_hero' | 'search_trending' | 'search_promo' | 'search_hot';
 export type Banner = {
   id: string;
   image_path: string | null;
@@ -207,11 +208,12 @@ export type Banner = {
   cta_url: string | null;
   display_order: number;
   publish_state: 'draft' | 'published';
+  placement: BannerPlacement;
 };
 export async function listBanners(): Promise<Banner[]> {
   const { data, error } = await supabase
     .from('banners')
-    .select('id, image_path, headline, cta_label, cta_url, display_order, publish_state')
+    .select('id, image_path, headline, cta_label, cta_url, display_order, publish_state, placement')
     .order('display_order');
   if (error) throw error;
   return data as Banner[];
@@ -224,6 +226,7 @@ export const upsertBanner = (p: {
   cta_url?: string | null;
   display_order?: number;
   publish_state?: 'draft' | 'published';
+  placement?: BannerPlacement;
 }) =>
   rpc<{ id: string }>('upsert_banner', {
     p_id: p.id ?? undefined,
@@ -233,6 +236,7 @@ export const upsertBanner = (p: {
     p_cta_url: p.cta_url ?? undefined,
     p_display_order: p.display_order ?? 0,
     p_publish_state: p.publish_state ?? 'draft',
+    p_placement: p.placement ?? 'home',
   });
 export const deleteBanner = (id: string) => rpc('delete_banner', { p_id: id });
 export const reorderBanners = (ids: string[]) => rpc('reorder_banners', { p_ids: ids });
