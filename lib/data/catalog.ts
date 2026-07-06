@@ -15,17 +15,20 @@ type Row = {
   description: string | null;
   rating: number | null;
   categories: { name: string } | null;
-  product_variants: { id: string; size: string | null; price: number; available_qty: number }[] | null;
+  product_variants:
+    | { id: string; size: string | null; price: number; available_qty: number; archived_at: string | null }[]
+    | null;
   product_images: { storage_path: string; is_primary: boolean; display_order: number }[] | null;
 };
 
 const SELECT =
   'id, name, subtitle, description, rating, categories(name), ' +
-  'product_variants(id, size, price, available_qty), ' +
+  'product_variants(id, size, price, available_qty, archived_at), ' +
   'product_images(storage_path, is_primary, display_order)';
 
 function mapProduct(r: Row): Product {
   const variants: ProductVariant[] = (r.product_variants ?? [])
+    .filter((v) => !v.archived_at) // retired size rows stay for history but never surface
     .map((v) => ({ id: v.id, size: v.size, price: v.price, available: v.available_qty }))
     .sort((a, b) => a.price - b.price);
 

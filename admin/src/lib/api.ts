@@ -45,6 +45,7 @@ export type Variant = {
   barcode: string | null;
   cost_price: number | null;
   unit: string;
+  archived_at?: string | null;
 };
 
 export type Product = {
@@ -85,12 +86,16 @@ export async function listProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, cost_price, unit), product_images(id, storage_path, is_primary)',
+      'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, cost_price, unit, archived_at), product_images(id, storage_path, is_primary)',
     )
     .is('archived_at', null)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return data as unknown as Product[];
+  // Hide archived (retired size) variants — 1 product = 1 live stock row.
+  return (data as unknown as Product[]).map((p) => ({
+    ...p,
+    product_variants: p.product_variants.filter((v) => !v.archived_at),
+  }));
 }
 
 /* ── Catalog mutations (0006 RPCs) ─────────────────────────────────────────── */
@@ -315,7 +320,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
   const { data, error } = await supabase
     .from('products')
     .select(
-      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku)',
+      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku, archived_at)',
     )
     .is('archived_at', null)
     .eq('publish_state', 'published')
@@ -328,7 +333,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
     category_id: string | null;
     categories: { name: string } | null;
     product_images: { storage_path: string; is_primary: boolean }[] | null;
-    product_variants: PosVariant[] | null;
+    product_variants: (PosVariant & { archived_at?: string | null })[] | null;
   };
   return (data as unknown as Row[]).map((p) => ({
     id: p.id,
@@ -338,7 +343,7 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
     category_name: p.categories?.name ?? null,
     image:
       (p.product_images?.find((i) => i.is_primary) ?? p.product_images?.[0])?.storage_path ?? null,
-    variants: p.product_variants ?? [],
+    variants: (p.product_variants ?? []).filter((v) => !v.archived_at),
   }));
 }
 

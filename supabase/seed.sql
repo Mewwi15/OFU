@@ -55,24 +55,13 @@ from (values
   ('พลาสเตอร์ยา (กล่อง 20 ชิ้น)', 'ยา', 'ปิดแผล กันน้ำ', 'พลาสเตอร์ปิดแผลกันน้ำ กล่องละ 20 ชิ้น เนื้อนุ่มยืดหยุ่น ติดแน่นไม่หลุดง่าย ปกป้องแผลให้สะอาด', 4.7)
 ) as x(name, cat, subtitle, description, rating);
 
--- ── Variants (per size for sized products; one default variant otherwise) ─────
--- sized products: a variant per size (mock had one price → reuse it per size)
-insert into public.product_variants (product_id, size, price, stock_qty)
-select p.id, x.size, x.price, 50
-from (values
-  ('ข้าวหอมมะลิ', '1 กก.', 165),
-  ('ข้าวหอมมะลิ', '5 กก.', 165),
-  ('น้ำดื่ม', '600 มล.', 14),
-  ('น้ำดื่ม', '1.5 ลิตร', 14),
-  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 'แผง 10 เม็ด', 12),
-  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 'กล่อง 100 เม็ด', 12)
-) as x(pname, size, price)
-join public.products p on p.name = x.pname and p.shop_id = '00000000-0000-0000-0000-0000000000a1';
-
--- sizeless products: one default variant (size null)
+-- ── Variants: one stock row per product (sizes dropped — owner uses names only) ─
 insert into public.product_variants (product_id, size, price, stock_qty)
 select p.id, null, x.price, 50
 from (values
+  ('ข้าวหอมมะลิ', 165),
+  ('น้ำดื่ม', 14),
+  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 12),
   ('ไข่ไก่สด (แผง 30 ฟอง)', 125),
   ('นมจืด UHT 1 ลิตร', 55),
   ('บะหมี่กึ่งสำเร็จรูป (แพ็ค 6)', 42),
