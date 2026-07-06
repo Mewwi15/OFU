@@ -1,5 +1,5 @@
 import { RiAddLine, RiDeleteBinLine, RiPencilLine } from '@remixicon/react';
-import { App, Button, Form, Input, Modal, Popconfirm, Space, Tooltip, Typography } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useState } from 'react';
 
@@ -8,6 +8,7 @@ import {
   apiError,
   deleteCategory,
   listCategories,
+  listProducts,
   reorderCategories,
   upsertCategory,
   type Category,
@@ -18,13 +19,18 @@ const { Title, Text } = Typography;
 export function Categories() {
   const { message } = App.useApp();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Category | 'new' | null>(null);
 
   async function load() {
     setLoading(true);
     try {
-      setCategories(await listCategories());
+      const [cats, prods] = await Promise.all([listCategories(), listProducts()]);
+      setCategories(cats);
+      const c: Record<string, number> = {};
+      for (const p of prods) if (p.category_id) c[p.category_id] = (c[p.category_id] ?? 0) + 1;
+      setCounts(c);
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -57,19 +63,38 @@ export function Categories() {
 
   const columns: ColumnsType<Category> = [
     { title: '', key: 'drag', width: 48, render: () => <DragHandle /> },
-    { title: 'ชื่อหมวดหมู่', key: 'name', render: (_, c) => <span className="font-medium text-[#2B2320]">{c.name}</span> },
+    { title: 'ชื่อหมวดหมู่', key: 'name', render: (_, c) => <span className="font-semibold text-[#2B2320]">{c.name}</span> },
+    {
+      title: 'สินค้าในหมวด',
+      key: 'count',
+      width: 150,
+      render: (_, c) => {
+        const n = counts[c.id] ?? 0;
+        return n > 0 ? (
+          <Tag color="processing" variant="filled">
+            {n} รายการ
+          </Tag>
+        ) : (
+          <Text type="secondary" className="text-xs">
+            ยังไม่มีสินค้า
+          </Text>
+        );
+      },
+    },
     {
       title: 'จัดการ',
       key: 'actions',
-      width: 110,
+      width: 150,
       align: 'right',
       render: (_, c) => (
-        <Space size={4}>
-          <Tooltip title="แก้ไข">
-            <Button size="small" type="text" icon={<RiPencilLine className="w-[17px] h-[17px]" />} onClick={() => setEditing(c)} />
-          </Tooltip>
+        <Space size={6}>
+          <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(c)}>
+            แก้ไข
+          </Button>
           <Popconfirm title="ลบหมวดหมู่นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(c)}>
-            <Button size="small" type="text" danger icon={<RiDeleteBinLine className="w-[17px] h-[17px]" />} />
+            <Tooltip title="ลบ">
+              <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -95,7 +120,7 @@ export function Categories() {
         onReorder={onReorder}
         loading={loading}
         columns={columns}
-        scroll={{ x: 420 }}
+        scroll={{ x: 520 }}
         style={{ background: '#fff', borderRadius: 12 }}
       />
 
