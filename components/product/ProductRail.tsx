@@ -12,7 +12,8 @@ import type { Product } from '@/data/products';
 import { useT } from '@/lib/i18n';
 
 export type ProductRailProps = {
-  title: string;
+  /** Section heading. Omit when a PromoBanner already heads the section. */
+  title?: string;
   data: Product[];
   /** Optional "ดูทั้งหมด" handler (omit to hide the action). */
   onSeeAll?: () => void;
@@ -23,16 +24,19 @@ const CARD_WIDTH = 168;
 
 export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
   const t = useT();
+  const showHead = !!title || !!onSeeAll;
   return (
-    <View style={styles.section}>
-      <View style={styles.head}>
-        <Text variant="subtitle">{title}</Text>
-        {onSeeAll ? (
-          <Pressable onPress={onSeeAll} hitSlop={8} accessibilityRole="button">
-            <Text style={styles.seeAll}>{t('widget.seeAll')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+    <View style={[styles.section, !showHead && styles.sectionTight]}>
+      {showHead ? (
+        <View style={styles.head}>
+          <Text variant="subtitle">{title}</Text>
+          {onSeeAll ? (
+            <Pressable onPress={onSeeAll} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.seeAll}>{t('widget.seeAll')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -50,6 +54,10 @@ export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
 const styles = StyleSheet.create({
   section: {
     marginTop: Spacing.lg,
+  },
+  // When a PromoBanner already heads the section, sit snug beneath it.
+  sectionTight: {
+    marginTop: Spacing.md,
   },
   head: {
     flexDirection: 'row',

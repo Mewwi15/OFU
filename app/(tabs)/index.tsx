@@ -24,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
+import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { useT } from '@/lib/i18n';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
@@ -313,7 +314,9 @@ const styles = StyleSheet.create({
     ...Shadow.card,
   },
   hero: {
-    height: 190,
+    // Same aspect the admin crops home slides to (BANNER_ASPECT.home = 2:1),
+    // so cropped banners fill the slide with no letterboxing or over-crop.
+    aspectRatio: BANNER_ASPECT.home,
     borderRadius: Radius.lg,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,

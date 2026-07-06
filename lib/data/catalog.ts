@@ -78,6 +78,20 @@ export async function loadCatalog(): Promise<Product[]> {
 export type BannerPlacement = 'home' | 'search_hero' | 'search_trending' | 'search_promo' | 'search_hot';
 export type HomeBanner = { id: string; image: string; title: string | null; placement: BannerPlacement };
 
+/**
+ * Display aspect ratio (width ÷ height) each placement renders at in the app.
+ * SINGLE SOURCE OF TRUTH — the app renders banners at these exact ratios and the
+ * admin crop tool (admin/src/pages/Banners.tsx → BANNER_ASPECT) mirrors them so
+ * "what you crop is what you get". Keep the two maps in sync.
+ */
+export const BANNER_ASPECT: Record<BannerPlacement, number> = {
+  home: 2, // หน้าแรก · สไลด์บนสุด
+  search_hero: 2.35, // หน้าค้นหา · แบนเนอร์บนสุด (เต็มความกว้าง)
+  search_trending: 2.8, // แถบ promo เหนือแถวสินค้า
+  search_promo: 2.8,
+  search_hot: 2.8,
+};
+
 /** Load ALL published banners (every placement), in admin display order. Screens
  *  filter by `placement` for their slot (home carousel, search hero/sections). */
 export async function loadBanners(): Promise<HomeBanner[]> {

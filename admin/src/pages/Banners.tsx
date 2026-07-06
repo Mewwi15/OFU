@@ -1,8 +1,8 @@
-import { RiAddLine, RiDeleteBinLine, RiImageAddLine, RiPencilLine } from '@remixicon/react';
+import { RiAddLine, RiDeleteBinLine, RiImageAddLine, RiImageEditLine, RiPencilLine } from '@remixicon/react';
 import { App, Button, Card, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { DndTable, DragHandle } from '../components/DndTable';
 import {
@@ -26,6 +26,21 @@ const PLACEMENTS: PlacementMeta[] = [
   { value: 'search_promo', label: 'หน้าค้นหา · แถบ “ลดสูงสุด 40%”', hint: 'แถบเหนือแถว “โปรโมชั่น” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
   { value: 'search_hot', label: 'หน้าค้นหา · แถบ “เรตติ้งสูงสุด”', hint: 'แถบเหนือแถว “มาแรงประจำสัปดาห์” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
 ];
+
+/**
+ * Crop aspect (width ÷ height) per placement — MUST match the app's render
+ * ratios (my-rn-app/lib/data/catalog.ts → BANNER_ASPECT) so the crop preview
+ * equals what shows in the app. Keep the two maps in sync.
+ */
+const BANNER_ASPECT: Record<BannerPlacement, number> = {
+  home: 2,
+  search_hero: 2.35,
+  search_trending: 2.8,
+  search_promo: 2.8,
+  search_hot: 2.8,
+};
+/** Human label for a ratio, e.g. 2 → "2 : 1", 2.35 → "2.35 : 1". */
+const ratioLabel = (a: number) => `${Number.isInteger(a) ? a : a.toFixed(2)} : 1`;
 
 export function Banners() {
   const { message } = App.useApp();
@@ -218,6 +233,9 @@ function BannerModal({
   const [form] = Form.useForm();
   const [busy, setBusy] = useState(false);
   const [image, setImage] = useState<string | null>(banner?.image_path ?? null);
+  // Crop aspect follows the selected placement so the crop matches the app.
+  const placement = (Form.useWatch('placement', form) as BannerPlacement | undefined) ?? banner?.placement ?? defaultPlacement;
+  const aspect = BANNER_ASPECT[placement] ?? 2;
 
   const submit = async () => {
     const v = await form.validateFields();
@@ -264,45 +282,61 @@ function BannerModal({
         <div className="mb-3">
           <div className="flex items-baseline justify-between mb-1">
             <span className="text-sm text-[#4b443f]">รูปแบนเนอร์</span>
-            <span className="text-xs text-gray-400">ครอบตัดสัดส่วน 2:1 (เช่น 1600×800) · วางเนื้อหาสำคัญไว้กลาง</span>
+            <span className="text-xs text-gray-400">ครอบตัดสัดส่วน {ratioLabel(aspect)} (ตรงกับที่แสดงในแอป) · วางเนื้อหาสำคัญไว้กลาง</span>
           </div>
-          {image ? (
-            <div className="relative w-full">
-              <img src={image} alt="" className="w-full object-cover rounded-lg border border-[#F0EAE6]" style={{ aspectRatio: '2 / 1' }} />
-              <Button size="small" danger className="!absolute top-2 right-2" onClick={() => setImage(null)}>
-                ลบรูป
-              </Button>
-            </div>
-          ) : (
-            <ImgCrop
-              aspect={2}
-              showGrid
-              rotationSlider
-              modalTitle="ครอบตัดรูปแบนเนอร์ (2:1)"
-              modalOk="ใช้รูปนี้"
-              modalCancel="ยกเลิก">
-              <Upload
-                accept="image/*"
-                showUploadList={false}
-                customRequest={async ({ file, onSuccess, onError }) => {
-                  try {
-                    setImage(await uploadBannerImage(file as File));
-                    message.success('อัปโหลดรูปแล้ว');
-                    onSuccess?.({});
-                  } catch (e) {
-                    message.error(apiError(e));
-                    onError?.(e as Error);
-                  }
-                }}>
+          {/* One uploader (crop → upload → replace state) reused for the empty
+              slot and the "เปลี่ยนรูป" action over an existing image. */}
+          {(() => {
+            const uploader = (trigger: ReactNode) => (
+              <ImgCrop
+                aspect={aspect}
+                showGrid
+                rotationSlider
+                modalTitle={`ครอบตัดรูปแบนเนอร์ (${ratioLabel(aspect)})`}
+                modalOk="ใช้รูปนี้"
+                modalCancel="ยกเลิก">
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  customRequest={async ({ file, onSuccess, onError }) => {
+                    try {
+                      setImage(await uploadBannerImage(file as File));
+                      message.success('เปลี่ยนรูปแล้ว');
+                      onSuccess?.({});
+                    } catch (e) {
+                      message.error(apiError(e));
+                      onError?.(e as Error);
+                    }
+                  }}>
+                  {trigger}
+                </Upload>
+              </ImgCrop>
+            );
+            return image ? (
+              <div className="relative w-full">
+                <img src={image} alt="" className="w-full object-cover rounded-lg border border-[#F0EAE6]" style={{ aspectRatio: String(aspect) }} />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  {uploader(
+                    <Button size="small" icon={<RiImageEditLine className="w-[15px] h-[15px]" />}>
+                      เปลี่ยนรูป
+                    </Button>,
+                  )}
+                  <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} onClick={() => setImage(null)}>
+                    ลบรูป
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              uploader(
                 <button type="button" className="w-full h-28 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
                   <div className="text-center">
                     <RiImageAddLine className="w-7 h-7 mx-auto" />
-                    <div className="text-xs mt-1">เลือกรูป แล้วครอบตัด 2:1</div>
+                    <div className="text-xs mt-1">เลือกรูป แล้วครอบตัด {ratioLabel(aspect)}</div>
                   </div>
-                </button>
-              </Upload>
-            </ImgCrop>
-          )}
+                </button>,
+              )
+            );
+          })()}
         </div>
         <Form.Item name="headline" label="หัวข้อ (ถ้ามี)">
           <Input placeholder="เช่น ลดราคาต้อนรับเปิดร้าน" />

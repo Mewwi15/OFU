@@ -21,19 +21,12 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
-import { bannerFor } from '@/lib/data/catalog';
+import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
 import { useT } from '@/lib/i18n';
 import { useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
 const TAB_BAR_CLEARANCE = 96;
-
-/** Background image for the promo banner heading each curated section. */
-const SECTION_BANNER_IMAGES = {
-  trending: 'https://picsum.photos/seed/oofoo-trend/900/360',
-  promo: 'https://picsum.photos/seed/oofoo-promo/900/360',
-  hot: 'https://picsum.photos/seed/oofoo-hot/900/360',
-} as const;
 
 /**
  * Catalog ("สินค้าทั้งหมด"): a search bar + category chips. By default it shows
@@ -46,8 +39,9 @@ export default function CatalogScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
-  // Show the full marketing banner (1672×941) below the safe area, uncropped.
-  const bannerHeight = screenW / (1672 / 941);
+  // A slim header band below the safe area, at the same aspect the admin crops
+  // search_hero to (BANNER_ASPECT) — cropped image fills it with no mismatch.
+  const bannerHeight = screenW / BANNER_ASPECT.search_hero;
   const { category } = useLocalSearchParams<{ category?: string }>();
 
   const [query, setQuery] = useState('');
@@ -115,13 +109,7 @@ export default function CatalogScreen() {
         <View style={[styles.hero, { height: insets.top + bannerHeight }]}>
           <Image
             source={heroBanner ? { uri: heroBanner.image } : require('../../assets/images/braner.png')}
-            style={{
-              position: 'absolute',
-              top: insets.top,
-              left: 0,
-              right: 0,
-              height: bannerHeight,
-            }}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
           <View
@@ -188,24 +176,45 @@ export default function CatalogScreen() {
           /* Curated view: a promo banner heading each horizontal rail, then a
              vertical recommended grid */
           <>
-            <PromoBanner
-              title={trendingBanner?.title || t('search.trendingBannerTitle')}
-              subtitle={t('search.trendingBannerSub')}
-              image={trendingBanner?.image ?? SECTION_BANNER_IMAGES.trending}
-            />
-            <ProductRail title={t('search.railTrending')} data={trending} />
-            <PromoBanner
-              title={promoBanner?.title || t('search.promoBannerTitle')}
-              subtitle={t('search.promoBannerSub')}
-              image={promoBanner?.image ?? SECTION_BANNER_IMAGES.promo}
-            />
-            <ProductRail title={t('search.railPromo')} data={promotions} />
-            <PromoBanner
-              title={hotBanner?.title || t('search.hotBannerTitle')}
-              subtitle={t('search.hotBannerSub')}
-              image={hotBanner?.image ?? SECTION_BANNER_IMAGES.hot}
-            />
-            <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
+            {/* Each curated section: when the owner has set a banner image it
+                heads the row (rail below carries no duplicate title); otherwise
+                just a clean text heading — no placeholder colour block. */}
+            {trendingBanner ? (
+              <>
+                <PromoBanner
+                  title={trendingBanner.title || t('search.trendingBannerTitle')}
+                  subtitle={t('search.trendingBannerSub')}
+                  image={trendingBanner.image}
+                />
+                <ProductRail data={trending} />
+              </>
+            ) : (
+              <ProductRail title={t('search.railTrending')} data={trending} />
+            )}
+            {promoBanner ? (
+              <>
+                <PromoBanner
+                  title={promoBanner.title || t('search.promoBannerTitle')}
+                  subtitle={t('search.promoBannerSub')}
+                  image={promoBanner.image}
+                />
+                <ProductRail data={promotions} />
+              </>
+            ) : (
+              <ProductRail title={t('search.railPromo')} data={promotions} />
+            )}
+            {hotBanner ? (
+              <>
+                <PromoBanner
+                  title={hotBanner.title || t('search.hotBannerTitle')}
+                  subtitle={t('search.hotBannerSub')}
+                  image={hotBanner.image}
+                />
+                <ProductRail data={hotWeekly} />
+              </>
+            ) : (
+              <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
+            )}
 
             <View style={styles.gridSection}>
               <Text variant="subtitle" style={styles.gridTitle}>
@@ -259,7 +268,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
     overflow: 'hidden',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryTint,
   },
   heroTop: {
     flexDirection: 'row',
