@@ -1,4 +1,4 @@
-import { RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
+import { RiFileList3Line, RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
 import { App, Button, Card, Drawer, Input, Popconfirm, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
@@ -166,12 +166,18 @@ export function PosSales() {
       ),
     },
     {
-      title: '',
+      title: 'จัดการ',
       key: 'view',
-      align: 'right',
-      width: 72,
+      align: 'center',
+      width: 96,
       render: (_, s) => (
-        <Button size="small" type="link" onClick={() => void openDetail(s)}>
+        <Button
+          size="small"
+          icon={<RiFileList3Line className="w-4 h-4" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            void openDetail(s);
+          }}>
           ดูบิล
         </Button>
       ),

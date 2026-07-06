@@ -242,13 +242,19 @@ export function Orders() {
       },
     },
     {
-      title: '',
+      title: 'จัดการ',
       key: 'actions',
-      width: 64,
-      align: 'right',
+      width: 96,
+      align: 'center',
       fixed: 'right',
       render: (_, o) => (
-        <Button type="link" size="small" icon={<RiEyeLine className="w-4 h-4" />} onClick={() => setSelected(o)}>
+        <Button
+          size="small"
+          icon={<RiEyeLine className="w-4 h-4" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelected(o);
+          }}>
           ดู
         </Button>
       ),
