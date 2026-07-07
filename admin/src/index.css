@@ -13,9 +13,9 @@ body {
 }
 
 /* POS receipt: print only the receipt, isolated from the rest of the page.
-   Sized for a 48mm thermal roll (POS-5890U-L). */
+   Sized for a 58mm thermal roll (POS-5890U-L; ~48mm printable). */
 @page {
-  size: 48mm auto; /* roll width × continuous length */
+  size: 58mm auto; /* roll width × continuous length */
   margin: 0;
 }
 @media print {
@@ -57,14 +57,13 @@ body {
     background: #fff !important;
   }
   #pos-receipt {
-    width: 48mm;
+    width: 58mm;
     margin: 0;
-    padding: 1.5mm 2mm; /* small quiet zone so text isn't clipped at the edges */
+    padding: 2mm 3mm; /* quiet zone so text isn't clipped at the roll edges */
     background: #fff;
     color: #000;
-    /* Tighter type so lines fit the narrow 48mm roll without wrapping. */
-    font-size: 11px;
-    line-height: 1.3;
+    font-size: 12px;
+    line-height: 1.35;
   }
   /* Force crisp black on thermal paper regardless of on-screen greys. */
   #pos-receipt * {

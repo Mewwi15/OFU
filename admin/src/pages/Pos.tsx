@@ -312,6 +312,25 @@ export function Pos() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Keep the scan target focused so a wired scanner types INTO the page, not the
+  // browser address bar (which would turn a scan into a web search). Focus the
+  // search box on mount and whenever the tab/window regains focus — but never
+  // steal focus away from another field the cashier is actively typing in.
+  useEffect(() => {
+    function focusScan() {
+      const a = document.activeElement as HTMLElement | null;
+      const busyField =
+        a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable);
+      if (!busyField) searchRef.current?.focus();
+    }
+    const id = setTimeout(focusScan, 300);
+    window.addEventListener('focus', focusScan);
+    return () => {
+      clearTimeout(id);
+      window.removeEventListener('focus', focusScan);
+    };
+  }, []);
+
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const total = Math.max(0, subtotal - discount);
   const vat =
