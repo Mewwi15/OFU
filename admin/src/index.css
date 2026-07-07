@@ -16,7 +16,9 @@ body {
    The POS58 driver's printable width is 48mm (paper form "48mm*210mm@203dpi"),
    so the receipt must be 48mm wide or the right-hand amounts get clipped. */
 @page {
-  size: 48mm auto; /* printable width × continuous length */
+  /* Must be TWO lengths — "48mm auto" is invalid CSS and makes Chrome fall back
+     to Letter (huge). Match the POS58 driver form 48mm × 210mm exactly. */
+  size: 48mm 210mm;
   margin: 0;
 }
 @media print {
