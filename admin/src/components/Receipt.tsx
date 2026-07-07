@@ -66,15 +66,15 @@ export function Receipt({
       <div
         id="pos-receipt"
         style={{ width: `${cw}mm` }}
-        className="font-mono text-[11px] text-black leading-snug pt-1 mx-auto [overflow-wrap:anywhere]">
+        className="font-mono text-[10px] text-black leading-snug pt-1 mx-auto [overflow-wrap:anywhere]">
         <div className="text-center mb-1">
           <img
             src="/logo-oofoo.png"
             alt=""
-            className="h-12 mx-auto mb-1 object-contain"
+            className="h-10 mx-auto mb-1 object-contain"
             style={{ filter: 'grayscale(1) contrast(1.25)' }}
           />
-          <div className="text-base font-bold leading-tight">{shop.receipt_header || shop.name}</div>
+          <div className="text-sm font-bold leading-tight">{shop.receipt_header || shop.name}</div>
           {cfg.phone ? <div className="text-[10px]">โทร {cfg.phone}</div> : null}
           {cfg.address ? <div className="text-[10px]">{cfg.address}</div> : null}
           {shop.vat_registered && shop.tax_id && (
