@@ -26,6 +26,11 @@ body {
   #root {
     display: none !important;
   }
+  /* Screen-only helpers inside the print modal (e.g. the "set margins = none"
+     hint) must never end up on the paper. */
+  .no-print {
+    display: none !important;
+  }
   /* Flatten the modal/drawer chrome so only the receipt defines the page. */
   .ant-modal-mask,
   .ant-drawer-mask,

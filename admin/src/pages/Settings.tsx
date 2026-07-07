@@ -161,7 +161,7 @@ export function Settings() {
           <Alert
             type="info"
             showIcon
-            className="mb-3"
+            className="mb-3 no-print"
             message="ในหน้าพิมพ์ ตั้ง ระยะขอบ = ไม่มี, ปรับขนาด = ค่าเริ่มต้น"
           />
           <div className="bg-[#f6f2ee] rounded-lg py-3">
