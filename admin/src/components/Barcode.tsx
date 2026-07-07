@@ -2,7 +2,7 @@ import JsBarcode from 'jsbarcode';
 import { useEffect, useRef } from 'react';
 
 /** Code128 barcode of a sale number, rendered as crisp SVG for thermal print. */
-export function Barcode({ value, height = 28 }: { value: string; height?: number }) {
+export function Barcode({ value, height = 22 }: { value: string; height?: number }) {
   const ref = useRef<SVGSVGElement>(null);
   useEffect(() => {
     if (!ref.current || !value) return;

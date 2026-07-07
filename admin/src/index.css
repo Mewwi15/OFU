@@ -66,8 +66,8 @@ body {
     padding: 1mm 1.5mm; /* minimal quiet zone; keep content within the roll */
     background: #fff;
     color: #000;
-    font-size: 9px;
-    line-height: 1.25;
+    font-size: 8px;
+    line-height: 1.2;
   }
   /* Force crisp black on thermal paper regardless of on-screen greys. */
   #pos-receipt * {

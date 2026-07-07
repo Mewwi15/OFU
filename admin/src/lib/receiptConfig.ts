@@ -53,7 +53,7 @@ export function setReceiptConfig(patch: Partial<ReceiptConfig>): ReceiptConfig {
 
 /** Content width (mm) for the receipt body — a hair narrower than the roll so
  *  nothing clips at the printer's edge margins. */
-export const contentMm = (w: PaperWidth) => (w === 58 ? 50 : 42);
+export const contentMm = (w: PaperWidth) => (w === 58 ? 48 : 40);
 
 /** Live config that re-renders on change (this tab or another). */
 export function useReceiptConfig(): [ReceiptConfig, (p: Partial<ReceiptConfig>) => void] {
