@@ -369,6 +369,44 @@ function ProductModal({
   // Images picked while creating a NEW product (no id yet) — uploaded on save.
   const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
 
+  // Scanner wedge (mirrors the POS page). A scanner "types" the barcode as a rapid
+  // key burst ending in Enter; routing that burst through the controlled Form
+  // <Input> garbles it (the modal re-renders per keystroke, so fast chars get
+  // dropped/reordered). So capture the burst at the window from e.key — correct
+  // order, immune to React — and write the barcode field in one shot. Machine-fast
+  // keys are also swallowed so they don't pollute whichever field is focused.
+  useEffect(() => {
+    const buf = { chars: '', last: 0, fast: false };
+    function onKey(e: KeyboardEvent) {
+      const now = e.timeStamp;
+      const gap = now - buf.last;
+      buf.last = now;
+      if (e.key === 'Enter') {
+        const code = buf.chars.trim();
+        const isScan = code.length >= 6 || (buf.fast && code.length >= 3);
+        buf.chars = '';
+        buf.fast = false;
+        if (isScan) {
+          e.preventDefault();
+          e.stopPropagation();
+          form.setFieldValue('barcode', code);
+          message.success(`บาร์โค้ด ${code}`);
+        }
+        return;
+      }
+      if (e.key.length !== 1) return;
+      if (gap > 120) { buf.chars = ''; buf.fast = false; } // human pause → new sequence
+      buf.chars += e.key;
+      if (gap < 50) {
+        buf.fast = true; // machine-fast burst → it's a scanner
+        e.preventDefault(); // don't let the burst land (garbled) in the focused field
+        e.stopPropagation();
+      }
+    }
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [form, message]);
+
   const reloadImages = async () => {
     if (product) setImages(await listProductImages(product.id));
   };
@@ -452,7 +490,7 @@ function ProductModal({
         }}
         className="mt-2">
         <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรุณากรอกชื่อสินค้า' }]}>
-          <Input placeholder="เช่น ข้าวหอมมะลิ" autoFocus />
+          <Input placeholder="เช่น ข้าวหอมมะลิ" />
         </Form.Item>
         <div className="grid grid-cols-2 gap-3">
           <Form.Item name="category_id" label="หมวดหมู่">
