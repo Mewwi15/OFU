@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Ship a self-unregistering SW: any client with the old cached service
+      // worker will unregister it and purge its caches on next visit, so deploys
+      // take effect immediately. (Offline/PWA isn't needed during active dev;
+      // re-enable by removing this once the receipt/scan flow is signed off.)
+      selfDestroying: true,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
