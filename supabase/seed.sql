@@ -75,20 +75,7 @@ from (values
 ) as x(pname, price)
 join public.products p on p.name = x.pname and p.shop_id = '00000000-0000-0000-0000-0000000000a1';
 
--- ── Images (one primary picsum placeholder per product) ──────────────────────
-insert into public.product_images (product_id, storage_path, is_primary, display_order)
-select p.id, x.url, true, 0
-from (values
-  ('ข้าวหอมมะลิ', 'https://picsum.photos/seed/oofoo1/600/800'),
-  ('ไข่ไก่สด (แผง 30 ฟอง)', 'https://picsum.photos/seed/oofoo2/600/800'),
-  ('นมจืด UHT 1 ลิตร', 'https://picsum.photos/seed/oofoo3/600/800'),
-  ('บะหมี่กึ่งสำเร็จรูป (แพ็ค 6)', 'https://picsum.photos/seed/oofoo4/600/800'),
-  ('น้ำดื่ม', 'https://picsum.photos/seed/oofoo5/600/800'),
-  ('น้ำมันพืช 1 ลิตร', 'https://picsum.photos/seed/oofoo6/600/800'),
-  ('ผงซักฟอก 800 ก.', 'https://picsum.photos/seed/oofoo7/600/800'),
-  ('มันฝรั่งทอดกรอบ', 'https://picsum.photos/seed/oofoo8/600/800'),
-  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 'https://picsum.photos/seed/oofoo9/600/800'),
-  ('ยาแก้แพ้ ลดน้ำมูก (10 เม็ด)', 'https://picsum.photos/seed/oofoo10/600/800'),
-  ('พลาสเตอร์ยา (กล่อง 20 ชิ้น)', 'https://picsum.photos/seed/oofoo11/600/800')
-) as x(pname, url)
-join public.products p on p.name = x.pname and p.shop_id = '00000000-0000-0000-0000-0000000000a1';
+-- ── Images ───────────────────────────────────────────────────────────────────
+-- No seed images: random stock photos made the POS/app look like a photo gallery.
+-- Products show a clean placeholder icon until the owner uploads real photos
+-- (admin สินค้า page). Add real product images there.
