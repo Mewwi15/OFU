@@ -508,7 +508,9 @@ export function Pos() {
                   cover={
                     <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center overflow-hidden">
                       {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                        // absolute-fill so a portrait image can't stretch the
+                        // square box (Safari/prod otherwise grow the card tall).
+                        <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
                         <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
                       )}
