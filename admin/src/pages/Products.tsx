@@ -29,7 +29,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   apiError,
@@ -71,6 +71,8 @@ export function Products() {
   const [query, setQuery] = useState('');
   const [catFilter, setCatFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  // Barcode to prefill when opening the Add modal via a scan (goods intake).
+  const [scanBarcode, setScanBarcode] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -87,6 +89,50 @@ export function Products() {
   useEffect(() => {
     void load();
   }, []);
+
+  // Scan-to-intake: with no modal open, a barcode scan looks the code up in the
+  // catalogue — found → open its Edit (restock); new → open Add prefilled with
+  // the barcode. Latest products/editing read via refs so the listener is set
+  // up once. Mirrors the POS keyboard-wedge (fast char burst ending in Enter).
+  const productsRef = useRef(products);
+  productsRef.current = products;
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  useEffect(() => {
+    const buf = { chars: '', last: 0 };
+    const editable = (el: EventTarget | null) => {
+      const n = el as HTMLElement | null;
+      return !!n?.tagName && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable);
+    };
+    function onKey(e: KeyboardEvent) {
+      if (editingRef.current) return; // a modal is open → let its fields take the scan
+      if (editable(e.target)) return;
+      const now = e.timeStamp;
+      if (now - buf.last > 120) buf.chars = ''; // slow gap → real typing, not a scan
+      buf.last = now;
+      if (e.key === 'Enter') {
+        const code = buf.chars.trim();
+        buf.chars = '';
+        if (code.length < 3) return;
+        e.preventDefault();
+        const found = productsRef.current.find((p) =>
+          p.product_variants.some((v) => v.barcode === code || v.sku === code),
+        );
+        if (found) {
+          message.info(`พบสินค้า: ${found.name} — แก้ไข/เติมสต็อก`);
+          setEditing(found);
+        } else {
+          message.success(`บาร์โค้ดใหม่ ${code} — เพิ่มสินค้า`);
+          setScanBarcode(code);
+          setEditing('new');
+        }
+        return;
+      }
+      if (e.key.length === 1) buf.chars += e.key;
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [message]);
 
   async function togglePublish(p: Product) {
     try {
@@ -285,10 +331,15 @@ export function Products() {
       {editing ? (
         <ProductModal
           product={editing === 'new' ? null : editing}
+          initialBarcode={scanBarcode}
           categories={categories}
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null);
+            setScanBarcode(null);
+          }}
           onSaved={() => {
             setEditing(null);
+            setScanBarcode(null);
             void load();
           }}
         />
@@ -299,11 +350,14 @@ export function Products() {
 
 function ProductModal({
   product,
+  initialBarcode,
   categories,
   onClose,
   onSaved,
 }: {
   product: Product | null;
+  /** Prefill the barcode when adding a product via a scan (goods intake). */
+  initialBarcode?: string | null;
   categories: Category[];
   onClose: () => void;
   onSaved: () => void;
@@ -392,13 +446,13 @@ function ProductModal({
           cost_price: product?.product_variants?.[0]?.cost_price ?? null,
           stock_qty: product?.product_variants?.[0]?.stock_qty ?? 0,
           low_stock_threshold: product?.product_variants?.[0]?.low_stock_threshold ?? 5,
-          barcode: product?.product_variants?.[0]?.barcode ?? '',
+          barcode: product?.product_variants?.[0]?.barcode ?? initialBarcode ?? '',
           sku: product?.product_variants?.[0]?.sku ?? '',
           unit: product?.product_variants?.[0]?.unit ?? 'ชิ้น',
         }}
         className="mt-2">
         <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรุณากรอกชื่อสินค้า' }]}>
-          <Input placeholder="เช่น ข้าวหอมมะลิ" />
+          <Input placeholder="เช่น ข้าวหอมมะลิ" autoFocus />
         </Form.Item>
         <div className="grid grid-cols-2 gap-3">
           <Form.Item name="category_id" label="หมวดหมู่">

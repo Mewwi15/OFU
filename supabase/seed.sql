@@ -56,24 +56,23 @@ from (values
 ) as x(name, cat, subtitle, description, rating);
 
 -- ── Variants: one stock row per product (sizes dropped — owner uses names only) ─
--- barcode + sku seeded with sample EAN-13 codes so the barcode scanner (Zebra
--- DS2208) has something to find out-of-the-box. Owner can overwrite these with
--- the real product barcodes via the admin สินค้า page before going live.
-insert into public.product_variants (product_id, size, price, stock_qty, barcode, sku)
-select p.id, null, x.price, 50, x.barcode, x.sku
+-- No barcode/sku seeded on purpose: real codes are captured by scanning during
+-- goods intake on the admin สินค้า page (scan-to-intake), not faked here.
+insert into public.product_variants (product_id, size, price, stock_qty)
+select p.id, null, x.price, 50
 from (values
-  ('ข้าวหอมมะลิ', 165, '8850001000016', 'OFU-RICE-JAS'),
-  ('น้ำดื่ม', 14, '8850005000014', 'OFU-WATER'),
-  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 12, '8854609011125', 'OFU-PARA-500'),
-  ('ไข่ไก่สด (แผง 30 ฟอง)', 125, '8850002000013', 'OFU-EGG-30'),
-  ('นมจืด UHT 1 ลิตร', 55, '8850003000010', 'OFU-MILK-1L'),
-  ('บะหมี่กึ่งสำเร็จรูป (แพ็ค 6)', 42, '8850004000017', 'OFU-NOODLE-6'),
-  ('น้ำมันพืช 1 ลิตร', 58, '8850006000011', 'OFU-OIL-1L'),
-  ('ผงซักฟอก 800 ก.', 69, '8850007000018', 'OFU-DETERGENT'),
-  ('มันฝรั่งทอดกรอบ', 25, '8850008000015', 'OFU-CHIPS'),
-  ('ยาแก้แพ้ ลดน้ำมูก (10 เม็ด)', 28, '8850010000010', 'OFU-ANTIHIST'),
-  ('พลาสเตอร์ยา (กล่อง 20 ชิ้น)', 35, '8850011000017', 'OFU-PLASTER')
-) as x(pname, price, barcode, sku)
+  ('ข้าวหอมมะลิ', 165),
+  ('น้ำดื่ม', 14),
+  ('พาราเซตามอล 500 มก. (แผง 10 เม็ด)', 12),
+  ('ไข่ไก่สด (แผง 30 ฟอง)', 125),
+  ('นมจืด UHT 1 ลิตร', 55),
+  ('บะหมี่กึ่งสำเร็จรูป (แพ็ค 6)', 42),
+  ('น้ำมันพืช 1 ลิตร', 58),
+  ('ผงซักฟอก 800 ก.', 69),
+  ('มันฝรั่งทอดกรอบ', 25),
+  ('ยาแก้แพ้ ลดน้ำมูก (10 เม็ด)', 28),
+  ('พลาสเตอร์ยา (กล่อง 20 ชิ้น)', 35)
+) as x(pname, price)
 join public.products p on p.name = x.pname and p.shop_id = '00000000-0000-0000-0000-0000000000a1';
 
 -- ── Images (one primary picsum placeholder per product) ──────────────────────
