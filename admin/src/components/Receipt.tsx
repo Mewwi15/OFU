@@ -53,7 +53,7 @@ export function Receipt({
   return (
     <div
       id="pos-receipt"
-      style={{ width: '48mm' }}
+      style={{ width: '46mm' }}
       className="font-mono text-[11px] text-black leading-snug pt-1 mx-auto [overflow-wrap:anywhere]">
       <div className="text-center mb-2">
         <img

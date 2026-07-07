@@ -58,9 +58,9 @@ body {
     background: #fff !important;
   }
   #pos-receipt {
-    width: 48mm;
-    margin: 0;
-    padding: 1mm 1.5mm; /* minimal quiet zone; keep content within 48mm */
+    width: 46mm; /* 48mm roll minus a small safety margin for printer edges */
+    margin: 0 auto;
+    padding: 1mm 1.5mm; /* minimal quiet zone; keep content within the roll */
     background: #fff;
     color: #000;
     /* Small mono type so the two-column rows fit 48mm without clipping. */
