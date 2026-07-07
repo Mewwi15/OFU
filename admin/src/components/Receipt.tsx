@@ -51,7 +51,10 @@ export function Receipt({
   const payLabel = PAY_LABEL[paymentMethod] ?? paymentMethod;
   const payValue = paymentMethod === 'cash' && cashPaid != null ? cashPaid : total;
   return (
-    <div id="pos-receipt" className="font-mono text-[13px] text-black leading-relaxed pt-1">
+    <div
+      id="pos-receipt"
+      style={{ width: '48mm' }}
+      className="font-mono text-[11px] text-black leading-snug pt-1 mx-auto [overflow-wrap:anywhere]">
       <div className="text-center mb-2">
         <img
           src="/logo-oofoo.png"
@@ -67,10 +70,9 @@ export function Receipt({
         )}
         <div className="text-[11px]">{taxInvoiceNo ? 'ใบกำกับภาษี' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ'}</div>
       </div>
-      <div className="flex justify-between text-[11px]">
-        <span>เลขที่ {saleNumber}</span>
-        <span>{at}</span>
-      </div>
+      {/* Stacked so the long date never forces the 48mm row to overflow. */}
+      <div className="text-[10px]">เลขที่ {saleNumber}</div>
+      <div className="text-[10px]">{at}</div>
       {taxInvoiceNo && <div className="text-[11px]">เลขใบกำกับ {taxInvoiceNo}</div>}
       {offline && (
         <div className="mt-1 text-[11px] text-center border border-dashed border-black rounded py-0.5">
