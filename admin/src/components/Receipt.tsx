@@ -59,8 +59,11 @@ export function Receipt({
         <img
           src="/logo-oofoo.png"
           alt=""
-          className="h-14 mx-auto mb-1 object-contain"
-          style={{ filter: 'grayscale(1) contrast(1.15)' }}
+          className="h-12 mx-auto mb-1 object-contain"
+          /* Grayscale + slight contrast: keeps the tiger recognisable while the
+             thermal driver dithers it. (A detailed logo can't go pure 1-bit
+             without falling apart; swap in a mono logo later if wanted.) */
+          style={{ filter: 'grayscale(1) contrast(1.25)' }}
         />
         <div className="text-base font-bold">{shop.receipt_header || shop.name}</div>
         {shop.vat_registered && shop.tax_id && (
