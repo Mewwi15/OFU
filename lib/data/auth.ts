@@ -127,6 +127,34 @@ export const authRepo = {
     return data.session;
   },
 
+  /** Register with email + password. Returns needsVerify=true when the project
+   *  requires email confirmation (no session yet → a 6-digit code was emailed). */
+  async signUpEmail(email: string, password: string): Promise<{ needsVerify: boolean }> {
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    if (error) throw error;
+    return { needsVerify: !data.session };
+  },
+
+  /** Confirm a signup with the 6-digit code sent to the email. */
+  async verifyEmailCode(email: string, code: string): Promise<Session> {
+    const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type: 'email' });
+    if (error) throw error;
+    if (!data.session) throw new Error('NO_SESSION');
+    return data.session;
+  },
+
+  /** Sign in an existing account with email + password. */
+  async signInEmail(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) throw error;
+  },
+
+  /** Re-send the signup confirmation code. */
+  async resendEmailCode(email: string): Promise<void> {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    if (error) throw error;
+  },
+
   async signOut(): Promise<void> {
     await supabase.auth.signOut();
   },

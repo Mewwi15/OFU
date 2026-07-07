@@ -48,6 +48,14 @@ export type AuthState = {
   startPhoneOtp: (phoneE164: string) => Promise<void>;
   /** Verify the OTP; the auth subscription flips status on success. */
   verifyPhoneOtp: (phoneE164: string, code: string) => Promise<void>;
+  /** Register with email + password. needsVerify=true → a code was emailed. */
+  signUpEmail: (email: string, password: string) => Promise<{ needsVerify: boolean }>;
+  /** Confirm signup with the emailed 6-digit code; subscription flips status. */
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
+  /** Sign in with email + password; subscription flips status on success. */
+  signInEmail: (email: string, password: string) => Promise<void>;
+  /** Re-send the signup confirmation code. */
+  resendEmailCode: (email: string) => Promise<void>;
   /** Re-fetch the profile row (e.g. after an edit elsewhere). */
   refreshProfile: () => Promise<void>;
   /** Patch the profile (name/avatar persist via RPC; rest optimistic). */
@@ -105,6 +113,17 @@ export const useAuth = create<AuthState>((set) => ({
     await authRepo.verifyPhoneOtp(phoneE164, code);
     // onAuthChange flips status → authenticated.
   },
+
+  signUpEmail: (email, password) => authRepo.signUpEmail(email, password),
+  verifyEmailCode: async (email, code) => {
+    await authRepo.verifyEmailCode(email, code);
+    // onAuthChange flips status → authenticated.
+  },
+  signInEmail: async (email, password) => {
+    await authRepo.signInEmail(email, password);
+    // onAuthChange flips status → authenticated.
+  },
+  resendEmailCode: (email) => authRepo.resendEmailCode(email),
 
   refreshProfile: async () => {
     set({ user: await loadUser() });
