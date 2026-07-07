@@ -13,6 +13,7 @@ import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
+import { Settings } from './pages/Settings';
 import { StoreCredit } from './pages/StoreCredit';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/banners" element={<Banners />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/payments" element={<Payments />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/pos" replace />} />
     </Routes>

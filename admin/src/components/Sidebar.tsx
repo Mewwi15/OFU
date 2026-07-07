@@ -10,6 +10,7 @@ import {
   RiMenuFoldLine,
   RiMenuUnfoldLine,
   RiPriceTag3Line,
+  RiSettings3Line,
   RiShoppingBag3Line,
   RiStore2Line,
   RiWallet3Line,
@@ -53,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
       { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
+      { to: '/settings', label: 'ตั้งค่า', Icon: RiSettings3Line },
     ],
   },
 ];

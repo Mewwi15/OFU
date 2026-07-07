@@ -13,14 +13,10 @@ body {
 }
 
 /* POS receipt: print only the receipt, isolated from the rest of the page.
-   The POS58 driver's printable width is 48mm (paper form "48mm*210mm@203dpi"),
-   so the receipt must be 48mm wide or the right-hand amounts get clipped. */
-@page {
-  /* Must be TWO lengths — "48mm auto" is invalid CSS and makes Chrome fall back
-     to Letter (huge). Match the POS58 driver form 48mm × 210mm exactly. */
-  size: 48mm 210mm;
-  margin: 0;
-}
+   The @page size + receipt width are injected at runtime by the Receipt
+   component from the per-machine paper config (48/58mm) — see receiptConfig.ts.
+   A valid two-length @page is required ("48mm auto" is invalid → Chrome falls
+   back to Letter). */
 @media print {
   /* The app shell (#root) is a full-height tree; keeping it in flow makes the
      printed page as long as the whole screen → metres of blank thermal paper.
@@ -60,12 +56,11 @@ body {
     background: #fff !important;
   }
   #pos-receipt {
-    width: 46mm; /* 48mm roll minus a small safety margin for printer edges */
+    /* width comes from the inline style (paper config); keep the rest tuned. */
     margin: 0 auto;
     padding: 1mm 1.5mm; /* minimal quiet zone; keep content within the roll */
     background: #fff;
     color: #000;
-    /* Small mono type so the two-column rows fit 48mm without clipping. */
     font-size: 10.5px;
     line-height: 1.3;
   }
