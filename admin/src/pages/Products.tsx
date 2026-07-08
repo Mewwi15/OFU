@@ -114,7 +114,11 @@ export function Products() {
         const code = buf.chars.trim();
         buf.chars = '';
         if (code.length < 3) return;
+        // Swallow the scan's Enter BEFORE it reaches whatever is focused —
+        // e.g. the sidebar Menu treats Enter as "activate item" and would
+        // navigate away (owner hit this: scanning bounced to the POS page).
         e.preventDefault();
+        e.stopPropagation();
         const found = productsRef.current.find((p) =>
           p.product_variants.some((v) => v.barcode === code || v.sku === code),
         );
@@ -130,8 +134,10 @@ export function Products() {
       }
       if (e.key.length === 1) buf.chars += e.key;
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Capture phase: run before the focused element's own handlers (menus,
+    // buttons) so a scan burst can't trigger them.
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [message]);
 
   async function togglePublish(p: Product) {

@@ -301,15 +301,19 @@ export function Pos() {
         const code = buf.chars;
         buf.chars = '';
         if (code.length >= 3) {
+          // Swallow the scan's Enter before the focused element sees it — a
+          // focused button/menu item would otherwise be "clicked" by the scan.
           e.preventDefault();
+          e.stopPropagation();
           scanRef.current(code, true);
         }
         return;
       }
       if (e.key.length === 1) buf.chars += e.key; // printable char
     }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // Capture phase: run before the focused element's own handlers.
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, []);
 
   // Keep the scan target focused so a wired scanner types INTO the page, not the
