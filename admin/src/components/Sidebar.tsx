@@ -144,6 +144,10 @@ export function Sidebar({
           style={{ justifyContent: collapsed ? 'center' : 'flex-start', color: '#6E625C' }}>
           {!collapsed && 'ออกจากระบบ'}
         </Button>
+        {/* Build stamp: which version this tab is ACTUALLY running (stale-tab tell). */}
+        {!collapsed && (
+          <div className="mt-1 text-center text-[10px] text-[#B7ACA5]">เวอร์ชัน {__BUILD_TIME__}</div>
+        )}
       </div>
     </div>
   );
