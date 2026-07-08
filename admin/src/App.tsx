@@ -1,7 +1,9 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
+import { installFlightRecorder, recordNav } from './lib/flightRecorder';
 import { Banners } from './pages/Banners';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
@@ -13,6 +15,7 @@ import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
+import { ScanLab } from './pages/ScanLab';
 import { Settings } from './pages/Settings';
 import { StoreCredit } from './pages/StoreCredit';
 
@@ -25,6 +28,16 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // Black box for the scanner haunting: log every keydown + route change;
+  // read the tape at /scan-lab.
+  const location = useLocation();
+  useEffect(() => {
+    installFlightRecorder();
+  }, []);
+  useEffect(() => {
+    recordNav(location.pathname);
+  }, [location.pathname]);
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -47,6 +60,7 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/payments" element={<Payments />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/scan-lab" element={<ScanLab />} />
       </Route>
       <Route path="*" element={<Navigate to="/pos" replace />} />
     </Routes>
