@@ -1,13 +1,17 @@
 /**
- * PreparingView — order-tracking state 1 ("ร้านกำลังเตรียมสินค้า").
+ * PreparingView — order tracking before the parcel/rider moves: the
+ * "waiting for slip verification" state and the "shop is preparing" state.
  *
- * A calm status screen: shop card with a "กำลังเตรียม" badge + ETA window, a
- * reassuring info banner, a free-delivery upsell, and a pinned footer showing
- * where the order is heading. Tokens-only, zero emoji.
+ * Redesigned for scannability (owner: the old screen "ดูยาก"): a 4-step
+ * progress strip (ตรวจสลิป/ยืนยัน → เตรียมสินค้า → จัดส่ง → สำเร็จ), the shop
+ * status card, an order-summary card (thumbnails + first item + total — the
+ * old screen showed no order context at all), and the delivery address. The
+ * promo upsell is gone. Tokens-only, zero emoji.
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,12 +21,12 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { TrackedOrder } from '@/data/fulfillment';
+import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 
 type Props = {
   order: TrackedOrder;
   onClose: () => void;
-  onExplore: () => void;
   /** Shown while the order can still be cancelled (before it ships). */
   onCancel?: () => void;
   /** Prepay order whose slip the shop hasn't approved yet — swap the copy to
@@ -30,9 +34,60 @@ type Props = {
   awaitingSlip?: boolean;
 };
 
-export function PreparingView({ order, onClose, onExplore, onCancel, awaitingSlip }: Props) {
+const THUMB = 44;
+
+/** Compact 4-step progress strip. Step 0 adapts to the payment flow. */
+function StepStrip({ awaitingSlip, isSlipFlow }: { awaitingSlip: boolean; isSlipFlow: boolean }) {
+  const t = useT();
+  const steps = [
+    isSlipFlow ? t('track.step.slip') : t('track.step.confirm'),
+    t('track.step.prepare'),
+    t('track.step.deliver'),
+    t('track.step.done'),
+  ];
+  const current = awaitingSlip ? 0 : 1;
+  return (
+    <View style={styles.stepRow}>
+      {steps.map((label, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <View key={label} style={styles.stepCol}>
+            <View style={styles.stepNodeRow}>
+              <View style={[styles.stepLine, i === 0 && styles.stepLineHidden, (done || active) && styles.stepLineOn]} />
+              {active ? (
+                <Breathing amount={0.12} duration={1300} style={[styles.stepDot, styles.stepDotActive]}>
+                  <View style={styles.stepDotCore} />
+                </Breathing>
+              ) : (
+                <View style={[styles.stepDot, done && styles.stepDotDone]}>
+                  {done ? <Ionicons name="checkmark" size={12} color={Colors.textOnPrimary} /> : null}
+                </View>
+              )}
+              <View
+                style={[styles.stepLine, i === steps.length - 1 && styles.stepLineHidden, done && styles.stepLineOn]}
+              />
+            </View>
+            <Text
+              variant="caption"
+              numberOfLines={1}
+              style={[styles.stepLabel, (done || active) && styles.stepLabelOn]}>
+              {label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }: Props) {
   const insets = useSafeAreaInsets();
   const t = useT();
+  const isSlipFlow = order.paymentMethod === 'promptpay_slip';
+  const images = (order.itemImages ?? []).slice(0, 3);
+  const extra = order.itemCount - images.length;
+  const restCount = order.itemCount - 1;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
@@ -40,13 +95,20 @@ export function PreparingView({ order, onClose, onExplore, onCancel, awaitingSli
         <IconButton icon="close" accessibilityLabel={t('track.close')} onPress={onClose} />
       </View>
 
-      <View style={styles.body}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.x2 }]}>
         <Text variant="title" style={styles.title}>
           {awaitingSlip ? t('track.verifySlipTitle') : t('track.preparingTitle')}
         </Text>
 
+        {/* Progress */}
+        <Animated.View entering={FadeInDown.springify().damping(18)} style={styles.stepCard}>
+          <StepStrip awaitingSlip={awaitingSlip} isSlipFlow={isSlipFlow} />
+        </Animated.View>
+
         {/* Shop / status card */}
-        <Animated.View entering={FadeInDown.delay(80).springify().damping(18)} style={styles.shopCard}>
+        <Animated.View entering={FadeInDown.delay(70).springify().damping(18)} style={styles.shopCard}>
           <View style={styles.shopTop}>
             <View style={styles.shopAvatar}>
               <Ionicons name="storefront" size={20} color={Colors.primaryStrong} />
@@ -60,81 +122,92 @@ export function PreparingView({ order, onClose, onExplore, onCancel, awaitingSli
               </Text>
             </Breathing>
           </View>
+          <View style={styles.noteRow}>
+            <Ionicons
+              name={awaitingSlip ? 'time-outline' : 'leaf'}
+              size={18}
+              color={Colors.accentStrong}
+            />
+            <Text variant="body" style={styles.noteText}>
+              {awaitingSlip ? t('track.verifySlipBanner') : t('track.preparingBanner')}
+            </Text>
+          </View>
+        </Animated.View>
 
-          <View style={styles.etaRow}>
-            <View style={styles.etaLeft}>
-              <Text variant="caption">
-                {awaitingSlip ? t('track.verifySlipStepLabel') : t('track.etaLabel')}
+        {/* Order summary — the old screen showed no order context at all */}
+        <Animated.View entering={FadeInDown.delay(140).springify().damping(18)} style={styles.sumCard}>
+          <View style={styles.sumHead}>
+            <Text variant="caption" numberOfLines={1} style={styles.sumMeta}>
+              #{order.id}
+              {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
+            </Text>
+          </View>
+          <View style={styles.sumBody}>
+            {images.length > 0 ? (
+              <View style={styles.thumbRow}>
+                {images.map((uri, i) => (
+                  <Image
+                    key={`${uri}-${i}`}
+                    source={{ uri }}
+                    style={[styles.thumb, i > 0 && styles.thumbOverlap]}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                ))}
+                {extra > 0 ? (
+                  <View style={[styles.thumb, styles.thumbOverlap, styles.thumbMore]}>
+                    <Text style={styles.thumbMoreText}>+{extra}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.thumbFallback}>
+                <Ionicons name="bag-handle-outline" size={20} color={Colors.primaryStrong} />
+              </View>
+            )}
+            <View style={styles.sumText}>
+              <Text style={styles.sumName} numberOfLines={1}>
+                {order.firstItemName ?? order.shopName}
               </Text>
-              <Text style={styles.etaValue}>
-                {awaitingSlip ? t('track.verifySlipStep') : order.etaText}
+              <Text variant="caption" numberOfLines={1}>
+                {restCount > 0
+                  ? `${t('orders.morePrefix')}${restCount}${t('orders.moreSuffix')}`
+                  : `${order.itemCount} ${t('orders.itemsUnit')}`}
               </Text>
             </View>
-            <Breathing style={styles.etaIcon}>
-              <Ionicons
-                name={awaitingSlip ? 'receipt-outline' : 'bicycle'}
-                size={26}
-                color={Colors.primary}
-              />
-            </Breathing>
+          </View>
+          <View style={styles.sumFoot}>
+            <Text variant="caption">{t('orders.totalLabel')}</Text>
+            <Text style={styles.sumTotal}>{money(order.total)}</Text>
           </View>
         </Animated.View>
 
-        {/* Reassurance banner */}
-        <Animated.View entering={FadeInDown.delay(160).springify().damping(18)} style={styles.banner}>
-          <Ionicons
-            name={awaitingSlip ? 'time-outline' : 'leaf'}
-            size={18}
-            color={Colors.accentStrong}
-          />
-          <Text variant="body" style={styles.bannerText}>
-            {awaitingSlip ? t('track.verifySlipBanner') : t('track.preparingBanner')}
-          </Text>
-        </Animated.View>
-
-        {/* Free-delivery upsell */}
-        <Animated.View entering={FadeInDown.delay(240).springify().damping(18)} style={styles.promoCard}>
-          <View style={styles.promoBody}>
-            <Text style={styles.promoTitle}>{t('track.unlockFreeDelivery')}</Text>
-            <Text variant="caption" style={styles.promoSub}>
-              {t('track.promoUpsellSub')}
+        {/* Delivery address + ETA */}
+        <Animated.View entering={FadeInDown.delay(210).springify().damping(18)} style={styles.addrCard}>
+          <View style={styles.addrPin}>
+            <Ionicons name="home" size={18} color={Colors.primaryStrong} />
+          </View>
+          <View style={styles.addrText}>
+            <Text variant="caption">{t('track.deliverTo')}</Text>
+            <Text style={styles.addrValue} numberOfLines={2}>
+              {order.addressLine || order.addressLabel}
             </Text>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={t('track.viewMoreDealsA11y')}
-              onPress={onExplore}
-              style={styles.promoBtn}>
-              <Text style={styles.promoBtnText}>{t('track.viewNow')}</Text>
-            </PressableScale>
           </View>
-          <View style={styles.promoIcon}>
-            <Ionicons name="bicycle" size={34} color={Colors.primary} />
+          <View style={styles.etaChip}>
+            <Text style={styles.etaChipText}>{order.etaShort}</Text>
           </View>
         </Animated.View>
-      </View>
 
-      {onCancel ? (
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={t('track.cancelOrderA11y')}
-          onPress={onCancel}
-          style={styles.cancelBtn}>
-          <Text style={styles.cancelText}>{t('track.cancelOrder')}</Text>
-        </PressableScale>
-      ) : null}
-
-      {/* Pinned footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
-        <View style={styles.footerPin}>
-          <Ionicons name="home" size={18} color={Colors.primaryStrong} />
-        </View>
-        <View style={styles.footerText}>
-          <Text variant="caption">{t('track.deliverTo')}</Text>
-          <Text style={styles.footerAddr} numberOfLines={1}>
-            {order.addressLabel} · {t('track.etaArriveIn')} {order.etaShort}
-          </Text>
-        </View>
-      </View>
+        {onCancel ? (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('track.cancelOrderA11y')}
+            onPress={onCancel}
+            style={styles.cancelBtn}>
+            <Text style={styles.cancelText}>{t('track.cancelOrder')}</Text>
+          </PressableScale>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -147,8 +220,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.lg,
   },
-  body: {
-    flex: 1,
+  content: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
   },
@@ -156,12 +228,84 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
 
+  /* Step strip */
+  stepCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: Spacing.md,
+    ...Shadow.card,
+  },
+  stepRow: {
+    flexDirection: 'row',
+  },
+  stepCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  stepNodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: Colors.border,
+  },
+  stepLineOn: {
+    backgroundColor: Colors.primary,
+  },
+  stepLineHidden: {
+    opacity: 0,
+  },
+  stepDot: {
+    width: 22,
+    height: 22,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surfaceMuted,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotDone: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  stepDotActive: {
+    width: 22,
+    height: 22,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryTint,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotCore: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  stepLabelOn: {
+    color: Colors.primaryStrong,
+    fontFamily: Typography.bodyStrong.fontFamily,
+  },
+
   /* Shop card */
   shopCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     ...Shadow.card,
   },
   shopTop: {
@@ -192,107 +336,106 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.primaryStrong,
   },
-  etaRow: {
+  noteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.accentTint,
   },
-  etaLeft: {
+  noteText: {
+    flex: 1,
+    color: Colors.text,
+  },
+
+  /* Order summary */
+  sumCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    ...Shadow.card,
+  },
+  sumHead: {
+    marginBottom: Spacing.md,
+  },
+  sumMeta: {
+    color: Colors.textMuted,
+  },
+  sumBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  sumText: {
     flex: 1,
     gap: 2,
   },
-  etaValue: {
-    ...Typography.title,
+  sumName: {
+    ...Typography.bodyStrong,
     color: Colors.text,
   },
-  etaIcon: {
-    width: 56,
-    height: 56,
+  sumFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  sumTotal: {
+    ...Typography.subtitle,
+    color: Colors.text,
+  },
+
+  /* Thumbnails */
+  thumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thumb: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  thumbOverlap: {
+    marginLeft: -14,
+  },
+  thumbMore: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primaryTint,
+  },
+  thumbMoreText: {
+    ...Typography.label,
+    color: Colors.primaryStrong,
+  },
+  thumbFallback: {
+    width: THUMB,
+    height: THUMB,
     borderRadius: Radius.md,
     backgroundColor: Colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  /* Banner */
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.lg,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.accentTint,
-    marginBottom: Spacing.lg,
-  },
-  bannerText: {
-    flex: 1,
-    color: Colors.text,
-  },
-
-  /* Promo */
-  promoCard: {
+  /* Address */
+  addrCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surfaceMuted,
-  },
-  promoBody: {
-    flex: 1,
-  },
-  promoTitle: {
-    ...Typography.subtitle,
-    color: Colors.text,
-  },
-  promoSub: {
-    marginTop: 2,
-  },
-  promoBtn: {
-    alignSelf: 'flex-start',
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
     backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
     ...Shadow.card,
   },
-  promoBtnText: {
-    ...Typography.button,
-    color: Colors.primaryStrong,
-  },
-  promoIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  cancelBtn: {
-    alignSelf: 'center',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    marginBottom: Spacing.xs,
-  },
-  cancelText: {
-    ...Typography.bodyStrong,
-    color: Colors.textMuted,
-    textDecorationLine: 'underline',
-  },
-
-  /* Footer */
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  footerPin: {
+  addrPin: {
     width: 40,
     height: 40,
     borderRadius: Radius.md,
@@ -300,12 +443,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footerText: {
+  addrText: {
     flex: 1,
     gap: 1,
   },
-  footerAddr: {
+  addrValue: {
     ...Typography.bodyStrong,
     color: Colors.text,
+  },
+  etaChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryTint,
+  },
+  etaChipText: {
+    ...Typography.label,
+    color: Colors.primaryStrong,
+  },
+
+  cancelBtn: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+  },
+  cancelText: {
+    ...Typography.bodyStrong,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });

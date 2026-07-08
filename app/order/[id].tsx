@@ -148,13 +148,7 @@ export default function OrderTrackingScreen() {
   if (isAwaitingSlipCheck(active)) {
     return (
       <View style={styles.screen}>
-        <PreparingView
-          order={active}
-          awaitingSlip
-          onClose={goHome}
-          onExplore={() => router.push('/search')}
-          onCancel={onCancel}
-        />
+        <PreparingView order={active} awaitingSlip onClose={goHome} onCancel={onCancel} />
       </View>
     );
   }
@@ -177,12 +171,7 @@ export default function OrderTrackingScreen() {
   return (
     <View style={styles.screen}>
       {active.status === 'preparing' ? (
-        <PreparingView
-          order={active}
-          onClose={goHome}
-          onExplore={() => router.push('/search')}
-          onCancel={onCancel}
-        />
+        <PreparingView order={active} onClose={goHome} onCancel={onCancel} />
       ) : active.status === 'out_for_delivery' ? (
         <TrackingMapView
           order={active}
