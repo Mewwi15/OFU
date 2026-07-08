@@ -100,6 +100,18 @@ export function Products() {
   editingRef.current = editing;
   useEffect(() => {
     const buf = { chars: '', last: 0 };
+    // Keypad-emulation scanner support (Alt + ASCII on the numpad) — see the
+    // modal wedge for the full story.
+    const alt = { digits: '' };
+    const finalizeAlt = (now: number) => {
+      if (!alt.digits) return;
+      const n = parseInt(alt.digits, 10);
+      alt.digits = '';
+      if (Number.isFinite(n) && n > 0 && n <= 255) {
+        buf.chars += String.fromCharCode(n);
+        buf.last = now;
+      }
+    };
     const editable = (el: EventTarget | null) => {
       const n = el as HTMLElement | null;
       return !!n?.tagName && (n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable);
@@ -108,9 +120,20 @@ export function Products() {
       if (editingRef.current) return; // a modal is open → let its fields take the scan
       if (editable(e.target)) return;
       const now = e.timeStamp;
+      if (e.key === 'Alt') {
+        finalizeAlt(now);
+        return;
+      }
+      const numpad = e.altKey ? /^Numpad(\d)$/.exec(e.code) : null;
+      if (numpad) {
+        alt.digits += numpad[1];
+        buf.last = now;
+        return;
+      }
       if (now - buf.last > 120) buf.chars = ''; // slow gap → real typing, not a scan
       buf.last = now;
       if (e.key === 'Enter') {
+        finalizeAlt(now);
         const code = buf.chars.trim();
         buf.chars = '';
         if (code.length < 3) return;
@@ -438,11 +461,35 @@ function ProductModal({
       swallowed = [];
     };
 
+    // The shop's scanner runs in Windows keypad-emulation: each char arrives as
+    // Alt + its ASCII code on the numpad (no printable keydowns at all — the
+    // flight recorder finally exposed this). Decode those groups into buf so
+    // scans in this mode get the full treatment (toast, barcode routing, and
+    // stripping the natively-composed chars out of whatever field was focused).
+    const alt = { digits: '', el: null as HTMLElement | null };
+    const finalizeAlt = () => {
+      if (!alt.digits) return;
+      const n = parseInt(alt.digits, 10);
+      alt.digits = '';
+      const el = alt.el;
+      alt.el = null;
+      if (!Number.isFinite(n) || n <= 0 || n > 255) return;
+      const ch = String.fromCharCode(n);
+      buf.chars += ch;
+      buf.fast = true; // alt-code bursts are machine input by definition
+      // Windows composes the char into the focused field on Alt-release —
+      // record it as a leak so stripLeaks() can pull it back out (endsWith
+      // guard makes this a no-op if composition didn't land).
+      if (el) leaked.push({ el, key: ch });
+    };
+
     const reset = () => {
       buf.chars = '';
       buf.fast = false;
       leaked = [];
       swallowed = [];
+      alt.digits = '';
+      alt.el = null;
     };
 
     // A scanner finishes with Enter within milliseconds. If the sequence just
@@ -465,8 +512,22 @@ function ProductModal({
       const target = e.target as HTMLElement | null;
       const editable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
+      // Keypad-emulation scanner: a new Alt press ends the previous group; the
+      // numpad digits while Alt is held spell the char's ASCII code.
+      if (e.key === 'Alt') {
+        finalizeAlt();
+        return;
+      }
+      const numpad = e.altKey ? /^Numpad(\d)$/.exec(e.code) : null;
+      if (numpad) {
+        alt.digits += numpad[1];
+        if (editable && target) alt.el = target;
+        return;
+      }
+
       if (e.key === 'Enter') {
         clearTimeout(idleTimer);
+        finalizeAlt();
         const code = buf.chars.trim();
         const isScan = code.length >= 6 || (buf.fast && code.length >= 3);
         const inTextarea = target?.tagName === 'TEXTAREA';

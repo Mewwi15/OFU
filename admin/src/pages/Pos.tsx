@@ -287,6 +287,18 @@ export function Pos() {
   // and never hijacks real typing in other inputs.
   useEffect(() => {
     const buf = { chars: '', last: 0 };
+    // Keypad-emulation scanner support (Alt + ASCII on the numpad) — see the
+    // Products modal wedge for the full story.
+    const alt = { digits: '' };
+    const finalizeAlt = (now: number) => {
+      if (!alt.digits) return;
+      const n = parseInt(alt.digits, 10);
+      alt.digits = '';
+      if (Number.isFinite(n) && n > 0 && n <= 255) {
+        buf.chars += String.fromCharCode(n);
+        buf.last = now;
+      }
+    };
     function editable(el: EventTarget | null) {
       const n = el as HTMLElement | null;
       if (!n?.tagName) return false;
@@ -295,9 +307,20 @@ export function Pos() {
     function onKey(e: KeyboardEvent) {
       if (editable(e.target)) return; // let the focused field (incl. search box) handle it
       const now = e.timeStamp;
+      if (e.key === 'Alt') {
+        finalizeAlt(now);
+        return;
+      }
+      const numpad = e.altKey ? /^Numpad(\d)$/.exec(e.code) : null;
+      if (numpad) {
+        alt.digits += numpad[1];
+        buf.last = now;
+        return;
+      }
       if (now - buf.last > 120) buf.chars = ''; // slow gap → not a scan burst
       buf.last = now;
       if (e.key === 'Enter') {
+        finalizeAlt(now);
         const code = buf.chars;
         buf.chars = '';
         if (code.length >= 3) {

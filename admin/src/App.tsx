@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth';
 import { Layout } from './components/Layout';
 import { installFlightRecorder, recordNav } from './lib/flightRecorder';
+import { installScannerGuard } from './lib/scannerGuard';
 import { Banners } from './pages/Banners';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
@@ -33,6 +34,7 @@ export default function App() {
   const location = useLocation();
   useEffect(() => {
     installFlightRecorder();
+    installScannerGuard();
   }, []);
   useEffect(() => {
     recordNav(location.pathname);
