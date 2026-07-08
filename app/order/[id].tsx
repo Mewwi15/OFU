@@ -26,6 +26,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { isAwaitingSlipCheck } from '@/data/fulfillment';
 import {
   cancelOrder,
+  confirmDelivered,
   orderErrorMessage,
   submitRating as submitRatingApi,
   subscribeOrder,
@@ -40,12 +41,10 @@ export default function OrderTrackingScreen() {
   const active = useOrder((s) => s.active);
   const activeLoading = useOrder((s) => s.activeLoading);
   const loadActive = useOrder((s) => s.loadActive);
-  const setStatus = useOrder((s) => s.setStatus);
 
   const [submitted, setSubmitted] = useState(false);
 
-  // Load the order from the backend on focus (status reflects the DB; realtime
-  // live-updates land in a later phase).
+  // Load the order from the backend on focus (status always reflects the DB).
   useFocusEffect(
     useCallback(() => {
       if (id) void loadActive(id);
@@ -64,6 +63,18 @@ export default function OrderTrackingScreen() {
     if (active) Linking.openURL(`tel:${active.rider.phone}`).catch(() => {});
   };
   const openHelp = () => Alert.alert(t('track.helpTitle'), t('track.helpBody'));
+
+  // Customer confirms receipt — persists via RPC, then reloads from the DB
+  // (the screen flips to DeliveredView from the real status, not local state).
+  const onArrived = async () => {
+    if (!active) return;
+    try {
+      await confirmDelivered(active.id);
+      await loadActive(active.id);
+    } catch (e) {
+      Alert.alert(t('track.confirmDeliveredFailed'), orderErrorMessage(e));
+    }
+  };
 
   const onSubmitRating = async (stars: number, comment: string) => {
     if (active) await submitRatingApi(active.id, stars, comment).catch(() => {});
@@ -155,7 +166,7 @@ export default function OrderTrackingScreen() {
         <ParcelTrackingView
           order={active}
           onClose={goHome}
-          onArrived={() => setStatus('delivered')}
+          onArrived={() => void onArrived()}
           onDone={goHome}
           onHelp={openHelp}
         />
@@ -179,7 +190,7 @@ export default function OrderTrackingScreen() {
           onHelp={openHelp}
           onChat={openChat}
           onCall={callRider}
-          onArrived={() => setStatus('delivered')}
+          onArrived={() => void onArrived()}
         />
       ) : (
         <DeliveredView

@@ -275,6 +275,14 @@ export async function getOrderByNumber(orderNumber: string): Promise<TrackedOrde
   return data ? toTracked(data as unknown as OrderRow) : null;
 }
 
+/** Customer confirms receipt: out_for_delivery → delivered (confirm_delivered RPC). */
+export async function confirmDelivered(orderNumber: string): Promise<void> {
+  const { error } = await supabase.rpc('confirm_delivered', {
+    p_order_number: orderNumber,
+  });
+  if (error) throw error;
+}
+
 /** Submit a 1–5 rating for a delivered order (submit_rating RPC). */
 export async function submitRating(
   orderNumber: string,
