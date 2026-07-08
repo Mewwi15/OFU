@@ -375,42 +375,151 @@ function ProductModal({
   // Images picked while creating a NEW product (no id yet) — uploaded on save.
   const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
 
-  // Scanner wedge (mirrors the POS page). A scanner "types" the barcode as a rapid
-  // key burst ending in Enter; routing that burst through the controlled Form
-  // <Input> garbles it (the modal re-renders per keystroke, so fast chars get
-  // dropped/reordered). So capture the burst at the window from e.key — correct
-  // order, immune to React — and write the barcode field in one shot. Machine-fast
-  // keys are also swallowed so they don't pollute whichever field is focused.
+  // Scanner wedge v3 — deterministic, no more timing guesswork ("หน้าสินค้าหลอน").
+  //
+  // Two hauntings this kills:
+  //  1) "เด้งไปหน้าอื่น / บันทึกเอง": the scan's trailing Enter reached antd's
+  //     Modal default button (บันทึก) or moved focus. → The modal now CONSUMES
+  //     every Enter except inside a textarea; saving is click-only.
+  //  2) "เลขขาด/เกิน/มั่ว": burst chars that slipped past the old 50ms heuristic
+  //     landed in whatever field was focused (name, price, …). → Every let-through
+  //     char is RECORDED with its target; when the burst ends as a scan we strip
+  //     exactly those leaked chars back out of the field (antd input id = form
+  //     field name) and write the full clean code into the barcode field.
   useEffect(() => {
+    // Only chars a scanner can emit take part; Thai typing is never touched.
+    const SCAN_CHAR = /^[0-9A-Za-z._\-]$/;
     const buf = { chars: '', last: 0, fast: false };
+    // Chars that reached a focused input during the current sequence (let-through).
+    let leaked: { el: HTMLElement; key: string }[] = [];
+    // Chars we swallowed (preventDefault) with the field they were headed for.
+    let swallowed: { el: HTMLElement | null; key: string }[] = [];
+
+    const fieldOf = (el: HTMLElement | null) => (el && el.id ? el.id : null);
+    const isNumeric = (el: HTMLElement) => el.classList.contains('ant-input-number-input');
+
+    /** Scan confirmed → pull the leaked chars back out of whatever field they hit. */
+    const stripLeaks = () => {
+      const byField = new Map<string, { el: HTMLElement; chars: string }>();
+      for (const l of leaked) {
+        const id = fieldOf(l.el);
+        if (!id) continue;
+        const cur = byField.get(id) ?? { el: l.el, chars: '' };
+        cur.chars += l.key;
+        byField.set(id, cur);
+      }
+      for (const [fieldId, { el, chars }] of byField) {
+        const value = form.getFieldValue(fieldId);
+        if (value === undefined || value === null) continue;
+        const str = String(value);
+        if (!str.endsWith(chars)) continue; // field changed some other way — leave it
+        const cleaned = str.slice(0, str.length - chars.length);
+        form.setFieldValue(fieldId, isNumeric(el) ? (cleaned === '' ? null : Number(cleaned)) : cleaned);
+      }
+    };
+
+    /** NOT a scan after all → give the swallowed keystrokes back to their field
+     *  (fast human typing must never silently vanish). */
+    const flushSwallowed = () => {
+      const byField = new Map<string, { el: HTMLElement; chars: string }>();
+      for (const s of swallowed) {
+        const id = fieldOf(s.el);
+        if (!id || !s.el) continue;
+        const cur = byField.get(id) ?? { el: s.el, chars: '' };
+        cur.chars += s.key;
+        byField.set(id, cur);
+      }
+      for (const [fieldId, { el, chars }] of byField) {
+        const value = form.getFieldValue(fieldId);
+        const str = value === undefined || value === null ? '' : String(value);
+        const next = str + chars;
+        form.setFieldValue(fieldId, isNumeric(el) ? (next === '' ? null : Number(next)) : next);
+      }
+      swallowed = [];
+    };
+
+    const reset = () => {
+      buf.chars = '';
+      buf.fast = false;
+      leaked = [];
+      swallowed = [];
+    };
+
+    // A scanner finishes with Enter within milliseconds. If the sequence just
+    // stops (human typed a fast pair then paused), flush what we swallowed so
+    // no keystroke ever silently vanishes.
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const armIdleFlush = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        flushSwallowed();
+        reset();
+      }, 250);
+    };
+
     function onKey(e: KeyboardEvent) {
+      armIdleFlush();
       const now = e.timeStamp;
       const gap = now - buf.last;
       buf.last = now;
+      const target = e.target as HTMLElement | null;
+      const editable = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+
       if (e.key === 'Enter') {
+        clearTimeout(idleTimer);
         const code = buf.chars.trim();
         const isScan = code.length >= 6 || (buf.fast && code.length >= 3);
-        buf.chars = '';
-        buf.fast = false;
-        if (isScan) {
+        const inTextarea = target?.tagName === 'TEXTAREA';
+        // Enter never submits/clicks in this modal — a scan's trailing Enter used
+        // to hit the Modal's default button (บันทึกเอง/เด้งหน้า). Saving is click-only.
+        // Textareas keep their newline unless the Enter is the tail of a scan.
+        if (isScan || !inTextarea) {
           e.preventDefault();
           e.stopPropagation();
+        }
+        if (isScan) {
+          stripLeaks();
           form.setFieldValue('barcode', code);
           message.success(`บาร์โค้ด ${code}`);
+        } else {
+          flushSwallowed(); // short/slow sequence = human typing — return it
         }
+        reset();
         return;
       }
+
       if (e.key.length !== 1) return;
-      if (gap > 120) { buf.chars = ''; buf.fast = false; } // human pause → new sequence
+
+      if (!SCAN_CHAR.test(e.key)) {
+        // Thai/space/symbol — a scanner never sends these. End any pending
+        // sequence as human typing and let the key through untouched.
+        flushSwallowed();
+        reset();
+        return;
+      }
+
+      if (gap > 250) {
+        flushSwallowed(); // pause = the fast pair was human — give it back first
+        reset();
+      }
       buf.chars += e.key;
-      if (gap < 50) {
-        buf.fast = true; // machine-fast burst → it's a scanner
-        e.preventDefault(); // don't let the burst land (garbled) in the focused field
+      if (gap < 100) {
+        // Machine-fast: swallow so the burst can't garble the focused field.
+        buf.fast = true;
+        e.preventDefault();
         e.stopPropagation();
+        swallowed.push({ el: editable ? target : null, key: e.key });
+      } else if (editable && target) {
+        // Let it through, but remember where it landed — if this turns out to be
+        // a scan, stripLeaks() pulls exactly these back out.
+        leaked.push({ el: target, key: e.key });
       }
     }
     window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true });
+    return () => {
+      clearTimeout(idleTimer);
+      window.removeEventListener('keydown', onKey, { capture: true });
+    };
   }, [form, message]);
 
   const reloadImages = async () => {
