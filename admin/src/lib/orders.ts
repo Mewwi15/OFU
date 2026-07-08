@@ -129,16 +129,33 @@ const rpc = async <T = unknown>(fn: string, args: Record<string, unknown>): Prom
   return data as T;
 };
 
-export const approveSlip = (orderId: string, rowVersion?: number) =>
-  rpc('approve_slip', { p_order_id: orderId, p_expected_row_version: rowVersion ?? undefined });
+/** The slip flow is two-phase in the backend: claim_slip locks the order
+ *  (slip_uploaded → verifying, records which admin took it), then approve/
+ *  reject finalises. One button must do both — approve_slip alone throws
+ *  NOT_IN_VERIFYING. Ignore a failed claim (already claimed → just proceed),
+ *  and skip the row-version check afterwards since the claim itself may bump
+ *  it (the claim lock already serialises concurrent admins). */
+const claimSlip = async (orderId: string) => {
+  try {
+    await rpc('claim_slip', { p_order_id: orderId });
+  } catch {
+    /* already verifying — proceed */
+  }
+};
 
-export const rejectSlip = (orderId: string, reason: SlipRejectReason, note?: string, rowVersion?: number) =>
-  rpc('reject_slip', {
+export const approveSlip = async (orderId: string, _rowVersion?: number) => {
+  await claimSlip(orderId);
+  return rpc('approve_slip', { p_order_id: orderId });
+};
+
+export const rejectSlip = async (orderId: string, reason: SlipRejectReason, note?: string, _rowVersion?: number) => {
+  await claimSlip(orderId);
+  return rpc('reject_slip', {
     p_order_id: orderId,
     p_reason: reason,
     p_note: note ?? undefined,
-    p_expected_row_version: rowVersion ?? undefined,
   });
+};
 
 export const advanceOrder = (orderId: string, toStatus: OrderStatus, rowVersion?: number) =>
   rpc('advance_order', {
