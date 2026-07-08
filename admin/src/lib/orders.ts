@@ -103,7 +103,9 @@ export async function getSlipUrl(orderId: string): Promise<string | null> {
   const { data: signed, error: signErr } = await supabase.storage
     .from('payment-slips')
     .createSignedUrl(path, 60 * 10);
-  if (signErr) return null;
+  // Surface signing failures — swallowing them rendered a blank "no slip" box
+  // with no way to see why (the shop needs the reason, e.g. an RLS/storage error).
+  if (signErr) throw signErr;
   return signed?.signedUrl ?? null;
 }
 

@@ -32,6 +32,8 @@ export function Payments() {
   const { message } = App.useApp();
   const [orders, setOrders] = useState<Order[]>([]);
   const [slips, setSlips] = useState<Record<string, string | null>>({});
+  // Why a slip image could not be loaded, per order (shown on the card).
+  const [slipErrs, setSlipErrs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<Order | null>(null);
@@ -44,10 +46,19 @@ export function Payments() {
         (o) => o.payment_status === 'slip_uploaded' || o.payment_status === 'verifying',
       );
       setOrders(pending);
+      const errs: Record<string, string> = {};
       const entries = await Promise.all(
-        pending.map(async (o) => [o.id, await getSlipUrl(o.id).catch(() => null)] as const),
+        pending.map(async (o) => {
+          try {
+            return [o.id, await getSlipUrl(o.id)] as const;
+          } catch (e) {
+            errs[o.id] = apiError(e);
+            return [o.id, null] as const;
+          }
+        }),
       );
       setSlips(Object.fromEntries(entries));
+      setSlipErrs(errs);
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -111,7 +122,12 @@ export function Payments() {
                 {slips[o.id] ? (
                   <Image src={slips[o.id] as string} alt="สลิป" height={200} style={{ objectFit: 'contain' }} />
                 ) : (
-                  <Text type="secondary">ไม่พบรูปสลิป</Text>
+                  <div className="px-3 text-center">
+                    <Text type="secondary">ไม่พบรูปสลิป</Text>
+                    {slipErrs[o.id] ? (
+                      <div className="text-xs text-red-500 mt-1">{slipErrs[o.id]}</div>
+                    ) : null}
+                  </div>
                 )}
               </div>
 
