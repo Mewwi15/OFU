@@ -63,6 +63,10 @@ Deno.serve(async () => {
         body: d.notification?.body ?? '',
         data: { targetId: d.notification?.target_id ?? null },
         sound: 'default',
+        // Transactional order updates must wake the device: normal-priority FCM
+        // gets deferred (or dropped) while the app is frozen in the background.
+        priority: 'high',
+        channelId: 'default',
       });
     }
   }
