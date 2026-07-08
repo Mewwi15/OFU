@@ -459,6 +459,9 @@ export function Pos() {
             autoFocus
             size="large"
             allowClear
+            // No browser autofill: Chrome remembered old scans and its suggestion
+            // popup swallowed the scan's Enter (picking a stale code).
+            autoComplete="off"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onSearchKey}

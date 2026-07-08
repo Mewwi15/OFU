@@ -125,6 +125,7 @@ export function Settings() {
                 </div>
                 <Input
                   allowClear
+                  autoComplete="off"
                   placeholder="คลิกช่องนี้แล้วยิงบาร์โค้ด 1 ครั้ง"
                   value={scan}
                   onChange={(e) => setScan(e.target.value)}

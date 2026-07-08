@@ -303,7 +303,7 @@ export function Products() {
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Input.Search allowClear placeholder="ค้นหาสินค้า…" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
+        <Input.Search allowClear placeholder="ค้นหาสินค้า…" autoComplete="off" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         <Select
           allowClear
           placeholder="ทุกหมวดหมู่"
@@ -589,6 +589,10 @@ function ProductModal({
         form={form}
         layout="vertical"
         requiredMark={false}
+        // Chrome's autofill remembered previously scanned barcodes and popped a
+        // suggestion list under the field; the scan's Enter then "picked" an OLD
+        // number. These fields must never be remembered.
+        autoComplete="off"
         initialValues={{
           name: product?.name ?? '',
           category_id: product?.category_id ?? undefined,
@@ -605,7 +609,7 @@ function ProductModal({
         }}
         className="mt-2">
         <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรุณากรอกชื่อสินค้า' }]}>
-          <Input placeholder="เช่น ข้าวหอมมะลิ" />
+          <Input placeholder="เช่น ข้าวหอมมะลิ" autoComplete="off" />
         </Form.Item>
         <div className="grid grid-cols-2 gap-3">
           <Form.Item name="category_id" label="หมวดหมู่">
@@ -639,10 +643,10 @@ function ProductModal({
             <InputNumber min={0} style={{ width: '100%' }} placeholder="5" />
           </Form.Item>
           <Form.Item name="barcode" label="บาร์โค้ด">
-            <Input placeholder="ยิงหรือพิมพ์บาร์โค้ด" />
+            <Input placeholder="ยิงหรือพิมพ์บาร์โค้ด" autoComplete="off" />
           </Form.Item>
           <Form.Item name="sku" label="รหัสสินค้า (SKU)">
-            <Input placeholder="เช่น RICE-5KG" />
+            <Input placeholder="เช่น RICE-5KG" autoComplete="off" />
           </Form.Item>
           <Form.Item name="unit" label="หน่วยนับ">
             <Input placeholder="ชิ้น" />
