@@ -41,6 +41,8 @@ export type AuthState = {
   status: AuthStatus;
   /** Initial session hydration finished (root layout gates `ready` on this). */
   hydrated: boolean;
+  /** Supabase auth user id of the signed-in account (null when signed out). */
+  userId: string | null;
   user: AuthUser;
   /** Hydrate the session + subscribe to auth changes (call once on startup). */
   initialize: () => void;
@@ -75,6 +77,7 @@ async function loadUser(): Promise<AuthUser> {
 export const useAuth = create<AuthState>((set) => ({
   status: 'loading',
   hydrated: false,
+  userId: null,
   user: GUEST,
 
   initialize: () => {
@@ -84,12 +87,12 @@ export const useAuth = create<AuthState>((set) => ({
       .getSession()
       .then(async (session) => {
         if (session) {
-          set({ status: 'authenticated', user: await loadUser(), hydrated: true });
+          set({ status: 'authenticated', userId: session.user.id, user: await loadUser(), hydrated: true });
         } else {
-          set({ status: 'unauthenticated', user: GUEST, hydrated: true });
+          set({ status: 'unauthenticated', userId: null, user: GUEST, hydrated: true });
         }
       })
-      .catch(() => set({ status: 'unauthenticated', user: GUEST, hydrated: true }));
+      .catch(() => set({ status: 'unauthenticated', userId: null, user: GUEST, hydrated: true }));
 
     // IMPORTANT: do NOT call other supabase methods synchronously inside the
     // onAuthStateChange callback — it runs under the auth lock and awaiting
@@ -97,12 +100,12 @@ export const useAuth = create<AuthState>((set) => ({
     // defer the profile fetch to a later tick.
     unsubscribe = authRepo.onAuthChange((session) => {
       if (session) {
-        set({ status: 'authenticated' });
+        set({ status: 'authenticated', userId: session.user.id });
         setTimeout(() => {
           void loadUser().then((user) => set({ user }));
         }, 0);
       } else {
-        set({ status: 'unauthenticated', user: GUEST });
+        set({ status: 'unauthenticated', userId: null, user: GUEST });
       }
     });
   },
@@ -146,6 +149,6 @@ export const useAuth = create<AuthState>((set) => ({
 
   logout: async () => {
     await authRepo.signOut();
-    set({ status: 'unauthenticated', user: GUEST });
+    set({ status: 'unauthenticated', userId: null, user: GUEST });
   },
 }));

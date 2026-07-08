@@ -38,6 +38,7 @@ export default function RootLayout() {
   // guarded blocks below is active at a time.
   const isAuthed = useAuth((s) => s.status === 'authenticated');
   const authHydrated = useAuth((s) => s.hydrated);
+  const userId = useAuth((s) => s.userId);
   const initAuth = useAuth((s) => s.initialize);
   const hydrated = useLock((s) => s.hydrated);
   const onboarded = useLock((s) => s.onboarded);
@@ -45,12 +46,20 @@ export default function RootLayout() {
   const locked = useLock((s) => s.locked);
   const hydrate = useLock((s) => s.hydrate);
   const lock = useLock((s) => s.lock);
+  const ensurePinOwner = useLock((s) => s.ensurePinOwner);
 
   // Hydrate persisted lock state + Supabase auth session once on startup.
   useEffect(() => {
     hydrate();
     initAuth();
   }, [hydrate, initAuth]);
+
+  // The PIN belongs to an account, not the device: if another account's PIN is
+  // still stored here (account switch / phone-OTP era), clear it so this
+  // account gets the setup flow instead of a lock it can never pass.
+  useEffect(() => {
+    if (userId && hydrated) void ensurePinOwner(userId);
+  }, [userId, hydrated, ensurePinOwner]);
 
   // Re-lock when the app is sent to the background (screen-lock behaviour).
   useEffect(() => {

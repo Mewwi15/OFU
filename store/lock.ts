@@ -20,6 +20,8 @@ import { create } from 'zustand';
 const PIN_KEY = 'oofoo-pin';
 const ONBOARDED_KEY = 'oofoo-onboarded';
 const BIOMETRIC_KEY = 'oofoo-biometric';
+/** auth user id the stored PIN belongs to (PIN is per-account, not per-device). */
+const PIN_OWNER_KEY = 'oofoo-pin-owner';
 
 export const PIN_LENGTH = 6;
 
@@ -48,6 +50,13 @@ export type LockState = {
   lock: () => void;
   /** Clear PIN + biometric (on sign-out). Onboarding stays done. */
   resetLock: () => Promise<void>;
+  /**
+   * Bind the stored PIN to the signed-in account. If the device holds a PIN
+   * set by a DIFFERENT (or unknown) account, clear it so the new account gets
+   * the setup flow instead of a lock screen it can never pass. Call whenever
+   * the authenticated user id becomes known.
+   */
+  ensurePinOwner: (userId: string) => Promise<void>;
 };
 
 async function readPin(): Promise<string | null> {
@@ -114,5 +123,14 @@ export const useLock = create<LockState>((set, get) => ({
     await SecureStore.deleteItemAsync(PIN_KEY).catch(() => {});
     await AsyncStorage.setItem(BIOMETRIC_KEY, '0');
     set({ hasPin: false, biometricEnabled: false, locked: false });
+  },
+
+  ensurePinOwner: async (userId) => {
+    const owner = await AsyncStorage.getItem(PIN_OWNER_KEY);
+    if (owner === userId) return;
+    // Signing in already proved identity — a leftover PIN from another account
+    // (e.g. the phone-OTP era, or a shared device) must not lock this one out.
+    if (get().hasPin) await get().resetLock();
+    await AsyncStorage.setItem(PIN_OWNER_KEY, userId);
   },
 }));
