@@ -33,7 +33,9 @@ function easProjectId(): string | undefined {
 
 /** Register this device for push. Safe to call on every authed launch. */
 export async function registerForPush(): Promise<void> {
-  if (!Device.isDevice) return; // simulators can't receive remote push
+  // iOS simulators can't receive remote push. Android emulators with Google
+  // Play services CAN (FCM works there), so only gate iOS.
+  if (!Device.isDevice && Platform.OS === 'ios') return;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
