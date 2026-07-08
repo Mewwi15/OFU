@@ -16,6 +16,13 @@ import { clearFlightLog, formatFlightLog, getFlightLog, type FlightEvent } from 
 const { Title, Text } = Typography;
 
 function EventRow({ e }: { e: FlightEvent }) {
+  if (e.kind === 'boot') {
+    return (
+      <div className="py-0.5 font-mono text-[12px] text-purple-600 font-semibold">
+        #{e.seq} ===== เปิดหน้าใหม่ ({e.bootType}) → {e.path} =====
+      </div>
+    );
+  }
   if (e.kind === 'nav') {
     return (
       <div className="py-0.5 font-mono text-[12px] text-red-600 font-semibold">

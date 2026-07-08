@@ -2,37 +2,63 @@
  * Flight recorder — a black box for the barcode-scanner haunting.
  *
  * Records (a) every keydown the browser delivers, with key/code/modifiers,
- * inter-key gap, target and whether any handler preventDefault'ed it, and
- * (b) every route change. When the page "jumps by itself" after a scan, the
- * interleaved log shows exactly which key (or which prefix/suffix the scanner
- * secretly sends) caused it. Read + copy at /scan-lab.
+ * inter-key gap, target and whether any handler preventDefault'ed it,
+ * (b) every SPA route change, and (c) every app BOOT (full page load, with
+ * whether it was a reload or a fresh navigation). Persisted in sessionStorage
+ * so the tape SURVIVES full page reloads — the first copied tape came back
+ * empty, which itself suggested the "jump" is a full browser navigation (the
+ * SPA reboots → index route redirects to /pos). Read + copy at /scan-lab.
  */
 
 export type FlightEvent = {
   seq: number;
-  t: number; // ms since recorder start
-  kind: 'key' | 'nav';
+  t: number; // ms since recorder start (per boot)
+  kind: 'key' | 'nav' | 'boot';
   // key events
   key?: string;
   code?: string;
-  mods?: string; // e.g. "Alt+Ctrl"
-  gap?: number; // ms since previous key
-  target?: string; // TAG#id
-  prevented?: boolean; // set at bubble phase (after app handlers ran)
+  mods?: string;
+  gap?: number;
+  target?: string;
+  prevented?: boolean;
   // nav events
   path?: string;
+  // boot events
+  bootType?: string; // 'reload' | 'navigate' | 'back_forward' | ...
 };
 
 const MAX = 400;
-const events: FlightEvent[] = [];
+const STORE_KEY = 'ofu.flightlog';
+let events: FlightEvent[] = [];
 let seq = 0;
 let started = 0;
 let lastKeyT = 0;
 let installed = false;
 
+function save() {
+  try {
+    sessionStorage.setItem(STORE_KEY, JSON.stringify({ seq, events }));
+  } catch {
+    /* full/unavailable — keep in-memory only */
+  }
+}
+
+function load() {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { seq: number; events: FlightEvent[] };
+    events = parsed.events ?? [];
+    seq = parsed.seq ?? 0;
+  } catch {
+    /* corrupted — start fresh */
+  }
+}
+
 function push(e: FlightEvent) {
   events.push(e);
   if (events.length > MAX) events.shift();
+  save();
 }
 
 export function recordNav(path: string) {
@@ -45,11 +71,13 @@ export function getFlightLog(): FlightEvent[] {
 }
 
 export function clearFlightLog() {
-  events.length = 0;
+  events = [];
+  save();
 }
 
 export function formatFlightLog(): string {
   const lines = events.map((e) => {
+    if (e.kind === 'boot') return `#${e.seq} ===== เปิดหน้าใหม่ (${e.bootType}) → ${e.path} =====`;
     if (e.kind === 'nav') return `#${e.seq} +${e.t}ms  >>> เปลี่ยนหน้า → ${e.path}`;
     const mods = e.mods ? `${e.mods}+` : '';
     return `#${e.seq} +${e.t}ms  key=${mods}${e.key} code=${e.code} gap=${e.gap}ms target=${e.target}${e.prevented ? ' [ถูกดักไว้]' : ''}`;
@@ -61,6 +89,20 @@ export function installFlightRecorder() {
   if (installed) return;
   installed = true;
   started = performance.now();
+  load();
+
+  // Mark this boot: a 'reload' here right after a scan = the smoking gun that
+  // something performed a full browser navigation (e.g. native form submit).
+  const navEntry = performance.getEntriesByType('navigation')[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  push({
+    seq: ++seq,
+    t: 0,
+    kind: 'boot',
+    bootType: navEntry?.type ?? 'unknown',
+    path: location.pathname,
+  });
 
   // Capture phase: log the raw key before any app handler can touch it.
   window.addEventListener(
@@ -88,8 +130,25 @@ export function installFlightRecorder() {
       // Bubble phase on the same event: see whether an app handler consumed it.
       const mark = () => {
         entry.prevented = e.defaultPrevented;
+        save();
       };
       window.addEventListener('keydown', mark, { once: true });
+    },
+    { capture: true },
+  );
+
+  // A native <form> submission would full-reload the page (and wipe an
+  // in-memory log — hence sessionStorage). Record any submit we can see.
+  window.addEventListener(
+    'submit',
+    (e) => {
+      const f = e.target as HTMLFormElement | null;
+      push({
+        seq: ++seq,
+        t: Math.round(performance.now() - started),
+        kind: 'nav',
+        path: `(FORM SUBMIT${e.defaultPrevented ? ' — ถูกดักไว้' : ' — ไม่ถูกดัก!'}) ${f?.id || f?.className?.slice?.(0, 40) || ''}`,
+      });
     },
     { capture: true },
   );
