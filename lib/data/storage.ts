@@ -15,8 +15,11 @@ const LOOKUP = (() => {
   return t;
 })();
 
-/** Decode a standard base64 string to bytes (ignores whitespace/padding). */
-export function base64ToBytes(b64: string): Uint8Array {
+/** Decode a standard base64 string to bytes (ignores whitespace/padding;
+ *  strips a `data:...;base64,` URI prefix if present). */
+export function base64ToBytes(b64raw: string): Uint8Array {
+  // indexOf(',') === -1 → slice(0) → the whole string (no prefix present).
+  const b64 = b64raw.startsWith('data:') ? b64raw.slice(b64raw.indexOf(',') + 1) : b64raw;
   let len = b64.length;
   while (len > 0 && b64[len - 1] === '=') len--;
   const out = new Uint8Array((len * 3) >> 2);
@@ -36,6 +39,17 @@ export function base64ToBytes(b64: string): Uint8Array {
   return o === out.length ? out : out.subarray(0, o);
 }
 
+/** Exact-size ArrayBuffer for upload bodies. React Native's fetch mangles a
+ *  Uint8Array body (the bytes arrive as text — the stored "image" was actually
+ *  base64 text and unviewable); an ArrayBuffer is the RN-supported body type
+ *  per Supabase's own Expo guidance. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  if (bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength) {
+    return bytes.buffer as ArrayBuffer;
+  }
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 /**
  * Upload a payment slip (base64 JPEG from the image picker) for an order.
  * Returns the storage path recorded via attach_payment_slip.
@@ -44,7 +58,7 @@ export async function uploadSlip(orderId: string, base64: string): Promise<strin
   const path = `${orderId}.jpg`;
   const { error } = await supabase.storage
     .from('payment-slips')
-    .upload(path, base64ToBytes(base64), { contentType: 'image/jpeg', upsert: true });
+    .upload(path, toArrayBuffer(base64ToBytes(base64)), { contentType: 'image/jpeg', upsert: true });
   if (error) throw error;
   return path;
 }
@@ -59,7 +73,7 @@ export async function uploadAvatar(base64: string): Promise<string> {
   const path = `${u.user.id}.jpg`;
   const { error } = await supabase.storage
     .from('avatars')
-    .upload(path, base64ToBytes(base64), { contentType: 'image/jpeg', upsert: true });
+    .upload(path, toArrayBuffer(base64ToBytes(base64)), { contentType: 'image/jpeg', upsert: true });
   if (error) throw error;
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
   return `${data.publicUrl}?v=${Date.now()}`;

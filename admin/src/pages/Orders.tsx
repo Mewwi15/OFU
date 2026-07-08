@@ -444,13 +444,27 @@ function OrderDrawer({
             title: 'สินค้า',
             key: 'name',
             render: (_, it) => (
-              <div>
-                <div className="text-[#2B2320]">{it.name_snapshot}</div>
-                {it.size_snapshot ? (
-                  <Text type="secondary" className="text-xs">
-                    {it.size_snapshot}
-                  </Text>
-                ) : null}
+              <div className="flex items-center gap-2.5">
+                {it.image ? (
+                  <Image
+                    src={it.image}
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="rounded-lg object-cover shrink-0"
+                    preview={false}
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-[#F6ECE5] shrink-0" />
+                )}
+                <div>
+                  <div className="text-[#2B2320]">{it.name_snapshot}</div>
+                  {it.size_snapshot ? (
+                    <Text type="secondary" className="text-xs">
+                      {it.size_snapshot}
+                    </Text>
+                  ) : null}
+                </div>
               </div>
             ),
           },

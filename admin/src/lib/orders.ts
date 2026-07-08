@@ -63,6 +63,8 @@ export type OrderItem = {
   unit_price: number;
   qty: number;
   line_total: number;
+  /** Product thumbnail (public URL; primary image, else first, else null). */
+  image: string | null;
 };
 
 const ORDER_COLS =
@@ -82,11 +84,22 @@ export async function listOrders(): Promise<Order[]> {
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
   const { data, error } = await supabase
     .from('order_items')
-    .select('id, name_snapshot, size_snapshot, unit_price, qty, line_total')
+    .select(
+      'id, name_snapshot, size_snapshot, unit_price, qty, line_total, ' +
+        'products(product_images(storage_path, is_primary))',
+    )
     .eq('order_id', orderId)
     .order('name_snapshot');
   if (error) throw error;
-  return data as unknown as OrderItem[];
+  type Row = OrderItem & {
+    products: { product_images: { storage_path: string; is_primary: boolean }[] } | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map(({ products, ...it }) => {
+    const imgs = products?.product_images ?? [];
+    const primary = imgs.find((i) => i.is_primary) ?? imgs[0];
+    // storage_path already holds the full public URL (see api.ts uploadProductImage).
+    return { ...it, image: primary?.storage_path ?? null };
+  });
 }
 
 /** Resolve a signed URL for the active payment slip image (bucket is private). */
