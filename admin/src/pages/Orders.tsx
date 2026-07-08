@@ -40,6 +40,7 @@ import {
   type ShopMode,
   type SlipRejectReason,
 } from '../lib/orders';
+import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
 
 const { Title, Text } = Typography;
 
@@ -163,6 +164,11 @@ export function Orders() {
   }
   useEffect(() => {
     void load();
+    // Live refresh when OrderAlerts sees an order INSERT/UPDATE via Realtime.
+    const onChanged = () => void load();
+    window.addEventListener(ORDERS_CHANGED_EVT, onChanged);
+    return () => window.removeEventListener(ORDERS_CHANGED_EVT, onChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const summary = useMemo(() => {

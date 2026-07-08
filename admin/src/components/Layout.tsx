@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../auth';
+import { OrderAlerts } from './OrderAlerts';
 import { Sidebar, currentNavLabel } from './Sidebar';
 
 const { Header, Sider, Content } = AntLayout;
@@ -19,6 +20,8 @@ export function Layout() {
 
   return (
     <AntLayout style={{ height: '100vh' }}>
+      {/* Live new-order / new-slip alerts (chime + notification) on every page */}
+      <OrderAlerts />
       {/* Fixed sidebar — full height, only the content area scrolls */}
       {isDesktop && (
         <Sider
