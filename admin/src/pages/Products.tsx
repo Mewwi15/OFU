@@ -695,7 +695,8 @@ function ProductModal({
             <InputNumber addonBefore="฿" min={0} style={{ width: '100%' }} placeholder="0" />
           </Form.Item>
           <Form.Item name="cost_price" label="ต้นทุน (ถ้ามี)">
-            <InputNumber addonBefore="฿" min={0} style={{ width: '100%' }} placeholder="0" />
+            {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
+            <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
           </Form.Item>
           <Form.Item name="stock_qty" label="สต็อกคงเหลือ">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
