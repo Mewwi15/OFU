@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "129235146060",
+    "project_id": "oofoo-be2e0",
+    "storage_bucket": "oofoo-be2e0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129235146060:android:d891c7fa27e162a57f6be9",
+        "android_client_info": {
+          "package_name": "com.anonymous.myrnapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPtBUEaUtcXc1EaT3OvTW4jjfj1cgS-Tc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

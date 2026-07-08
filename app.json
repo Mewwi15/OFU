@@ -25,7 +25,8 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.anonymous.myrnapp"
+      "package": "com.anonymous.myrnapp",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
