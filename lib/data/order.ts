@@ -182,6 +182,13 @@ export function mapOrderStatus(db: string): OrderStatus {
 
 export const TERMINAL: OrderStatus[] = ['delivered', 'cancelled', 'returned', 'delivery_failed'];
 
+type OrderItemRow = {
+  qty: number;
+  name_snapshot: string;
+  // Product may be unpublished/archived later → null; images sorted client-side.
+  products: { product_images: { storage_path: string; is_primary: boolean }[] | null } | null;
+};
+
 type OrderRow = {
   order_number: string;
   order_status: string;
@@ -193,20 +200,30 @@ type OrderRow = {
   delivered_at: string | null;
   ship_recipient: string | null;
   ship_address_text: string | null;
-  order_items: { qty: number }[] | null;
+  order_items: OrderItemRow[] | null;
   // PostgREST returns a reverse-embedded (FK→orders) relation as an array.
   parcel_shipments: { tracking_no: string | null; courier: string | null }[] | null;
 };
 
 const ORDER_SELECT =
   'order_number, order_status, payment_status, payment_method, shop_mode, total, placed_at, ' +
-  'delivered_at, ship_recipient, ship_address_text, order_items(qty), ' +
+  'delivered_at, ship_recipient, ship_address_text, ' +
+  'order_items(qty, name_snapshot, products(product_images(storage_path, is_primary))), ' +
   'parcel_shipments(tracking_no, courier)';
 
 function toTracked(r: OrderRow): TrackedOrder {
   const fulfilment = r.shop_mode === 'online' ? 'parcel' : 'delivery';
-  const itemCount = (r.order_items ?? []).reduce((s, i) => s + i.qty, 0);
+  const items = r.order_items ?? [];
+  const itemCount = items.reduce((s, i) => s + i.qty, 0);
   const status = mapOrderStatus(r.order_status);
+  // One thumbnail per item (its primary image), capped for the stacked strip.
+  const itemImages = items
+    .map((i) => {
+      const imgs = i.products?.product_images ?? [];
+      return (imgs.find((x) => x.is_primary) ?? imgs[0])?.storage_path ?? null;
+    })
+    .filter((p): p is string => !!p)
+    .slice(0, 4);
   return {
     id: r.order_number,
     shopName: 'ร้าน อู้ฟู่',
@@ -223,6 +240,8 @@ function toTracked(r: OrderRow): TrackedOrder {
     fulfilment,
     paymentStatus: r.payment_status,
     paymentMethod: r.payment_method,
+    firstItemName: items[0]?.name_snapshot,
+    itemImages,
     ...(fulfilment === 'parcel'
       ? {
           courier: r.parcel_shipments?.[0]?.courier ?? 'Flash Express',

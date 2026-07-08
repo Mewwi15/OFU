@@ -216,6 +216,10 @@ export type TrackedOrder = {
   paymentStatus?: string;
   /** DB payment_method (cod | promptpay_slip). */
   paymentMethod?: string;
+  /** First item's display name — makes the order list scannable. */
+  firstItemName?: string;
+  /** Product thumbnails of the order's items (primary image each, ≤4). */
+  itemImages?: string[];
 };
 
 /** Prepay order whose slip the shop hasn't approved yet (manual verification). */

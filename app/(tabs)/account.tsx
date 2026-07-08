@@ -1,9 +1,11 @@
 /**
  * Profile tab — `/account`.
  *
- * The signed-in customer's hub: an identity card (avatar + name + phone + email
- * + Edit) over a short menu (orders, help) and a sign-out action. Reads the user
- * from the auth store. Coral is the sole accent; tokens-only, zero emoji.
+ * The signed-in customer's hub, redesigned for scannability (owner: the old
+ * stack "ดูยาก"). One identity card holds avatar/name/member-id, an edit
+ * shortcut, and the phone + login-account facts. The menu is grouped into
+ * labelled sections (การสั่งซื้อ / การตั้งค่า / เกี่ยวกับ) with single-line rows —
+ * no per-row captions. Coral is the sole accent; tokens-only, zero emoji.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -38,30 +40,42 @@ const ICON = {
   logout: require('@/assets/icon-src/b9.png') as number,
 };
 
-/** "Google · a@b.com" / "Phone · 081…" for the login-account row. */
-function loginAccountLabel(id: AccountIdentity | null, phoneLabel: string): string {
+/** "Google · a@b.com" / "อีเมล · a@b.com" / "โทรศัพท์ · 081…" for the login row. */
+function loginAccountLabel(id: AccountIdentity | null, t: (k: string) => string): string {
   if (!id) return '—';
   if (id.provider === 'google') return `Google · ${id.email ?? ''}`.trim();
-  if (id.provider === 'phone' || id.phone) return `${phoneLabel} · ${id.phone ?? ''}`.trim();
+  if (id.provider === 'email') return `${t('account.loginEmail')} · ${id.email ?? ''}`.trim();
+  if (id.provider === 'phone' || id.phone) return `${t('account.loginPhone')} · ${id.phone ?? ''}`.trim();
   return id.provider;
 }
 
 const AVATAR_SIZE = 64;
 
-type MenuRow = {
-  key: string;
-  labelKey: string;
-  capKey: string;
-  icon: number;
-};
+type MenuRow = { key: string; labelKey: string; icon: number };
+type MenuSection = { titleKey: string; rows: MenuRow[] };
 
-const MENU_ROWS: MenuRow[] = [
-  { key: 'orders', labelKey: 'account.menu.orders', capKey: 'account.menu.ordersCap', icon: ICON.orders },
-  { key: 'address', labelKey: 'account.menu.address', capKey: 'account.menu.addressCap', icon: ICON.address },
-  { key: 'settings', labelKey: 'account.menu.notif', capKey: 'account.menu.notifCap', icon: ICON.settings },
-  { key: 'language', labelKey: 'account.menu.lang', capKey: 'account.menu.langCap', icon: ICON.language },
-  { key: 'legal', labelKey: 'account.menu.legal', capKey: 'account.menu.legalCap', icon: ICON.legal },
-  { key: 'help', labelKey: 'account.menu.help', capKey: 'account.menu.helpCap', icon: ICON.help },
+const SECTIONS: MenuSection[] = [
+  {
+    titleKey: 'account.sec.shopping',
+    rows: [
+      { key: 'orders', labelKey: 'account.menu.orders', icon: ICON.orders },
+      { key: 'address', labelKey: 'account.menu.address', icon: ICON.address },
+    ],
+  },
+  {
+    titleKey: 'account.sec.prefs',
+    rows: [
+      { key: 'settings', labelKey: 'account.menu.notif', icon: ICON.settings },
+      { key: 'language', labelKey: 'account.menu.lang', icon: ICON.language },
+    ],
+  },
+  {
+    titleKey: 'account.sec.about',
+    rows: [
+      { key: 'legal', labelKey: 'account.menu.legal', icon: ICON.legal },
+      { key: 'help', labelKey: 'account.menu.help', icon: ICON.help },
+    ],
+  },
 ];
 
 export default function ProfileScreen() {
@@ -156,7 +170,7 @@ export default function ProfileScreen() {
           }
         />
 
-        {/* Identity */}
+        {/* Identity — avatar/name/member id + edit shortcut + account facts */}
         <Animated.View entering={FadeInDown.springify().damping(18)} style={styles.profileCard}>
           <View style={styles.idRow}>
             <Image
@@ -176,71 +190,65 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={t('account.editProfile')}
+              hitSlop={6}
+              onPress={() => router.push('/account/edit')}
+              style={styles.editBtn}>
+              <Image source={ICON.edit} style={styles.editIcon} contentFit="contain" />
+            </PressableScale>
           </View>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={t('account.editProfile')}
-            onPress={() => router.push('/account/edit')}
-            style={styles.editBtn}>
-            <Image source={ICON.edit} style={styles.editIcon} contentFit="contain" />
-            <Text style={styles.editText}>{t('account.editProfile')}</Text>
-          </PressableScale>
-        </Animated.View>
 
-        {/* Identity info */}
-        <Animated.View
-          entering={FadeInDown.delay(80).springify().damping(18)}
-          style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text variant="caption" style={styles.infoLabel}>
-              {t('account.phoneLabel')}
-            </Text>
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {user.phone || identity?.phone || t('common.notSet')}
-            </Text>
-          </View>
-          <View style={[styles.infoRow, styles.infoDivider]}>
-            <Text variant="caption" style={styles.infoLabel}>
-              {t('account.loginAccountLabel')}
-            </Text>
-            <Text style={styles.infoValue} numberOfLines={1}>
-              {loginAccountLabel(identity, t('account.loginPhone'))}
-            </Text>
+          <View style={styles.factBox}>
+            <View style={styles.factRow}>
+              <Text variant="caption" style={styles.factLabel}>
+                {t('account.phoneLabel')}
+              </Text>
+              <Text style={styles.factValue} numberOfLines={1}>
+                {user.phone || identity?.phone || t('common.notSet')}
+              </Text>
+            </View>
+            <View style={[styles.factRow, styles.factDivider]}>
+              <Text variant="caption" style={styles.factLabel}>
+                {t('account.loginAccountLabel')}
+              </Text>
+              <Text style={styles.factValue} numberOfLines={1}>
+                {loginAccountLabel(identity, t)}
+              </Text>
+            </View>
           </View>
         </Animated.View>
 
-        {/* Menu */}
-        <View style={styles.menuCard}>
-          {MENU_ROWS.map((row, i) => (
-            <Animated.View
-              key={row.key}
-              entering={FadeInDown.delay(120 + i * 70).springify().damping(18)}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t(row.labelKey)}
-                onPress={() => onRow(row.key)}
-                style={({ pressed }) => [
-                  styles.row,
-                  i > 0 && styles.rowDivider,
-                  pressed && styles.rowPressed,
-                ]}>
-                <View style={styles.iconTile}>
+        {/* Grouped menu — single-line rows, no caption noise */}
+        {SECTIONS.map((section, s) => (
+          <Animated.View
+            key={section.titleKey}
+            entering={FadeInDown.delay(80 + s * 70).springify().damping(18)}>
+            <Text style={styles.eyebrow}>{t(section.titleKey)}</Text>
+            <View style={styles.menuCard}>
+              {section.rows.map((row, i) => (
+                <Pressable
+                  key={row.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(row.labelKey)}
+                  onPress={() => onRow(row.key)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i > 0 && styles.rowDivider,
+                    pressed && styles.rowPressed,
+                  ]}>
                   <Image source={row.icon} style={styles.menuIcon} contentFit="contain" />
-                </View>
-                <View style={styles.rowText}>
                   <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
-                  <Text variant="caption" numberOfLines={1}>
-                    {t(row.capKey)}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-              </Pressable>
-            </Animated.View>
-          ))}
-        </View>
+                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        ))}
 
         {/* Sign out */}
-        <Animated.View entering={FadeInDown.delay(280).springify().damping(18)}>
+        <Animated.View entering={FadeInDown.delay(300).springify().damping(18)}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('account.logout')}
@@ -249,10 +257,8 @@ export default function ProfileScreen() {
             <Image source={ICON.logout} style={styles.logoutIcon} contentFit="contain" />
             <Text style={styles.logoutText}>{t('account.logout')}</Text>
           </Pressable>
-        </Animated.View>
 
-        {/* Delete account (PDPA) */}
-        <Animated.View entering={FadeInDown.delay(340).springify().damping(18)}>
+          {/* Delete account (PDPA) */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('account.delete')}
@@ -273,7 +279,12 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.xl,
+    gap: Spacing.lg,
+  },
+  eyebrow: {
+    ...Typography.label,
+    color: Colors.textMuted,
+    marginBottom: Spacing.sm,
   },
 
   /* Identity */
@@ -303,19 +314,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
+  memberIcon: { width: 18, height: 18 },
   editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    minHeight: 44,
-    marginTop: Spacing.lg,
+    width: 40,
+    height: 40,
     borderRadius: Radius.pill,
     backgroundColor: Colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  editText: {
-    ...Typography.button,
-    color: Colors.primaryStrong,
+  editIcon: { width: 22, height: 22 },
+
+  factBox: {
+    marginTop: Spacing.lg,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+    paddingHorizontal: Spacing.md,
+  },
+  factRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    paddingVertical: Spacing.sm,
+    minHeight: 40,
+  },
+  factDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  factLabel: {
+    color: Colors.textMuted,
+  },
+  factValue: {
+    ...Typography.bodyStrong,
+    fontSize: 14,
+    color: Colors.text,
+    flexShrink: 1,
+    textAlign: 'right',
   },
 
   /* Menu */
@@ -330,35 +366,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    minHeight: 56,
   },
   rowDivider: {
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.border,
   },
   rowPressed: {
     backgroundColor: Colors.surfaceMuted,
   },
-  iconTile: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuIcon: { width: 42, height: 42 },
-  editIcon: { width: 22, height: 22 },
-  logoutIcon: { width: 24, height: 24 },
-  memberIcon: { width: 18, height: 18 },
-  rowText: {
-    flex: 1,
-    gap: 1,
-  },
+  menuIcon: { width: 34, height: 34 },
   rowLabel: {
+    flex: 1,
     ...Typography.bodyStrong,
     color: Colors.text,
   },
 
-  /* Sign out */
+  /* Sign out / delete */
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,38 +393,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     ...Shadow.card,
   },
+  logoutIcon: { width: 24, height: 24 },
   logoutText: {
     ...Typography.button,
     color: Colors.dangerStrong,
   },
-
-  infoCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.lg,
-    ...Shadow.card,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  infoDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-  },
-  infoLabel: {
-    color: Colors.textMuted,
-  },
-  infoValue: {
-    ...Typography.bodyStrong,
-    color: Colors.text,
-    flexShrink: 1,
-    textAlign: 'right',
-  },
-
   deleteBtn: {
     alignItems: 'center',
     justifyContent: 'center',

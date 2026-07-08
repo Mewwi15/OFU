@@ -1,13 +1,16 @@
 /**
  * Orders tab — `/orders`.
  *
- * The customer's order list: any in-flight order on top (tappable → live
- * tracking) followed by past orders newest-first. Reads `active` + `history`
- * from the persisted order store. Replaces the old wishlist tab. Tokens-only,
- * zero emoji.
+ * The customer's order list, redesigned for scannability (owner: the old rows
+ * "ดูยาก"). Each card leads with what was bought — stacked product thumbnails +
+ * the first item's name — over a clear footer (total + track/reorder action).
+ * The order number/date live in a small card header; status is a colored badge.
+ * In-flight orders sit on top with a coral "ติดตามออเดอร์" call-to-action.
+ * Tokens-only, zero emoji.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -18,7 +21,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import type { OrderStatus, TrackedOrder } from '@/data/fulfillment';
+import { isAwaitingSlipCheck, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
 import { getReorderItems, TERMINAL } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -51,62 +54,119 @@ const TONE_TEXT: Record<StatusTone, string> = {
   fail: Colors.dangerStrong,
 };
 
-function OrderRow({
+const THUMB = 44;
+
+/** Stacked product thumbnails (≤3 + a "+N" chip); falls back to an icon tile. */
+function ThumbStack({ order }: { order: TrackedOrder }) {
+  const images = order.itemImages ?? [];
+  if (images.length === 0) {
+    return (
+      <View style={styles.thumbFallback}>
+        <Ionicons name="bag-handle-outline" size={20} color={Colors.primaryStrong} />
+      </View>
+    );
+  }
+  const shown = images.slice(0, 3);
+  const extra = order.itemCount - shown.length;
+  return (
+    <View style={styles.thumbRow}>
+      {shown.map((uri, i) => (
+        <Image
+          key={`${uri}-${i}`}
+          source={{ uri }}
+          style={[styles.thumb, i > 0 && styles.thumbOverlap]}
+          contentFit="cover"
+          transition={150}
+        />
+      ))}
+      {extra > 0 ? (
+        <View style={[styles.thumb, styles.thumbOverlap, styles.thumbMore]}>
+          <Text style={styles.thumbMoreText}>+{extra}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function OrderCard({
   order,
   onPress,
   onReorder,
 }: {
   order: TrackedOrder;
-  onPress?: () => void;
+  onPress: () => void;
   onReorder?: () => void;
 }) {
   const t = useT();
   const meta = STATUS_META[order.status];
-  const Row = (
-    <View style={styles.row}>
-      <View style={styles.iconTile}>
-        <Ionicons name="receipt-outline" size={20} color={Colors.primaryStrong} />
-      </View>
-      <View style={styles.rowText}>
-        <View style={styles.rowTop}>
-          <Text style={styles.orderId} numberOfLines={1}>
-            {order.id}
-          </Text>
-          <View style={[styles.badge, TONE_BADGE[meta.tone]]}>
-            <Text style={[styles.badgeText, { color: TONE_TEXT[meta.tone] }]}>
-              {t(`orders.status.${order.status}`)}
-            </Text>
-          </View>
-        </View>
-        <Text variant="caption" numberOfLines={1}>
-          {order.itemCount} {t('orders.itemsUnit')} · {money(order.total)}
-          {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
-        </Text>
-      </View>
-      {onReorder ? (
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={`${t('orders.reorderA11y')} ${order.id}`}
-          hitSlop={8}
-          onPress={onReorder}
-          style={styles.reorderPill}>
-          <Text style={styles.reorderText}>{t('orders.reorder')}</Text>
-        </PressableScale>
-      ) : onPress ? (
-        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-      ) : null}
-    </View>
-  );
+  const ongoing = !onReorder;
+  const restCount = order.itemCount - 1;
+  // Honest badge: the shop hasn't approved the slip yet → not "preparing".
+  const statusLabel = isAwaitingSlipCheck(order)
+    ? t('orders.status.awaitSlip')
+    : t(`orders.status.${order.status}`);
 
-  if (!onPress) return <View style={styles.card}>{Row}</View>;
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${t('orders.trackA11y')} ${order.id}`}
       onPress={onPress}
       scaleTo={0.98}
-      style={styles.card}>
-      {Row}
+      style={[styles.card, ongoing && styles.cardOngoing]}>
+      {/* Header: order no. + date | status badge */}
+      <View style={styles.cardHead}>
+        <Text variant="caption" numberOfLines={1} style={styles.headMeta}>
+          #{order.id}
+          {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
+        </Text>
+        <View style={[styles.badge, TONE_BADGE[meta.tone]]}>
+          <Text style={[styles.badgeText, { color: TONE_TEXT[meta.tone] }]}>
+            {statusLabel}
+          </Text>
+        </View>
+      </View>
+
+      {/* What was bought */}
+      <View style={styles.cardBody}>
+        <ThumbStack order={order} />
+        <View style={styles.bodyText}>
+          <Text style={styles.itemName} numberOfLines={1}>
+            {order.firstItemName ?? order.shopName}
+          </Text>
+          <Text variant="caption" numberOfLines={1}>
+            {restCount > 0
+              ? `${t('orders.morePrefix')}${restCount}${t('orders.moreSuffix')}`
+              : `${order.itemCount} ${t('orders.itemsUnit')}`}
+          </Text>
+        </View>
+        <View style={styles.totalCol}>
+          <Text variant="caption">{t('orders.totalLabel')}</Text>
+          <Text style={styles.totalValue}>{money(order.total)}</Text>
+        </View>
+      </View>
+
+      {/* Footer action */}
+      {ongoing ? (
+        <View style={styles.trackStrip}>
+          <Text style={styles.trackText}>{t('orders.trackCta')}</Text>
+          <Ionicons name="arrow-forward" size={16} color={Colors.textOnPrimary} />
+        </View>
+      ) : (
+        <View style={styles.cardFoot}>
+          <Text variant="caption" numberOfLines={1} style={styles.footMeta}>
+            {order.deliveredAt ?? ''}
+          </Text>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={`${t('orders.reorderA11y')} ${order.id}`}
+            hitSlop={8}
+            onPress={onReorder}
+            style={styles.reorderPill}>
+            <Ionicons name="refresh" size={14} color={Colors.primaryStrong} />
+            <Text style={styles.reorderText}>{t('orders.reorder')}</Text>
+          </PressableScale>
+        </View>
+      )}
     </PressableScale>
   );
 }
@@ -181,7 +241,11 @@ export default function OrdersScreen() {
               <Text style={styles.eyebrow}>{t('orders.ongoing')}</Text>
               <View style={styles.stack}>
                 {ongoing.map((order) => (
-                  <OrderRow key={order.id} order={order} onPress={() => router.push(`/order/${order.id}`)} />
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onPress={() => router.push(`/order/${order.id}`)}
+                  />
                 ))}
               </View>
             </Animated.View>
@@ -195,7 +259,7 @@ export default function OrdersScreen() {
                   <Animated.View
                     key={order.id}
                     entering={FadeInDown.delay(120 + i * 60).springify().damping(18)}>
-                    <OrderRow
+                    <OrderCard
                       order={order}
                       onPress={() => router.push(`/order/${order.id}`)}
                       onReorder={() => reorder(order.id)}
@@ -234,37 +298,26 @@ const styles = StyleSheet.create({
   stack: {
     gap: Spacing.md,
   },
+
+  /* Card */
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     ...Shadow.card,
   },
-  row: {
+  cardOngoing: {
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+  },
+  cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-  },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
-  },
-  rowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  orderId: {
-    ...Typography.bodyStrong,
-    color: Colors.text,
+  headMeta: {
     flexShrink: 1,
   },
   badge: {
@@ -275,7 +328,97 @@ const styles = StyleSheet.create({
   badgeText: {
     ...Typography.label,
   },
+
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  bodyText: {
+    flex: 1,
+    gap: 2,
+  },
+  itemName: {
+    ...Typography.bodyStrong,
+    color: Colors.text,
+  },
+  totalCol: {
+    alignItems: 'flex-end',
+    gap: 1,
+  },
+  totalValue: {
+    ...Typography.subtitle,
+    color: Colors.text,
+  },
+
+  /* Thumbnails */
+  thumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  thumb: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  thumbOverlap: {
+    marginLeft: -14,
+  },
+  thumbMore: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primaryTint,
+  },
+  thumbMoreText: {
+    ...Typography.label,
+    color: Colors.primaryStrong,
+  },
+  thumbFallback: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Footer — ongoing: track CTA strip */
+  trackStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    minHeight: 40,
+    marginTop: Spacing.lg,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+  },
+  trackText: {
+    ...Typography.button,
+    color: Colors.textOnPrimary,
+  },
+
+  /* Footer — history: delivered date + reorder */
+  cardFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
+  },
+  footMeta: {
+    flexShrink: 1,
+  },
   reorderPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
     borderWidth: 1,
     borderColor: Colors.primary,
     borderRadius: Radius.pill,
