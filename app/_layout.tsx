@@ -8,7 +8,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -61,10 +61,21 @@ export default function RootLayout() {
     if (userId && hydrated) void ensurePinOwner(userId);
   }, [userId, hydrated, ensurePinOwner]);
 
-  // Re-lock when the app is sent to the background (screen-lock behaviour).
+  // Re-lock when the app has been in the background for a while (screen-lock
+  // behaviour) — but with a grace period. Locking on EVERY background made
+  // in-app detours require the PIN again: the image picker (slip/avatar) and
+  // the Google OAuth browser both background the app for a few seconds.
+  const LOCK_GRACE_MS = 2 * 60 * 1000;
+  const backgroundedAt = useRef<number | null>(null);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') lock();
+      if (state === 'background') {
+        backgroundedAt.current = Date.now();
+      } else if (state === 'active') {
+        const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
+        backgroundedAt.current = null;
+        if (away > LOCK_GRACE_MS) lock();
+      }
     });
     return () => sub.remove();
   }, [lock]);
