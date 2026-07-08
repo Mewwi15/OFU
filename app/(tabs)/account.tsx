@@ -137,15 +137,18 @@ export default function ProfileScreen() {
     ]);
   };
 
+  // Sign-out keeps the device PIN: the same account signing back in unlocks
+  // with the PIN it already set (ensurePinOwner wipes it only when a DIFFERENT
+  // account signs in). Wiping here forced a fresh PIN setup on every re-login.
+  // The lock screen's own logout still wipes — that path is the forgot-PIN escape.
   const confirmLogout = () => {
     Alert.alert(t('account.logout'), t('account.logoutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('account.logout'),
         style: 'destructive',
-        onPress: async () => {
-          await resetLock();
-          logout();
+        onPress: () => {
+          void logout();
         },
       },
     ]);
