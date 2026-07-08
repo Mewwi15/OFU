@@ -2,14 +2,14 @@
  * Order tracking — `/order/[id]`.
  *
  * One status-driven screen for the whole post-checkout delivery lifecycle. It
- * reads the active order from the store and renders:
+ * loads the order from the backend (and re-loads on Realtime updates) and renders:
+ *   awaiting slip    → PreparingView (awaitingSlip) — shop is checking the slip
  *   preparing        → PreparingView   (shop is preparing + ETA)
  *   out_for_delivery → TrackingMapView (live route map + stepper + rider)
  *   delivered        → DeliveredView   (order complete + rating)
  *
- * For the frontend-first demo the status auto-advances preparing → out for
- * delivery on a timer; the rider hand-off ("ได้รับสินค้าแล้ว") moves it to
- * delivered. Realtime order events will drive these transitions later.
+ * Status comes from the orders table; the admin's approve/advance actions flip
+ * it and `subscribeOrder` refreshes this screen live.
  */
 
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import { TrackingMapView } from '@/components/order/TrackingMapView';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Spacing } from '@/constants/theme';
+import { isAwaitingSlipCheck } from '@/data/fulfillment';
 import {
   cancelOrder,
   orderErrorMessage,
@@ -108,16 +109,41 @@ export default function OrderTrackingScreen() {
     );
   }
 
-  // Cancelled / failed orders show a simple terminal card (both modes).
+  // Cancelled / failed orders show a simple terminal card (both modes). A
+  // rejected slip gets its own honest copy instead of a generic "cancelled".
   if (active.status === 'cancelled') {
+    const rejected = active.paymentStatus === 'rejected';
     return (
       <View style={styles.guard}>
         <Text variant="subtitle" style={styles.guardTitle}>
-          {t('track.orderPrefix')}{active.id}{t('track.orderCancelledSuffix')}
+          {rejected
+            ? t('track.paymentRejectedTitle')
+            : `${t('track.orderPrefix')}${active.id}${t('track.orderCancelledSuffix')}`}
         </Text>
+        {rejected ? (
+          <Text variant="body" style={styles.guardBody}>
+            {t('track.paymentRejectedBody')}
+          </Text>
+        ) : null}
         <Text variant="body" style={styles.guardBody} onPress={goHome}>
           {t('track.backHome')}
         </Text>
+      </View>
+    );
+  }
+
+  // Prepay order whose slip the shop hasn't approved yet (either fulfilment):
+  // show the honest waiting state; Realtime flips it once the shop approves.
+  if (isAwaitingSlipCheck(active)) {
+    return (
+      <View style={styles.screen}>
+        <PreparingView
+          order={active}
+          awaitingSlip
+          onClose={goHome}
+          onExplore={() => router.push('/search')}
+          onCancel={onCancel}
+        />
       </View>
     );
   }

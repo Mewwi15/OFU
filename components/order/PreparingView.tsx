@@ -25,9 +25,12 @@ type Props = {
   onExplore: () => void;
   /** Shown while the order can still be cancelled (before it ships). */
   onCancel?: () => void;
+  /** Prepay order whose slip the shop hasn't approved yet — swap the copy to
+      "waiting for slip verification" (Realtime flips it once approved). */
+  awaitingSlip?: boolean;
 };
 
-export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
+export function PreparingView({ order, onClose, onExplore, onCancel, awaitingSlip }: Props) {
   const insets = useSafeAreaInsets();
   const t = useT();
 
@@ -39,7 +42,7 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
 
       <View style={styles.body}>
         <Text variant="title" style={styles.title}>
-          {t('track.preparingTitle')}
+          {awaitingSlip ? t('track.verifySlipTitle') : t('track.preparingTitle')}
         </Text>
 
         {/* Shop / status card */}
@@ -52,26 +55,40 @@ export function PreparingView({ order, onClose, onExplore, onCancel }: Props) {
               {order.shopName}
             </Text>
             <Breathing amount={0.05} duration={1300} style={styles.statusPill}>
-              <Text style={styles.statusPillText}>{t('track.preparingBadge')}</Text>
+              <Text style={styles.statusPillText}>
+                {awaitingSlip ? t('track.verifySlipBadge') : t('track.preparingBadge')}
+              </Text>
             </Breathing>
           </View>
 
           <View style={styles.etaRow}>
             <View style={styles.etaLeft}>
-              <Text variant="caption">{t('track.etaLabel')}</Text>
-              <Text style={styles.etaValue}>{order.etaText}</Text>
+              <Text variant="caption">
+                {awaitingSlip ? t('track.verifySlipStepLabel') : t('track.etaLabel')}
+              </Text>
+              <Text style={styles.etaValue}>
+                {awaitingSlip ? t('track.verifySlipStep') : order.etaText}
+              </Text>
             </View>
             <Breathing style={styles.etaIcon}>
-              <Ionicons name="bicycle" size={26} color={Colors.primary} />
+              <Ionicons
+                name={awaitingSlip ? 'receipt-outline' : 'bicycle'}
+                size={26}
+                color={Colors.primary}
+              />
             </Breathing>
           </View>
         </Animated.View>
 
         {/* Reassurance banner */}
         <Animated.View entering={FadeInDown.delay(160).springify().damping(18)} style={styles.banner}>
-          <Ionicons name="leaf" size={18} color={Colors.accentStrong} />
+          <Ionicons
+            name={awaitingSlip ? 'time-outline' : 'leaf'}
+            size={18}
+            color={Colors.accentStrong}
+          />
           <Text variant="body" style={styles.bannerText}>
-            {t('track.preparingBanner')}
+            {awaitingSlip ? t('track.verifySlipBanner') : t('track.preparingBanner')}
           </Text>
         </Animated.View>
 

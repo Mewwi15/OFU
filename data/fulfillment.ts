@@ -211,7 +211,20 @@ export type TrackedOrder = {
   courier?: string;
   /** Courier tracking number (parcel only). */
   trackingNo?: string;
+  /** DB payment_status (awaiting_payment|slip_uploaded|verifying|paid|rejected)
+      — drives the "shop is checking your slip" tracking state. */
+  paymentStatus?: string;
+  /** DB payment_method (cod | promptpay_slip). */
+  paymentMethod?: string;
 };
+
+/** Prepay order whose slip the shop hasn't approved yet (manual verification). */
+export function isAwaitingSlipCheck(o: TrackedOrder): boolean {
+  return (
+    o.paymentMethod === 'promptpay_slip' &&
+    ['awaiting_payment', 'slip_uploaded', 'verifying'].includes(o.paymentStatus ?? '')
+  );
+}
 
 /* ----------------------------------------------------------------------- */
 /* Notifications                                                           */

@@ -221,6 +221,8 @@ function toTracked(r: OrderRow): TrackedOrder {
     deliveredAt: thaiStamp(r.delivered_at),
     rider: MOCK_RIDER,
     fulfilment,
+    paymentStatus: r.payment_status,
+    paymentMethod: r.payment_method,
     ...(fulfilment === 'parcel'
       ? {
           courier: r.parcel_shipments?.[0]?.courier ?? 'Flash Express',

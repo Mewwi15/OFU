@@ -47,7 +47,6 @@ import { type PaymentMethod } from '@/lib/payment';
 import { selectedAddress, useAddress } from '@/store/address';
 import { cartCount, cartSubtotal, selectedItems, useCart } from '@/store/cart';
 import { deliveryFeeFor, useMode } from '@/store/mode';
-import { useOrder } from '@/store/order';
 
 type Status = 'idle' | 'verifying' | 'success';
 
