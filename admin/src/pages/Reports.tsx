@@ -157,7 +157,7 @@ export function Reports() {
           size="small"
           rowKey={(r) => r.product_name + (r.size ?? '')}
           pagination={{ pageSize: 8, hideOnSinglePage: true }}
-          locale={{ emptyText: 'สต็อกเพียงพอทุกรายการ 👍' }}
+          locale={{ emptyText: 'สต็อกเพียงพอทุกรายการ' }}
           dataSource={lowStock}
           columns={[
             {
