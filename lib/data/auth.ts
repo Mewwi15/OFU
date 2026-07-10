@@ -34,24 +34,9 @@ export async function getAccountIdentity(): Promise<AccountIdentity | null> {
   };
 }
 
-/** PDPA erasure: anonymize the account on the backend, then sign out. */
-export async function deleteAccount(): Promise<void> {
-  const { error } = await supabase.rpc('delete_my_account');
-  if (error) throw error;
-  await supabase.auth.signOut();
-}
-
-/**
- * A successful sign-in on a previously "deleted" (deactivated) account proves
- * identity + intent to return — reactivate it so the customer can order again.
- * No-op for active accounts; the erased PII stays erased.
- */
-export async function reactivateIfNeeded(): Promise<void> {
-  await supabase.rpc('reactivate_my_account').then(
-    () => undefined,
-    () => undefined, // non-fatal — ordering will surface ACCOUNT_INACTIVE if it failed
-  );
-}
+// Self-service account deletion was removed (owner decision 2026-07-10):
+// the app offers sign-out only; PDPA deletion requests are handled by the shop
+// directly. The delete_my_account/reactivate_my_account RPCs were dropped (0040).
 
 /** OAuth providers Supabase supports natively (LINE needs a custom flow). */
 export type OAuthProvider = 'google' | 'apple';

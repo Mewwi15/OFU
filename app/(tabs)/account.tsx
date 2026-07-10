@@ -22,7 +22,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
-import { deleteAccount, getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
+import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 import { useLock } from '@/store/lock';
@@ -116,25 +116,6 @@ export default function ProfileScreen() {
         Alert.alert(t('account.menu.help'), t('account.helpBody'));
         break;
     }
-  };
-
-  const confirmDelete = () => {
-    Alert.alert(t('account.delete'), t('account.deleteBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('account.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteAccount();
-            await resetLock();
-            logout();
-          } catch {
-            Alert.alert(t('account.deleteFailed'), t('common.tryAgain'));
-          }
-        },
-      },
-    ]);
   };
 
   // Sign-out keeps the device PIN: the same account signing back in unlocks
@@ -259,15 +240,6 @@ export default function ProfileScreen() {
             style={({ pressed }) => [styles.logoutBtn, pressed && styles.rowPressed]}>
             <Image source={ICON.logout} style={styles.logoutIcon} contentFit="contain" />
             <Text style={styles.logoutText}>{t('account.logout')}</Text>
-          </Pressable>
-
-          {/* Delete account (PDPA) */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('account.delete')}
-            onPress={confirmDelete}
-            style={({ pressed }) => [styles.deleteBtn, pressed && styles.rowPressed]}>
-            <Text style={styles.deleteText}>{t('account.delete')}</Text>
           </Pressable>
         </Animated.View>
       </ScrollView>
@@ -400,16 +372,5 @@ const styles = StyleSheet.create({
   logoutText: {
     ...Typography.button,
     color: Colors.dangerStrong,
-  },
-  deleteBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    marginTop: Spacing.xs,
-  },
-  deleteText: {
-    ...Typography.body,
-    color: Colors.textMuted,
-    textDecorationLine: 'underline',
   },
 });
