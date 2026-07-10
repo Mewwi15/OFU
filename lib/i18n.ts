@@ -71,6 +71,8 @@ const th: Dict = {
 
   'settings.title': 'ตั้งค่าการแจ้งเตือน',
   'settings.promoLabel': 'ข่าวสารและโปรโมชัน',
+  'settings.bioLabel': 'สแกนปลดล็อกแอป',
+  'settings.bioCap': 'ใช้สแกนใบหน้า/ลายนิ้วมือแทนการกรอก PIN ตอนเปิดแอป',
   'settings.promoCap': 'รับแจ้งเตือนดีล ส่วนลด และข่าวสารจากร้าน',
   'settings.note': 'การแจ้งเตือนสถานะคำสั่งซื้อจะส่งให้เสมอ เพื่อให้คุณติดตามออเดอร์ได้ตลอด',
   'settings.saveFailed': 'บันทึกไม่สำเร็จ',
@@ -538,6 +540,8 @@ const en: Dict = {
 
   'settings.title': 'Notification settings',
   'settings.promoLabel': 'News and promotions',
+  'settings.bioLabel': 'Biometric unlock',
+  'settings.bioCap': 'Use face/fingerprint instead of typing the PIN',
   'settings.promoCap': 'Get alerts on deals, discounts, and shop news',
   'settings.note': 'Order status alerts are always sent so you can track your orders.',
   'settings.saveFailed': 'Could not save',

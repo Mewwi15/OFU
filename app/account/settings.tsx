@@ -1,10 +1,15 @@
 /**
- * Notification settings — `/account/settings`.
+ * Settings — `/account/settings`.
  *
- * One toggle for marketing/promo push (PDPA opt-out). Transactional order alerts
- * are always sent and aren't controlled here. Backed by notification_preferences.
+ * Two cards:
+ *  • Marketing/promo push toggle (PDPA opt-out; transactional alerts always send).
+ *  • Biometric unlock (Face ID / fingerprint) toggle — previously only offered
+ *    once during PIN setup; now switchable any time. Enabling requires passing
+ *    a biometric prompt first; the row hides on devices without enrolled
+ *    biometrics (and on simulators without a test face/finger).
  */
 
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
@@ -16,6 +21,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { getPushEnabled, setPushEnabled } from '@/lib/data/notifications';
 import { useT } from '@/lib/i18n';
+import { useLock } from '@/store/lock';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -24,10 +30,29 @@ export default function SettingsScreen() {
   const [push, setPush] = useState<boolean | null>(null); // null = loading
   const [saving, setSaving] = useState(false);
 
+  const biometricEnabled = useLock((s) => s.biometricEnabled);
+  const setBiometricEnabled = useLock((s) => s.setBiometricEnabled);
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioLabel, setBioLabel] = useState('');
+  const [bioSaving, setBioSaving] = useState(false);
+
   useEffect(() => {
     getPushEnabled()
       .then(setPush)
       .catch(() => setPush(true));
+    (async () => {
+      const [hasHw, enrolled, types] = await Promise.all([
+        LocalAuthentication.hasHardwareAsync(),
+        LocalAuthentication.isEnrolledAsync(),
+        LocalAuthentication.supportedAuthenticationTypesAsync(),
+      ]);
+      if (hasHw && enrolled) {
+        setBioAvailable(true);
+        const isFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+        setBioLabel(isFace ? 'Face ID' : t('lock.fingerprint'));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggle = async (value: boolean) => {
@@ -39,6 +64,24 @@ export default function SettingsScreen() {
       setPush(!value); // revert on failure
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleBio = async (value: boolean) => {
+    if (!value) {
+      await setBiometricEnabled(false);
+      return;
+    }
+    // Turning ON requires passing the scan once — proves it works on this device.
+    setBioSaving(true);
+    try {
+      const res = await LocalAuthentication.authenticateAsync({
+        promptMessage: `${t('lock.bioPromptPrefix')}${bioLabel}${t('lock.bioPromptSuffix')}`,
+        cancelLabel: t('common.cancel'),
+      });
+      if (res.success) await setBiometricEnabled(true);
+    } finally {
+      setBioSaving(false);
     }
   };
 
@@ -71,6 +114,27 @@ export default function SettingsScreen() {
             )}
           </View>
         </View>
+
+        {bioAvailable ? (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={styles.rowLabel}>
+                  {t('settings.bioLabel')} ({bioLabel})
+                </Text>
+                <Text variant="caption" style={styles.rowCaption}>
+                  {t('settings.bioCap')}
+                </Text>
+              </View>
+              <Switch
+                value={biometricEnabled}
+                onValueChange={toggleBio}
+                disabled={bioSaving}
+                trackColor={{ true: Colors.primary, false: Colors.border }}
+              />
+            </View>
+          </View>
+        ) : null}
 
         <Text variant="caption" style={styles.note}>
           {t('settings.note')}
