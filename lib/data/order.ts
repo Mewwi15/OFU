@@ -232,6 +232,7 @@ function toTracked(r: OrderRow): TrackedOrder {
     etaShort: fulfilment === 'parcel' ? '2-3 วัน' : '25 นาที',
     total: r.total,
     itemCount,
+    lineCount: items.length,
     addressLabel: 'บ้าน',
     addressLine: r.ship_address_text ?? '',
     placedAtLabel: thaiStamp(r.placed_at),

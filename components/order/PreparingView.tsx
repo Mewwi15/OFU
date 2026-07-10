@@ -86,8 +86,10 @@ export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }
   const t = useT();
   const isSlipFlow = order.paymentMethod === 'promptpay_slip';
   const images = (order.itemImages ?? []).slice(0, 3);
-  const extra = order.itemCount - images.length;
-  const restCount = order.itemCount - 1;
+  // Lines, not units — "+4"/"และอีก 4 รายการ" on a 1-product ×5 order would mislead.
+  const lineCount = order.lineCount ?? order.itemCount;
+  const extra = lineCount - images.length;
+  const restCount = lineCount - 1;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>

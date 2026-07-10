@@ -194,7 +194,11 @@ export type TrackedOrder = {
   /** Short "expected in" used on the footer / arrival line. */
   etaShort: string;
   total: number;
+  /** Total units across the order (sum of qty) — "N ชิ้น". */
   itemCount: number;
+  /** Distinct product lines — drives "และอีก N รายการ" / +N thumb badge.
+      Absent on old persisted orders → fall back to itemCount. */
+  lineCount?: number;
   addressLabel: string;
   addressLine: string;
   /** When the order was placed, display-formatted Thai (e.g. "27 มิ.ย. 14:30 น."). */

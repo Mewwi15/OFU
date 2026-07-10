@@ -67,7 +67,8 @@ function ThumbStack({ order }: { order: TrackedOrder }) {
     );
   }
   const shown = images.slice(0, 3);
-  const extra = order.itemCount - shown.length;
+  // Lines, not units — "+4" on a 1-product ×5 order would mislead.
+  const extra = (order.lineCount ?? order.itemCount) - shown.length;
   return (
     <View style={styles.thumbRow}>
       {shown.map((uri, i) => (
@@ -100,7 +101,8 @@ function OrderCard({
   const t = useT();
   const meta = STATUS_META[order.status];
   const ongoing = !onReorder;
-  const restCount = order.itemCount - 1;
+  // "และอีก N รายการ" counts other product lines, not leftover units.
+  const restCount = (order.lineCount ?? order.itemCount) - 1;
   // Honest badge: the shop hasn't approved the slip yet → not "preparing".
   const statusLabel = isAwaitingSlipCheck(order)
     ? t('orders.status.awaitSlip')
