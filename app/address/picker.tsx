@@ -179,30 +179,33 @@ export default function AddressPickerScreen() {
     geoTimer.current = setTimeout(runGeocode, 650);
   };
 
+  // Android's map view throws a hard SecurityException if my-location is
+  // enabled before the permission is granted — track it and gate the prop.
+  const [locGranted, setLocGranted] = useState(false);
+
   // On first mount (new addresses only): if location permission was ALREADY
   // granted, silently centre on the device GPS — no permission prompt (that's
   // the FAB's job). Otherwise just reverse-geocode the default centre.
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
-      if (!editing) {
-        try {
-          const { status } = await Location.getForegroundPermissionsAsync();
-          if (status === 'granted') {
-            const loc = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted' && !cancelled) setLocGranted(true);
+        if (!editing && status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          if (!cancelled) {
+            setPoint({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
             });
-            if (!cancelled) {
-              setPoint({
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-              });
-              return;
-            }
+            return;
           }
-        } catch {
-          // Permission check / fix failed — fall back to the default centre.
         }
+      } catch {
+        // Permission check / fix failed — fall back to the default centre.
       }
       if (!cancelled && !editing?.line) runGeocode();
     };
@@ -317,6 +320,7 @@ export default function AddressPickerScreen() {
         Alert.alert(t('address.locPermTitle'), t('address.locPermBody'));
         return;
       }
+      setLocGranted(true); // เพิ่งได้สิทธิ์ — เปิดจุดตำแหน่งบนแผนที่ได้แล้ว
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -372,7 +376,7 @@ export default function AddressPickerScreen() {
             ref={appleRef}
             style={StyleSheet.absoluteFill}
             cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
-            properties={{ isMyLocationEnabled: true }}
+            properties={{ isMyLocationEnabled: locGranted }}
             uiSettings={{ myLocationButtonEnabled: false, compassEnabled: false }}
             onMapClick={onMapClick}
             onCameraMove={onCameraMove}
@@ -382,7 +386,7 @@ export default function AddressPickerScreen() {
             ref={googleRef}
             style={StyleSheet.absoluteFill}
             cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
-            properties={{ isMyLocationEnabled: true }}
+            properties={{ isMyLocationEnabled: locGranted }}
             uiSettings={{ myLocationButtonEnabled: false }}
             onMapClick={onMapClick}
             onCameraMove={onCameraMove}

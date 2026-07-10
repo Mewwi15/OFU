@@ -170,7 +170,11 @@ export default function CheckoutScreen() {
       return;
     }
     if (!address) {
-      Alert.alert(t('checkout.noAddressTitle'), t('checkout.noAddressBody'));
+      // พาไปหน้าเพิ่มที่อยู่ได้ทันที ไม่ต้องย้อนหาเอง
+      Alert.alert(t('checkout.noAddressTitle'), t('checkout.noAddressBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('checkout.addAddressCta'), onPress: () => router.push('/address/picker') },
+      ]);
       return;
     }
     if (chosen.length === 0) return;

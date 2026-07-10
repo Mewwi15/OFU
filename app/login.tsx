@@ -325,13 +325,23 @@ export default function LoginScreen() {
 
 /** Map Supabase auth errors to friendly Thai copy. */
 function authMessage(e: unknown, mode: Mode): string {
-  const msg = (e as { message?: string })?.message?.toLowerCase() ?? '';
+  const err = e as { message?: string; code?: string };
+  const code = err?.code ?? '';
+  const msg = err?.message?.toLowerCase() ?? '';
   if (msg.includes('already registered') || msg.includes('already been registered'))
     return 'อีเมลนี้สมัครไว้แล้ว — ลองเข้าสู่ระบบแทน';
-  if (msg.includes('invalid login') || msg.includes('invalid credentials'))
+  // ตอน "เข้าสู่ระบบ" ทุกเคสที่เกี่ยวกับรหัส = ข้อมูลไม่ถูกต้อง (ห้ามขึ้นข้อความเงื่อนไขรหัสผ่าน)
+  if (
+    code === 'invalid_credentials' ||
+    msg.includes('invalid login') ||
+    msg.includes('invalid credentials') ||
+    (mode === 'signin' && msg.includes('password'))
+  )
     return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
   if (msg.includes('not confirmed')) return 'อีเมลยังไม่ได้ยืนยัน — กรุณายืนยันก่อนเข้าสู่ระบบ';
-  if (msg.includes('password')) return 'รหัสผ่านไม่ผ่านเงื่อนไข (อย่างน้อย 6 ตัวอักษร)';
+  // ข้อความเงื่อนไขรหัสผ่านมีเฉพาะตอนสมัครสมาชิก
+  if (code === 'weak_password' || msg.includes('password'))
+    return 'รหัสผ่านไม่ผ่านเงื่อนไข (อย่างน้อย 6 ตัวอักษร)';
   return mode === 'signin' ? 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง' : 'สมัครไม่สำเร็จ ลองใหม่อีกครั้ง';
 }
 
