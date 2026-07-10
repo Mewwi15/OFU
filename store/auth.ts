@@ -11,7 +11,7 @@
 
 import { create } from 'zustand';
 
-import { authRepo, type Profile } from '@/lib/data/auth';
+import { authRepo, reactivateIfNeeded, type Profile } from '@/lib/data/auth';
 
 export type AuthUser = {
   name: string;
@@ -102,7 +102,9 @@ export const useAuth = create<AuthState>((set) => ({
       if (session) {
         set({ status: 'authenticated', userId: session.user.id });
         setTimeout(() => {
-          void loadUser().then((user) => set({ user }));
+          // A fresh sign-in on a "deleted" (deactivated) account reactivates it
+          // (proof of identity + intent to return) before the profile loads.
+          void reactivateIfNeeded().then(() => loadUser().then((user) => set({ user })));
         }, 0);
       } else {
         set({ status: 'unauthenticated', userId: null, user: GUEST });

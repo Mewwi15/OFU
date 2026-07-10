@@ -41,6 +41,18 @@ export async function deleteAccount(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+/**
+ * A successful sign-in on a previously "deleted" (deactivated) account proves
+ * identity + intent to return — reactivate it so the customer can order again.
+ * No-op for active accounts; the erased PII stays erased.
+ */
+export async function reactivateIfNeeded(): Promise<void> {
+  await supabase.rpc('reactivate_my_account').then(
+    () => undefined,
+    () => undefined, // non-fatal — ordering will surface ACCOUNT_INACTIVE if it failed
+  );
+}
+
 /** OAuth providers Supabase supports natively (LINE needs a custom flow). */
 export type OAuthProvider = 'google' | 'apple';
 
