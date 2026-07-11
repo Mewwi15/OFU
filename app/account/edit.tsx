@@ -31,6 +31,7 @@ import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
 import { uploadAvatar } from '@/lib/data/storage';
+import { compressForUpload } from '@/lib/images';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
@@ -102,13 +103,13 @@ export default function EditProfileScreen() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
-      base64: true,
     });
-    if (result.canceled || !result.assets[0].base64) return;
+    if (result.canceled) return;
     setAvatarBusy(true);
     try {
-      const url = await uploadAvatar(result.assets[0].base64);
+      // Avatars render small — 512px keeps them crisp at a fraction of the bytes.
+      const photo = await compressForUpload(result.assets[0], { maxDim: 512, quality: 0.7 });
+      const url = await uploadAvatar(photo.base64);
       await updateProfile({ avatar: url });
     } catch {
       Alert.alert(t('editProfile.avatarFailed'), t('editProfile.avatarFailedBody'));

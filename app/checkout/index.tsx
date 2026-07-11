@@ -40,6 +40,7 @@ import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
 import { uploadSlip } from '@/lib/data/storage';
+import { compressForUpload } from '@/lib/images';
 import { useShop } from '@/store/shop';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -153,12 +154,13 @@ export default function CheckoutScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.7,
-      base64: true,
     });
     if (!result.canceled) {
-      setSlipUri(result.assets[0].uri);
-      setSlipBase64(result.assets[0].base64 ?? null);
+      // Shrink on-device before it ever leaves the phone — slips upload in a
+      // couple hundred KB instead of multi-MB camera originals.
+      const slip = await compressForUpload(result.assets[0]);
+      setSlipUri(slip.uri);
+      setSlipBase64(slip.base64);
       if (Platform.OS !== 'web') Haptics.selectionAsync();
     }
   };
