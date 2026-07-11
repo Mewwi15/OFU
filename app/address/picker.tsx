@@ -194,14 +194,19 @@ export default function AddressPickerScreen() {
   // enabled before the permission is granted — track it and gate the prop.
   const [locGranted, setLocGranted] = useState(false);
 
-  // On first mount (new addresses only): if location permission was ALREADY
-  // granted, silently centre on the device GPS — no permission prompt (that's
-  // the FAB's job). Otherwise just reverse-geocode the default centre.
+  // On first mount: NEW addresses actively request location permission and
+  // jump straight to the device GPS — the address is the whole point of this
+  // screen, so we don't make the user hunt for themselves on a Bangkok default
+  // (denying keeps the fallback centre; the FAB can re-ask later). Editing an
+  // existing address never jumps — its saved pin is what matters — we only
+  // silently check permission so the my-location dot can show.
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
       try {
-        const { status } = await Location.getForegroundPermissionsAsync();
+        const { status } = editing
+          ? await Location.getForegroundPermissionsAsync()
+          : await Location.requestForegroundPermissionsAsync();
         if (status === 'granted' && !cancelled) setLocGranted(true);
         if (!editing && status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({
