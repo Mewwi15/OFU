@@ -11,8 +11,10 @@
  * collects label / recipient / phone / extra detail, then saves to the book.
  *
  * Maps are native (expo-maps) — this screen only renders in a development build,
- * NOT Expo Go. Forward/reverse geocoding is on-device (expo-location); it can
- * return nothing on a bare emulator but works on iOS and real Android devices.
+ * NOT Expo Go. Search is Google Places Autocomplete on Android (lib/places),
+ * falling back to the on-device geocoder (expo-location) when Places fails or
+ * on iOS; reverse geocoding is always on-device — it can return nothing on a
+ * bare emulator but works on iOS and real Android devices.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -40,11 +42,19 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
+import { autocompletePlaces, fetchPlaceLocation, placesAvailable } from '@/lib/places';
 import { selectedAddress, useAddress } from '@/store/address';
+import { useLocale } from '@/store/locale';
 import { useMode } from '@/store/mode';
 
 type LatLng = { latitude: number; longitude: number };
-type SearchResult = { coords: LatLng; label: string };
+/**
+ * A row in the search dropdown: a Google Places suggestion (name + locality,
+ * coordinates fetched on pick) or an on-device geocoder hit (fallback path).
+ */
+type SearchResult =
+  | { kind: 'place'; placeId: string; primary: string; secondary: string }
+  | { kind: 'geo'; coords: LatLng; label: string };
 
 /** Best-effort map of a reverse-geocode result to Thai postal parts. */
 type ParcelParts = {
@@ -65,6 +75,8 @@ function parcelPartsFrom(a: Location.LocationGeocodedAddress): ParcelParts {
 /** Bangkok (สุขุมวิท) — fallback centre when there's no address yet. */
 const DEFAULT_CENTER: LatLng = { latitude: 13.7236, longitude: 100.5686 };
 const DEFAULT_ZOOM = 16;
+/** Shortest query worth searching — Thai place names get useful at 2 chars. */
+const MIN_QUERY = 2;
 const LABEL_KEYS = ['address.labelHome', 'address.labelWork', 'address.labelOther'] as const;
 
 /** Build a readable Thai address line from a reverse-geocode result. */
@@ -93,6 +105,7 @@ function formatLine(a: Location.LocationGeocodedAddress): string {
 
 export default function AddressPickerScreen() {
   const t = useT();
+  const lang = useLocale((s) => s.lang);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -153,7 +166,10 @@ export default function AddressPickerScreen() {
     }
   };
 
-  const runGeocode = async () => {
+  // keepLine: the line was just set from an authoritative source (a picked
+  // Places result) — reverse-geocode only to fill blank parcel fields, and
+  // don't flag failure (the line isn't stale).
+  const runGeocode = async ({ keepLine = false } = {}) => {
     const { latitude, longitude } = centerRef.current;
     // Guard against out-of-order resolves: if the pin moves again before this
     // reverse-geocode returns, a newer call bumps geoSeq and this stale result
@@ -165,7 +181,7 @@ export default function AddressPickerScreen() {
       if (seq === geoSeq.current) {
         if (res[0]) {
           setGeoFailed(false);
-          setLine(formatLine(res[0]));
+          if (!keepLine) setLine(formatLine(res[0]));
           // Fill any BLANK parcel field from the geocode — never clobber a value
           // the user has already typed/corrected.
           const parts = parcelPartsFrom(res[0]);
@@ -173,21 +189,21 @@ export default function AddressPickerScreen() {
           if (parts.district) setDistrict((v) => v || parts.district);
           if (parts.province) setProvince((v) => v || parts.province);
           if (parts.postalCode) setPostalCode((v) => v || parts.postalCode);
-        } else {
+        } else if (!keepLine) {
           setGeoFailed(true);
         }
       }
     } catch {
       // Keep the previous line, but tell the user it's stale.
-      if (seq === geoSeq.current) setGeoFailed(true);
+      if (seq === geoSeq.current && !keepLine) setGeoFailed(true);
     } finally {
       if (seq === geoSeq.current) setGeocoding(false);
     }
   };
 
-  const scheduleGeocode = () => {
+  const scheduleGeocode = (opts?: { keepLine?: boolean }) => {
     if (geoTimer.current) clearTimeout(geoTimer.current);
-    geoTimer.current = setTimeout(runGeocode, 650);
+    geoTimer.current = setTimeout(() => runGeocode(opts), 650);
   };
 
   // Android's map view throws a hard SecurityException if my-location is
@@ -235,11 +251,20 @@ export default function AddressPickerScreen() {
   }, []);
 
   /** Move the pin to a point, then reverse-geocode it into the line. */
-  const setPoint = (coords: LatLng, { fly = true } = {}) => {
+  const setPoint = (coords: LatLng, { fly = true, keepLine = false } = {}) => {
     centerRef.current = coords;
     if (fly) recenter(coords);
-    scheduleGeocode();
+    scheduleGeocode({ keepLine });
   };
+
+  // Where a picked Places result put the pin. Camera-move events near this
+  // point (our own fly settling, or nudging the pin within the same building)
+  // must NOT overwrite the Google-formatted line with a reverse geocode.
+  const pickedPlace = useRef<LatLng | null>(null);
+  const nearPickedPlace = (p: LatLng) =>
+    !!pickedPlace.current &&
+    Math.abs(p.latitude - pickedPlace.current.latitude) < 3e-4 &&
+    Math.abs(p.longitude - pickedPlace.current.longitude) < 3e-4;
 
   const onCameraMove = (e: {
     coordinates: { latitude?: number; longitude?: number };
@@ -247,7 +272,10 @@ export default function AddressPickerScreen() {
     const { latitude, longitude } = e.coordinates;
     if (latitude == null || longitude == null) return;
     // User panned the map — the pin already tracks the centre; just geocode.
-    setPoint({ latitude, longitude }, { fly: false });
+    setPoint(
+      { latitude, longitude },
+      { fly: false, keepLine: nearPickedPlace({ latitude, longitude }) },
+    );
   };
 
   /** Tap anywhere on the map to drop the pin there. */
@@ -256,15 +284,40 @@ export default function AddressPickerScreen() {
   }) => {
     const { latitude, longitude } = e.coordinates;
     if (latitude == null || longitude == null) return;
+    pickedPlace.current = null;
     setPoint({ latitude, longitude });
     dismissSearch();
   };
 
   /* --------------------------- place search --------------------------- */
 
+  /** On-device geocoder search — iOS path and the fallback when Places fails. */
+  const geocodeSearch = async (q: string): Promise<SearchResult[]> => {
+    const hits = await Location.geocodeAsync(q);
+    const labeled = await Promise.all(
+      hits.slice(0, 5).map(async (h) => {
+        const coords = { latitude: h.latitude, longitude: h.longitude };
+        let label = q;
+        try {
+          const rev = await Location.reverseGeocodeAsync(coords);
+          const formatted = rev[0] && formatLine(rev[0]);
+          if (formatted) label = formatted;
+        } catch {
+          // fall back to the raw query
+        }
+        return { kind: 'geo' as const, coords, label };
+      }),
+    );
+    // Drop duplicate labels (geocoder often returns near-identical hits).
+    const seen = new Set<string>();
+    return labeled.filter((r) =>
+      seen.has(r.label) ? false : (seen.add(r.label), true),
+    );
+  };
+
   const runSearch = async (raw: string) => {
     const q = raw.trim();
-    if (q.length < 3) {
+    if (q.length < MIN_QUERY) {
       setResults([]);
       setSearching(false);
       return;
@@ -272,29 +325,23 @@ export default function AddressPickerScreen() {
     const seq = ++searchSeq.current;
     setSearching(true);
     try {
-      const hits = await Location.geocodeAsync(q);
-      const labeled = await Promise.all(
-        hits.slice(0, 5).map(async (h) => {
-          const coords = { latitude: h.latitude, longitude: h.longitude };
-          let label = q;
-          try {
-            const rev = await Location.reverseGeocodeAsync(coords);
-            const formatted = rev[0] && formatLine(rev[0]);
-            if (formatted) label = formatted;
-          } catch {
-            // fall back to the raw query
-          }
-          return { coords, label };
-        }),
-      );
-      // Drop duplicate labels (geocoder often returns near-identical hits).
-      const seen = new Set<string>();
-      const unique = labeled.filter((r) =>
-        seen.has(r.label) ? false : (seen.add(r.label), true),
-      );
+      let found: SearchResult[] = [];
+      if (placesAvailable()) {
+        try {
+          const suggestions = await autocompletePlaces(q, {
+            lang,
+            near: centerRef.current,
+          });
+          found = suggestions.map((s) => ({ kind: 'place' as const, ...s }));
+        } catch {
+          // Places unreachable (offline, key/API not enabled) — the on-device
+          // geocoder below still gives address-level results.
+        }
+      }
+      if (found.length === 0) found = await geocodeSearch(q);
       if (seq === searchSeq.current) {
-        setResults(unique);
-        setNoResults(unique.length === 0);
+        setResults(found);
+        setNoResults(found.length === 0);
       }
     } catch {
       if (seq === searchSeq.current) {
@@ -310,18 +357,39 @@ export default function AddressPickerScreen() {
     setQuery(text);
     setNoResults(false);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (text.trim().length < 3) {
+    if (text.trim().length < MIN_QUERY) {
       setResults([]);
       setSearching(false);
       return;
     }
-    searchTimer.current = setTimeout(() => runSearch(text), 450);
+    searchTimer.current = setTimeout(() => runSearch(text), 350);
   };
 
-  const pickResult = (r: SearchResult) => {
-    setPoint(r.coords);
-    setLine(r.label);
-    dismissSearch();
+  const pickResult = async (r: SearchResult) => {
+    if (r.kind === 'geo') {
+      pickedPlace.current = null;
+      setPoint(r.coords);
+      setLine(r.label);
+      dismissSearch();
+      return;
+    }
+    // A Places suggestion carries no coordinates — resolve them now. Keep the
+    // dropdown open until it works so a failed tap isn't a dead end.
+    setSearching(true);
+    try {
+      const place = await fetchPlaceLocation(r.placeId, lang);
+      pickedPlace.current = place.coords;
+      setGeoFailed(false);
+      setLine(place.address || [r.primary, r.secondary].filter(Boolean).join(' '));
+      // keepLine: Google's formatted address beats the on-device reverse
+      // geocode — that run only fills blank parcel fields.
+      setPoint(place.coords, { keepLine: true });
+      dismissSearch();
+    } catch {
+      Alert.alert(t('address.placeFailed'), t('address.placeFailedBody'));
+    } finally {
+      setSearching(false);
+    }
   };
 
   const dismissSearch = () => {
@@ -482,18 +550,29 @@ export default function AddressPickerScreen() {
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}>
-              {results.map((r, i) => (
-                <Pressable
-                  key={`${r.label}-${i}`}
-                  accessibilityRole="button"
-                  onPress={() => pickResult(r)}
-                  style={[styles.resultItem, i > 0 && styles.resultDivider]}>
-                  <Ionicons name="location-outline" size={18} color={Colors.primaryStrong} />
-                  <Text variant="body" numberOfLines={2} style={styles.resultText}>
-                    {r.label}
-                  </Text>
-                </Pressable>
-              ))}
+              {results.map((r, i) => {
+                const title = r.kind === 'place' ? r.primary : r.label;
+                const caption = r.kind === 'place' ? r.secondary : '';
+                return (
+                  <Pressable
+                    key={r.kind === 'place' ? r.placeId : `${r.label}-${i}`}
+                    accessibilityRole="button"
+                    onPress={() => pickResult(r)}
+                    style={[styles.resultItem, i > 0 && styles.resultDivider]}>
+                    <Ionicons name="location-outline" size={18} color={Colors.primaryStrong} />
+                    <View style={styles.resultText}>
+                      <Text variant="body" numberOfLines={caption ? 1 : 2}>
+                        {title}
+                      </Text>
+                      {caption ? (
+                        <Text variant="caption" numberOfLines={1} style={styles.resultCaption}>
+                          {caption}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
         ) : null}
@@ -781,6 +860,10 @@ const styles = StyleSheet.create({
   },
   resultText: {
     flex: 1,
+  },
+  resultCaption: {
+    color: Colors.textMuted,
+    marginTop: 1,
   },
   noResults: {
     flexDirection: 'row',
