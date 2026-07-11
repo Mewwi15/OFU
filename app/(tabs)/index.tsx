@@ -178,6 +178,9 @@ export default function HomeScreen() {
           </Pressable>
           <IconButton
             icon="notifications-outline"
+            variant="tint"
+            shape="rounded"
+            size={40}
             accessibilityLabel={t('home.notifications')}
             onPress={() => router.push('/notifications')}
           />
@@ -335,6 +338,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.md,
   },
   locLeft: {
     flex: 1,

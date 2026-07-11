@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CartBadge } from '@/components/navigation/CartBadge';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductRail } from '@/components/product/ProductRail';
 import { CategoryIcon } from '@/components/shop/CategoryIcon';
@@ -112,33 +113,38 @@ export default function CatalogScreen() {
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
-          <View
-            style={[styles.heroTop, { paddingTop: insets.top + Spacing.sm }]}>
-            <View style={styles.heroTitleWrap} />
-            <IconButton
-              icon="bag-outline"
-              accessibilityLabel={t('search.cart')}
-              onPress={() => router.push('/cart')}
-            />
-          </View>
         </View>
 
         <View style={styles.body}>
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('search.placeholder')}
-            rightIcon={
-              <Pressable
-                onPress={() => {}}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={t('search.voiceSearch')}>
-                <Ionicons name="mic-outline" size={20} color={Colors.primary} />
-              </Pressable>
-            }
-            containerStyle={styles.search}
-          />
+          {/* Floating toolbar over the banner's bottom edge: search + cart.
+              Both are white surfaces so they read as one group. */}
+          <View style={styles.searchRow}>
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('search.placeholder')}
+              rightIcon={
+                <Pressable
+                  onPress={() => {}}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('search.voiceSearch')}>
+                  <Ionicons name="mic-outline" size={20} color={Colors.primary} />
+                </Pressable>
+              }
+              containerStyle={styles.search}
+            />
+            <View style={styles.cartWrap}>
+              <IconButton
+                icon="bag-outline"
+                shape="rounded"
+                size={48}
+                accessibilityLabel={t('search.cart')}
+                onPress={() => router.push('/cart')}
+              />
+              <CartBadge />
+            </View>
+          </View>
 
           <ScrollView
             horizontal
@@ -270,22 +276,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
   },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.md,
-  },
-  heroTitleWrap: {
-    flex: 1,
-  },
   body: {
     paddingHorizontal: Spacing.lg,
   },
-  search: {
+  searchRow: {
     marginTop: -24,
     marginBottom: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  search: {
+    flex: 1,
+  },
+  cartWrap: {
+    // Anchor for the absolutely-positioned cart count badge.
+    position: 'relative',
   },
   chipsScroll: {
     marginHorizontal: -Spacing.lg,

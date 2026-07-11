@@ -8,15 +8,20 @@ import {
 
 import { Colors, Radius, Shadow } from '@/constants/theme';
 
-export type IconButtonVariant = 'surface' | 'primary';
+export type IconButtonVariant = 'surface' | 'primary' | 'tint';
+
+export type IconButtonShape = 'circle' | 'rounded';
 
 export type IconButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
   /** Diameter of the circle in px. Defaults to 44. */
   size?: number;
-  /** `surface` = white circle w/ soft shadow; `primary` = green filled. */
+  /** `surface` = white w/ soft shadow; `primary` = coral filled;
+   *  `tint` = flat peach wash w/ coral icon (no shadow). */
   variant?: IconButtonVariant;
+  /** `circle` (default) or `rounded` — squircle matching Radius.md chips. */
+  shape?: IconButtonShape;
   /** Override the icon color. Defaults based on variant. */
   color?: string;
   /**
@@ -40,14 +45,25 @@ export function IconButton({
   onPress,
   size = 44,
   variant = 'surface',
+  shape = 'circle',
   color,
   accessibilityLabel,
   disabled,
   style,
 }: IconButtonProps) {
-  const isPrimary = variant === 'primary';
   const iconColor =
-    color ?? (isPrimary ? Colors.textOnPrimary : Colors.text);
+    color ??
+    (variant === 'primary'
+      ? Colors.textOnPrimary
+      : variant === 'tint'
+        ? Colors.primaryStrong
+        : Colors.text);
+  const background =
+    variant === 'primary'
+      ? Colors.primary
+      : variant === 'tint'
+        ? Colors.primaryTint
+        : Colors.surface;
   const iconSize = Math.round(size * 0.5);
   // Expand the press area to the 44pt minimum when the circle is smaller.
   const slop = Math.max(0, Math.round((MIN_TOUCH - size) / 2));
@@ -65,10 +81,10 @@ export function IconButton({
         {
           width: size,
           height: size,
-          borderRadius: Radius.pill,
-          backgroundColor: isPrimary ? Colors.primary : Colors.surface,
+          borderRadius: shape === 'rounded' ? Radius.md : Radius.pill,
+          backgroundColor: background,
         },
-        !isPrimary && Shadow.card,
+        variant === 'surface' && Shadow.card,
         pressed && styles.pressed,
         disabled && styles.disabled,
         style,
