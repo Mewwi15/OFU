@@ -64,6 +64,23 @@ export async function uploadSlip(orderId: string, base64: string): Promise<strin
 }
 
 /**
+ * Upload a chat photo (base64 JPEG) to the private chat-images bucket. The
+ * folder is ALWAYS the customer's uid (storage RLS keys visibility off the
+ * first path segment) — for a customer that's their own uid.
+ * Returns the storage path to record on the chat message.
+ */
+export async function uploadChatImage(base64: string): Promise<string> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('UNAUTHENTICATED');
+  const path = `${u.user.id}/${Date.now()}-${Math.floor(Math.random() * 1e6)}.jpg`;
+  const { error } = await supabase.storage
+    .from('chat-images')
+    .upload(path, toArrayBuffer(base64ToBytes(base64)), { contentType: 'image/jpeg' });
+  if (error) throw error;
+  return path;
+}
+
+/**
  * Upload the signed-in user's profile photo (base64 JPEG) to the public avatars
  * bucket (keyed by uid). Returns a cache-busted public URL to store + display.
  */

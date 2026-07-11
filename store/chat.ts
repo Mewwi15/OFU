@@ -1,79 +1,108 @@
 /**
- * Rider-chat store (zustand).
+ * Shop-chat store (zustand) — real backend conversation with the shop admin.
  *
- * A seeded customer ↔ rider conversation for the tracking chat screen. `send`
- * appends a customer message. Frontend-first: replies are static today and will
- * come over realtime once the backend lands.
+ * `open()` gets-or-creates the thread, loads history, subscribes to Realtime
+ * and zeroes the unread counter; `close()` tears the subscription down. Sends
+ * append optimistically from the insert's returned row; the Realtime echo of
+ * our own insert is deduped by id. `unread` feeds the account-menu badge and
+ * is refreshed on demand (account focus) + live while the app runs.
  */
 
 import { create } from 'zustand';
 
-export type ChatMessage = {
-  id: string;
-  /** 'me' = customer (coral, right), 'rider' = rider (grey, left). */
-  from: 'me' | 'rider';
-  text: string;
-  time: string;
+import {
+  ensureThread,
+  fetchChatUnread,
+  fetchMessages,
+  markChatRead,
+  sendChatImage,
+  sendChatText,
+  subscribeChat,
+  type ChatMessage,
+} from '@/lib/data/chat';
+
+export type { ChatMessage };
+
+type ChatState = {
+  threadId: string | null;
+  messages: ChatMessage[];
+  loading: boolean;
+  sending: boolean;
+  unread: number;
+  /** Enter the chat screen: ensure thread + history + live updates + mark read. */
+  open: () => Promise<void>;
+  /** Leave the chat screen: stop the live subscription. */
+  close: () => void;
+  send: (text: string) => Promise<void>;
+  sendImage: (base64: string) => Promise<void>;
+  refreshUnread: () => Promise<void>;
 };
 
-const SEED: ChatMessage[] = [
-  { id: 'm1', from: 'me', text: 'สวัสดีครับ', time: '08:30' },
-  { id: 'm2', from: 'me', text: 'ของผมกำลังมาส่งไหมครับ', time: '08:30' },
-  {
-    id: 'm3',
-    from: 'rider',
-    text: 'สวัสดีครับ ผมเพิ่งรับของจากร้านอู้ฟู่มาครับ',
-    time: '08:32',
-  },
-  { id: 'm4', from: 'me', text: 'เยี่ยมเลยครับ อีกประมาณกี่นาทีถึงครับ', time: '08:32' },
-  { id: 'm5', from: 'rider', text: 'ประมาณ 15 นาทีถึงครับ', time: '08:32' },
-];
+let unsubscribe: (() => void) | null = null;
 
-let seq = 100;
-
-/** Canned rider replies, cycled so the demo conversation feels alive. */
-const CANNED_REPLIES = [
-  'รับทราบครับ',
-  'กำลังไปครับ อีกประมาณ 10 นาที',
-  'ถึงปากซอยแล้วครับ',
-  'ขอบคุณครับ เดี๋ยวถึงแล้วโทรหานะครับ',
-];
-let replyIdx = 0;
-
-/** Current HH:MM, zero-padded. */
-function nowLabel(): string {
-  const d = new Date();
-  const hh = `${d.getHours()}`.padStart(2, '0');
-  const mm = `${d.getMinutes()}`.padStart(2, '0');
-  return `${hh}:${mm}`;
+function appendUnique(list: ChatMessage[], m: ChatMessage): ChatMessage[] {
+  return list.some((x) => x.id === m.id) ? list : [...list, m];
 }
 
-export type ChatState = {
-  messages: ChatMessage[];
-  send: (text: string) => void;
-  /** Append the next canned rider reply (used after a "typing" delay). */
-  riderReply: () => void;
-};
+export const useChat = create<ChatState>((set, get) => ({
+  threadId: null,
+  messages: [],
+  loading: false,
+  sending: false,
+  unread: 0,
 
-export const useChat = create<ChatState>((set) => ({
-  messages: SEED,
-  send: (text) =>
-    set((state) => ({
-      messages: [
-        ...state.messages,
-        { id: `m${++seq}`, from: 'me', text, time: nowLabel() },
-      ],
-    })),
-  riderReply: () =>
-    set((state) => ({
-      messages: [
-        ...state.messages,
-        {
-          id: `m${++seq}`,
-          from: 'rider',
-          text: CANNED_REPLIES[replyIdx++ % CANNED_REPLIES.length],
-          time: nowLabel(),
-        },
-      ],
-    })),
+  open: async () => {
+    set({ loading: true });
+    try {
+      const threadId = get().threadId ?? (await ensureThread());
+      const messages = await fetchMessages(threadId);
+      unsubscribe?.();
+      unsubscribe = subscribeChat(threadId, (m) => {
+        set((s) => ({ messages: appendUnique(s.messages, m) }));
+        // Screen is open — anything arriving is read immediately.
+        void markChatRead(threadId);
+      });
+      set({ threadId, messages, unread: 0 });
+      void markChatRead(threadId);
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  close: () => {
+    unsubscribe?.();
+    unsubscribe = null;
+  },
+
+  send: async (text) => {
+    const threadId = get().threadId;
+    if (!threadId) return;
+    set({ sending: true });
+    try {
+      const m = await sendChatText(threadId, text);
+      set((s) => ({ messages: appendUnique(s.messages, m) }));
+    } finally {
+      set({ sending: false });
+    }
+  },
+
+  sendImage: async (base64) => {
+    const threadId = get().threadId;
+    if (!threadId) return;
+    set({ sending: true });
+    try {
+      const m = await sendChatImage(threadId, base64);
+      set((s) => ({ messages: appendUnique(s.messages, m) }));
+    } finally {
+      set({ sending: false });
+    }
+  },
+
+  refreshUnread: async () => {
+    try {
+      set({ unread: await fetchChatUnread() });
+    } catch {
+      // badge is best-effort
+    }
+  },
 }));

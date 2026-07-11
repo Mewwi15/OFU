@@ -39,6 +39,8 @@ function iconFor(category: string): AppNotification['icon'] {
       return 'card';
     case 'promo':
       return 'pricetag';
+    case 'chat':
+      return 'chatbubble';
     case 'order':
       return 'receipt';
     default:

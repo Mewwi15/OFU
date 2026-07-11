@@ -2,6 +2,7 @@ import {
   RiBarChart2Line,
   RiBillLine,
   RiCashLine,
+  RiChat1Line,
   RiFileList3Line,
   RiImageLine,
   RiLayoutMasonryLine,
@@ -15,10 +16,23 @@ import {
   RiStore2Line,
   RiWallet3Line,
 } from '@remixicon/react';
-import { Button, Menu } from 'antd';
+import { Badge, Button, Menu } from 'antd';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
+import { subscribeChatActivity, totalUnread } from '../lib/chat';
+
+/** Live unread-chat total for the sidebar badge (best-effort). */
+function useChatUnread(): number {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    const refresh = () => void totalUnread().then(setUnread).catch(() => {});
+    refresh();
+    return subscribeChatActivity(refresh);
+  }, []);
+  return unread;
+}
 
 export type NavItem = { to: string; label: string; Icon: typeof RiCashLine };
 export type NavGroup = { title: string; items: NavItem[] };
@@ -37,6 +51,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
       { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
+      { to: '/chat', label: 'แชตลูกค้า', Icon: RiChat1Line },
     ],
   },
   {
@@ -109,6 +124,7 @@ export function Sidebar({
   const nav = useNavigate();
   const { pathname } = useLocation();
   const { signOut } = useAuth();
+  const chatUnread = useChatUnread();
   const active = NAV.find((n) => navMatches(pathname, n.to))?.to ?? '/pos';
 
   return (
@@ -130,7 +146,15 @@ export function Sidebar({
           children: g.items.map((n) => ({
             key: n.to,
             icon: <n.Icon className="w-[18px] h-[18px]" />,
-            label: n.label,
+            label:
+              n.to === '/chat' && chatUnread > 0 ? (
+                <span className="flex items-center justify-between gap-2">
+                  {n.label}
+                  <Badge count={chatUnread} size="small" />
+                </span>
+              ) : (
+                n.label
+              ),
           })),
         }))}
       />

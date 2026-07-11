@@ -25,6 +25,7 @@ import { avatarSource } from '@/lib/avatar';
 import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
+import { useChat } from '@/store/chat';
 import { useLock } from '@/store/lock';
 
 /** อู้ฟู่ 3D clay account icons (assets/icon-src/b1–b9). */
@@ -73,7 +74,7 @@ const SECTIONS: MenuSection[] = [
     titleKey: 'account.sec.about',
     rows: [
       { key: 'legal', labelKey: 'account.menu.legal', icon: ICON.legal },
-      { key: 'help', labelKey: 'account.menu.help', icon: ICON.help },
+      { key: 'chat', labelKey: 'account.menu.chat', icon: ICON.help },
     ],
   },
 ];
@@ -85,6 +86,8 @@ export default function ProfileScreen() {
   const logout = useAuth((s) => s.logout);
   const resetLock = useLock((s) => s.resetLock);
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
+  const chatUnread = useChat((s) => s.unread);
+  const refreshChatUnread = useChat((s) => s.refreshUnread);
   const t = useT();
 
   useFocusEffect(
@@ -92,7 +95,8 @@ export default function ProfileScreen() {
       getAccountIdentity()
         .then(setIdentity)
         .catch(() => {});
-    }, []),
+      void refreshChatUnread();
+    }, [refreshChatUnread]),
   );
 
   const onRow = (key: string) => {
@@ -115,8 +119,8 @@ export default function ProfileScreen() {
       case 'legal':
         router.push('/account/legal');
         break;
-      case 'help':
-        Alert.alert(t('account.menu.help'), t('account.helpBody'));
+      case 'chat':
+        router.push('/chat');
         break;
     }
   };
@@ -251,6 +255,13 @@ export default function ProfileScreen() {
                   ]}>
                   <Image source={row.icon} style={styles.menuIcon} contentFit="contain" />
                   <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
+                  {row.key === 'chat' && chatUnread > 0 ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadText}>
+                        {chatUnread > 99 ? '99+' : chatUnread}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
                 </Pressable>
               ))}
@@ -373,6 +384,20 @@ const styles = StyleSheet.create({
     flex: 1,
     ...Typography.bodyStrong,
     color: Colors.text,
+  },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadText: {
+    ...Typography.label,
+    fontSize: 12,
+    color: Colors.textOnPrimary,
   },
 
   /* Sign out / delete */

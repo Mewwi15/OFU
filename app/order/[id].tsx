@@ -104,7 +104,7 @@ export default function OrderTrackingScreen() {
   }, [id, loadActive]);
 
   const goHome = () => router.replace('/');
-  const openChat = () => router.push('/order/chat');
+  const openChat = () => router.push('/chat');
   const callRider = () => {
     if (active) Linking.openURL(`tel:${active.rider.phone}`).catch(() => {});
   };

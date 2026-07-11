@@ -8,6 +8,7 @@ import { installScannerGuard } from './lib/scannerGuard';
 import { Banners } from './pages/Banners';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
+import { Chat } from './pages/Chat';
 import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/banners" element={<Banners />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/payments" element={<Payments />} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/scan-lab" element={<ScanLab />} />
       </Route>
