@@ -1,21 +1,23 @@
 /**
  * Edit profile — `/account/edit`.
  *
- * Edits the signed-in customer's name, phone and email (the fields surfaced on
- * the account screen). Saving patches the auth store and returns. Frontend-first:
- * persists to the in-memory store; the backend sync lands later.
+ * Edits the signed-in customer's name, contact phone and email, plus an
+ * optional password change (email-login accounts only). What's editable
+ * depends on the login method: the credential itself (login phone / login
+ * email) is read-only; everything else saves via the auth store in one tap.
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -30,6 +32,7 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
+import { getAccountIdentity, toE164Thai } from '@/lib/data/auth';
 import { uploadAvatar } from '@/lib/data/storage';
 import { compressForUpload } from '@/lib/images';
 import { useT } from '@/lib/i18n';
@@ -46,6 +49,10 @@ type FieldProps = {
   /** Read-only display (e.g. the login phone number). */
   readOnly?: boolean;
   hint?: string;
+  /** Error takes the hint slot in the warning colour. */
+  error?: string;
+  maxLength?: number;
+  secure?: boolean;
 };
 
 function Field({
@@ -58,7 +65,11 @@ function Field({
   autoCapitalize = 'sentences',
   readOnly = false,
   hint,
+  error,
+  maxLength,
+  secure = false,
 }: FieldProps) {
+  const [hidden, setHidden] = useState(secure);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -73,12 +84,37 @@ function Field({
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
           editable={!readOnly}
+          maxLength={maxLength}
+          secureTextEntry={hidden}
           style={[styles.input, readOnly && styles.inputReadonly]}
         />
+        {secure ? (
+          <Pressable
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={hidden ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน'}
+            onPress={() => setHidden((v) => !v)}>
+            <Ionicons
+              name={hidden ? 'eye-outline' : 'eye-off-outline'}
+              size={18}
+              color={Colors.textMuted}
+            />
+          </Pressable>
+        ) : null}
       </View>
-      {hint ? <Text style={styles.fieldHint}>{hint}</Text> : null}
+      {error ? (
+        <Text style={[styles.fieldHint, styles.fieldError]}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.fieldHint}>{hint}</Text>
+      ) : null}
     </View>
   );
+}
+
+/** "+66812345678" (store display form) → local "0812345678" for editing. */
+function toLocalThai(display: string): string {
+  const digits = display.replace(/\D/g, '');
+  return digits.startsWith('66') ? `0${digits.slice(2)}` : digits;
 }
 
 export default function EditProfileScreen() {
@@ -87,11 +123,34 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuth((s) => s.user);
   const updateProfile = useAuth((s) => s.updateProfile);
+  const changePassword = useAuth((s) => s.changePassword);
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
+  const [phone, setPhone] = useState(toLocalThai(user.phone));
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+
+  // Login method decides what's editable: the credential itself is read-only
+  // (login phone / login email); a password only exists for email accounts.
+  const [provider, setProvider] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getAccountIdentity()
+      .then((id) => {
+        if (alive) setProvider(id?.provider ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const phoneIsLogin = provider === 'phone';
+  const emailIsLogin = provider === 'email';
+  const hasPassword = provider === 'email';
 
   const pickAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -118,13 +177,37 @@ export default function EditProfileScreen() {
     }
   };
 
-  const dirty = name !== user.name || email !== user.email;
-  const canSave = dirty && name.trim().length > 0;
+  const phoneDigits = phone.replace(/\D/g, '');
+  const phoneChanged = !phoneIsLogin && phoneDigits !== toLocalThai(user.phone);
+  const phoneValid = phoneDigits === '' || /^0\d{9}$/.test(phoneDigits);
+  const wantsPassword = password.length > 0 || confirm.length > 0;
+  const passwordValid = !wantsPassword || (password.length >= 6 && password === confirm);
 
-  const onSave = () => {
+  const dirty =
+    name !== user.name || (!emailIsLogin && email !== user.email) || phoneChanged || wantsPassword;
+  const canSave = dirty && name.trim().length > 0 && phoneValid && passwordValid && !saving;
+
+  const onSave = async () => {
     if (!canSave) return;
-    updateProfile({ name: name.trim(), email: email.trim() });
-    setSaved(true);
+    setSaving(true);
+    try {
+      const patch: { name: string; email?: string; phone?: string } = { name: name.trim() };
+      if (!emailIsLogin && email !== user.email) patch.email = email.trim();
+      if (phoneChanged) patch.phone = phoneDigits ? toE164Thai(phoneDigits) : '';
+      await updateProfile(patch);
+      if (wantsPassword) await changePassword(password);
+      setSaved(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      Alert.alert(
+        t('editProfile.saveFailed'),
+        /duplicate|unique|23505/i.test(msg)
+          ? t('editProfile.phoneTaken')
+          : t('editProfile.saveFailedBody'),
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Hide the toast first, then leave on the next frame — navigating while the
@@ -193,16 +276,30 @@ export default function EditProfileScreen() {
             onChangeText={setName}
             placeholder={t('editProfile.namePlaceholder')}
           />
-          <Field
-            label={t('editProfile.phone')}
-            icon="call-outline"
-            value={user.phone}
-            onChangeText={() => {}}
-            placeholder="—"
-            keyboardType="phone-pad"
-            readOnly
-            hint={t('editProfile.phoneHint')}
-          />
+          {phoneIsLogin ? (
+            <Field
+              label={t('editProfile.phone')}
+              icon="call-outline"
+              value={user.phone}
+              onChangeText={() => {}}
+              placeholder="—"
+              keyboardType="phone-pad"
+              readOnly
+              hint={t('editProfile.phoneHint')}
+            />
+          ) : (
+            <Field
+              label={t('editProfile.phone')}
+              icon="call-outline"
+              value={phone}
+              onChangeText={setPhone}
+              placeholder={t('editProfile.phonePlaceholder')}
+              keyboardType="phone-pad"
+              maxLength={12}
+              hint={t('editProfile.phoneHintEditable')}
+              error={phoneValid ? undefined : t('editProfile.phoneInvalid')}
+            />
+          )}
           <Field
             label={t('editProfile.email')}
             icon="mail-outline"
@@ -211,7 +308,46 @@ export default function EditProfileScreen() {
             placeholder="you@email.com"
             keyboardType="email-address"
             autoCapitalize="none"
+            readOnly={emailIsLogin}
+            hint={emailIsLogin ? t('editProfile.emailLoginHint') : undefined}
           />
+
+          {hasPassword ? (
+            <View style={styles.passwordSection}>
+              <Text variant="subtitle" style={styles.sectionTitle}>
+                {t('editProfile.passwordSection')}
+              </Text>
+              <Text style={styles.sectionHint}>{t('editProfile.passwordSectionHint')}</Text>
+              <Field
+                label={t('editProfile.newPassword')}
+                icon="lock-closed-outline"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="••••••"
+                autoCapitalize="none"
+                secure
+                error={
+                  password.length > 0 && password.length < 6
+                    ? t('editProfile.passwordShort')
+                    : undefined
+                }
+              />
+              <Field
+                label={t('editProfile.confirmPassword')}
+                icon="lock-closed-outline"
+                value={confirm}
+                onChangeText={setConfirm}
+                placeholder="••••••"
+                autoCapitalize="none"
+                secure
+                error={
+                  confirm.length > 0 && confirm !== password
+                    ? t('editProfile.passwordMismatch')
+                    : undefined
+                }
+              />
+            </View>
+          ) : null}
         </ScrollView>
 
         {/* Save */}
@@ -220,9 +356,13 @@ export default function EditProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('editProfile.save')}
             disabled={!canSave}
-            onPress={onSave}
+            onPress={() => void onSave()}
             style={[styles.saveBtn, !canSave && styles.saveBtnOff]}>
-            <Text style={styles.saveText}>{t('editProfile.save')}</Text>
+            {saving ? (
+              <ActivityIndicator size="small" color={Colors.textOnPrimary} />
+            ) : (
+              <Text style={styles.saveText}>{t('editProfile.save')}</Text>
+            )}
           </PressableScale>
         </View>
       </KeyboardAvoidingView>
@@ -312,6 +452,20 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   fieldHint: {
+    ...Typography.caption,
+    color: Colors.textMuted,
+  },
+  fieldError: {
+    color: Colors.dangerStrong,
+  },
+  passwordSection: {
+    marginTop: Spacing.md,
+    gap: Spacing.lg,
+  },
+  sectionTitle: {
+    marginBottom: -Spacing.sm,
+  },
+  sectionHint: {
     ...Typography.caption,
     color: Colors.textMuted,
   },

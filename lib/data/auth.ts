@@ -156,20 +156,28 @@ export const authRepo = {
     await supabase.auth.signOut();
   },
 
+  /** Set a new password on the signed-in account (email-login only). */
+  async changePassword(newPassword: string): Promise<void> {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  },
+
   /** Load the app_users profile row for the signed-in user (RLS → own row). */
   async fetchProfile(): Promise<Profile | null> {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) return null;
     const { data, error } = await supabase
       .from('app_users')
-      .select('id, display_name, email, avatar_path')
+      .select('id, display_name, email, phone, avatar_path')
       .eq('id', auth.user.id)
       .maybeSingle();
     if (error) throw error;
     return {
       id: auth.user.id,
       displayName: data?.display_name ?? '',
-      phone: auth.user.phone ?? '',
+      // Contact phone (editable) wins; phone-login users fall back to the
+      // auth phone (same E.164-without-'+' format).
+      phone: data?.phone ?? auth.user.phone ?? '',
       email: data?.email ?? auth.user.email ?? '',
       avatarPath: data?.avatar_path ?? null,
     };
@@ -179,11 +187,14 @@ export const authRepo = {
     displayName?: string;
     avatarPath?: string;
     email?: string;
+    /** E.164 without '+' ("66812345678"); '' clears the contact phone. */
+    phone?: string;
   }): Promise<void> {
     const { error } = await supabase.rpc('update_profile', {
       p_display_name: patch.displayName ?? undefined,
       p_avatar_path: patch.avatarPath ?? undefined,
       p_locale: undefined,
+      p_phone: patch.phone ?? undefined,
     });
     if (error) throw error;
     // Email lives on the auth user (app_users.email is null for phone-OTP signups,

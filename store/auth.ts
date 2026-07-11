@@ -60,8 +60,10 @@ export type AuthState = {
   resendEmailCode: (email: string) => Promise<void>;
   /** Re-fetch the profile row (e.g. after an edit elsewhere). */
   refreshProfile: () => Promise<void>;
-  /** Patch the profile (name/avatar persist via RPC; rest optimistic). */
+  /** Patch the profile (name/avatar/phone persist via RPC; rest optimistic). */
   updateProfile: (patch: Partial<AuthUser>) => Promise<void>;
+  /** Set a new password for the signed-in (email-login) account. */
+  changePassword: (newPassword: string) => Promise<void>;
   /** Sign out and return to the login gate. */
   logout: () => Promise<void>;
 };
@@ -133,19 +135,23 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   updateProfile: async (patch) => {
+    // `phone` arrives as E.164 without '+' ("66812345678") or '' to clear;
+    // the display form ("+66…") is derived below like toUser() does.
     await authRepo.updateProfile({
       displayName: patch.name,
       avatarPath: patch.avatar,
       email: patch.email,
+      phone: patch.phone,
     });
-    // Merge only fields we actually persist (name/avatar/email). `phone` is the
-    // verified login identity and is not editable here.
     const persisted: Partial<AuthUser> = {};
     if (patch.name !== undefined) persisted.name = patch.name;
     if (patch.avatar !== undefined) persisted.avatar = patch.avatar;
     if (patch.email !== undefined) persisted.email = patch.email;
+    if (patch.phone !== undefined) persisted.phone = patch.phone ? `+${patch.phone}` : '';
     set((s) => ({ user: { ...s.user, ...persisted } }));
   },
+
+  changePassword: (newPassword) => authRepo.changePassword(newPassword),
 
   logout: async () => {
     await authRepo.signOut();
