@@ -117,10 +117,16 @@ export async function registerPushToken(token: string, platform?: string): Promi
   if (error) throw error;
 }
 
+// Channel topics must be unique per subscriber: supabase-js reuses a channel
+// with the same topic, so a remount (or a second listener) that lands before
+// the old channel finishes tearing down throws "cannot add callbacks after
+// subscribe()".
+let chanSeq = 0;
+
 /** Live feed: fire onChange whenever the customer's recipient rows change. */
 export function subscribeNotifications(onChange: () => void): () => void {
   const channel = supabase
-    .channel('notifications')
+    .channel(`notifications-${++chanSeq}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'notification_recipients' },

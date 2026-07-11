@@ -116,13 +116,18 @@ export async function sendChatImage(threadId: string, base64: string): Promise<C
   return toChatMessage(data as MessageRow, await signPaths([path]));
 }
 
+// Channel topics must be unique per subscriber — a screen remount can land
+// before the old channel tears down, and supabase-js reuses same-topic
+// channels (adding callbacks after subscribe() throws).
+let chanSeq = 0;
+
 /** Live inserts on this thread (both sides — dedupe by id when appending). */
 export function subscribeChat(
   threadId: string,
   onMessage: (m: ChatMessage) => void,
 ): () => void {
   const channel = supabase
-    .channel(`chat:${threadId}`)
+    .channel(`chat:${threadId}:${++chanSeq}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `thread_id=eq.${threadId}` },
