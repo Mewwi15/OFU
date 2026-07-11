@@ -34,6 +34,7 @@ const ICON = {
   language: require('@/assets/icon-src/b4.png') as number,
   legal: require('@/assets/icon-src/b5.png') as number,
   help: require('@/assets/icon-src/b6.png') as number,
+  password: require('@/assets/icon-src/b7.png') as number,
   member: require('@/assets/icon-src/b8.png') as number,
   logout: require('@/assets/icon-src/b9.png') as number,
 };
@@ -106,6 +107,9 @@ export default function ProfileScreen() {
         break;
       case 'language':
         router.push('/account/language');
+        break;
+      case 'password':
+        router.push('/account/password');
         break;
       case 'legal':
         router.push('/account/legal');
@@ -205,8 +209,19 @@ export default function ProfileScreen() {
           </View>
         </Animated.View>
 
-        {/* Grouped menu — single-line rows, no caption noise */}
-        {SECTIONS.map((section, s) => (
+        {/* Grouped menu — single-line rows, no caption noise. Email-login
+            accounts get a change-password row in การตั้งค่า. */}
+        {SECTIONS.map((section) =>
+          section.titleKey === 'account.sec.prefs' && identity?.provider === 'email'
+            ? {
+                ...section,
+                rows: [
+                  ...section.rows,
+                  { key: 'password', labelKey: 'account.menu.password', icon: ICON.password },
+                ],
+              }
+            : section,
+        ).map((section, s) => (
           <Animated.View
             key={section.titleKey}
             entering={FadeInDown.delay(80 + s * 70).springify().damping(18)}>

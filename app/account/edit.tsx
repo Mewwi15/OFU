@@ -1,10 +1,10 @@
 /**
  * Edit profile — `/account/edit`.
  *
- * Edits the signed-in customer's name, contact phone and email, plus an
- * optional password change (email-login accounts only). What's editable
- * depends on the login method: the credential itself (login phone / login
- * email) is read-only; everything else saves via the auth store in one tap.
+ * Edits the signed-in customer's name, contact phone and email. What's
+ * editable depends on the login method: the credential itself (login phone /
+ * login email) is read-only. Password changes live on their own screen
+ * (`/account/password`), reached from the account menu.
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -17,14 +17,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FormField } from '@/components/ui/FormField';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -38,79 +37,6 @@ import { compressForUpload } from '@/lib/images';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
-type FieldProps = {
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  value: string;
-  onChangeText: (t: string) => void;
-  placeholder: string;
-  keyboardType?: 'default' | 'email-address' | 'phone-pad';
-  autoCapitalize?: 'none' | 'sentences';
-  /** Read-only display (e.g. the login phone number). */
-  readOnly?: boolean;
-  hint?: string;
-  /** Error takes the hint slot in the warning colour. */
-  error?: string;
-  maxLength?: number;
-  secure?: boolean;
-};
-
-function Field({
-  label,
-  icon,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType = 'default',
-  autoCapitalize = 'sentences',
-  readOnly = false,
-  hint,
-  error,
-  maxLength,
-  secure = false,
-}: FieldProps) {
-  const [hidden, setHidden] = useState(secure);
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.inputRow, readOnly && styles.inputRowReadonly]}>
-        <Ionicons name={icon} size={18} color={Colors.textMuted} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={Colors.textMuted}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={false}
-          editable={!readOnly}
-          maxLength={maxLength}
-          secureTextEntry={hidden}
-          style={[styles.input, readOnly && styles.inputReadonly]}
-        />
-        {secure ? (
-          <Pressable
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={hidden ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน'}
-            onPress={() => setHidden((v) => !v)}>
-            <Ionicons
-              name={hidden ? 'eye-outline' : 'eye-off-outline'}
-              size={18}
-              color={Colors.textMuted}
-            />
-          </Pressable>
-        ) : null}
-      </View>
-      {error ? (
-        <Text style={[styles.fieldHint, styles.fieldError]}>{error}</Text>
-      ) : hint ? (
-        <Text style={styles.fieldHint}>{hint}</Text>
-      ) : null}
-    </View>
-  );
-}
-
 /** "+66812345678" (store display form) → local "0812345678" for editing. */
 function toLocalThai(display: string): string {
   const digits = display.replace(/\D/g, '');
@@ -123,19 +49,16 @@ export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuth((s) => s.user);
   const updateProfile = useAuth((s) => s.updateProfile);
-  const changePassword = useAuth((s) => s.changePassword);
 
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(toLocalThai(user.phone));
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
 
   // Login method decides what's editable: the credential itself is read-only
-  // (login phone / login email); a password only exists for email accounts.
+  // (login phone / login email).
   const [provider, setProvider] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -150,7 +73,6 @@ export default function EditProfileScreen() {
   }, []);
   const phoneIsLogin = provider === 'phone';
   const emailIsLogin = provider === 'email';
-  const hasPassword = provider === 'email';
 
   const pickAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -180,12 +102,9 @@ export default function EditProfileScreen() {
   const phoneDigits = phone.replace(/\D/g, '');
   const phoneChanged = !phoneIsLogin && phoneDigits !== toLocalThai(user.phone);
   const phoneValid = phoneDigits === '' || /^0\d{9}$/.test(phoneDigits);
-  const wantsPassword = password.length > 0 || confirm.length > 0;
-  const passwordValid = !wantsPassword || (password.length >= 6 && password === confirm);
 
-  const dirty =
-    name !== user.name || (!emailIsLogin && email !== user.email) || phoneChanged || wantsPassword;
-  const canSave = dirty && name.trim().length > 0 && phoneValid && passwordValid && !saving;
+  const dirty = name !== user.name || (!emailIsLogin && email !== user.email) || phoneChanged;
+  const canSave = dirty && name.trim().length > 0 && phoneValid && !saving;
 
   const onSave = async () => {
     if (!canSave) return;
@@ -195,7 +114,6 @@ export default function EditProfileScreen() {
       if (!emailIsLogin && email !== user.email) patch.email = email.trim();
       if (phoneChanged) patch.phone = phoneDigits ? toE164Thai(phoneDigits) : '';
       await updateProfile(patch);
-      if (wantsPassword) await changePassword(password);
       setSaved(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
@@ -269,7 +187,7 @@ export default function EditProfileScreen() {
             </PressableScale>
           </View>
 
-          <Field
+          <FormField
             label={t('editProfile.name')}
             icon="person-outline"
             value={name}
@@ -277,7 +195,7 @@ export default function EditProfileScreen() {
             placeholder={t('editProfile.namePlaceholder')}
           />
           {phoneIsLogin ? (
-            <Field
+            <FormField
               label={t('editProfile.phone')}
               icon="call-outline"
               value={user.phone}
@@ -288,7 +206,7 @@ export default function EditProfileScreen() {
               hint={t('editProfile.phoneHint')}
             />
           ) : (
-            <Field
+            <FormField
               label={t('editProfile.phone')}
               icon="call-outline"
               value={phone}
@@ -300,7 +218,7 @@ export default function EditProfileScreen() {
               error={phoneValid ? undefined : t('editProfile.phoneInvalid')}
             />
           )}
-          <Field
+          <FormField
             label={t('editProfile.email')}
             icon="mail-outline"
             value={email}
@@ -311,43 +229,6 @@ export default function EditProfileScreen() {
             readOnly={emailIsLogin}
             hint={emailIsLogin ? t('editProfile.emailLoginHint') : undefined}
           />
-
-          {hasPassword ? (
-            <View style={styles.passwordSection}>
-              <Text variant="subtitle" style={styles.sectionTitle}>
-                {t('editProfile.passwordSection')}
-              </Text>
-              <Text style={styles.sectionHint}>{t('editProfile.passwordSectionHint')}</Text>
-              <Field
-                label={t('editProfile.newPassword')}
-                icon="lock-closed-outline"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••"
-                autoCapitalize="none"
-                secure
-                error={
-                  password.length > 0 && password.length < 6
-                    ? t('editProfile.passwordShort')
-                    : undefined
-                }
-              />
-              <Field
-                label={t('editProfile.confirmPassword')}
-                icon="lock-closed-outline"
-                value={confirm}
-                onChangeText={setConfirm}
-                placeholder="••••••"
-                autoCapitalize="none"
-                secure
-                error={
-                  confirm.length > 0 && confirm !== password
-                    ? t('editProfile.passwordMismatch')
-                    : undefined
-                }
-              />
-            </View>
-          ) : null}
         </ScrollView>
 
         {/* Save */}
@@ -419,55 +300,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: Colors.background,
-  },
-  field: {
-    gap: Spacing.sm,
-  },
-  fieldLabel: {
-    ...Typography.label,
-    color: Colors.textMuted,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    minHeight: 52,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  input: {
-    ...Typography.body,
-    flex: 1,
-    color: Colors.text,
-    padding: 0,
-  },
-  inputRowReadonly: {
-    backgroundColor: Colors.surfaceMuted,
-    borderColor: 'transparent',
-  },
-  inputReadonly: {
-    color: Colors.textMuted,
-  },
-  fieldHint: {
-    ...Typography.caption,
-    color: Colors.textMuted,
-  },
-  fieldError: {
-    color: Colors.dangerStrong,
-  },
-  passwordSection: {
-    marginTop: Spacing.md,
-    gap: Spacing.lg,
-  },
-  sectionTitle: {
-    marginBottom: -Spacing.sm,
-  },
-  sectionHint: {
-    ...Typography.caption,
-    color: Colors.textMuted,
   },
   footer: {
     paddingHorizontal: Spacing.lg,

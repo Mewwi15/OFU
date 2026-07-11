@@ -128,6 +128,7 @@ export default function RootLayout() {
               <Stack.Screen name="order/[id]" />
               <Stack.Screen name="order/chat" />
               <Stack.Screen name="account/edit" />
+              <Stack.Screen name="account/password" />
               <Stack.Screen name="account/settings" />
               <Stack.Screen name="account/language" />
               <Stack.Screen name="account/legal" />
