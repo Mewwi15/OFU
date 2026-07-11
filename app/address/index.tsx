@@ -46,6 +46,9 @@ export default function AddressBookScreen() {
       <View style={styles.header}>
         <IconButton
           icon="chevron-back"
+          variant="tint"
+          shape="rounded"
+          size={40}
           accessibilityLabel={t('common.back')}
           onPress={() => router.back()}
         />

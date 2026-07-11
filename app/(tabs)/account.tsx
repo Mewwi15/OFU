@@ -146,6 +146,9 @@ export default function ProfileScreen() {
           right={
             <IconButton
               icon="notifications-outline"
+              variant="tint"
+              shape="rounded"
+              size={40}
               accessibilityLabel={t('account.notifications')}
               onPress={() => router.push('/notifications')}
             />

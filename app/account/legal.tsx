@@ -27,7 +27,16 @@ export default function LegalScreen() {
       <ScreenHeader
         title={t('legal.title')}
         style={styles.header}
-        left={<IconButton icon="chevron-back" accessibilityLabel="back" onPress={() => router.back()} />}
+        left={
+          <IconButton
+            icon="chevron-back"
+            variant="tint"
+            shape="rounded"
+            size={40}
+            accessibilityLabel="back"
+            onPress={() => router.back()}
+          />
+        }
       />
       <ScrollView
         showsVerticalScrollIndicator={false}

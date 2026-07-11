@@ -145,7 +145,14 @@ export default function EditProfileScreen() {
         title={t('editProfile.title')}
         style={styles.header}
         left={
-          <IconButton icon="chevron-back" accessibilityLabel={t('common.back')} onPress={() => router.back()} />
+          <IconButton
+            icon="chevron-back"
+            variant="tint"
+            shape="rounded"
+            size={40}
+            accessibilityLabel={t('common.back')}
+            onPress={() => router.back()}
+          />
         }
       />
 

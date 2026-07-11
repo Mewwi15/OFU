@@ -57,12 +57,22 @@ export default function NotificationsScreen() {
         title={t('notif.title')}
         style={styles.header}
         left={
-          <IconButton icon="chevron-back" accessibilityLabel={t('common.back')} onPress={() => router.back()} />
+          <IconButton
+            icon="chevron-back"
+            variant="tint"
+            shape="rounded"
+            size={40}
+            accessibilityLabel={t('common.back')}
+            onPress={() => router.back()}
+          />
         }
         right={
           unread > 0 ? (
             <IconButton
               icon="checkmark-done"
+              variant="tint"
+              shape="rounded"
+              size={40}
               accessibilityLabel={t('notif.markAllRead')}
               onPress={() => void markAllRead()}
             />

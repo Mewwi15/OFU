@@ -32,7 +32,16 @@ export default function LanguageScreen() {
       <ScreenHeader
         title={t('language.title')}
         style={styles.header}
-        left={<IconButton icon="chevron-back" accessibilityLabel="back" onPress={() => router.back()} />}
+        left={
+          <IconButton
+            icon="chevron-back"
+            variant="tint"
+            shape="rounded"
+            size={40}
+            accessibilityLabel="back"
+            onPress={() => router.back()}
+          />
+        }
       />
       <View style={styles.content}>
         <View style={styles.card}>

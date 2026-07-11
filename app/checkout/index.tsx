@@ -123,6 +123,9 @@ export default function CheckoutScreen() {
           left={
             <IconButton
               icon="chevron-back"
+              variant="tint"
+              shape="rounded"
+              size={40}
               accessibilityLabel={t('common.back')}
               onPress={() => router.back()}
             />
@@ -230,6 +233,9 @@ export default function CheckoutScreen() {
         left={
           <IconButton
             icon="chevron-back"
+            variant="tint"
+            shape="rounded"
+            size={40}
             accessibilityLabel={t('common.back')}
             onPress={() => router.back()}
           />
