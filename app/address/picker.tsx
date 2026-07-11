@@ -166,11 +166,24 @@ export default function AddressPickerScreen() {
     }
   };
 
+  // Last point that reverse-geocoded successfully. Camera-settle events after
+  // auto-locate/search re-request virtually the SAME point; Apple's geocoder
+  // throttles rapid calls, so that redundant request used to fail and flash
+  // the stale-address warning under a perfectly good line. Same point → skip.
+  const lastGeo = useRef<LatLng | null>(null);
+
   // keepLine: the line was just set from an authoritative source (a picked
   // Places result) — reverse-geocode only to fill blank parcel fields, and
   // don't flag failure (the line isn't stale).
   const runGeocode = async ({ keepLine = false } = {}) => {
     const { latitude, longitude } = centerRef.current;
+    if (
+      lastGeo.current &&
+      Math.abs(latitude - lastGeo.current.latitude) < 1.5e-4 &&
+      Math.abs(longitude - lastGeo.current.longitude) < 1.5e-4
+    ) {
+      return;
+    }
     // Guard against out-of-order resolves: if the pin moves again before this
     // reverse-geocode returns, a newer call bumps geoSeq and this stale result
     // is ignored — otherwise it could overwrite the line with the old address.
@@ -180,6 +193,7 @@ export default function AddressPickerScreen() {
       const res = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (seq === geoSeq.current) {
         if (res[0]) {
+          lastGeo.current = { latitude, longitude };
           setGeoFailed(false);
           if (!keepLine) setLine(formatLine(res[0]));
           // Fill any BLANK parcel field from the geocode — never clobber a value
