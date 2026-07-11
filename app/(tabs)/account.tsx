@@ -17,7 +17,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
-import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
@@ -35,7 +34,6 @@ const ICON = {
   language: require('@/assets/icon-src/b4.png') as number,
   legal: require('@/assets/icon-src/b5.png') as number,
   help: require('@/assets/icon-src/b6.png') as number,
-  edit: require('@/assets/icon-src/b7.png') as number,
   member: require('@/assets/icon-src/b8.png') as number,
   logout: require('@/assets/icon-src/b9.png') as number,
 };
@@ -174,14 +172,14 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            <PressableScale
-              accessibilityRole="button"
+            <IconButton
+              icon="create-outline"
+              variant="tint"
+              shape="rounded"
+              size={40}
               accessibilityLabel={t('account.editProfile')}
-              hitSlop={6}
               onPress={() => router.push('/account/edit')}
-              style={styles.editBtn}>
-              <Image source={ICON.edit} style={styles.editIcon} contentFit="contain" />
-            </PressableScale>
+            />
           </View>
 
           <View style={styles.factBox}>
@@ -290,15 +288,6 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   memberIcon: { width: 18, height: 18 },
-  editBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editIcon: { width: 22, height: 22 },
 
   factBox: {
     marginTop: Spacing.lg,
