@@ -121,6 +121,9 @@ export default function AddressPickerScreen() {
 
   const [line, setLine] = useState(editing?.line ?? '');
   const [geocoding, setGeocoding] = useState(false);
+  // Reverse geocode came back empty/failed — surface it instead of silently
+  // keeping the stale line (the user can always type the address manually).
+  const [geoFailed, setGeoFailed] = useState(false);
   const [label, setLabel] = useState(editing?.label ?? t(LABEL_KEYS[0]));
   const [recipient, setRecipient] = useState(editing?.recipient ?? '');
   const [phone, setPhone] = useState(editing?.phone ?? '');
@@ -135,6 +138,8 @@ export default function AddressPickerScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  // A completed search found nothing — show "no results" instead of nothing.
+  const [noResults, setNoResults] = useState(false);
 
   const recenter = (coordinates: LatLng) => {
     // setCameraPosition is a native call that can throw if the view isn't ready
@@ -157,18 +162,24 @@ export default function AddressPickerScreen() {
     setGeocoding(true);
     try {
       const res = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (seq === geoSeq.current && res[0]) {
-        setLine(formatLine(res[0]));
-        // Fill any BLANK parcel field from the geocode — never clobber a value
-        // the user has already typed/corrected.
-        const parts = parcelPartsFrom(res[0]);
-        if (parts.subDistrict) setSubDistrict((v) => v || parts.subDistrict);
-        if (parts.district) setDistrict((v) => v || parts.district);
-        if (parts.province) setProvince((v) => v || parts.province);
-        if (parts.postalCode) setPostalCode((v) => v || parts.postalCode);
+      if (seq === geoSeq.current) {
+        if (res[0]) {
+          setGeoFailed(false);
+          setLine(formatLine(res[0]));
+          // Fill any BLANK parcel field from the geocode — never clobber a value
+          // the user has already typed/corrected.
+          const parts = parcelPartsFrom(res[0]);
+          if (parts.subDistrict) setSubDistrict((v) => v || parts.subDistrict);
+          if (parts.district) setDistrict((v) => v || parts.district);
+          if (parts.province) setProvince((v) => v || parts.province);
+          if (parts.postalCode) setPostalCode((v) => v || parts.postalCode);
+        } else {
+          setGeoFailed(true);
+        }
       }
     } catch {
-      // Keep the previous line on failure.
+      // Keep the previous line, but tell the user it's stale.
+      if (seq === geoSeq.current) setGeoFailed(true);
     } finally {
       if (seq === geoSeq.current) setGeocoding(false);
     }
@@ -276,9 +287,15 @@ export default function AddressPickerScreen() {
       const unique = labeled.filter((r) =>
         seen.has(r.label) ? false : (seen.add(r.label), true),
       );
-      if (seq === searchSeq.current) setResults(unique);
+      if (seq === searchSeq.current) {
+        setResults(unique);
+        setNoResults(unique.length === 0);
+      }
     } catch {
-      if (seq === searchSeq.current) setResults([]);
+      if (seq === searchSeq.current) {
+        setResults([]);
+        setNoResults(true);
+      }
     } finally {
       if (seq === searchSeq.current) setSearching(false);
     }
@@ -286,6 +303,7 @@ export default function AddressPickerScreen() {
 
   const onQueryChange = (text: string) => {
     setQuery(text);
+    setNoResults(false);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (text.trim().length < 3) {
       setResults([]);
@@ -303,6 +321,7 @@ export default function AddressPickerScreen() {
 
   const dismissSearch = () => {
     setResults([]);
+    setNoResults(false);
     setQuery('');
     Keyboard.dismiss();
   };
@@ -437,6 +456,21 @@ export default function AddressPickerScreen() {
           </View>
         </View>
 
+        {/* Search found nothing — say so instead of showing nothing */}
+        {noResults && results.length === 0 ? (
+          <View
+            style={[
+              styles.results,
+              styles.noResults,
+              { top: insets.top + Spacing.sm + 48 + Spacing.xs },
+            ]}>
+            <Ionicons name="search" size={16} color={Colors.textMuted} />
+            <Text variant="caption" style={styles.noResultsText}>
+              {t('address.searchNoResults')}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Search results dropdown */}
         {results.length > 0 ? (
           <View style={[styles.results, { top: insets.top + Spacing.sm + 48 + Spacing.xs }]}>
@@ -504,6 +538,16 @@ export default function AddressPickerScreen() {
             </View>
             {geocoding ? <ActivityIndicator size="small" color={Colors.primary} /> : null}
           </View>
+
+          {/* Reverse geocode failed — the line above is stale/manual */}
+          {geoFailed && !geocoding ? (
+            <View style={styles.geoWarn}>
+              <Ionicons name="alert-circle-outline" size={14} color={Colors.starStrong} />
+              <Text variant="caption" style={styles.geoWarnText}>
+                {t('address.geoFailed')}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Label chips */}
           <Text variant="caption" style={styles.fieldLabel}>
@@ -732,6 +776,27 @@ const styles = StyleSheet.create({
   },
   resultText: {
     flex: 1,
+  },
+  noResults: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  noResultsText: {
+    flex: 1,
+    color: Colors.textMuted,
+  },
+  geoWarn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: -Spacing.xs,
+  },
+  geoWarnText: {
+    flex: 1,
+    color: Colors.starStrong,
   },
 
   locFab: {
