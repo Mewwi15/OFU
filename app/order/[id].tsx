@@ -12,6 +12,7 @@
  * it and `subscribeOrder` refreshes this screen live.
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, View, StyleSheet } from 'react-native';
@@ -20,9 +21,10 @@ import { DeliveredView } from '@/components/order/DeliveredView';
 import { ParcelTrackingView } from '@/components/order/ParcelTrackingView';
 import { PreparingView } from '@/components/order/PreparingView';
 import { TrackingMapView } from '@/components/order/TrackingMapView';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { isAwaitingSlipCheck } from '@/data/fulfillment';
 import {
   cancelOrder,
@@ -33,6 +35,50 @@ import {
 } from '@/lib/data/order';
 import { useT } from '@/lib/i18n';
 import { useOrder } from '@/store/order';
+
+/**
+ * Full-screen terminal state (cancelled / rejected slip / not found) — icon in
+ * a soft circle, title, optional body, and a primary way back home. Mirrors
+ * the empty-cart layout so dead ends feel like the rest of the app.
+ */
+function TerminalState({
+  icon,
+  tone,
+  title,
+  body,
+  buttonLabel,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  tone: 'danger' | 'brand';
+  title: string;
+  body?: string;
+  buttonLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.terminal}>
+      <View style={[styles.terminalBadge, tone === 'brand' && styles.terminalBadgeBrand]}>
+        <Ionicons
+          name={icon}
+          size={40}
+          color={tone === 'danger' ? Colors.danger : Colors.primaryStrong}
+        />
+      </View>
+      <Text variant="title" style={styles.terminalTitle}>
+        {title}
+      </Text>
+      {body ? (
+        <Text variant="body" style={styles.terminalBody}>
+          {body}
+        </Text>
+      ) : null}
+      <Button onPress={onPress} style={styles.terminalButton}>
+        {buttonLabel}
+      </Button>
+    </View>
+  );
+}
 
 export default function OrderTrackingScreen() {
   const router = useRouter();
@@ -106,40 +152,43 @@ export default function OrderTrackingScreen() {
   };
 
   if (!active) {
-    return (
-      <View style={styles.guard}>
-        <Text variant="subtitle" style={styles.guardTitle}>
-          {activeLoading ? t('track.loadingOrder') : t('track.orderNotFound')}
-        </Text>
-        {activeLoading ? null : (
-          <Text variant="body" style={styles.guardBody} onPress={goHome}>
-            {t('track.backHome')}
+    if (activeLoading) {
+      return (
+        <View style={styles.guard}>
+          <Text variant="subtitle" style={styles.guardTitle}>
+            {t('track.loadingOrder')}
           </Text>
-        )}
-      </View>
+        </View>
+      );
+    }
+    return (
+      <TerminalState
+        icon="receipt-outline"
+        tone="brand"
+        title={t('track.orderNotFound')}
+        buttonLabel={t('track.backHome')}
+        onPress={goHome}
+      />
     );
   }
 
-  // Cancelled / failed orders show a simple terminal card (both modes). A
+  // Cancelled / failed orders end in a full terminal state (both modes). A
   // rejected slip gets its own honest copy instead of a generic "cancelled".
   if (active.status === 'cancelled') {
     const rejected = active.paymentStatus === 'rejected';
     return (
-      <View style={styles.guard}>
-        <Text variant="subtitle" style={styles.guardTitle}>
-          {rejected
+      <TerminalState
+        icon={rejected ? 'alert' : 'close'}
+        tone="danger"
+        title={
+          rejected
             ? t('track.paymentRejectedTitle')
-            : `${t('track.orderPrefix')}${active.id}${t('track.orderCancelledSuffix')}`}
-        </Text>
-        {rejected ? (
-          <Text variant="body" style={styles.guardBody}>
-            {t('track.paymentRejectedBody')}
-          </Text>
-        ) : null}
-        <Text variant="body" style={styles.guardBody} onPress={goHome}>
-          {t('track.backHome')}
-        </Text>
-      </View>
+            : `${t('track.orderPrefix')}${active.id}${t('track.orderCancelledSuffix')}`
+        }
+        body={rejected ? t('track.paymentRejectedBody') : t('track.orderCancelledBody')}
+        buttonLabel={t('track.backHome')}
+        onPress={goHome}
+      />
     );
   }
 
@@ -220,7 +269,37 @@ const styles = StyleSheet.create({
   guardTitle: {
     color: Colors.text,
   },
-  guardBody: {
-    color: Colors.primaryStrong,
+
+  /* Terminal state — mirrors the empty-cart layout */
+  terminal: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.x2,
+    backgroundColor: Colors.background,
+  },
+  terminalBadge: {
+    width: 96,
+    height: 96,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  terminalBadgeBrand: {
+    backgroundColor: Colors.primaryTint,
+  },
+  terminalTitle: {
+    marginTop: Spacing.xl,
+    textAlign: 'center',
+  },
+  terminalBody: {
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+    color: Colors.textMuted,
+  },
+  terminalButton: {
+    marginTop: Spacing.xl,
+    minWidth: 180,
   },
 });

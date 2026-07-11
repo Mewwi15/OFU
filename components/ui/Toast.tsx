@@ -34,7 +34,8 @@ export type ToastProps = {
   onAction?: () => void;
   /** Called when dismissed (auto-timer or backdrop tap) — flip parent state off. */
   onHide: () => void;
-  /** Visible duration in ms before auto-dismiss. Defaults to 2800. */
+  /** Visible duration in ms before auto-dismiss. Defaults to 2800 — or 4500
+   *  when there's an action button, so the user has time to decide to tap it. */
   duration?: number;
 };
 
@@ -45,13 +46,14 @@ export function Toast({
   actionLabel,
   onAction,
   onHide,
-  duration = 2800,
+  duration,
 }: ToastProps) {
   const t = useT();
+  const visibleMs = duration ?? (actionLabel ? 4500 : 2800);
   useEffect(() => {
-    const timer = setTimeout(onHide, duration);
+    const timer = setTimeout(onHide, visibleMs);
     return () => clearTimeout(timer);
-  }, [onHide, duration]);
+  }, [onHide, visibleMs]);
 
   return (
     <View pointerEvents="box-none" style={styles.wrap}>

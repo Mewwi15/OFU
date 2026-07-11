@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
@@ -175,8 +176,10 @@ export default function ProfileScreen() {
               <View style={styles.metaRow}>
                 <Image source={ICON.member} style={styles.memberIcon} contentFit="contain" />
                 <Text variant="caption" numberOfLines={1}>
-                  {t('account.memberId')} {identity ? identity.id.slice(0, 8).toUpperCase() : '—'}
+                  {t('account.memberId')}
+                  {identity ? ` ${identity.id.slice(0, 8).toUpperCase()}` : ''}
                 </Text>
+                {identity ? null : <Skeleton width={72} height={11} />}
               </View>
             </View>
             <IconButton
@@ -194,17 +197,25 @@ export default function ProfileScreen() {
               <Text variant="caption" style={styles.factLabel}>
                 {t('account.phoneLabel')}
               </Text>
-              <Text style={styles.factValue} numberOfLines={1}>
-                {user.phone || identity?.phone || t('common.notSet')}
-              </Text>
+              {user.phone || identity ? (
+                <Text style={styles.factValue} numberOfLines={1}>
+                  {user.phone || identity?.phone || t('common.notSet')}
+                </Text>
+              ) : (
+                <Skeleton width={104} />
+              )}
             </View>
             <View style={[styles.factRow, styles.factDivider]}>
               <Text variant="caption" style={styles.factLabel}>
                 {t('account.loginAccountLabel')}
               </Text>
-              <Text style={styles.factValue} numberOfLines={1}>
-                {loginAccountLabel(identity, t)}
-              </Text>
+              {identity ? (
+                <Text style={styles.factValue} numberOfLines={1}>
+                  {loginAccountLabel(identity, t)}
+                </Text>
+              ) : (
+                <Skeleton width={148} />
+              )}
             </View>
           </View>
         </Animated.View>

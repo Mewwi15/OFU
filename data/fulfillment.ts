@@ -226,9 +226,14 @@ export type TrackedOrder = {
   itemImages?: string[];
 };
 
-/** Prepay order whose slip the shop hasn't approved yet (manual verification). */
+/**
+ * Prepay order whose slip the shop hasn't approved yet (manual verification).
+ * A cancelled order is never "awaiting" — its slip stays unverified forever,
+ * so without the status guard the orders list would badge it รอตรวจสลิป.
+ */
 export function isAwaitingSlipCheck(o: TrackedOrder): boolean {
   return (
+    o.status !== 'cancelled' &&
     o.paymentMethod === 'promptpay_slip' &&
     ['awaiting_payment', 'slip_uploaded', 'verifying'].includes(o.paymentStatus ?? '')
   );
