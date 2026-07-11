@@ -1,22 +1,24 @@
 /**
  * Google Places API (New) — autocomplete + place lookup for the address picker.
  *
- * Uses the same Android-restricted key as the native map. The Places REST
- * endpoints honour an "Android apps" key restriction when the request carries
- * X-Android-Package / X-Android-Cert headers matching a cert registered on the
- * key — Google checks the headers against the key's allow-list (it cannot see
- * the real signature over REST), so the registered debug SHA-1 works from any
- * build and release builds need no change HERE (the native map still needs the
- * release SHA-1 added to the key).
+ * A Google key can carry ONE application-restriction type, so each platform
+ * has its own key (both restricted to Places API (New) only, both safe to
+ * commit — the repo is public either way and a restricted key is unusable by
+ * others). The REST endpoints honour those restrictions via identification
+ * headers that Google checks against the key's allow-list (it cannot see the
+ * real app signature over REST):
+ *  - Android: X-Android-Package + X-Android-Cert. The registered DEBUG SHA-1
+ *    works from any build, so release builds need no change HERE (only the
+ *    native map needs the release SHA-1 added to its key).
+ *  - iOS: X-Ios-Bundle-Identifier.
  *
  * Cost: only Essentials-tier SKUs are used — Autocomplete per-request and
  * Place Details with an Essentials field mask — each with a 10K/month free
  * tier, far above the shop's scale. Adding Pro fields (displayName, rating…)
  * to the field mask would move Details to a paid SKU: don't.
  *
- * iOS ships Apple Maps and no Google key, so this module reports unavailable
- * there; the picker falls back to the on-device geocoder (which is decent on
- * real iOS devices), same as when a call here fails.
+ * When no key exists for the platform (or a call fails), the picker falls
+ * back to the on-device geocoder.
  */
 
 import { Platform } from 'react-native';
@@ -31,22 +33,34 @@ export type PlaceSuggestion = {
   secondary: string;
 };
 
-// Same key as android/app/src/main/AndroidManifest.xml (already public in the
-// repo; usable only by apps on the key's Android allow-list).
-const KEY = 'AIzaSyBtLlL9dF_bJEPpccud6Q3N4uat_O0C3-8';
-const ANDROID_PACKAGE = 'com.anonymous.myrnapp';
-// Debug-keystore SHA-1 registered on the key (colons stripped).
-const ANDROID_CERT = '5E8F16062EA3CD2C4A0D547876BAA6F38CABF625';
+// iOS-apps-restricted key (bundle id com.anonymous.my-rn-app — note the
+// hyphens; the Android package has none).
+const IOS_KEY = 'AIzaSyAj78470TAv1n_hAV9bGATJappdYPZedJU';
+
+const CREDS = Platform.select<{ key: string; idHeaders: Record<string, string> } | null>({
+  android: {
+    // Same key as android/app/src/main/AndroidManifest.xml.
+    key: 'AIzaSyBtLlL9dF_bJEPpccud6Q3N4uat_O0C3-8',
+    idHeaders: {
+      'X-Android-Package': 'com.anonymous.myrnapp',
+      // Debug-keystore SHA-1 registered on the key (colons stripped).
+      'X-Android-Cert': '5E8F16062EA3CD2C4A0D547876BAA6F38CABF625',
+    },
+  },
+  ios: IOS_KEY
+    ? { key: IOS_KEY, idHeaders: { 'X-Ios-Bundle-Identifier': 'com.anonymous.my-rn-app' } }
+    : null,
+  default: null,
+});
 
 const HEADERS = {
   'Content-Type': 'application/json',
-  'X-Goog-Api-Key': KEY,
-  'X-Android-Package': ANDROID_PACKAGE,
-  'X-Android-Cert': ANDROID_CERT,
+  'X-Goog-Api-Key': CREDS?.key ?? '',
+  ...CREDS?.idHeaders,
 };
 
 export function placesAvailable(): boolean {
-  return Platform.OS === 'android';
+  return CREDS != null;
 }
 
 /**
