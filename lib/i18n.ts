@@ -50,7 +50,7 @@ const th: Dict = {
   'account.deleteBody':
     'ข้อมูลส่วนตัวของคุณจะถูกลบถาวรและออกจากระบบทันที (ประวัติคำสั่งซื้อจะถูกเก็บแบบไม่ระบุตัวตนตามกฎหมาย) — ดำเนินการต่อหรือไม่?',
   'account.deleteFailed': 'ลบบัญชีไม่สำเร็จ',
-  'account.helpBody': 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.',
+  'account.helpBody': 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 เปิดทุกวัน 24 ชั่วโมง',
 
   'common.back': 'ย้อนกลับ',
   'common.and': 'และ',
@@ -102,7 +102,7 @@ const th: Dict = {
     'รองรับการชำระเงินปลายทางและพร้อมเพย์ (แนบสลิป) กรณีสินค้ามีปัญหาหรือยกเลิกก่อนจัดส่ง สามารถติดต่อขอคืนเงินได้ตามเงื่อนไขของร้าน',
   'legal.s4.title': 'ติดต่อเรา',
   'legal.s4.body':
-    'ร้านอู้ฟู่ · โทร 02-000-0000 ทุกวัน 8:00–22:00 น. สำหรับคำถามเรื่องข้อมูลส่วนบุคคล ติดต่อเจ้าหน้าที่คุ้มครองข้อมูลได้ที่ช่องทางเดียวกัน',
+    'ร้านอู้ฟู่ · โทร 02-000-0000 เปิดทุกวัน 24 ชั่วโมง สำหรับคำถามเรื่องข้อมูลส่วนบุคคล ติดต่อเจ้าหน้าที่คุ้มครองข้อมูลได้ที่ช่องทางเดียวกัน',
 
   'home.banner1Title': 'ลดสูงสุด 40%\nช้อปเลยวันนี้!',
   'home.banner2Title': 'ส่งฟรี!\nเมื่อสั่งครบ 200฿',
@@ -447,7 +447,7 @@ const th: Dict = {
   'track.receivedParcel': 'ฉันได้รับพัสดุแล้ว',
   'track.trackStatusOnFlash': 'ติดตามสถานะบน Flash',
   'track.helpTitle': 'ศูนย์ช่วยเหลือ',
-  'track.helpBody': 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 ทุกวัน 8:00-22:00 น.',
+  'track.helpBody': 'ติดต่อทีมงานอู้ฟู่ได้ที่ 02-000-0000 เปิดทุกวัน 24 ชั่วโมง',
   'track.cancelConfirmPrefix': 'ต้องการยกเลิกออเดอร์ ',
   'track.no': 'ไม่ใช่',
   'track.cancelFailed': 'ยกเลิกไม่สำเร็จ',
@@ -554,7 +554,7 @@ const en: Dict = {
   'account.deleteBody':
     'Your personal data will be permanently removed and you will be signed out immediately (order history is kept anonymized as required by law). Continue?',
   'account.deleteFailed': 'Could not delete account',
-  'account.helpBody': 'Reach the Oofoo team at 02-000-0000, daily 8:00–22:00.',
+  'account.helpBody': 'Reach the Oofoo team at 02-000-0000 — open 24 hours, every day.',
 
   'common.back': 'Back',
   'common.and': 'and',
@@ -606,7 +606,7 @@ const en: Dict = {
     'We support cash on delivery and PromptPay (with slip). For faulty items or cancellations before dispatch, you may request a refund per the shop’s terms.',
   'legal.s4.title': 'Contact us',
   'legal.s4.body':
-    'Oofoo · 02-000-0000, daily 8:00–22:00. For data-privacy questions, contact our data protection officer through the same channel.',
+    'Oofoo · 02-000-0000, open 24 hours every day. For data-privacy questions, contact our data protection officer through the same channel.',
 
   'home.banner1Title': 'Up to 40% off\nShop today!',
   'home.banner2Title': 'Free delivery!\nOn orders over 200฿',
@@ -951,7 +951,7 @@ const en: Dict = {
   'track.receivedParcel': 'I\'ve received my parcel',
   'track.trackStatusOnFlash': 'Track status on Flash',
   'track.helpTitle': 'Help center',
-  'track.helpBody': 'Reach the Oofoo team at 02-000-0000, daily 8:00–22:00.',
+  'track.helpBody': 'Reach the Oofoo team at 02-000-0000 — open 24 hours, every day.',
   'track.cancelConfirmPrefix': 'Cancel order ',
   'track.no': 'No',
   'track.cancelFailed': 'Couldn\'t cancel',

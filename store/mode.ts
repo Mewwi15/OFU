@@ -20,6 +20,13 @@ import { zustandStorage } from '@/lib/storage';
 
 export type ShopMode = 'delivery' | 'online';
 
+/**
+ * Rider delivery hasn't launched yet (owner decision 2026-07-11) — the mode
+ * shows as "เร็วๆ นี้" and can't be selected. Flip to false on launch day; the
+ * switch UI, fees and checkout branches below are all still wired up.
+ */
+export const DELIVERY_COMING_SOON = true;
+
 export type ModeMeta = {
   key: ShopMode;
   /** Short label, e.g. "เดลิเวอรี่". */
@@ -28,14 +35,17 @@ export type ModeMeta = {
   tagline: string;
   /** Ionicons glyph name. */
   icon: string;
+  /** Not selectable yet — rendered dimmed with an "เร็วๆ นี้" badge. */
+  comingSoon?: boolean;
 };
 
 export const MODE_META: Record<ShopMode, ModeMeta> = {
   delivery: {
     key: 'delivery',
     label: 'เดลิเวอรี่',
-    tagline: 'สั่งเลย ส่งถึงบ้าน',
+    tagline: DELIVERY_COMING_SOON ? 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้' : 'สั่งเลย ส่งถึงบ้าน',
     icon: 'bicycle',
+    comingSoon: DELIVERY_COMING_SOON,
   },
   online: {
     key: 'online',
@@ -83,13 +93,26 @@ export type ModeState = {
 export const useMode = create<ModeState>()(
   persist(
     (set) => ({
-      mode: 'delivery',
-      setMode: (mode) => set({ mode }),
+      mode: DELIVERY_COMING_SOON ? 'online' : 'delivery',
+      setMode: (mode) => {
+        if (MODE_META[mode].comingSoon) return; // not selectable yet
+        set({ mode });
+      },
     }),
     {
       name: 'oofoo-mode',
       storage: zustandStorage,
       partialize: (state) => ({ mode: state.mode }),
+      // v2: delivery paused — devices that had persisted 'delivery' move to
+      // 'online' instead of waking up stuck in an unselectable mode.
+      version: 2,
+      migrate: (persisted) => {
+        const state = persisted as { mode?: ShopMode } | undefined;
+        if (DELIVERY_COMING_SOON && state?.mode === 'delivery') {
+          return { ...state, mode: 'online' as ShopMode };
+        }
+        return state;
+      },
     },
   ),
 );

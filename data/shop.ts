@@ -29,11 +29,17 @@ export const DEFAULT_SHOP: ShopInfo = {
     displayName: 'ร้าน อู้ฟู่ (พร้อมเพย์)',
     bankName: 'พร้อมเพย์ · เบอร์โทร',
   },
-  hours: { open: '08:00', close: '22:00' },
+  hours: { open: '00:00', close: '24:00' },
 };
+
+/** A 00:00–24:00 (or 23:59) window means the shop never closes. */
+export function isAllDay(hours: ShopHours): boolean {
+  return hours.open === '00:00' && (hours.close === '24:00' || hours.close === '23:59');
+}
 
 /** Operating-hours label shown to the customer. */
 export function shopHoursLabel(hours: ShopHours): string {
+  if (isAllDay(hours)) return 'เปิดทุกวัน 24 ชั่วโมง';
   return `ทุกวัน ${hours.open}–${hours.close} น.`;
 }
 
@@ -45,6 +51,7 @@ function toMinutes(hm: string): number {
 
 /** Whether the shop is open at `now` (handles windows that cross midnight). */
 export function isShopOpen(hours: ShopHours, now: Date = new Date()): boolean {
+  if (isAllDay(hours)) return true;
   const mins = now.getHours() * 60 + now.getMinutes();
   const open = toMinutes(hours.open);
   const close = toMinutes(hours.close);

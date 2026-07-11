@@ -14,9 +14,9 @@ insert into public.shop_settings (shop_id)
 values ('00000000-0000-0000-0000-0000000000a1')
 on conflict (shop_id) do nothing;
 
--- Operating hours: every day 08:00–22:00
+-- Operating hours: open 24 hours, every day
 insert into public.shop_hours (shop_id, weekday, open_time, close_time)
-select '00000000-0000-0000-0000-0000000000a1', wd, '08:00', '22:00'
+select '00000000-0000-0000-0000-0000000000a1', wd, '00:00', '24:00'
 from generate_series(0, 6) as wd
 on conflict (shop_id, weekday) do nothing;
 

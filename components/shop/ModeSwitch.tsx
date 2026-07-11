@@ -12,7 +12,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Alert, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
@@ -35,6 +35,15 @@ export function ModeSwitch({ compact = false, style }: Props) {
   const mode = useMode((s) => s.mode);
   const setMode = useMode((s) => s.setMode);
 
+  /** Coming-soon modes stay visible but explain themselves instead of switching. */
+  const onPick = (m: (typeof MODES)[number]) => {
+    if (m.comingSoon) {
+      Alert.alert(m.label, 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้');
+      return;
+    }
+    setMode(m.key);
+  };
+
   /* Compact: one segmented track with a white active thumb. */
   if (compact) {
     return (
@@ -47,12 +56,21 @@ export function ModeSwitch({ compact = false, style }: Props) {
             <Pressable
               key={m.key}
               accessibilityRole="button"
-              accessibilityState={active ? { selected: true } : {}}
+              accessibilityState={
+                m.comingSoon ? { disabled: true } : active ? { selected: true } : {}
+              }
               accessibilityLabel={m.label}
-              onPress={() => setMode(m.key)}
+              onPress={() => onPick(m)}
               style={[styles.segment, active && styles.segmentActive]}>
-              <Ionicons name={icon} size={18} color={tint} />
-              <Text style={[Typography.button, { color: tint }]}>{m.label}</Text>
+              <Ionicons name={icon} size={18} color={tint} style={m.comingSoon && styles.dim} />
+              <Text style={[Typography.button, { color: tint }, m.comingSoon && styles.dim]}>
+                {m.label}
+              </Text>
+              {m.comingSoon ? (
+                <View style={styles.soonPill}>
+                  <Text style={styles.soonText}>เร็วๆ นี้</Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -70,25 +88,37 @@ export function ModeSwitch({ compact = false, style }: Props) {
         return (
           <Pressable
             key={m.key}
-            onPress={() => setMode(m.key)}
+            onPress={() => onPick(m)}
+            accessibilityState={m.comingSoon ? { disabled: true } : {}}
             style={[
               styles.card,
               active && { borderColor: accent.color, borderWidth: 2 },
             ]}>
-            <View style={[styles.iconBadge, { backgroundColor: accent.tint }]}>
+            <View
+              style={[
+                styles.iconBadge,
+                { backgroundColor: accent.tint },
+                m.comingSoon && styles.dim,
+              ]}>
               <Ionicons name={icon} size={22} color={accent.color} />
             </View>
             <View style={styles.cardText}>
-              <Text variant="subtitle">{m.label}</Text>
+              <Text variant="subtitle" style={m.comingSoon && styles.dim}>
+                {m.label}
+              </Text>
               <Text variant="caption" style={{ color: Colors.textMuted }}>
                 {m.tagline}
               </Text>
             </View>
-            {active && (
+            {m.comingSoon ? (
+              <View style={[styles.soonPill, styles.soonPillCard]}>
+                <Text style={styles.soonText}>เร็วๆ นี้</Text>
+              </View>
+            ) : active ? (
               <View style={[styles.check, { backgroundColor: accent.color }]}>
                 <Ionicons name="checkmark" size={12} color={Colors.textOnPrimary} />
               </View>
-            )}
+            ) : null}
           </Pressable>
         );
       })}
@@ -156,5 +186,26 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* Coming-soon treatment */
+  dim: {
+    opacity: 0.45,
+  },
+  soonPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryTint,
+  },
+  soonPillCard: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+  },
+  soonText: {
+    ...Typography.label,
+    fontSize: 11,
+    color: Colors.primaryStrong,
   },
 });
