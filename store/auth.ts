@@ -105,6 +105,11 @@ export const useAuth = create<AuthState>((set) => ({
         set({ status: 'authenticated', userId: session.user.id });
         setTimeout(() => {
           void loadUser().then((user) => set({ user }));
+          // PDPA consent on EVERY sign-in path — only the email forms used to
+          // grant it, so Google/Apple logins hit CONSENT_REQUIRED at
+          // place_order. grant_consent is latest-row-wins; re-granting on
+          // each sign-in is harmless.
+          void authRepo.grantConsent('data_processing', 'v1').catch(() => {});
         }, 0);
       } else {
         set({ status: 'unauthenticated', userId: null, user: GUEST });

@@ -28,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { authRepo, signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
+import { signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
@@ -79,15 +79,12 @@ export default function LoginScreen() {
     try {
       if (mode === 'signin') {
         await signInEmail(email, password);
-        await authRepo.grantConsent('data_processing', 'v1').catch(() => {});
       } else {
         const { needsVerify } = await signUpEmail(email, password);
         if (needsVerify) {
           setCode('');
           setStep('verify');
           setTimeout(() => codeRef.current?.focus(), 250);
-        } else {
-          await authRepo.grantConsent('data_processing', 'v1').catch(() => {});
         }
       }
     } catch (e) {
@@ -103,7 +100,6 @@ export default function LoginScreen() {
     setError(null);
     try {
       await verifyEmailCode(email, code);
-      await authRepo.grantConsent('data_processing', 'v1').catch(() => {});
     } catch {
       setError('รหัสยืนยันไม่ถูกต้องหรือหมดอายุ');
       setCode('');
