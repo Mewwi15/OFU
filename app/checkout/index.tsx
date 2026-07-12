@@ -217,7 +217,7 @@ export default function CheckoutScreen() {
   };
 
   // Once the success card is closed: clear the paid lines, then start tracking —
-  // delivery → live rider map, online → Flash parcel timeline.
+  // delivery → live rider map, online → parcel timeline.
   const finishSuccess = () => {
     removeSelected();
     // The order lives in the DB now; the tracking screen loads it by number.

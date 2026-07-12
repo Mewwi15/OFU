@@ -115,7 +115,7 @@ export default function AddressPickerScreen() {
     id ? s.addresses.find((a) => a.id === id) : undefined,
   );
   const current = useAddress(selectedAddress);
-  // Online (Flash Express) orders ship a parcel, so they need a full structured
+  // Online orders ship a parcel nationwide, so they need a full structured
   // postal address; the delivery (rider) flow only needs the pin + line.
   const isOnline = useMode((s) => s.mode === 'online');
 
@@ -142,7 +142,7 @@ export default function AddressPickerScreen() {
   const [phone, setPhone] = useState(editing?.phone ?? '');
   const [detail, setDetail] = useState(editing?.detail ?? '');
 
-  // Structured parcel fields (online / Flash Express only).
+  // Structured parcel fields (online / parcel only).
   const [subDistrict, setSubDistrict] = useState(editing?.subDistrict ?? '');
   const [district, setDistrict] = useState(editing?.district ?? '');
   const [province, setProvince] = useState(editing?.province ?? '');
@@ -713,7 +713,7 @@ export default function AddressPickerScreen() {
             style={styles.input}
           />
 
-          {/* Parcel address — online (Flash Express) only */}
+          {/* Parcel address — online (parcel) only */}
           {isOnline ? (
             <>
               <View style={styles.parcelHead}>

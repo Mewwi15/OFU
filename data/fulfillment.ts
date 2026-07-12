@@ -38,11 +38,10 @@ export const MOCK_RIDER: Rider = {
 
 /**
  * Order tracking states. Shared by the local-rider (`delivery`) flow and the
- * Flash Express parcel (`online`) flow; each surface renders the subset it
- * needs. The parcel-specific codes mirror Flash Open API parcel states (mapped
- * in `lib/flash.ts`, see docs/adr/ADR-0003):
- *   picked_up = 1, in_transit = 2, out_for_delivery = 3, delivered = 5,
- *   delivery_failed = 4|6, returned = 7, cancelled = 8|9.
+ * parcel (`online`) flow; each surface renders the subset it needs. The
+ * parcel-specific codes map 1:1 onto `apply_flash_state` in migration 0016 —
+ * the single carrier-state mapping (see docs/adr/ADR-0003). Carrier branding
+ * is deliberately absent from customer copy until the courier API lands.
  * The rider flow only ever uses preparing / out_for_delivery / delivered.
  */
 export type OrderStatus =
@@ -68,14 +67,14 @@ export type ExceptionMeta = {
   label: string;
   message: string;
   icon: IconName;
-  /** Flash may re-attempt (true) vs terminal (false). */
+  /** The carrier may re-attempt (true) vs terminal (false). */
   canRetry: boolean;
 };
 
 export const EXCEPTION_META: Record<ExceptionStatus, ExceptionMeta> = {
   delivery_failed: {
     label: 'นำจ่ายไม่สำเร็จ',
-    message: 'Flash จะติดต่อและพยายามนำส่งให้อีกครั้ง หากต้องการความช่วยเหลือ ติดต่อร้านอู้ฟู่ได้เลย',
+    message: 'ทีมงานอู้ฟู่จะติดต่อและพยายามนำส่งให้อีกครั้ง หากต้องการความช่วยเหลือ ติดต่อร้านได้เลย',
     icon: 'alert-circle',
     canRetry: true,
   },
@@ -128,13 +127,13 @@ export function stageIndexFor(status: OrderStatus): number {
 }
 
 /* ----------------------------------------------------------------------- */
-/* Parcel (online / Flash Express) timeline                                */
+/* Parcel (online) timeline                                                */
 /* ----------------------------------------------------------------------- */
 
-/** Vertical parcel-tracking steps for an online (Flash Express) shipment. */
+/** Vertical parcel-tracking steps for an online parcel shipment. */
 export const PARCEL_STAGES: DeliveryStage[] = [
   { key: 'preparing', label: 'ร้านกำลังแพ็คสินค้า', icon: 'cube-outline' },
-  { key: 'picked_up', label: 'Flash รับพัสดุแล้ว', icon: 'cube' },
+  { key: 'picked_up', label: 'อู้ฟู่ส่งพัสดุเข้าขนส่งแล้ว', icon: 'cube' },
   { key: 'in_transit', label: 'กำลังขนส่งระหว่างศูนย์', icon: 'car-outline' },
   { key: 'out_for_delivery', label: 'กำลังนำจ่าย', icon: 'bicycle-outline' },
   { key: 'delivered', label: 'จัดส่งสำเร็จ', icon: 'checkmark-done-outline' },
@@ -208,10 +207,10 @@ export type TrackedOrder = {
   rider: Rider;
 
   /* Fulfilment kind — `delivery` = local อู้ฟู่ rider (live map), `parcel` =
-     shipped via Flash Express (tracking number + timeline, no rider map).
+     shipped nationwide (tracking number + timeline, no rider map).
      Absent is treated as `delivery` for backward-compat with old orders. */
   fulfilment?: 'delivery' | 'parcel';
-  /** Courier name, e.g. "Flash Express" (parcel only). */
+  /** Courier display name (parcel only) — carrier brand withheld until the API lands. */
   courier?: string;
   /** Courier tracking number (parcel only). */
   trackingNo?: string;

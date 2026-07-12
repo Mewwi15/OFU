@@ -5,8 +5,9 @@
  *  - `delivery` — a local อู้ฟู่ rider brings the order to a pinned address
  *    (delivery fee, cash-on-delivery or transfer; same-area only).
  *  - `online`   — paid up-front (PromptPay / transfer + slip) and shipped
- *    nationwide as a parcel via Flash Express, so it needs a full structured
- *    postal address (province + postcode), not just a map pin.
+ *    nationwide as a parcel, so it needs a full structured postal address
+ *    (province + postcode), not just a map pin. Carrier branding is withheld
+ *    from customer copy until the courier API integration lands.
  *
  * Screens read `mode` to branch their UI (home mode switch, cart summary,
  * checkout payment options). `MODE_META` holds the shared Thai copy + icon so
@@ -50,7 +51,7 @@ export const MODE_META: Record<ShopMode, ModeMeta> = {
   online: {
     key: 'online',
     label: 'ออนไลน์',
-    tagline: 'ส่งทั่วไทย ผ่าน Flash',
+    tagline: 'อู้ฟู่ส่งพัสดุทั่วไทย',
     icon: 'cube',
   },
 };
@@ -62,20 +63,20 @@ export const FREE_DELIVERY_MIN = 200;
 /** Minimum subtotal required to place a delivery order. */
 export const MIN_ORDER = 100;
 
-/** Flat Flash Express parcel-shipping fee (online), waived above the threshold. */
+/** Flat parcel-shipping fee (online), waived above the threshold. */
 export const FLASH_FEE = 40;
-/** Order subtotal at/above which Flash shipping is free. */
+/** Order subtotal at/above which parcel shipping is free. */
 export const FLASH_FREE_MIN = 500;
 
 /**
  * Fulfilment fee for a subtotal + mode — rider delivery fee (`delivery`) or
- * Flash parcel-shipping fee (`online`), each waived above its free threshold.
+ * parcel-shipping fee (`online`), each waived above its free threshold.
  */
 export function deliveryFeeFor(mode: ShopMode, subtotal: number): number {
   if (mode === 'delivery') {
     return subtotal >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
   }
-  // online → Flash Express parcel shipping
+  // online → nationwide parcel shipping
   return subtotal >= FLASH_FREE_MIN ? 0 : FLASH_FEE;
 }
 

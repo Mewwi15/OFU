@@ -245,7 +245,8 @@ function toTracked(r: OrderRow): TrackedOrder {
     itemImages,
     ...(fulfilment === 'parcel'
       ? {
-          courier: r.parcel_shipments?.[0]?.courier ?? 'Flash Express',
+          // Carrier brand withheld until the courier API integration lands.
+          courier: r.parcel_shipments?.[0]?.courier ?? 'ร้านอู้ฟู่',
           trackingNo: r.parcel_shipments?.[0]?.tracking_no ?? undefined,
         }
       : {}),

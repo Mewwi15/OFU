@@ -28,12 +28,6 @@ export type CreateOrderInput = {
   orderNumber?: string;
 };
 
-/** Flash-style tracking number derived from the order id (Hermes-safe, stable). */
-function trackingNoFor(id: string): string {
-  const digits = id.replace(/\D/g, '').padStart(11, '0').slice(-11);
-  return `TH${digits}A`;
-}
-
 export type OrderRating = {
   orderId: string;
   stars: number;
@@ -134,9 +128,8 @@ export const useOrder = create<OrderState>()(
           placedAtLabel: stampNow(),
           rider: MOCK_RIDER,
           fulfilment: input.fulfilment ?? 'delivery',
-          ...(isParcel
-            ? { courier: 'Flash Express', trackingNo: trackingNoFor(id) }
-            : {}),
+          // Parcel courier/trackingNo stay unset — the real tracking number
+          // comes from parcel_shipments once the shop ships (loadActive).
         };
         set({ active: order, rating: null });
         return id;

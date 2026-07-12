@@ -1,17 +1,17 @@
 /**
- * ParcelTrackingView — order-tracking screen for an ONLINE (Flash Express)
- * shipment. Unlike the rider flow there's no live map; instead it shows the
- * courier + tracking number (copyable, opens Flash tracking), a vertical
- * status timeline, the destination address and an order summary. Drives the
- * same three order statuses (preparing → out_for_delivery → delivered) mapped
- * onto the parcel stages. Tokens-only, zero emoji.
+ * ParcelTrackingView — order-tracking screen for an ONLINE parcel shipment
+ * (อู้ฟู่ ships nationwide; carrier branding intentionally absent until the
+ * courier API integration lands). Unlike the rider flow there's no live map;
+ * instead it shows the tracking number (copyable, shown once the parcel ships),
+ * a vertical status timeline, the destination address and an order summary.
+ * Tokens-only, zero emoji.
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -64,7 +64,6 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
   const activeStage = PARCEL_STAGES[activeIndex];
   const heroLabel = exceptionMeta?.label ?? activeStage?.label ?? t('track.inProgress');
   const heroArt = activeStage ? PARCEL_ART[activeStage.key] : undefined;
-  const trackingNo = order.trackingNo ?? '-';
 
   const copyTracking = async () => {
     if (!order.trackingNo) return;
@@ -73,13 +72,6 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }
-  };
-
-  const openFlash = () => {
-    if (!order.trackingNo) return;
-    Linking.openURL(
-      `https://www.flashexpress.com/fle/tracking?se=${encodeURIComponent(order.trackingNo)}`,
-    ).catch(() => {});
   };
 
   return (
@@ -142,17 +134,8 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
               <Text variant="caption" style={styles.muted}>
                 {t('track.shippedBy')}
               </Text>
-              <Text style={styles.courierName}>{order.courier ?? 'Flash Express'}</Text>
+              <Text style={styles.courierName}>{order.courier ?? 'ร้านอู้ฟู่'}</Text>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('track.trackOnFlashWebA11y')}
-              hitSlop={8}
-              onPress={openFlash}
-              style={styles.flashLink}>
-              <Text style={styles.flashLinkText}>{t('track.trackOnFlash')}</Text>
-              <Ionicons name="open-outline" size={14} color={Colors.primaryStrong} />
-            </Pressable>
           </View>
 
           <View style={styles.trackNoRow}>
@@ -160,21 +143,29 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
               <Text variant="caption" style={styles.muted}>
                 {t('track.trackingNo')}
               </Text>
-              <Text style={styles.trackNo}>{trackingNo}</Text>
+              {order.trackingNo ? (
+                <Text style={styles.trackNo}>{order.trackingNo}</Text>
+              ) : (
+                <Text variant="body" style={styles.trackNoPending}>
+                  {t('track.trackingNoPending')}
+                </Text>
+              )}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('track.copyTrackingA11y')}
-              hitSlop={8}
-              onPress={copyTracking}
-              style={styles.copyBtn}>
-              <Ionicons
-                name={copied ? 'checkmark' : 'copy-outline'}
-                size={15}
-                color={Colors.primaryStrong}
-              />
-              <Text style={styles.copyText}>{copied ? t('track.copied') : t('track.copy')}</Text>
-            </Pressable>
+            {order.trackingNo ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('track.copyTrackingA11y')}
+                hitSlop={8}
+                onPress={copyTracking}
+                style={styles.copyBtn}>
+                <Ionicons
+                  name={copied ? 'checkmark' : 'copy-outline'}
+                  size={15}
+                  color={Colors.primaryStrong}
+                />
+                <Text style={styles.copyText}>{copied ? t('track.copied') : t('track.copy')}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </Animated.View>
 
@@ -276,19 +267,14 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
       {/* Footer action */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md }]}>
         {exception ? (
-          <View style={styles.footerStack}>
-            <Button onPress={onHelp}>{t('track.contactShop')}</Button>
-            <Button variant="secondary" onPress={openFlash}>
-              {t('track.trackOnFlash')}
-            </Button>
-          </View>
+          <Button onPress={onHelp}>{t('track.contactShop')}</Button>
         ) : delivered ? (
           <Button onPress={onDone}>{t('track.done')}</Button>
         ) : order.status === 'out_for_delivery' ? (
           <Button onPress={onArrived}>{t('track.receivedParcel')}</Button>
         ) : (
-          <Button variant="secondary" onPress={openFlash}>
-            {t('track.trackStatusOnFlash')}
+          <Button variant="secondary" onPress={onHelp}>
+            {t('track.contactShop')}
           </Button>
         )}
       </View>
@@ -378,15 +364,6 @@ const styles = StyleSheet.create({
     ...Typography.bodyStrong,
     color: Colors.text,
   },
-  flashLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  flashLinkText: {
-    ...Typography.label,
-    color: Colors.primaryStrong,
-  },
   trackNoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -400,6 +377,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 1,
     color: Colors.text,
+  },
+  trackNoPending: {
+    color: Colors.textMuted,
+    marginTop: 1,
   },
   copyBtn: {
     flexDirection: 'row',
@@ -524,8 +505,5 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-  },
-  footerStack: {
-    gap: Spacing.sm,
   },
 });

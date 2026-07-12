@@ -202,7 +202,7 @@ export default function OrderTrackingScreen() {
     );
   }
 
-  // Online orders ship as a Flash parcel — one timeline view across all states.
+  // Online orders ship as a parcel — one timeline view across all states.
   if (active.fulfilment === 'parcel') {
     return (
       <View style={styles.screen}>

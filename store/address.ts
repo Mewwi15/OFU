@@ -25,7 +25,7 @@ export type Address = {
   lat: number;
   lng: number;
 
-  /* Structured postal parts — required to ship a parcel via Flash Express. */
+  /* Structured postal parts — required to ship a parcel nationwide. */
   subDistrict?: string;
   district?: string;
   province?: string;
@@ -117,7 +117,7 @@ export function selectedAddress(state: AddressState): Address | undefined {
 }
 
 /**
- * Whether an address carries enough structured detail to ship a Flash Express
+ * Whether an address carries enough structured detail to ship a nationwide
  * parcel (online mode): recipient, phone, province and a 5-digit postcode.
  */
 export function hasParcelInfo(a?: Address): boolean {

@@ -215,7 +215,7 @@ export default function CartScreen() {
   // Minimum-order floor (delivery only) — only relevant once something is ticked.
   const belowMin = !nothingSelected && !meetsMinOrder(mode, subtotal);
   const minShortfall = Math.max(0, MIN_ORDER - subtotal);
-  // Online (Flash) needs a parcel-ready address before checkout.
+  // Online (parcel) needs a parcel-ready address before checkout.
   const needsParcel = mode === 'online' && !hasParcelInfo(address);
   const canCheckout =
     !nothingSelected && shopOpen && !belowMin && !needsParcel;
@@ -391,7 +391,7 @@ export default function CartScreen() {
                 <FreeShipBlock subtotal={subtotal} />
               </View>
             ) : (
-              /* Online surface — Flash Express parcel address */
+              /* Online surface — nationwide parcel address */
               <View style={styles.deliveryCard}>
                 <PressableScale
                   accessibilityRole="button"
