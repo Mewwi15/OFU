@@ -12,7 +12,12 @@
           "package_name": "com.anonymous.myrnapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAPtBUEaUtcXc1EaT3OvTW4jjfj1cgS-Tc"
@@ -20,7 +25,41 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129235146060:android:571f6f86000266bc7f6be9",
+        "android_client_info": {
+          "package_name": "com.oofoo.shop"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPtBUEaUtcXc1EaT3OvTW4jjfj1cgS-Tc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

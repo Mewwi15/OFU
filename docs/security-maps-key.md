@@ -20,7 +20,9 @@ useless to anyone else. In **Google Cloud Console → APIs & Services →
 Credentials → (the key)**:
 
 1. **Application restrictions → Android apps.** Add an entry:
-   - Package name: `com.anonymous.myrnapp`
+   - Package name: `com.oofoo.shop` (renamed 2026-07 for the store release; the
+     pre-rename dev builds used `com.anonymous.myrnapp` — keep both entries
+     while old dev installs are still around)
    - SHA-1 certificate fingerprint: see below.
 2. **API restrictions → Restrict key →** select **Maps SDK for Android** only.
 3. Save.

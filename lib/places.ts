@@ -33,8 +33,9 @@ export type PlaceSuggestion = {
   secondary: string;
 };
 
-// iOS-apps-restricted key (bundle id com.anonymous.my-rn-app — note the
-// hyphens; the Android package has none).
+// iOS-apps-restricted key (bundle id com.oofoo.shop — same id on both
+// platforms since the 2026-07 store-prep rename; the key's GCP allowlist must
+// include it or Places calls 403 and the picker falls back to the geocoder).
 const IOS_KEY = 'AIzaSyAj78470TAv1n_hAV9bGATJappdYPZedJU';
 
 const CREDS = Platform.select<{ key: string; idHeaders: Record<string, string> } | null>({
@@ -42,13 +43,13 @@ const CREDS = Platform.select<{ key: string; idHeaders: Record<string, string> }
     // Same key as android/app/src/main/AndroidManifest.xml.
     key: 'AIzaSyBtLlL9dF_bJEPpccud6Q3N4uat_O0C3-8',
     idHeaders: {
-      'X-Android-Package': 'com.anonymous.myrnapp',
+      'X-Android-Package': 'com.oofoo.shop',
       // Debug-keystore SHA-1 registered on the key (colons stripped).
       'X-Android-Cert': '5E8F16062EA3CD2C4A0D547876BAA6F38CABF625',
     },
   },
   ios: IOS_KEY
-    ? { key: IOS_KEY, idHeaders: { 'X-Ios-Bundle-Identifier': 'com.anonymous.my-rn-app' } }
+    ? { key: IOS_KEY, idHeaders: { 'X-Ios-Bundle-Identifier': 'com.oofoo.shop' } }
     : null,
   default: null,
 });

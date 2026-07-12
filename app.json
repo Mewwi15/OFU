@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.my-rn-app"
+      "bundleIdentifier": "com.oofoo.shop"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +25,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.anonymous.myrnapp",
+      "package": "com.oofoo.shop",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
