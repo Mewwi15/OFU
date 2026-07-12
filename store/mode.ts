@@ -66,8 +66,9 @@ export const MIN_ORDER = 100;
 /** Flat parcel-shipping fee (online), waived above the threshold.
     MUST match shop_settings.online_fee (0048) — place_order recomputes there. */
 export const FLASH_FEE = 150;
-/** Order subtotal at/above which parcel shipping is free. */
-export const FLASH_FREE_MIN = 500;
+/** No free-shipping tier for parcels (owner decision) — every online order
+    pays the fee. Mirrors shop_settings.online_free_threshold = NULL (0049). */
+export const FLASH_FREE_MIN = Number.POSITIVE_INFINITY;
 
 /**
  * Fulfilment fee for a subtotal + mode — rider delivery fee (`delivery`) or
