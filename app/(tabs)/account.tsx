@@ -22,6 +22,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { avatarSource } from '@/lib/avatar';
+import {
+  cancelAccountDeletion,
+  hasPendingDeletionRequest,
+  requestAccountDeletion,
+} from '@/lib/data/account';
 import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
@@ -86,6 +91,7 @@ export default function ProfileScreen() {
   const logout = useAuth((s) => s.logout);
   const resetLock = useLock((s) => s.resetLock);
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
+  const [deletionPending, setDeletionPending] = useState(false);
   const chatUnread = useChat((s) => s.unread);
   const refreshChatUnread = useChat((s) => s.refreshUnread);
   const t = useT();
@@ -94,6 +100,9 @@ export default function ProfileScreen() {
     useCallback(() => {
       getAccountIdentity()
         .then(setIdentity)
+        .catch(() => {});
+      hasPendingDeletionRequest()
+        .then(setDeletionPending)
         .catch(() => {});
       void refreshChatUnread();
     }, [refreshChatUnread]),
@@ -137,6 +146,45 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: () => {
           void logout();
+        },
+      },
+    ]);
+  };
+
+  // Request-based deletion (App Store 5.1.1(v) requires in-app initiation;
+  // the shop processes it manually — see lib/data/account.ts).
+  const confirmDeletion = () => {
+    if (deletionPending) {
+      Alert.alert(t('account.deleteCancelTitle'), t('account.deleteCancelBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('account.deleteCancelCta'),
+          onPress: async () => {
+            try {
+              await cancelAccountDeletion();
+              setDeletionPending(false);
+              Alert.alert(t('account.deleteCancelled'));
+            } catch {
+              Alert.alert(t('account.deleteFailed'));
+            }
+          },
+        },
+      ]);
+      return;
+    }
+    Alert.alert(t('account.deleteConfirmTitle'), t('account.deleteConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('account.deleteConfirmCta'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await requestAccountDeletion();
+            setDeletionPending(true);
+            Alert.alert(t('account.deleteSentTitle'), t('account.deleteSentBody'));
+          } catch {
+            Alert.alert(t('account.deleteFailed'));
+          }
         },
       },
     ]);
@@ -279,6 +327,21 @@ export default function ProfileScreen() {
             <Image source={ICON.logout} style={styles.logoutIcon} contentFit="contain" />
             <Text style={styles.logoutText}>{t('account.logout')}</Text>
           </Pressable>
+
+          {/* Account deletion request — quiet text link (must stay findable
+              from the account page per store rules, but not shouty). */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              deletionPending ? t('account.deleteRequestPending') : t('account.deleteRequest')
+            }
+            onPress={confirmDeletion}
+            hitSlop={Spacing.sm}
+            style={styles.deleteLink}>
+            <Text variant="caption" style={styles.deleteLinkText}>
+              {deletionPending ? t('account.deleteRequestPending') : t('account.deleteRequest')}
+            </Text>
+          </Pressable>
         </Animated.View>
       </ScrollView>
     </View>
@@ -415,5 +478,14 @@ const styles = StyleSheet.create({
   logoutText: {
     ...Typography.button,
     color: Colors.dangerStrong,
+  },
+  deleteLink: {
+    alignSelf: 'center',
+    marginTop: Spacing.lg,
+    paddingVertical: Spacing.xs,
+  },
+  deleteLinkText: {
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });

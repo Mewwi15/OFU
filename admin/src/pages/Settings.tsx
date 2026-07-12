@@ -1,9 +1,14 @@
 import { RiBarcodeLine, RiCheckLine, RiPrinterLine } from '@remixicon/react';
-import { App, Alert, Button, Card, Input, Modal, Segmented, Space, Switch, Tag, Typography } from 'antd';
+import { App, Alert, Button, Card, Input, Modal, Popconfirm, Segmented, Space, Switch, Tag, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { Receipt, type ReceiptProps } from '../components/Receipt';
 import { apiError, getShopInfo, type ShopInfo } from '../lib/api';
+import {
+  completeDeletionRequest,
+  listDeletionRequests,
+  type DeletionRequest,
+} from '../lib/deletionRequests';
 import { contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Title, Text } = Typography;
@@ -40,11 +45,19 @@ export function Settings() {
   const [testOpen, setTestOpen] = useState(false);
   const [scan, setScan] = useState('');
   const [lastScan, setLastScan] = useState<string | null>(null);
+  const [delReqs, setDelReqs] = useState<DeletionRequest[]>([]);
+
+  const loadDeletionRequests = () =>
+    listDeletionRequests()
+      .then(setDelReqs)
+      .catch((e) => message.error(apiError(e)));
 
   useEffect(() => {
     void getShopInfo()
       .then(setShop)
       .catch((e) => message.error(apiError(e)));
+    void loadDeletionRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message]);
 
   return (
@@ -146,6 +159,59 @@ export function Settings() {
                 )}
               </div>
             </Space>
+          </Card>
+
+          {/* ── คำขอลบบัญชี (จากแอปลูกค้า — กติกา App Store / Play) ────── */}
+          <Card
+            title={
+              <Space>
+                คำขอลบบัญชี
+                {delReqs.some((r) => r.status === 'pending') ? (
+                  <Tag color="red">{delReqs.filter((r) => r.status === 'pending').length} รอดำเนินการ</Tag>
+                ) : null}
+              </Space>
+            }
+            size="small">
+            {delReqs.length === 0 ? (
+              <Text type="secondary">ยังไม่มีคำขอ — ลูกค้าส่งคำขอได้จากเมนูบัญชีในแอป</Text>
+            ) : (
+              <Space direction="vertical" size={10} className="w-full">
+                <Text type="secondary" className="text-xs">
+                  วิธีลบ: Supabase Dashboard → Authentication → ค้นอีเมล → Delete user
+                  แล้วกลับมากด "ลบแล้ว" (ต้องทำภายใน 7 วันตามที่แจ้งลูกค้า)
+                </Text>
+                {delReqs.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-[#2B2320]">{r.email_snapshot ?? '(ไม่มีอีเมล)'}</div>
+                      <Text type="secondary" className="text-xs">
+                        ขอเมื่อ {new Date(r.requested_at).toLocaleString('th-TH')}
+                      </Text>
+                    </div>
+                    {r.status === 'pending' ? (
+                      <Popconfirm
+                        title="ยืนยันว่าลบผู้ใช้ใน Supabase แล้ว?"
+                        okText="ลบแล้ว"
+                        cancelText="ยัง"
+                        onConfirm={() =>
+                          void completeDeletionRequest(r.id)
+                            .then(loadDeletionRequests)
+                            .then(() => message.success('บันทึกแล้ว'))
+                            .catch((e) => message.error(apiError(e)))
+                        }>
+                        <Button size="small" danger>
+                          ลบแล้ว
+                        </Button>
+                      </Popconfirm>
+                    ) : (
+                      <Tag color={r.status === 'done' ? 'green' : 'default'}>
+                        {r.status === 'done' ? 'เสร็จสิ้น' : 'ลูกค้ายกเลิก'}
+                      </Tag>
+                    )}
+                  </div>
+                ))}
+              </Space>
+            )}
           </Card>
         </Space>
       </div>
