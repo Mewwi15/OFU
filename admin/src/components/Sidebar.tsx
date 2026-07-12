@@ -38,6 +38,7 @@ export type NavItem = { to: string; label: string; Icon: typeof RiCashLine };
 export type NavGroup = { title: string; items: NavItem[] };
 
 /** Sidebar grouped into zones: on-site, online, catalog/app, overview. */
+// eslint-disable-next-line react/only-export-components -- nav data lives beside its component
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'หน้าร้าน',
@@ -74,11 +75,13 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+// eslint-disable-next-line react/only-export-components -- nav data lives beside its component
 export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 // Match on a path boundary so e.g. "/pos-sales" doesn't get captured by "/pos".
 const navMatches = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + '/');
 
+// eslint-disable-next-line react/only-export-components -- nav helper lives beside its component
 export const currentNavLabel = (pathname: string) =>
   NAV.find((n) => navMatches(pathname, n.to))?.label ?? '';
 

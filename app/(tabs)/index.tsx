@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductRail } from '@/components/product/ProductRail';
 import { CategoryIcon } from '@/components/shop/CategoryIcon';
-import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';

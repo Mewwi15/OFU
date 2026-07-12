@@ -20,6 +20,7 @@ type AuthCtx = {
 };
 
 const Ctx = createContext<AuthCtx>(null as unknown as AuthCtx);
+// eslint-disable-next-line react/only-export-components -- hook + provider are one module by design
 export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }: { children: ReactNode }) {

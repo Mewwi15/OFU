@@ -31,7 +31,6 @@ import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 import { useChat } from '@/store/chat';
-import { useLock } from '@/store/lock';
 
 /** อู้ฟู่ 3D clay account icons (assets/icon-src/b1–b9). */
 const ICON = {
@@ -89,7 +88,6 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
-  const resetLock = useLock((s) => s.resetLock);
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
   const [deletionPending, setDeletionPending] = useState(false);
   const chatUnread = useChat((s) => s.unread);

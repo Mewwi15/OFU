@@ -60,6 +60,8 @@ export function PosSales() {
   useEffect(() => {
     void load();
     getShopInfo().then(setShop).catch(() => {});
+    // mount-only fetch; load isn't memoized so listing it would refetch every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function openDetail(s: PosSale) {

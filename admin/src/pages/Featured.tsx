@@ -77,6 +77,8 @@ export function Featured() {
   }
   useEffect(() => {
     void load();
+    // mount-only fetch; load isn't memoized so listing it would refetch every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onReorder(next: FeaturedSection[]) {

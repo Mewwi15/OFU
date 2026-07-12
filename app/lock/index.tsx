@@ -45,7 +45,7 @@ export default function LockScreen() {
       cancelLabel: t('lock.usePin'),
     });
     if (res.success) unlock();
-  }, [unlock]);
+  }, [unlock, t]);
 
   // Probe biometric availability + auto-prompt once on mount when enabled.
   useEffect(() => {

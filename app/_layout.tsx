@@ -25,6 +25,13 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+/**
+ * Re-lock grace period. Locking on EVERY background made in-app detours
+ * require the PIN again: the image picker (slip/avatar) and the Google OAuth
+ * browser both background the app for a few seconds.
+ */
+const LOCK_GRACE_MS = 2 * 60 * 1000;
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     Mitr_300Light,
@@ -61,11 +68,6 @@ export default function RootLayout() {
     if (userId && hydrated) void ensurePinOwner(userId);
   }, [userId, hydrated, ensurePinOwner]);
 
-  // Re-lock when the app has been in the background for a while (screen-lock
-  // behaviour) — but with a grace period. Locking on EVERY background made
-  // in-app detours require the PIN again: the image picker (slip/avatar) and
-  // the Google OAuth browser both background the app for a few seconds.
-  const LOCK_GRACE_MS = 2 * 60 * 1000;
   const backgroundedAt = useRef<number | null>(null);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {

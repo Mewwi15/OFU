@@ -61,6 +61,8 @@ export function Banners() {
   }
   useEffect(() => {
     void load();
+    // mount-only fetch; load isn't memoized so listing it would refetch every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onReorder(placement: BannerPlacement, next: Banner[]) {

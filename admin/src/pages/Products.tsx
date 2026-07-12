@@ -88,6 +88,8 @@ export function Products() {
   }
   useEffect(() => {
     void load();
+    // mount-only fetch; load isn't memoized so listing it would refetch every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Scan-to-intake: with no modal open, a barcode scan looks the code up in the
@@ -411,7 +413,7 @@ function ProductModal({
   //     field name) and write the full clean code into the barcode field.
   useEffect(() => {
     // Only chars a scanner can emit take part; Thai typing is never touched.
-    const SCAN_CHAR = /^[0-9A-Za-z._\-]$/;
+    const SCAN_CHAR = /^[0-9A-Za-z._-]$/;
     const buf = { chars: '', last: 0, fast: false };
     // Chars that reached a focused input during the current sequence (let-through).
     let leaked: { el: HTMLElement; key: string }[] = [];

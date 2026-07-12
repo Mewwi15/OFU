@@ -54,7 +54,7 @@ export default function LockSetupScreen() {
         setBioLabel(isFace ? 'Face ID' : t('lock.fingerprint'));
       }
     })();
-  }, []);
+  }, [t]);
 
   // Drive the two PIN steps as the entry fills up.
   useEffect(() => {
