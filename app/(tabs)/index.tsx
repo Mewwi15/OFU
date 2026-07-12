@@ -33,24 +33,12 @@ import { useShop } from '@/store/shop';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
 const TAB_BAR_CLEARANCE = 110;
-/** Auto-rotating hero banner slides. */
-const BANNER_SLIDES = [
-  {
-    id: 'b1',
-    image: 'https://picsum.photos/seed/oofoo-promo1/900/600',
-    titleKey: 'home.banner1Title',
-  },
-  {
-    id: 'b2',
-    image: 'https://picsum.photos/seed/oofoo-promo2/900/600',
-    titleKey: 'home.banner2Title',
-  },
-  {
-    id: 'b3',
-    image: 'https://picsum.photos/seed/oofoo-promo3/900/600',
-    titleKey: 'home.banner3Title',
-  },
-];
+/**
+ * Fallback slide shown until the owner publishes home banners (admin แบนเนอร์
+ * page) — the local brand art, same asset as the catalog hero. Never network
+ * placeholders here: this is the first thing a customer sees.
+ */
+const FALLBACK_SLIDES = [{ id: 'brand', image: require('../../assets/images/braner.png') }];
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
 
@@ -79,10 +67,10 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [reloadCatalog]);
   const homeBanners = useCatalog((s) => s.banners).filter((b) => b.placement === 'home');
-  // Admin-managed home banners when present; otherwise the built-in fallback slides.
+  // Admin-managed home banners when present; otherwise the local brand slide.
   const slides = homeBanners.length
-    ? homeBanners.map((b) => ({ id: b.id, image: b.image, title: b.title ?? '' }))
-    : BANNER_SLIDES.map((b) => ({ id: b.id, image: b.image, title: t(b.titleKey) }));
+    ? homeBanners.map((b) => ({ id: b.id, image: { uri: b.image } as number | { uri: string } }))
+    : FALLBACK_SLIDES;
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);
   const bestsellerIds = useCatalog((s) => s.bestsellerIds);
@@ -199,7 +187,7 @@ export default function HomeScreen() {
               {slides.map((slide) => (
                 <View key={slide.id} style={{ width: bannerWidth, height: '100%' }}>
                   <Image
-                    source={{ uri: slide.image }}
+                    source={slide.image}
                     style={StyleSheet.absoluteFill}
                     contentFit="cover"
                     transition={300}
@@ -216,11 +204,13 @@ export default function HomeScreen() {
                 pointerEvents="none"
               />
             ) : null}
-            <View style={styles.dots} pointerEvents="none">
-              {slides.map((slide, i) => (
-                <View key={slide.id} style={[styles.dot, i === activeSlide && styles.dotActive]} />
-              ))}
-            </View>
+            {slides.length > 1 ? (
+              <View style={styles.dots} pointerEvents="none">
+                {slides.map((slide, i) => (
+                  <View key={slide.id} style={[styles.dot, i === activeSlide && styles.dotActive]} />
+                ))}
+              </View>
+            ) : null}
           </View>
         </View>
 

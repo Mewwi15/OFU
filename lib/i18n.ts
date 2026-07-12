@@ -104,9 +104,6 @@ const th: Dict = {
   'legal.s4.body':
     'ร้านอู้ฟู่ · โทร 02-000-0000 เปิดทุกวัน 24 ชั่วโมง สำหรับคำถามเรื่องข้อมูลส่วนบุคคล ติดต่อเจ้าหน้าที่คุ้มครองข้อมูลได้ที่ช่องทางเดียวกัน',
 
-  'home.banner1Title': 'ลดสูงสุด 40%\nช้อปเลยวันนี้!',
-  'home.banner2Title': 'ส่งฟรี!\nเมื่อสั่งครบ 200฿',
-  'home.banner3Title': 'ของสดใหม่ทุกวัน\nคัดพิเศษเพื่อคุณ',
   'home.shopNow': 'ช้อปเลย',
   'home.changeAddress': 'เปลี่ยนที่อยู่จัดส่ง',
   'home.deliverTo': 'จัดส่งไปที่',
@@ -608,9 +605,6 @@ const en: Dict = {
   'legal.s4.body':
     'Oofoo · 02-000-0000, open 24 hours every day. For data-privacy questions, contact our data protection officer through the same channel.',
 
-  'home.banner1Title': 'Up to 40% off\nShop today!',
-  'home.banner2Title': 'Free delivery!\nOn orders over 200฿',
-  'home.banner3Title': 'Fresh every day\nHand-picked for you',
   'home.shopNow': 'Shop now',
   'home.changeAddress': 'Change delivery address',
   'home.deliverTo': 'Deliver to',
