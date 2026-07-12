@@ -5,6 +5,7 @@
  */
 
 import type { Session } from '@supabase/supabase-js';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -79,6 +80,36 @@ export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<
     return true;
   }
   return false;
+}
+
+/**
+ * Native Sign in with Apple (iOS only) — App Store guideline 4.8 requires it
+ * alongside Google login. Uses the OS account sheet, then exchanges the
+ * identity token directly (signInWithIdToken — no browser and no nonce; the
+ * nonce is only for the web JS flow per Supabase's Apple guide). The auth
+ * store's onAuthStateChange picks up the session like every other sign-in.
+ * Requires the bundle id (com.oofoo.shop) in the Apple provider's Client IDs
+ * in Supabase. Returns false if the user dismissed the sheet.
+ */
+export async function signInWithAppleNative(): Promise<boolean> {
+  try {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+    if (!credential.identityToken) throw new Error('NO_IDENTITY_TOKEN');
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: 'apple',
+      token: credential.identityToken,
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return false; // user dismissed
+    throw e;
+  }
 }
 
 export type Profile = {

@@ -2,14 +2,17 @@
  * Login / register — `/login`.
  *
  * Cost-free auth (no SMS): email + password with a 6-digit email verification
- * code, plus Google social sign-in. Two modes (sign in / sign up); signing up
- * moves to a verify step where the emailed code is entered. PDPA consent line
- * per product requirements. Tokens-only, zero emoji.
+ * code, plus Google social sign-in — and, on iOS, native Sign in with Apple
+ * (guideline 4.8: mandatory once any third-party login exists). Two modes
+ * (sign in / sign up); signing up moves to a verify step where the emailed
+ * code is entered. PDPA consent line per product requirements. Tokens-only,
+ * zero emoji.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -25,7 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { authRepo, signInWithOAuthProvider } from '@/lib/data/auth';
+import { authRepo, signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { useAuth } from '@/store/auth';
 
@@ -54,7 +57,16 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [socialBusy, setSocialBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Native Apple sheet availability (iOS 13+ device/sim; always false on Android).
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const codeRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    AppleAuthentication.isAvailableAsync()
+      .then(setAppleAvailable)
+      .catch(() => {});
+  }, []);
 
   const formValid =
     emailValid(email) && password.length >= 6 && (mode === 'signin' || password === confirm);
@@ -115,6 +127,18 @@ export default function LoginScreen() {
     setSocialBusy(true);
     try {
       await signInWithOAuthProvider('google');
+    } catch {
+      Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
+    } finally {
+      setSocialBusy(false);
+    }
+  };
+
+  const onApple = async () => {
+    if (socialBusy) return;
+    setSocialBusy(true);
+    try {
+      await signInWithAppleNative();
     } catch {
       Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
     } finally {
@@ -246,6 +270,18 @@ export default function LoginScreen() {
               </Text>
               <View style={styles.divider} />
             </View>
+            {/* Apple first (its own native, brand-compliant button — renders a
+                localized "ดำเนินการต่อด้วย Apple"); guideline 4.8 wants it at
+                least as prominent as other third-party logins. */}
+            {appleAvailable ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={26}
+                onPress={onApple}
+                style={styles.appleButton}
+              />
+            ) : null}
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel={t('login.continueGoogle')}
@@ -412,6 +448,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   socialBordered: { borderWidth: 1, borderColor: Colors.border },
+  /* Native Apple button — must carry explicit dimensions to render; height and
+     pill radius mirror the Google row below it. */
+  appleButton: {
+    height: 52,
+    width: '100%',
+    marginBottom: Spacing.md,
+  },
   socialText: { ...Typography.button },
 
   /* Verify (reused OTP cells) */
