@@ -34,8 +34,8 @@ export type ModeMeta = {
   label: string;
   /** One-line tagline under the label. */
   tagline: string;
-  /** Ionicons glyph name. */
-  icon: string;
+  /** Owner's 3D clay art (same family as the parcel-tracking stages). */
+  image: number;
   /** Not selectable yet — rendered dimmed with an "เร็วๆ นี้" badge. */
   comingSoon?: boolean;
 };
@@ -45,14 +45,14 @@ export const MODE_META: Record<ShopMode, ModeMeta> = {
     key: 'delivery',
     label: 'เดลิเวอรี่',
     tagline: DELIVERY_COMING_SOON ? 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้' : 'สั่งเลย ส่งถึงบ้าน',
-    icon: 'bicycle',
+    image: require('@/assets/images/parcel/parcel-4.png') as number,
     comingSoon: DELIVERY_COMING_SOON,
   },
   online: {
     key: 'online',
     label: 'ออนไลน์',
     tagline: 'อู้ฟู่ส่งพัสดุทั่วไทย',
-    icon: 'cube',
+    image: require('@/assets/images/parcel/parcel-1.png') as number,
   },
 };
 

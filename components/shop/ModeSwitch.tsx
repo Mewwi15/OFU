@@ -12,6 +12,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Alert, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
@@ -50,7 +51,6 @@ export function ModeSwitch({ compact = false, style }: Props) {
       <View style={[styles.track, style]}>
         {MODES.map((m) => {
           const active = m.key === mode;
-          const icon = m.icon as keyof typeof Ionicons.glyphMap;
           const tint = active ? Colors.primaryStrong : Colors.textMuted;
           return (
             <Pressable
@@ -62,7 +62,12 @@ export function ModeSwitch({ compact = false, style }: Props) {
               accessibilityLabel={m.label}
               onPress={() => onPick(m)}
               style={[styles.segment, active && styles.segmentActive]}>
-              <Ionicons name={icon} size={18} color={tint} style={m.comingSoon && styles.dim} />
+              <Image
+                source={m.image}
+                style={[styles.segmentArt, (m.comingSoon || !active) && styles.dim]}
+                contentFit="contain"
+                accessibilityIgnoresInvertColors
+              />
               <Text style={[Typography.button, { color: tint }, m.comingSoon && styles.dim]}>
                 {m.label}
               </Text>
@@ -84,7 +89,6 @@ export function ModeSwitch({ compact = false, style }: Props) {
       {MODES.map((m) => {
         const active = m.key === mode;
         const accent = ACCENT[m.key];
-        const icon = m.icon as keyof typeof Ionicons.glyphMap;
         return (
           <Pressable
             key={m.key}
@@ -100,7 +104,12 @@ export function ModeSwitch({ compact = false, style }: Props) {
                 { backgroundColor: accent.tint },
                 m.comingSoon && styles.dim,
               ]}>
-              <Ionicons name={icon} size={22} color={accent.color} />
+              <Image
+                source={m.image}
+                style={styles.cardArt}
+                contentFit="contain"
+                accessibilityIgnoresInvertColors
+              />
             </View>
             <View style={styles.cardText}>
               <Text variant="subtitle" style={m.comingSoon && styles.dim}>
@@ -148,6 +157,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     ...Shadow.card,
   },
+  segmentArt: {
+    width: 24,
+    height: 24,
+  },
 
   /* Large cards (home). */
   row: {
@@ -176,6 +189,10 @@ const styles = StyleSheet.create({
   },
   cardText: {
     flex: 1,
+  },
+  cardArt: {
+    width: 34,
+    height: 34,
   },
   check: {
     position: 'absolute',
