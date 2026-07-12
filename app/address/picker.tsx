@@ -918,6 +918,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     ...Shadow.float,
+    // Cap the sheet so the map keeps a usable share of the screen: the online
+    // (parcel) form is tall enough to swallow it otherwise. The inner
+    // ScrollView takes over once the fields don't fit.
+    maxHeight: '58%',
   },
   sheetContent: {
     paddingHorizontal: Spacing.lg,
