@@ -28,10 +28,12 @@ import {
   approveSlip,
   cancelOrder,
   getOrderItems,
+  getParcelTracking,
   getSlipUrl,
   listOrders,
   nextStatus,
   rejectSlip,
+  setOrderTrackingNo,
   type CancelReason,
   type Order,
   type OrderItem,
@@ -366,11 +368,17 @@ function OrderDrawer({
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // Parcel tracking number (online orders): shown in the details, typed in the
+  // ship modal when advancing to picked_up (customer push carries it — 0046).
+  const [trackingNo, setTrackingNo] = useState<string | null>(null);
+  const [shipOpen, setShipOpen] = useState(false);
+  const [shipNo, setShipNo] = useState('');
 
   useEffect(() => {
     if (!order) {
       setItems([]);
       setSlipUrl(null);
+      setTrackingNo(null);
       return;
     }
     let alive = true;
@@ -379,6 +387,10 @@ function OrderDrawer({
       try {
         const its = await getOrderItems(order.id);
         if (alive) setItems(its);
+        if (order.shop_mode === 'online') {
+          const track = await getParcelTracking(order.id).catch(() => null);
+          if (alive) setTrackingNo(track);
+        }
         if (isSlipPending(order)) {
           const url = await getSlipUrl(order.id).catch(() => null);
           if (alive) setSlipUrl(url);
@@ -426,6 +438,9 @@ function OrderDrawer({
         <Descriptions.Item label="โทร">{order.ship_phone ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="ที่อยู่">{order.ship_address_text ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="การชำระ">{paymentStatusTag(order.payment_status)}</Descriptions.Item>
+        {order.shop_mode === 'online' ? (
+          <Descriptions.Item label="เลขพัสดุ">{trackingNo ?? '—'}</Descriptions.Item>
+        ) : null}
         <Descriptions.Item label="เวลา">{fmtTime(order.placed_at)}</Descriptions.Item>
       </Descriptions>
 
@@ -518,21 +533,36 @@ function OrderDrawer({
       <Divider style={{ margin: '20px 0 12px' }} />
       <Space direction="vertical" style={{ width: '100%' }}>
         {next ? (
-          <Popconfirm
-            title="เลื่อนสถานะถัดไป?"
-            description={`ไปเป็น “${ORDER_STATUS[next].label}”`}
-            okText="ยืนยัน"
-            cancelText="ยกเลิก"
-            onConfirm={() =>
-              void runAction(
-                () => advanceOrder(order.id, next, order.row_version),
-                'เลื่อนสถานะแล้ว',
-              )
-            }>
-            <Button type="primary" block loading={busy}>
+          next === 'picked_up' ? (
+            /* Shipping an online order — collect the tracking number first so
+               the customer's picked_up push carries it (0046). */
+            <Button
+              type="primary"
+              block
+              loading={busy}
+              onClick={() => {
+                setShipNo(trackingNo ?? '');
+                setShipOpen(true);
+              }}>
               เลื่อนสถานะถัดไป → {ORDER_STATUS[next].label}
             </Button>
-          </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="เลื่อนสถานะถัดไป?"
+              description={`ไปเป็น “${ORDER_STATUS[next].label}”`}
+              okText="ยืนยัน"
+              cancelText="ยกเลิก"
+              onConfirm={() =>
+                void runAction(
+                  () => advanceOrder(order.id, next, order.row_version),
+                  'เลื่อนสถานะแล้ว',
+                )
+              }>
+              <Button type="primary" block loading={busy}>
+                เลื่อนสถานะถัดไป → {ORDER_STATUS[next].label}
+              </Button>
+            </Popconfirm>
+          )
         ) : null}
         {!isTerminal(order) ? (
           <Button danger block loading={busy} onClick={() => setCancelOpen(true)}>
@@ -556,6 +586,52 @@ function OrderDrawer({
           );
         }}
       />
+      <Modal
+        open={shipOpen}
+        title="ส่งพัสดุเข้าขนส่ง"
+        onCancel={() => setShipOpen(false)}
+        footer={[
+          <Button
+            key="skip"
+            loading={busy}
+            onClick={async () => {
+              setShipOpen(false);
+              await runAction(
+                () => advanceOrder(order.id, 'picked_up', order.row_version),
+                'เลื่อนสถานะแล้ว (ยังไม่ใส่เลขพัสดุ)',
+              );
+            }}>
+            เลื่อนโดยยังไม่ใส่เลข
+          </Button>,
+          <Button
+            key="ship"
+            type="primary"
+            disabled={!shipNo.trim()}
+            loading={busy}
+            onClick={async () => {
+              const no = shipNo.trim();
+              setShipOpen(false);
+              await runAction(async () => {
+                await setOrderTrackingNo(order.id, no);
+                await advanceOrder(order.id, 'picked_up', order.row_version);
+              }, 'บันทึกเลขพัสดุและเลื่อนสถานะแล้ว');
+              setTrackingNo(no);
+            }}>
+            บันทึกและเลื่อนสถานะ
+          </Button>,
+        ]}>
+        <Text type="secondary">
+          กรอกเลขพัสดุจากใบเสร็จขนส่ง ลูกค้าจะได้รับแจ้งเตือนพร้อมเลขพัสดุนี้ทันที
+        </Text>
+        <Input
+          className="mt-3"
+          placeholder="เช่น TH0116ABC1234"
+          value={shipNo}
+          maxLength={40}
+          autoFocus
+          onChange={(e) => setShipNo(e.target.value)}
+        />
+      </Modal>
       <ReasonModal
         open={cancelOpen}
         title="ยกเลิกออเดอร์"

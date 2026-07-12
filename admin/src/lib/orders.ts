@@ -102,6 +102,17 @@ export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
   });
 }
 
+/** Tracking number of an online order's parcel shipment (null until shipped). */
+export async function getParcelTracking(orderId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('parcel_shipments')
+    .select('tracking_no')
+    .eq('order_id', orderId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { tracking_no: string | null } | null)?.tracking_no ?? null;
+}
+
 /** Resolve a signed URL for the active payment slip image (bucket is private). */
 export async function getSlipUrl(orderId: string): Promise<string | null> {
   const { data, error } = await supabase
@@ -156,6 +167,11 @@ export const rejectSlip = async (orderId: string, reason: SlipRejectReason, note
     p_note: note ?? undefined,
   });
 };
+
+/** Admin types the courier receipt's tracking number when the parcel ships
+ *  (set_order_tracking_no, 0046). The picked_up push then carries the number. */
+export const setOrderTrackingNo = (orderId: string, trackingNo: string) =>
+  rpc('set_order_tracking_no', { p_order_id: orderId, p_tracking_no: trackingNo });
 
 export const advanceOrder = (orderId: string, toStatus: OrderStatus, rowVersion?: number) =>
   rpc('advance_order', {
