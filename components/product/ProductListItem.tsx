@@ -8,7 +8,6 @@
  * details route.
  */
 
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import {
@@ -123,20 +122,13 @@ export function ProductListItem({
               {size}
             </Text>
           ) : null
-        ) : (
+        ) : product.subtitle ? (
           <View style={styles.metaRow}>
-            <Ionicons name="star" size={13} color={Colors.star} />
-            <Text style={styles.metaText}>{product.rating.toFixed(1)}</Text>
-            {product.subtitle ? (
-              <>
-                <Text style={styles.dot}>·</Text>
-                <Text style={styles.metaTextMuted} numberOfLines={1}>
-                  {product.subtitle}
-                </Text>
-              </>
-            ) : null}
+            <Text style={styles.metaTextMuted} numberOfLines={1}>
+              {product.subtitle}
+            </Text>
           </View>
-        )}
+        ) : null}
 
         <Text style={styles.price}>{money(product.price)}</Text>
       </View>
@@ -203,19 +195,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  metaText: {
-    fontFamily: 'Mitr_400Regular',
-    fontSize: 13,
-    color: Colors.text,
-  },
   metaTextMuted: {
     flexShrink: 1,
     fontSize: 13,
     color: Colors.textMuted,
-  },
-  dot: {
-    color: Colors.textMuted,
-    fontSize: 13,
   },
   price: {
     ...Typography.price,

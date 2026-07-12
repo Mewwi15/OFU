@@ -17,7 +17,6 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
-import { RatingStars } from '@/components/ui/RatingStars';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -142,15 +141,16 @@ export default function ProductDetailsScreen() {
                 {product.category}
               </Text>
             </View>
-            <RatingStars rating={product.rating} size={15} showValue />
           </View>
 
           <Text variant="title" style={styles.name}>
             {product.name}
           </Text>
-          <Text variant="body" style={[styles.subtitle, { color: Colors.textMuted }]}>
-            {product.subtitle}
-          </Text>
+          {product.subtitle ? (
+            <Text variant="body" style={[styles.subtitle, { color: Colors.textMuted }]}>
+              {product.subtitle}
+            </Text>
+          ) : null}
 
           <Text style={styles.price}>{money(product.price)}</Text>
 
