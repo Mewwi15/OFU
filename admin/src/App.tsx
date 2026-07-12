@@ -10,6 +10,7 @@ import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
 import { Chat } from './pages/Chat';
 import { DeleteAccountInfo } from './pages/DeleteAccountInfo';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
@@ -45,8 +46,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      {/* Public — Play Data Safety requires a web-visible deletion path. */}
+      {/* Public — store compliance pages (Play Data Safety / App Store links). */}
       <Route path="/delete-account" element={<DeleteAccountInfo />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route
         element={
           <Protected>
