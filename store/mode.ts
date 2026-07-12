@@ -63,8 +63,9 @@ export const FREE_DELIVERY_MIN = 200;
 /** Minimum subtotal required to place a delivery order. */
 export const MIN_ORDER = 100;
 
-/** Flat parcel-shipping fee (online), waived above the threshold. */
-export const FLASH_FEE = 40;
+/** Flat parcel-shipping fee (online), waived above the threshold.
+    MUST match shop_settings.online_fee (0048) — place_order recomputes there. */
+export const FLASH_FEE = 150;
 /** Order subtotal at/above which parcel shipping is free. */
 export const FLASH_FREE_MIN = 500;
 
