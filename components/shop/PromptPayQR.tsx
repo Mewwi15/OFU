@@ -3,10 +3,13 @@
  *
  * Renders a scannable PromptPay QR (encoding the shop's receiving id + the exact
  * order amount) inside a clean white slip: a coral header band, the QR in a soft
- * frame, the prefilled amount, and the account name + number with a copy action.
+ * frame, the prefilled amount, and the account name + number with copy and
+ * save-image actions. Saving writes the QR PNG to the photo library (add-only
+ * permission) so the customer can pick it from the gallery inside their banking
+ * app — the QR embeds its own quiet zone so gallery scans decode reliably.
  *
- * Presentational only — the parent owns clipboard + toast via `onCopyNumber`.
- * Tokens-only, zero emoji.
+ * The parent owns clipboard + toast via `onCopyNumber`; saving is self-contained
+ * here (it owns the QR ref). Tokens-only, zero emoji.
  *
  * Note: the header reads "พร้อมเพย์ · Thai QR Payment" as text rather than the
  * official PromptPay/Thai-QR logo artwork. Drop the real logo asset in here
@@ -14,7 +17,10 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { useRef, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -48,6 +54,30 @@ type Props = {
 export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props) {
   const t = useT();
   const payload = promptPayPayload(target, amount);
+  // react-native-qrcode-svg exposes toDataURL on the underlying svg element.
+  const qrRef = useRef<{ toDataURL: (cb: (b64: string) => void) => void } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const saveImage = async () => {
+    if (saving || !qrRef.current) return;
+    setSaving(true);
+    try {
+      const { granted } = await MediaLibrary.requestPermissionsAsync(true); // add-only
+      if (!granted) {
+        Alert.alert(t('qr.savePermissionTitle'), t('qr.savePermissionBody'));
+        return;
+      }
+      const b64 = await new Promise<string>((resolve) => qrRef.current!.toDataURL(resolve));
+      const file = new File(Paths.cache, `oofoo-qr-${Date.now()}.png`);
+      file.write(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+      await MediaLibrary.saveToLibraryAsync(file.uri);
+      Alert.alert(t('qr.savedTitle'), t('qr.savedBody'));
+    } catch {
+      Alert.alert(t('qr.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -66,6 +96,10 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
             color={Colors.text}
             backgroundColor={Colors.surface}
             ecl="M"
+            quietZone={12}
+            getRef={(c) => {
+              qrRef.current = c;
+            }}
           />
         </View>
         <Text style={styles.amountLabel}>{t('qr.amountDue')}</Text>
@@ -83,14 +117,26 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
           </Text>
           <Text style={styles.accountNo}>{formatTarget(target)}</Text>
         </View>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel={t('qr.copyNumberA11y')}
-          onPress={onCopyNumber}
-          style={styles.copyBtn}>
-          <Ionicons name="copy-outline" size={16} color={Colors.primaryStrong} />
-          <Text style={styles.copyText}>{t('qr.copy')}</Text>
-        </PressableScale>
+        <View style={styles.actionCol}>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('qr.copyNumberA11y')}
+            onPress={onCopyNumber}
+            style={styles.copyBtn}>
+            <Ionicons name="copy-outline" size={16} color={Colors.primaryStrong} />
+            <Text style={styles.copyText}>{t('qr.copy')}</Text>
+          </PressableScale>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('qr.saveA11y')}
+            onPress={() => void saveImage()}
+            style={styles.copyBtn}>
+            <Ionicons name="download-outline" size={16} color={Colors.primaryStrong} />
+            <Text style={styles.copyText}>
+              {saving ? t('qr.saving') : t('qr.save')}
+            </Text>
+          </PressableScale>
+        </View>
       </View>
     </View>
   );
@@ -161,9 +207,14 @@ const styles = StyleSheet.create({
     color: Colors.primaryStrong,
     letterSpacing: 0.5,
   },
+  actionCol: {
+    gap: Spacing.sm,
+    alignItems: 'stretch',
+  },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
