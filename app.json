@@ -2,7 +2,7 @@
   "expo": {
     "name": "OFU",
     "slug": "my-rn-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myrnapp",
@@ -26,7 +26,8 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.oofoo.shop",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 2
     },
     "web": {
       "output": "static",
