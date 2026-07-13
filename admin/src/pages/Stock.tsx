@@ -16,6 +16,7 @@
 
 import {
   RiAddLine,
+  RiArrowDownSLine,
   RiAlarmWarningLine,
   RiDeleteBinLine,
   RiDownload2Line,
@@ -31,6 +32,7 @@ import {
   Button,
   Card,
   Col,
+  Dropdown,
   Empty,
   Input,
   InputNumber,
@@ -44,7 +46,6 @@ import {
   Table,
   Tabs,
   Tag,
-  Tooltip,
   Typography,
   Upload,
 } from 'antd';
@@ -444,33 +445,32 @@ export function Stock() {
       title: '',
       key: 'actions',
       fixed: 'right',
-      width: 170,
+      width: 110,
       render: (_, i) => (
-        <Space size={4}>
-          <Tooltip title="เติมสต๊อก (รับของ)">
-            <Button size="small" type="primary" ghost icon={<RiAddLine className="w-4 h-4" />}
-              onClick={() => openAction('receive', i)} />
-          </Tooltip>
-          <Tooltip title="ปรับ +/- (ของเสีย/แก้ยอด)">
-            <Button size="small" icon={<RiPencilLine className="w-4 h-4" />}
-              onClick={() => openAction('adjust', i)} />
-          </Tooltip>
-          <Tooltip title="นับสต๊อก (ตั้งค่าคงเหลือ)">
-            <Button size="small" icon={<RiScales3Line className="w-4 h-4" />}
-              onClick={() => openAction('set', i)} />
-          </Tooltip>
-          <Tooltip title="เกณฑ์เตือนใกล้หมด">
-            <Button size="small" icon={<RiAlarmWarningLine className="w-4 h-4" />}
-              onClick={() => openAction('threshold', i)} />
-          </Tooltip>
-          <Tooltip title="ประวัติของชิ้นนี้">
-            <Button size="small" icon={<RiHistoryLine className="w-4 h-4" />}
-              onClick={() => {
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: [
+              { key: 'receive', icon: <RiAddLine className="w-4 h-4" />, label: 'เติมสต๊อก (รับของ)' },
+              { key: 'adjust', icon: <RiPencilLine className="w-4 h-4" />, label: 'ปรับ +/- (ของเสีย/แก้ยอด)' },
+              { key: 'set', icon: <RiScales3Line className="w-4 h-4" />, label: 'นับสต๊อก (ตั้งค่าคงเหลือ)' },
+              { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'เกณฑ์เตือนใกล้หมด' },
+              { type: 'divider' },
+              { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ประวัติของชิ้นนี้' },
+            ],
+            onClick: ({ key }) => {
+              if (key === 'history') {
                 setVariantFilter({ id: i.variantId, label: itemLabel(i) });
                 setTab('history');
-              }} />
-          </Tooltip>
-        </Space>
+                return;
+              }
+              openAction(key as Action, i);
+            },
+          }}>
+          <Button size="small">
+            จัดการ <RiArrowDownSLine className="w-4 h-4 inline-block align-text-bottom" />
+          </Button>
+        </Dropdown>
       ),
     },
   ];
