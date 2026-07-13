@@ -1,54 +1,76 @@
 /**
- * สต๊อก — the stock workspace (owner request 2026-07-13).
+ * สต๊อก — full stock workspace (owner request 2026-07-13 "มีให้หมดทุกฟังก์ชั่น").
  *
- *  • รับของเข้า : goods-in. Search by name or scan a barcode (scanner types +
- *    Enter into the same box), build the receiving list, save once — each line
- *    lands in the ledger with the dedicated 'receive' reason.
- *  • ประวัติ    : the stock_movements ledger (who/what/when, in/out, order no).
- *  • ใกล้หมด    : variants at/below their low-stock threshold, one tap to put
- *    them on the receiving list. LINE alerts fire from the DB trigger (0055).
+ *  • ภาพรวม   : every variant in one readable table — photo, barcode/SKU,
+ *    price/cost, on-hand / reserved / sellable, threshold, stock value, status.
+ *    Row actions: เติม (receive), ปรับ (±), นับ (absolute set), เกณฑ์เตือน,
+ *    ประวัติ (jumps to the filtered ledger). Summary cards + search + filters.
+ *    Export = Excel-compatible CSV (BOM). Import = CSV in two modes:
+ *    นับสต๊อก (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock),
+ *    matched by variant_id → barcode → SKU → ชื่อเต็ม, with a preview first.
+ *  • รับของเข้า: scan/search → receiving list → one save ('receive' ledger).
+ *  • ประวัติ   : stock_movements ledger, filter by type or a single product.
+ *
+ * LINE low-stock alerts fire from the DB trigger (0055) — nothing to do here.
  */
 
 import {
   RiAddLine,
   RiAlarmWarningLine,
   RiDeleteBinLine,
+  RiDownload2Line,
   RiHistoryLine,
   RiInboxArchiveLine,
+  RiPencilLine,
+  RiScales3Line,
+  RiUpload2Line,
 } from '@remixicon/react';
 import {
   App,
+  Avatar,
   Button,
   Card,
+  Col,
   Empty,
   Input,
   InputNumber,
+  Modal,
+  Radio,
+  Row,
+  Segmented,
   Select,
   Space,
+  Statistic,
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
+  Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
+  adjustStock,
   apiError,
   listProducts,
   listStockMovements,
   receiveStock,
+  setStockQty,
   type Product,
   type StockMovement,
 } from '../lib/api';
 
 const { Title, Text } = Typography;
 
+const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
 /** Ledger reason → Thai label + tag colour. */
 const REASONS: Record<string, { label: string; color: string }> = {
   receive: { label: 'รับของเข้า', color: 'green' },
-  admin_adjust: { label: 'ปรับสต๊อก', color: 'blue' },
+  admin_adjust: { label: 'ปรับ/นับสต๊อก', color: 'blue' },
   pos_sale: { label: 'ขายหน้าร้าน', color: 'volcano' },
   pos_refund: { label: 'คืนสินค้า POS', color: 'purple' },
   reserve_placed: { label: 'จอง (ออเดอร์ใหม่)', color: 'gold' },
@@ -62,108 +84,513 @@ const REASONS: Record<string, { label: string; color: string }> = {
 };
 const reasonMeta = (r: string) => REASONS[r] ?? { label: r, color: 'default' };
 
-/** One row on the receiving list. */
-type ReceiveLine = {
+/** One sellable item (variant) flattened with its product facts. */
+type Item = {
   variantId: string;
+  productId: string;
   productName: string;
   size: string | null;
-  currentStock: number;
-  qty: number;
-};
-
-type VariantOption = {
-  variantId: string;
-  productName: string;
-  size: string | null;
+  category: string;
+  image: string | null;
   barcode: string | null;
+  sku: string | null;
+  unit: string | null;
+  price: number;
+  cost: number | null;
   stock: number;
+  reserved: number;
+  available: number;
   threshold: number;
 };
 
-function flattenVariants(products: Product[]): VariantOption[] {
-  return products.flatMap((p) =>
-    p.product_variants.map((v) => ({
+function flatten(products: Product[]): Item[] {
+  return products.flatMap((p) => {
+    const image =
+      p.product_images.find((i) => i.is_primary)?.storage_path ??
+      p.product_images[0]?.storage_path ??
+      null;
+    return p.product_variants.map((v) => ({
       variantId: v.id,
+      productId: p.id,
       productName: p.name,
       size: v.size,
+      category: p.categories?.name ?? '—',
+      image,
       barcode: v.barcode ?? null,
+      sku: v.sku ?? null,
+      unit: v.unit ?? null,
+      price: v.price,
+      cost: v.cost_price ?? null,
       stock: v.stock_qty,
+      reserved: v.reserved_qty,
+      available: v.available_qty,
       threshold: v.low_stock_threshold,
-    })),
-  );
+    }));
+  });
 }
 
-const variantLabel = (v: { productName: string; size: string | null }) =>
-  v.productName + (v.size ? ` (${v.size})` : '');
+const itemLabel = (i: { productName: string; size: string | null }) =>
+  i.productName + (i.size ? ` (${i.size})` : '');
+
+const statusOf = (i: Item): 'out' | 'low' | 'ok' =>
+  i.stock === 0 ? 'out' : i.stock <= i.threshold ? 'low' : 'ok';
+
+/* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
+
+const CSV_HEAD = [
+  'ชื่อสินค้า', 'ขนาด', 'บาร์โค้ด', 'SKU', 'หมวดหมู่', 'หน่วย',
+  'ราคาขาย', 'ต้นทุน', 'คงเหลือ', 'จอง', 'พร้อมขาย', 'เกณฑ์เตือน',
+  'มูลค่าทุน', 'variant_id',
+];
+
+function csvCell(v: unknown): string {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportCsv(items: Item[]) {
+  const rows = items.map((i) => [
+    i.productName, i.size ?? '', i.barcode ?? '', i.sku ?? '', i.category, i.unit ?? '',
+    i.price, i.cost ?? '', i.stock, i.reserved, i.available, i.threshold,
+    i.cost != null ? i.cost * i.stock : '', i.variantId,
+  ]);
+  const csv = [CSV_HEAD, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `stock-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/** Tiny CSV parser (quoted fields, CRLF/CR/LF). Good enough for our template. */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQ = false;
+  const src = text.replace(/^﻿/, '');
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inQ) {
+      if (c === '"' && src[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cell += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && src[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some((x) => x.trim() !== '')) rows.push(row);
+      row = [];
+    } else cell += c;
+  }
+  row.push(cell);
+  if (row.some((x) => x.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+type ImportRow = {
+  key: number;
+  label: string;
+  qty: number;
+  item: Item | null;
+};
+
+/** Match an import row to an item: variant_id → barcode → SKU → exact name. */
+function matchItem(items: Item[], cells: Record<string, string>): Item | null {
+  const vid = cells['variant_id']?.trim();
+  if (vid) {
+    const hit = items.find((i) => i.variantId === vid);
+    if (hit) return hit;
+  }
+  const bc = cells['บาร์โค้ด']?.trim();
+  if (bc) {
+    const hit = items.find((i) => i.barcode === bc);
+    if (hit) return hit;
+  }
+  const sku = cells['SKU']?.trim();
+  if (sku) {
+    const hit = items.find((i) => i.sku === sku);
+    if (hit) return hit;
+  }
+  const name = cells['ชื่อสินค้า']?.trim();
+  const size = cells['ขนาด']?.trim() || null;
+  if (name) {
+    const hit = items.find(
+      (i) => i.productName === name && (i.size ?? null) === (size || null),
+    );
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════ */
 
 export function Stock() {
   const { message } = App.useApp();
   const [products, setProducts] = useState<Product[]>([]);
-  const [tab, setTab] = useState('receive');
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState('overview');
 
   const reload = useCallback(async () => {
+    setLoading(true);
     try {
       setProducts(await listProducts());
     } catch (e) {
       message.error(apiError(e));
+    } finally {
+      setLoading(false);
     }
   }, [message]);
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  const variants = useMemo(() => flattenVariants(products), [products]);
+  const items = useMemo(() => flatten(products), [products]);
+  const lowCount = useMemo(() => items.filter((i) => statusOf(i) !== 'ok').length, [items]);
 
-  /* ── รับของเข้า ─────────────────────────────────────────────────────────── */
-  const [lines, setLines] = useState<ReceiveLine[]>([]);
+  /* ── ภาพรวม: filters ─────────────────────────────────────────────────── */
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+
+  const categories = useMemo(
+    () => [...new Set(items.map((i) => i.category))].sort(),
+    [items],
+  );
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((i) => {
+      if (statusFilter === 'low' && statusOf(i) === 'ok') return false;
+      if (statusFilter === 'out' && statusOf(i) !== 'out') return false;
+      if (categoryFilter && i.category !== categoryFilter) return false;
+      if (!q) return true;
+      return (
+        i.productName.toLowerCase().includes(q) ||
+        (i.barcode ?? '').includes(q) ||
+        (i.sku ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [items, query, statusFilter, categoryFilter]);
+
+  const totals = useMemo(() => {
+    const costValue = items.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
+    const saleValue = items.reduce((s, i) => s + i.price * i.stock, 0);
+    const pieces = items.reduce((s, i) => s + i.stock, 0);
+    return { costValue, saleValue, pieces };
+  }, [items]);
+
+  /* ── row-action modal (เติม / ปรับ / นับ / เกณฑ์เตือน) ─────────────────── */
+  type Action = 'receive' | 'adjust' | 'set' | 'threshold';
+  const [action, setAction] = useState<{ type: Action; item: Item } | null>(null);
+  const [actionQty, setActionQty] = useState<number | null>(null);
+  const [actionNote, setActionNote] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const openAction = (type: Action, item: Item) => {
+    setAction({ type, item });
+    setActionQty(type === 'threshold' ? item.threshold : type === 'set' ? item.stock : null);
+    setActionNote('');
+  };
+
+  const runAction = async () => {
+    if (!action || actionQty == null) return;
+    setActionBusy(true);
+    try {
+      const { type, item } = action;
+      if (type === 'receive') {
+        await receiveStock(item.variantId, actionQty, actionNote.trim() || undefined);
+        message.success(`เติม ${itemLabel(item)} +${actionQty}`);
+      } else if (type === 'adjust') {
+        if (actionQty === 0) return;
+        await adjustStock(item.variantId, actionQty, actionNote.trim() || undefined);
+        message.success(`ปรับ ${itemLabel(item)} ${actionQty > 0 ? '+' : ''}${actionQty}`);
+      } else if (type === 'set') {
+        await setStockQty(item.variantId, actionQty, actionNote.trim() || undefined);
+        message.success(`นับสต๊อก ${itemLabel(item)} = ${actionQty}`);
+      } else {
+        const { upsertVariant } = await import('../lib/api');
+        await upsertVariant({
+          id: item.variantId,
+          product_id: item.productId,
+          size: item.size,
+          price: item.price,
+          low_stock_threshold: actionQty,
+          sku: item.sku,
+          barcode: item.barcode,
+          cost_price: item.cost,
+          unit: item.unit,
+        });
+        message.success(`ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`);
+      }
+      setAction(null);
+      void reload();
+      void reloadMoves();
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const ACTION_META: Record<Action, { title: string; hint: string; min: number }> = {
+    receive: { title: 'เติมสต๊อก (รับของเข้า)', hint: 'จำนวนที่รับเข้า', min: 1 },
+    adjust: { title: 'ปรับสต๊อก (+/-)', hint: 'ใส่ค่าลบเพื่อตัดออก เช่น -2 ของเสีย', min: -100000 },
+    set: { title: 'นับสต๊อก (ตั้งค่าคงเหลือ)', hint: 'จำนวนที่นับได้จริงบนชั้น', min: 0 },
+    threshold: { title: 'เกณฑ์เตือนใกล้หมด', hint: 'เตือนทาง LINE เมื่อคงเหลือถึงจำนวนนี้', min: 0 },
+  };
+
+  /* ── overview columns ───────────────────────────────────────────────── */
+  const overviewColumns: ColumnsType<Item> = [
+    {
+      title: 'สินค้า',
+      fixed: 'left',
+      width: 260,
+      sorter: (a, b) => a.productName.localeCompare(b.productName, 'th'),
+      render: (_, i) => (
+        <Space>
+          <Avatar shape="square" size={44} src={i.image ?? undefined}>
+            {i.productName[0]}
+          </Avatar>
+          <Space direction="vertical" size={0}>
+            <Text strong>{itemLabel(i)}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {[i.barcode, i.sku].filter(Boolean).join(' · ') || 'ไม่มีบาร์โค้ด'}
+            </Text>
+          </Space>
+        </Space>
+      ),
+    },
+    {
+      title: 'หมวดหมู่',
+      dataIndex: 'category',
+      width: 120,
+      responsive: ['lg'],
+    },
+    {
+      title: 'ราคา / ทุน',
+      width: 120,
+      align: 'right',
+      sorter: (a, b) => a.price - b.price,
+      render: (_, i) => (
+        <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
+          <Text strong>{baht(i.price)}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {i.cost != null ? `ทุน ${baht(i.cost)}` : 'ไม่ระบุทุน'}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'คงเหลือ',
+      dataIndex: 'stock',
+      width: 100,
+      align: 'right',
+      sorter: (a, b) => a.stock - b.stock,
+      render: (s: number, i) => (
+        <Text strong style={{ fontSize: 16 }} type={statusOf(i) === 'ok' ? undefined : 'danger'}>
+          {s}
+          {i.unit ? <Text type="secondary" style={{ fontSize: 12 }}> {i.unit}</Text> : null}
+        </Text>
+      ),
+    },
+    {
+      title: 'จอง',
+      dataIndex: 'reserved',
+      width: 70,
+      align: 'right',
+      responsive: ['md'],
+      render: (r: number) => (r ? r : <Text type="secondary">—</Text>),
+    },
+    {
+      title: 'พร้อมขาย',
+      dataIndex: 'available',
+      width: 90,
+      align: 'right',
+      sorter: (a, b) => a.available - b.available,
+    },
+    {
+      title: 'มูลค่า (ทุน)',
+      width: 110,
+      align: 'right',
+      responsive: ['lg'],
+      sorter: (a, b) => (a.cost ?? 0) * a.stock - (b.cost ?? 0) * b.stock,
+      render: (_, i) =>
+        i.cost != null ? baht(i.cost * i.stock) : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'สถานะ',
+      width: 100,
+      filters: [
+        { text: 'ปกติ', value: 'ok' },
+        { text: 'ใกล้หมด', value: 'low' },
+        { text: 'หมด', value: 'out' },
+      ],
+      onFilter: (v, i) => statusOf(i) === v,
+      render: (_, i) => {
+        const s = statusOf(i);
+        return s === 'out' ? (
+          <Tag color="red">หมด</Tag>
+        ) : s === 'low' ? (
+          <Tag color="orange">ใกล้หมด</Tag>
+        ) : (
+          <Tag color="green">ปกติ</Tag>
+        );
+      },
+    },
+    {
+      title: '',
+      key: 'actions',
+      fixed: 'right',
+      width: 170,
+      render: (_, i) => (
+        <Space size={4}>
+          <Tooltip title="เติมสต๊อก (รับของ)">
+            <Button size="small" type="primary" ghost icon={<RiAddLine className="w-4 h-4" />}
+              onClick={() => openAction('receive', i)} />
+          </Tooltip>
+          <Tooltip title="ปรับ +/- (ของเสีย/แก้ยอด)">
+            <Button size="small" icon={<RiPencilLine className="w-4 h-4" />}
+              onClick={() => openAction('adjust', i)} />
+          </Tooltip>
+          <Tooltip title="นับสต๊อก (ตั้งค่าคงเหลือ)">
+            <Button size="small" icon={<RiScales3Line className="w-4 h-4" />}
+              onClick={() => openAction('set', i)} />
+          </Tooltip>
+          <Tooltip title="เกณฑ์เตือนใกล้หมด">
+            <Button size="small" icon={<RiAlarmWarningLine className="w-4 h-4" />}
+              onClick={() => openAction('threshold', i)} />
+          </Tooltip>
+          <Tooltip title="ประวัติของชิ้นนี้">
+            <Button size="small" icon={<RiHistoryLine className="w-4 h-4" />}
+              onClick={() => {
+                setVariantFilter({ id: i.variantId, label: itemLabel(i) });
+                setTab('history');
+              }} />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  /* ── import ─────────────────────────────────────────────────────────── */
+  const [importOpen, setImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'set' | 'receive'>('set');
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importBusy, setImportBusy] = useState(false);
+
+  const onImportFile = (file: File) => {
+    void file.text().then((text) => {
+      const rows = parseCsv(text);
+      if (rows.length < 2) {
+        message.error('ไฟล์ว่างหรือไม่มีหัวตาราง — ใช้ปุ่ม "ส่งออก Excel" เป็นแม่แบบได้');
+        return;
+      }
+      const head = rows[0].map((h) => h.trim());
+      const qtyCol = head.findIndex((h) => h === 'คงเหลือ' || h === 'จำนวน');
+      if (qtyCol < 0) {
+        message.error('ไม่พบคอลัมน์ "คงเหลือ" หรือ "จำนวน" ในไฟล์');
+        return;
+      }
+      const parsed: ImportRow[] = rows.slice(1).map((r, idx) => {
+        const cells: Record<string, string> = {};
+        head.forEach((h, c) => (cells[h] = r[c] ?? ''));
+        const item = matchItem(items, cells);
+        const qty = Number(cells[head[qtyCol]]);
+        return {
+          key: idx,
+          label:
+            item ? itemLabel(item)
+            : (cells['ชื่อสินค้า'] || cells['บาร์โค้ด'] || cells['SKU'] || `แถวที่ ${idx + 2}`),
+          qty: Number.isFinite(qty) ? qty : NaN,
+          item,
+        };
+      });
+      setImportRows(parsed);
+    });
+    return false; // stop antd upload
+  };
+
+  const importReady = importRows.filter(
+    (r) => r.item && Number.isFinite(r.qty) && r.qty >= 0 && (importMode === 'set' || r.qty > 0),
+  );
+
+  const runImport = async () => {
+    setImportBusy(true);
+    let ok = 0;
+    let failed = 0;
+    for (const r of importReady) {
+      try {
+        if (importMode === 'set') await setStockQty(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (นับสต๊อก)');
+        else await receiveStock(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (รับของ)');
+        ok++;
+      } catch {
+        failed++;
+      }
+    }
+    setImportBusy(false);
+    setImportOpen(false);
+    setImportRows([]);
+    message[failed ? 'warning' : 'success'](
+      `นำเข้าสำเร็จ ${ok} รายการ${failed ? ` · ล้มเหลว ${failed}` : ''}`,
+    );
+    void reload();
+    void reloadMoves();
+  };
+
+  const importColumns: ColumnsType<ImportRow> = [
+    {
+      title: 'สินค้า',
+      dataIndex: 'label',
+      render: (v: string, r) =>
+        r.item ? <Text>{v}</Text> : <Text type="danger">{v} — จับคู่ไม่ได้</Text>,
+    },
+    {
+      title: importMode === 'set' ? 'ตั้งคงเหลือเป็น' : 'รับเข้าเพิ่ม',
+      dataIndex: 'qty',
+      width: 130,
+      align: 'right',
+      render: (q: number) =>
+        Number.isFinite(q) ? (
+          <Text strong>{importMode === 'receive' ? `+${q}` : q}</Text>
+        ) : (
+          <Text type="danger">ไม่ใช่ตัวเลข</Text>
+        ),
+    },
+    {
+      title: 'คงเหลือเดิม',
+      width: 110,
+      align: 'right',
+      render: (_, r) => (r.item ? r.item.stock : '—'),
+    },
+  ];
+
+  /* ── รับของเข้า (receiving list) ─────────────────────────────────────── */
+  const [lines, setLines] = useState<{ item: Item; qty: number }[]>([]);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
-  const addVariant = useCallback(
-    (v: VariantOption, qty = 1) => {
-      setLines((prev) => {
-        const at = prev.findIndex((l) => l.variantId === v.variantId);
-        if (at >= 0) {
-          const next = [...prev];
-          next[at] = { ...next[at], qty: next[at].qty + qty };
-          return next;
-        }
-        return [
-          ...prev,
-          {
-            variantId: v.variantId,
-            productName: v.productName,
-            size: v.size,
-            currentStock: v.stock,
-            qty,
-          },
-        ];
-      });
-    },
-    [],
-  );
-
-  /** Scanner path: exact barcode match auto-adds a unit. */
-  const onSearchEnter = (raw: string) => {
-    const q = raw.trim();
-    if (!q) return;
-    const hit = variants.find((v) => v.barcode && v.barcode === q);
-    if (hit) {
-      addVariant(hit);
-      setSearch(null);
-      return;
-    }
-    message.warning('ไม่พบบาร์โค้ดนี้ — เลือกจากรายการค้นหาแทน');
-  };
+  const addItem = useCallback((item: Item, qty = 1) => {
+    setLines((prev) => {
+      const at = prev.findIndex((l) => l.item.variantId === item.variantId);
+      if (at >= 0) {
+        const next = [...prev];
+        next[at] = { ...next[at], qty: next[at].qty + qty };
+        return next;
+      }
+      return [...prev, { item, qty }];
+    });
+  }, []);
 
   const saveReceive = async () => {
     if (!lines.length) return;
     setSaving(true);
     try {
       for (const l of lines) {
-        await receiveStock(l.variantId, l.qty, note.trim() || undefined);
+        await receiveStock(l.item.variantId, l.qty, note.trim() || undefined);
       }
       message.success(`รับของเข้า ${lines.length} รายการเรียบร้อย`);
       setLines([]);
@@ -177,14 +604,14 @@ export function Stock() {
     }
   };
 
-  const receiveColumns: ColumnsType<ReceiveLine> = [
+  const receiveColumns: ColumnsType<{ item: Item; qty: number }> = [
     {
       title: 'สินค้า',
       render: (_, l) => (
         <Space direction="vertical" size={0}>
-          <Text strong>{variantLabel(l)}</Text>
+          <Text strong>{itemLabel(l.item)}</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            คงเหลือปัจจุบัน {l.currentStock}
+            คงเหลือปัจจุบัน {l.item.stock}
           </Text>
         </Space>
       ),
@@ -199,7 +626,9 @@ export function Stock() {
           value={l.qty}
           onChange={(v) =>
             setLines((prev) =>
-              prev.map((x) => (x.variantId === l.variantId ? { ...x, qty: v ?? 1 } : x)),
+              prev.map((x) =>
+                x.item.variantId === l.item.variantId ? { ...x, qty: v ?? 1 } : x,
+              ),
             )
           }
         />
@@ -213,22 +642,25 @@ export function Stock() {
           type="text"
           danger
           icon={<RiDeleteBinLine className="w-4 h-4" />}
-          onClick={() => setLines((prev) => prev.filter((x) => x.variantId !== l.variantId))}
+          onClick={() =>
+            setLines((prev) => prev.filter((x) => x.item.variantId !== l.item.variantId))
+          }
         />
       ),
     },
   ];
 
-  /* ── ประวัติ ───────────────────────────────────────────────────────────── */
+  /* ── ประวัติ ────────────────────────────────────────────────────────── */
   const [moves, setMoves] = useState<StockMovement[]>([]);
   const [movesLoading, setMovesLoading] = useState(false);
   const [moreLeft, setMoreLeft] = useState(true);
   const [reasonFilter, setReasonFilter] = useState<string | null>(null);
+  const [variantFilter, setVariantFilter] = useState<{ id: string; label: string } | null>(null);
 
   const reloadMoves = useCallback(async () => {
     setMovesLoading(true);
     try {
-      const rows = await listStockMovements(200);
+      const rows = await listStockMovements(200, undefined, variantFilter?.id);
       setMoves(rows);
       setMoreLeft(rows.length === 200);
     } catch (e) {
@@ -236,7 +668,7 @@ export function Stock() {
     } finally {
       setMovesLoading(false);
     }
-  }, [message]);
+  }, [message, variantFilter]);
   useEffect(() => {
     void reloadMoves();
   }, [reloadMoves]);
@@ -246,7 +678,7 @@ export function Stock() {
     if (!last) return;
     setMovesLoading(true);
     try {
-      const rows = await listStockMovements(200, last.created_at);
+      const rows = await listStockMovements(200, last.created_at, variantFilter?.id);
       setMoves((prev) => [...prev, ...rows]);
       setMoreLeft(rows.length === 200);
     } catch (e) {
@@ -270,9 +702,7 @@ export function Stock() {
     },
     {
       title: 'สินค้า',
-      render: (_, m) => (
-        <Text strong>{m.product_name + (m.size ? ` (${m.size})` : '')}</Text>
-      ),
+      render: (_, m) => <Text strong>{m.product_name + (m.size ? ` (${m.size})` : '')}</Text>,
     },
     {
       title: 'รายการ',
@@ -300,8 +730,9 @@ export function Stock() {
     {
       title: 'จอง',
       dataIndex: 'delta_reserved',
-      width: 90,
+      width: 80,
       align: 'right',
+      responsive: ['md'],
       render: (d: number) =>
         d === 0 ? <Text type="secondary">—</Text> : <Text>{d > 0 ? `+${d}` : d}</Text>,
     },
@@ -315,58 +746,112 @@ export function Stock() {
       title: 'โดย',
       dataIndex: 'actor_name',
       width: 140,
+      responsive: ['lg'],
       render: (v: string | null) => v ?? <Text type="secondary">ระบบ</Text>,
     },
   ];
 
-  /* ── ใกล้หมด ───────────────────────────────────────────────────────────── */
-  const lowStock = useMemo(
-    () => variants.filter((v) => v.stock <= v.threshold).sort((a, b) => a.stock - b.stock),
-    [variants],
-  );
-
-  const lowColumns: ColumnsType<VariantOption> = [
-    {
-      title: 'สินค้า',
-      render: (_, v) => <Text strong>{variantLabel(v)}</Text>,
-    },
-    {
-      title: 'คงเหลือ',
-      dataIndex: 'stock',
-      width: 110,
-      align: 'right',
-      render: (s: number) =>
-        s === 0 ? <Tag color="red">หมด</Tag> : <Tag color="orange">{s}</Tag>,
-    },
-    { title: 'เกณฑ์เตือน', dataIndex: 'threshold', width: 110, align: 'right' },
-    {
-      title: '',
-      width: 130,
-      render: (_, v) => (
-        <Button
-          size="small"
-          icon={<RiAddLine className="w-4 h-4" />}
-          onClick={() => {
-            addVariant(v);
-            setTab('receive');
-          }}>
-          รับของเข้า
-        </Button>
-      ),
-    },
-  ];
-
-  /* ── render ───────────────────────────────────────────────────────────── */
+  /* ── render ─────────────────────────────────────────────────────────── */
   return (
     <div className="space-y-4">
-      <Title level={4} style={{ margin: 0 }}>
-        สต๊อก
-      </Title>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <Title level={4} style={{ margin: 0 }}>
+          สต๊อก
+        </Title>
+        <Space>
+          <Upload accept=".csv" showUploadList={false} beforeUpload={(f) => {
+            setImportOpen(true);
+            return onImportFile(f);
+          }}>
+            <Button icon={<RiUpload2Line className="w-4 h-4" />}>นำเข้าไฟล์</Button>
+          </Upload>
+          <Button icon={<RiDownload2Line className="w-4 h-4" />} onClick={() => exportCsv(items)}>
+            ส่งออก Excel
+          </Button>
+        </Space>
+      </div>
+
+      <Row gutter={[12, 12]}>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic title="รายการสินค้า" value={items.length} suffix={`(${totals.pieces} ชิ้น)`} />
+          </Card>
+        </Col>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic
+              title="ใกล้หมด / หมด"
+              value={lowCount}
+              styles={{ content: { color: lowCount ? '#c5410f' : undefined } }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic title="มูลค่าสต๊อก (ทุน)" value={totals.costValue} prefix="฿" />
+          </Card>
+        </Col>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic title="มูลค่าสต๊อก (ราคาขาย)" value={totals.saleValue} prefix="฿" />
+          </Card>
+        </Col>
+      </Row>
 
       <Tabs
         activeKey={tab}
         onChange={setTab}
         items={[
+          {
+            key: 'overview',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <RiScales3Line className="w-4 h-4" /> ภาพรวม
+                {lowCount ? <Tag color="red">{lowCount}</Tag> : null}
+              </span>
+            ),
+            children: (
+              <Card>
+                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                  <Space wrap>
+                    <Input.Search
+                      allowClear
+                      placeholder="ค้นหาชื่อ / บาร์โค้ด / SKU"
+                      style={{ width: 280 }}
+                      onSearch={setQuery}
+                      onChange={(e) => !e.target.value && setQuery('')}
+                    />
+                    <Segmented
+                      value={statusFilter}
+                      onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                      options={[
+                        { label: 'ทั้งหมด', value: 'all' },
+                        { label: `ใกล้หมด (${lowCount})`, value: 'low' },
+                        { label: 'หมด', value: 'out' },
+                      ]}
+                    />
+                    <Select
+                      allowClear
+                      placeholder="หมวดหมู่"
+                      style={{ width: 160 }}
+                      value={categoryFilter}
+                      onChange={(v) => setCategoryFilter(v ?? null)}
+                      options={categories.map((c) => ({ value: c, label: c }))}
+                    />
+                  </Space>
+                  <Table
+                    rowKey="variantId"
+                    columns={overviewColumns}
+                    dataSource={shown}
+                    loading={loading}
+                    pagination={{ pageSize: 25, showSizeChanger: false }}
+                    scroll={{ x: 1080 }}
+                    size="middle"
+                  />
+                </Space>
+              </Card>
+            ),
+          },
           {
             key: 'receive',
             label: (
@@ -379,16 +864,15 @@ export function Stock() {
               <Card>
                 <Space direction="vertical" style={{ width: '100%' }} size="middle">
                   <Select
-                    ref={searchRef as never}
                     showSearch
                     value={search}
                     placeholder="ค้นหาชื่อสินค้า หรือยิงบาร์โค้ดที่ช่องนี้"
                     style={{ width: '100%', maxWidth: 520 }}
-                    options={variants.map((v) => ({
-                      value: v.variantId,
-                      label: `${variantLabel(v)} · คงเหลือ ${v.stock}`,
-                      name: variantLabel(v),
-                      barcode: v.barcode ?? '',
+                    options={items.map((i) => ({
+                      value: i.variantId,
+                      label: `${itemLabel(i)} · คงเหลือ ${i.stock}`,
+                      name: itemLabel(i),
+                      barcode: i.barcode ?? '',
                     }))}
                     filterOption={(input, opt) => {
                       const q = input.trim().toLowerCase();
@@ -397,22 +881,25 @@ export function Stock() {
                       return name.includes(q) || (!!barcode && barcode === input.trim());
                     }}
                     onSelect={(id: string) => {
-                      const v = variants.find((x) => x.variantId === id);
-                      if (v) addVariant(v);
+                      const i = items.find((x) => x.variantId === id);
+                      if (i) addItem(i);
                       setSearch(null);
                     }}
                     onInputKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const el = e.target as HTMLInputElement;
-                        onSearchEnter(el.value);
+                        const hit = items.find((i) => i.barcode && i.barcode === el.value.trim());
+                        if (hit) {
+                          addItem(hit);
+                          setSearch(null);
+                        }
                       }
                     }}
                   />
-
                   {lines.length ? (
                     <>
                       <Table
-                        rowKey="variantId"
+                        rowKey={(l) => l.item.variantId}
                         columns={receiveColumns}
                         dataSource={lines}
                         pagination={false}
@@ -446,23 +933,31 @@ export function Stock() {
             children: (
               <Card>
                 <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Select
-                    allowClear
-                    value={reasonFilter}
-                    onChange={(v) => setReasonFilter(v ?? null)}
-                    placeholder="กรองตามประเภทรายการ"
-                    style={{ width: 260 }}
-                    options={Object.entries(REASONS).map(([value, m]) => ({
-                      value,
-                      label: m.label,
-                    }))}
-                  />
+                  <Space wrap>
+                    <Select
+                      allowClear
+                      value={reasonFilter}
+                      onChange={(v) => setReasonFilter(v ?? null)}
+                      placeholder="กรองตามประเภทรายการ"
+                      style={{ width: 240 }}
+                      options={Object.entries(REASONS).map(([value, m]) => ({
+                        value,
+                        label: m.label,
+                      }))}
+                    />
+                    {variantFilter ? (
+                      <Tag closable onClose={() => setVariantFilter(null)} color="orange">
+                        เฉพาะ: {variantFilter.label}
+                      </Tag>
+                    ) : null}
+                  </Space>
                   <Table
                     rowKey="id"
                     columns={moveColumns}
                     dataSource={shownMoves}
                     loading={movesLoading}
                     pagination={{ pageSize: 20, showSizeChanger: false }}
+                    scroll={{ x: 900 }}
                     size="middle"
                   />
                   {moreLeft && !reasonFilter ? (
@@ -474,32 +969,93 @@ export function Stock() {
               </Card>
             ),
           },
-          {
-            key: 'low',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <RiAlarmWarningLine className="w-4 h-4" /> ใกล้หมด
-                {lowStock.length ? <Tag color="red">{lowStock.length}</Tag> : null}
-              </span>
-            ),
-            children: (
-              <Card>
-                {lowStock.length ? (
-                  <Table
-                    rowKey="variantId"
-                    columns={lowColumns}
-                    dataSource={lowStock}
-                    pagination={false}
-                    size="middle"
-                  />
-                ) : (
-                  <Empty description="ไม่มีสินค้าใกล้หมด" />
-                )}
-              </Card>
-            ),
-          },
         ]}
       />
+
+      {/* row action modal */}
+      <Modal
+        open={!!action}
+        title={action ? `${ACTION_META[action.type].title} — ${itemLabel(action.item)}` : ''}
+        onCancel={() => setAction(null)}
+        onOk={() => void runAction()}
+        okText="บันทึก"
+        cancelText="ยกเลิก"
+        confirmLoading={actionBusy}
+        destroyOnHidden>
+        {action ? (
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Text type="secondary">
+              คงเหลือปัจจุบัน {action.item.stock}
+              {action.item.unit ? ` ${action.item.unit}` : ''} · {ACTION_META[action.type].hint}
+            </Text>
+            <InputNumber
+              autoFocus
+              style={{ width: 200 }}
+              min={ACTION_META[action.type].min}
+              max={100000}
+              value={actionQty}
+              onChange={setActionQty}
+            />
+            {action.type !== 'threshold' ? (
+              <Input
+                value={actionNote}
+                onChange={(e) => setActionNote(e.target.value)}
+                placeholder="หมายเหตุ (ใส่หรือไม่ก็ได้)"
+                maxLength={120}
+              />
+            ) : null}
+          </Space>
+        ) : null}
+      </Modal>
+
+      {/* import modal */}
+      <Modal
+        open={importOpen}
+        width={720}
+        title="นำเข้าสต๊อกจากไฟล์"
+        onCancel={() => {
+          setImportOpen(false);
+          setImportRows([]);
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => { setImportOpen(false); setImportRows([]); }}>
+            ยกเลิก
+          </Button>,
+          <Button
+            key="ok"
+            type="primary"
+            disabled={!importReady.length}
+            loading={importBusy}
+            onClick={() => void runImport()}>
+            นำเข้า {importReady.length} รายการ
+          </Button>,
+        ]}>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Radio.Group
+            value={importMode}
+            onChange={(e) => setImportMode(e.target.value)}
+            options={[
+              { value: 'set', label: 'นับสต๊อก — ตั้งค่าคงเหลือตามไฟล์' },
+              { value: 'receive', label: 'รับของเข้า — บวกเพิ่มตามไฟล์' },
+            ]}
+          />
+          <Text type="secondary">
+            ใช้ไฟล์จากปุ่ม "ส่งออก Excel" เป็นแม่แบบ แก้คอลัมน์ "คงเหลือ" (หรือเพิ่มคอลัมน์
+            "จำนวน") แล้วบันทึกเป็น .csv — ระบบจับคู่สินค้าจากบาร์โค้ด / SKU / ชื่อ
+          </Text>
+          {importRows.length ? (
+            <Table
+              rowKey="key"
+              columns={importColumns}
+              dataSource={importRows}
+              pagination={{ pageSize: 8, showSizeChanger: false }}
+              size="small"
+            />
+          ) : (
+            <Empty description="ยังไม่ได้เลือกไฟล์ — กดปุ่ม นำเข้าไฟล์ อีกครั้งเพื่อเลือก .csv" />
+          )}
+        </Space>
+      </Modal>
     </div>
   );
 }

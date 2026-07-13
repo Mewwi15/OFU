@@ -281,8 +281,12 @@ export async function listProductImages(productId: string): Promise<ProductImage
   return data as ProductImage[];
 }
 
-export const adjustStock = (variantId: string, delta: number) =>
-  rpc('adjust_stock', { p_variant_id: variantId, p_delta: delta });
+export const adjustStock = (variantId: string, delta: number, note?: string) =>
+  rpc<{ variant_id: string; stock_qty: number }>('adjust_stock', {
+    p_variant_id: variantId,
+    p_delta: delta,
+    p_note: note ?? undefined,
+  });
 
 export const setPublishState = (productId: string, state: 'draft' | 'published', rowVersion?: number) =>
   rpc('set_publish_state', { p_product_id: productId, p_state: state, p_expected_row_version: rowVersion ?? undefined });
@@ -547,13 +551,18 @@ export type StockMovement = {
 };
 
 /** Ledger page, newest first; pass `before` (created_at) to page further back. */
-export async function listStockMovements(limit = 200, before?: string): Promise<StockMovement[]> {
+export async function listStockMovements(
+  limit = 200,
+  before?: string,
+  variantId?: string,
+): Promise<StockMovement[]> {
   let q = supabase
     .from('stock_movements_view')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit);
   if (before) q = q.lt('created_at', before);
+  if (variantId) q = q.eq('variant_id', variantId);
   const { data, error } = await q;
   if (error) throw error;
   return data as StockMovement[];
@@ -562,6 +571,15 @@ export async function listStockMovements(limit = 200, before?: string): Promise<
 /** Goods-in: adds qty to a variant with its own 'receive' ledger reason. */
 export const receiveStock = (variantId: string, qty: number, note?: string) =>
   rpc<{ variant_id: string; stock_qty: number }>('receive_stock', {
+    p_variant_id: variantId,
+    p_qty: qty,
+    p_note: note ?? undefined,
+  });
+
+
+/** Absolute set (stock count / import) — ledgers the computed difference. */
+export const setStockQty = (variantId: string, qty: number, note?: string) =>
+  rpc<{ variant_id: string; stock_qty: number; delta: number }>('set_stock_qty', {
     p_variant_id: variantId,
     p_qty: qty,
     p_note: note ?? undefined,
