@@ -11,10 +11,8 @@ import { Categories } from './pages/Categories';
 import { Chat } from './pages/Chat';
 import { DeleteAccountInfo } from './pages/DeleteAccountInfo';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
-import { Featured } from './pages/Featured';
 import { Login } from './pages/Login';
 import { Orders } from './pages/Orders';
-import { Payments } from './pages/Payments';
 import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
@@ -63,12 +61,10 @@ export default function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
-        <Route path="/featured" element={<Featured />} />
         <Route path="/store-credit" element={<StoreCredit />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/banners" element={<Banners />} />
         <Route path="/orders" element={<Orders />} />
-        <Route path="/payments" element={<Payments />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/scan-lab" element={<ScanLab />} />

@@ -1,12 +1,10 @@
 import {
   RiInboxArchiveLine,
   RiBarChart2Line,
-  RiBillLine,
   RiCashLine,
   RiChat1Line,
   RiFileList3Line,
   RiImageLine,
-  RiLayoutMasonryLine,
   RiLogoutBoxRLine,
   RiMegaphoneLine,
   RiMenuFoldLine,
@@ -53,7 +51,6 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'ออนไลน์',
     items: [
       { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
-      { to: '/payments', label: 'ตรวจสลิป', Icon: RiBillLine },
       { to: '/chat', label: 'แชตลูกค้า', Icon: RiChat1Line },
     ],
   },
@@ -62,7 +59,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
       { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
-      { to: '/featured', label: 'จัดหน้าแอป', Icon: RiLayoutMasonryLine },
       { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
       { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
     ],
