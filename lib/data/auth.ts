@@ -8,6 +8,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
 import { supabase } from '@/lib/supabase/client';
 
@@ -52,6 +53,18 @@ export type OAuthProvider = 'google' | 'apple';
  * redirect URL (myrnapp://auth-callback) to be allow-listed.
  */
 export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    // Full-page redirect; on return detectSessionInUrl completes the PKCE
+    // exchange and onAuthStateChange flips the gate. The origin must be in
+    // Supabase's Redirect URLs allowlist.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+    return true; // the page is navigating away
+  }
+
   const redirectTo = Linking.createURL('auth-callback');
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,

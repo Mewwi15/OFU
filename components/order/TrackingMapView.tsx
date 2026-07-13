@@ -9,11 +9,11 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image, useImage } from 'expo-image';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppleMaps, GoogleMaps } from '@/components/maps/native-maps';
 import { DeliveryStepper } from '@/components/order/DeliveryStepper';
 import { RiderIllustration } from '@/components/shop/RiderIllustration';
 import { PressableScale } from '@/components/ui/PressableScale';

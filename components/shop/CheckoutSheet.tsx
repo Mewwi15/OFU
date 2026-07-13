@@ -232,6 +232,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: Radius.xl,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
+    // On web the Modal overlays the whole browser window (not the phone
+    // frame) — keep the sheet phone-sized and centred on desktop.
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     ...Shadow.float,
   },
   handleHit: {

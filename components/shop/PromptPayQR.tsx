@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -62,6 +62,15 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
     if (saving || !qrRef.current) return;
     setSaving(true);
     try {
+      if (Platform.OS === 'web') {
+        // No photo library on web — hand the PNG to the browser as a download.
+        const b64 = await new Promise<string>((resolve) => qrRef.current!.toDataURL(resolve));
+        const a = document.createElement('a');
+        a.href = `data:image/png;base64,${b64}`;
+        a.download = 'oofoo-promptpay-qr.png';
+        a.click();
+        return;
+      }
       const { granted } = await MediaLibrary.requestPermissionsAsync(true); // add-only
       if (!granted) {
         Alert.alert(t('qr.savePermissionTitle'), t('qr.savePermissionBody'));

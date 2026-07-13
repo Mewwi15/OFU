@@ -30,12 +30,20 @@
       "versionCode": 2
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-apple-authentication",
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "asyncRoutes": {
+            "web": true,
+            "default": false
+          }
+        }
+      ],
       [
         "expo-notifications",
         {

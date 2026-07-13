@@ -18,13 +18,11 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -36,12 +34,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PickerMap, type PickerMapHandle } from '@/components/maps/PickerMap';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
+import { showAlert } from '@/lib/showAlert';
+import { osmReverseGeocode, osmSearch } from '@/lib/osm';
 import { autocompletePlaces, fetchPlaceLocation, placesAvailable } from '@/lib/places';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useLocale } from '@/store/locale';
@@ -124,8 +125,7 @@ export default function AddressPickerScreen() {
     ? { latitude: start.lat, longitude: start.lng }
     : DEFAULT_CENTER;
 
-  const appleRef = useRef<AppleMaps.MapView>(null);
-  const googleRef = useRef<GoogleMaps.MapView>(null);
+  const mapRef = useRef<PickerMapHandle>(null);
   const centerRef = useRef<LatLng>(initialCenter);
   const geoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geoSeq = useRef(0);
@@ -155,15 +155,9 @@ export default function AddressPickerScreen() {
   const [noResults, setNoResults] = useState(false);
 
   const recenter = (coordinates: LatLng) => {
-    // setCameraPosition is a native call that can throw if the view isn't ready
-    // yet (e.g. an auto-locate that resolves before the first layout). The pin
-    // is driven by centerRef regardless, so swallowing this is safe.
-    try {
-      appleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
-      googleRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
-    } catch {
-      // view not ready — ignore
-    }
+    // The pin is driven by centerRef regardless; a missed recentre (view not
+    // laid out yet) is swallowed inside PickerMap.
+    mapRef.current?.setCameraPosition({ coordinates, zoom: DEFAULT_ZOOM });
   };
 
   // Last point that reverse-geocoded successfully. Camera-settle events after
@@ -190,7 +184,11 @@ export default function AddressPickerScreen() {
     const seq = ++geoSeq.current;
     setGeocoding(true);
     try {
-      const res = await Location.reverseGeocodeAsync({ latitude, longitude });
+      // Web: Nominatim (expo-location has no web geocoder); native: on-device.
+      const res =
+        Platform.OS === 'web'
+          ? await osmReverseGeocode({ latitude, longitude }, lang)
+          : await Location.reverseGeocodeAsync({ latitude, longitude });
       if (seq === geoSeq.current) {
         if (res[0]) {
           lastGeo.current = { latitude, longitude };
@@ -305,8 +303,13 @@ export default function AddressPickerScreen() {
 
   /* --------------------------- place search --------------------------- */
 
-  /** On-device geocoder search — iOS path and the fallback when Places fails. */
+  /** On-device geocoder search — iOS path and the fallback when Places fails.
+   *  On web this is Nominatim (labels come back pre-formatted). */
   const geocodeSearch = async (q: string): Promise<SearchResult[]> => {
+    if (Platform.OS === 'web') {
+      const found = await osmSearch(q, lang);
+      return found.map((h) => ({ kind: 'geo' as const, coords: h.coords, label: h.label }));
+    }
     const hits = await Location.geocodeAsync(q);
     const labeled = await Promise.all(
       hits.slice(0, 5).map(async (h) => {
@@ -400,7 +403,7 @@ export default function AddressPickerScreen() {
       setPoint(place.coords, { keepLine: true });
       dismissSearch();
     } catch {
-      Alert.alert(t('address.placeFailed'), t('address.placeFailedBody'));
+      showAlert(t('address.placeFailed'), t('address.placeFailedBody'));
     } finally {
       setSearching(false);
     }
@@ -423,7 +426,12 @@ export default function AddressPickerScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('address.locPermTitle'), t('address.locPermBody'));
+        showAlert(
+          t('address.locPermTitle'),
+          Platform.OS === 'web'
+            ? `${t('address.locPermBody')}\n\n${t('address.locPermWebHint')}`
+            : t('address.locPermBody'),
+        );
         return;
       }
       setLocGranted(true); // เพิ่งได้สิทธิ์ — เปิดจุดตำแหน่งบนแผนที่ได้แล้ว
@@ -437,7 +445,7 @@ export default function AddressPickerScreen() {
     } catch {
       // GPS can reject if location is momentarily unavailable (cold start,
       // weak signal). Tell the user instead of leaking an unhandled rejection.
-      Alert.alert(t('address.locateFailed'), t('address.locateFailedBody'));
+      showAlert(t('address.locateFailed'), t('address.locateFailedBody'));
     } finally {
       setLocating(false);
     }
@@ -469,41 +477,22 @@ export default function AddressPickerScreen() {
       });
       router.back();
     } catch {
-      Alert.alert(t('address.saveFailed'), t('address.saveFailedBody'));
+      showAlert(t('address.saveFailed'), t('address.saveFailedBody'));
     }
   };
 
   return (
     <View style={styles.screen}>
-      {/* Map */}
+      {/* Map — expo-maps on native, Leaflet/OSM on web (PickerMap.web.tsx) */}
       <View style={styles.mapWrap}>
-        {Platform.OS === 'ios' ? (
-          <AppleMaps.View
-            ref={appleRef}
-            style={StyleSheet.absoluteFill}
-            cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
-            properties={{ isMyLocationEnabled: locGranted }}
-            uiSettings={{ myLocationButtonEnabled: false, compassEnabled: false }}
-            onMapClick={onMapClick}
-            onCameraMove={onCameraMove}
-          />
-        ) : Platform.OS === 'android' ? (
-          <GoogleMaps.View
-            ref={googleRef}
-            style={StyleSheet.absoluteFill}
-            cameraPosition={{ coordinates: initialCenter, zoom: DEFAULT_ZOOM }}
-            properties={{ isMyLocationEnabled: locGranted }}
-            uiSettings={{ myLocationButtonEnabled: false }}
-            onMapClick={onMapClick}
-            onCameraMove={onCameraMove}
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, styles.mapFallback]}>
-            <Text style={{ color: Colors.textMuted }}>
-              {t('address.mapUnavailable')}
-            </Text>
-          </View>
-        )}
+        <PickerMap
+          ref={mapRef}
+          initialCenter={initialCenter}
+          initialZoom={DEFAULT_ZOOM}
+          myLocationEnabled={locGranted}
+          onMapClick={onMapClick}
+          onCameraMove={onCameraMove}
+        />
 
         {/* Fixed centre pin (tip points at the map centre) */}
         <View style={styles.pinWrap} pointerEvents="none">
@@ -801,10 +790,6 @@ const styles = StyleSheet.create({
   mapWrap: {
     flex: 1,
     backgroundColor: Colors.surfaceMuted,
-  },
-  mapFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   pinWrap: {
     position: 'absolute',

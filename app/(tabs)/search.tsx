@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +22,9 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
+import { DesktopCatalog } from '@/components/web/DesktopCatalog';
 import { useT } from '@/lib/i18n';
+import { useAppWidth, useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
@@ -39,11 +40,12 @@ export default function CatalogScreen() {
   const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: screenW } = useWindowDimensions();
+  const isDesktopWeb = useIsDesktopWeb();
+  const screenW = useAppWidth();
   // A slim header band below the safe area, at the same aspect the admin crops
   // search_hero to (BANNER_ASPECT) — cropped image fills it with no mismatch.
   const bannerHeight = screenW / BANNER_ASPECT.search_hero;
-  const { category } = useLocalSearchParams<{ category?: string }>();
+  const { category, q: qParam } = useLocalSearchParams<{ category?: string; q?: string }>();
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(category ?? 'ทั้งหมด');
@@ -96,6 +98,17 @@ export default function CatalogScreen() {
     });
   }, [products, q, activeCategory]);
 
+  // Desktop web renders the sidebar-filter catalog instead (after all hooks).
+  if (isDesktopWeb) {
+    return (
+      <DesktopCatalog
+        key={`${category ?? ''}|${qParam ?? ''}`}
+        initialCategory={category}
+        initialQuery={qParam}
+      />
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -109,7 +122,7 @@ export default function CatalogScreen() {
             copy baked in). The cart button is overlaid top-right. */}
         <View style={[styles.hero, { height: insets.top + bannerHeight }]}>
           <Image
-            source={heroBanner ? { uri: heroBanner.image } : require('../../assets/images/braner.png')}
+            source={heroBanner ? { uri: heroBanner.image } : require('../../assets/images/braner.jpg')}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />

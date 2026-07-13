@@ -12,7 +12,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
@@ -40,6 +40,7 @@ export default function SettingsScreen() {
     getPushEnabled()
       .then(setPush)
       .catch(() => setPush(true));
+    if (Platform.OS === 'web') return; // no biometrics / app lock on web
     (async () => {
       const [hasHw, enrolled, types] = await Promise.all([
         LocalAuthentication.hasHardwareAsync(),

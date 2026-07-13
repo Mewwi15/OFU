@@ -14,15 +14,18 @@ import { Platform } from 'react-native';
 
 import { registerPushToken } from '@/lib/data/notifications';
 
-// Foreground notifications: show a banner + bump the badge.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: true,
-  }),
-});
+// Foreground notifications: show a banner + bump the badge. (Not on web —
+// the site relies on the in-app feed, no browser push.)
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 function easProjectId(): string | undefined {
   return (
@@ -33,6 +36,9 @@ function easProjectId(): string | undefined {
 
 /** Register this device for push. Safe to call on every authed launch. */
 export async function registerForPush(): Promise<void> {
+  // No browser push on web (would need VAPID + a service worker; the in-app
+  // notification feed covers it). Don't prompt for permission there.
+  if (Platform.OS === 'web') return;
   // iOS simulators can't receive remote push. Android emulators with Google
   // Play services CAN (FCM works there), so only gate iOS.
   if (!Device.isDevice && Platform.OS === 'ios') return;

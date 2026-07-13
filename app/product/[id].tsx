@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   View,
-  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -21,7 +20,9 @@ import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { money } from '@/lib/format';
+import { DesktopProduct } from '@/components/web/DesktopProduct';
 import { useT } from '@/lib/i18n';
+import { useAppWidth, useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useCart } from '@/store/cart';
 import { findProduct, useCatalog } from '@/store/catalog';
 
@@ -37,7 +38,8 @@ export default function ProductDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
+  const isDesktopWeb = useIsDesktopWeb();
 
   const products = useCatalog((s) => s.products);
   const product = findProduct(products, id);
@@ -79,6 +81,9 @@ export default function ProductDetailsScreen() {
       </View>
     );
   }
+
+  // Desktop web renders the two-column product page instead.
+  if (isDesktopWeb) return <DesktopProduct key={product.id} product={product} />;
 
   const imageHeight = Math.round(width * 0.92);
   const total = product.price * qty;

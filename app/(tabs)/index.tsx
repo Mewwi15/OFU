@@ -20,11 +20,13 @@ import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { DesktopHome } from '@/components/web/DesktopHome';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { useT } from '@/lib/i18n';
+import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
@@ -37,11 +39,12 @@ const TAB_BAR_CLEARANCE = 110;
  * page) — the local brand art, same asset as the catalog hero. Never network
  * placeholders here: this is the first thing a customer sees.
  */
-const FALLBACK_SLIDES = [{ id: 'brand', image: require('../../assets/images/braner.png') }];
+const FALLBACK_SLIDES = [{ id: 'brand', image: require('../../assets/images/braner.jpg') }];
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
 
 export default function HomeScreen() {
+  const isDesktopWeb = useIsDesktopWeb();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const address = useAddress(selectedAddress);
@@ -131,6 +134,9 @@ export default function HomeScreen() {
         ? `/search?category=${encodeURIComponent(category)}`
         : '/search',
     );
+
+  // Desktop web renders the full storefront landing instead (after all hooks).
+  if (isDesktopWeb) return <DesktopHome />;
 
   return (
     <View style={styles.screen}>

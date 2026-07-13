@@ -9,11 +9,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
+import { SiteShell } from '@/components/web/SiteShell';
 import { ThemeProvider } from '@/theme/theme-provider';
 import { useAuth } from '@/store/auth';
 import { useLock } from '@/store/lock';
@@ -61,6 +62,35 @@ export default function RootLayout() {
     initAuth();
   }, [hydrate, initAuth]);
 
+  // Web: a tab from a previous deploy requests route chunks that no longer
+  // exist (hashed filenames change per deploy) and dies with a white screen.
+  // Metro loads async chunks via <script> tags, so the failure surfaces as an
+  // UNCAUGHT ERROR ("Requiring unknown module …" / "Unexpected token '<'"),
+  // not only as a rejected dynamic import — listen on both channels and
+  // reload once to pick up the fresh index.html.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const STALE_RE =
+      /Requiring unknown module|Unexpected token '<'|dynamically imported module|Importing a module script|ChunkLoadError/i;
+    const reloadOnce = (msg: string) => {
+      if (!STALE_RE.test(msg)) return;
+      if (sessionStorage.getItem('oofoo-chunk-reload') === '1') return; // avoid loops
+      sessionStorage.setItem('oofoo-chunk-reload', '1');
+      location.reload();
+    };
+    const onRejection = (e: PromiseRejectionEvent) =>
+      reloadOnce(String((e.reason as { message?: string })?.message ?? e.reason ?? ''));
+    const onError = (e: ErrorEvent) => reloadOnce(String(e.message ?? ''));
+    window.addEventListener('unhandledrejection', onRejection);
+    window.addEventListener('error', onError);
+    // A successful boot means the current bundle is live — arm the guard again.
+    sessionStorage.removeItem('oofoo-chunk-reload');
+    return () => {
+      window.removeEventListener('unhandledrejection', onRejection);
+      window.removeEventListener('error', onError);
+    };
+  }, []);
+
   // The PIN belongs to an account, not the device: if another account's PIN is
   // still stored here (account switch / phone-OTP era), clear it so this
   // account gets the setup flow instead of a lock it can never pass.
@@ -94,16 +124,20 @@ export default function RootLayout() {
     return null;
   }
 
+  // The PIN app-lock rides on the OS keychain (expo-secure-store), which has
+  // no web backend — on web the browser session is the lock, so skip it.
+  const lockSupported = Platform.OS !== 'web';
   const showOnboarding = !onboarded;
   const showLogin = onboarded && !isAuthed;
-  const showSetup = onboarded && isAuthed && !hasPin;
-  const showLock = onboarded && isAuthed && hasPin && locked;
-  const showApp = onboarded && isAuthed && hasPin && !locked;
+  const showSetup = onboarded && isAuthed && lockSupported && !hasPin;
+  const showLock = onboarded && isAuthed && lockSupported && hasPin && locked;
+  const showApp = onboarded && isAuthed && (!lockSupported || (hasPin && !locked));
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
+          <SiteShell>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Protected guard={showOnboarding}>
               <Stack.Screen name="onboarding" />
@@ -137,6 +171,7 @@ export default function RootLayout() {
               <Stack.Screen name="notifications" />
             </Stack.Protected>
           </Stack>
+          </SiteShell>
           <StatusBar style="dark" />
         </ThemeProvider>
       </SafeAreaProvider>

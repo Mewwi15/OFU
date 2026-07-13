@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CartBadge } from '@/components/navigation/CartBadge';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
+import { useIsDesktopWeb } from '@/lib/useAppWidth';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -39,6 +40,10 @@ const TABS: Record<string, TabMeta> = {
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const t = useT();
   const insets = useSafeAreaInsets();
+  const isDesktopWeb = useIsDesktopWeb();
+
+  // Desktop web navigates via the SiteHeader — no floating tab bar.
+  if (isDesktopWeb) return null;
 
   return (
     <View
