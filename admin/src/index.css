@@ -76,3 +76,9 @@ body {
     print-color-adjust: exact;
   }
 }
+
+/* สต๊อก: row tint by stock status (pairs with STATUS_COLOR in Stock.tsx) */
+.stock-row-low > td { background: #fff7ed !important; }
+.stock-row-low:hover > td { background: #ffedd5 !important; }
+.stock-row-out > td { background: #fef2f2 !important; }
+.stock-row-out:hover > td { background: #fee2e2 !important; }

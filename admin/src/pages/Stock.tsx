@@ -136,6 +136,14 @@ const itemLabel = (i: { productName: string; size: string | null }) =>
 const statusOf = (i: Item): 'out' | 'low' | 'ok' =>
   i.stock === 0 ? 'out' : i.stock <= i.threshold ? 'low' : 'ok';
 
+/** Big-and-obvious status colours (matches the row tint in index.css). */
+const STATUS_COLOR: Record<'ok' | 'low' | 'out', string> = {
+  ok: '#15803d',
+  low: '#c2410c',
+  out: '#dc2626',
+};
+const STATUS_TAG = { fontSize: 14, lineHeight: '26px', paddingInline: 12 } as const;
+
 /* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
 
 const CSV_HEAD = [
@@ -356,8 +364,8 @@ export function Stock() {
             {i.productName[0]}
           </Avatar>
           <Space direction="vertical" size={0}>
-            <Text strong>{itemLabel(i)}</Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text strong style={{ fontSize: 16 }}>{itemLabel(i)}</Text>
+            <Text type="secondary" style={{ fontSize: 13 }}>
               {[i.barcode, i.sku].filter(Boolean).join(' · ') || 'ไม่มีบาร์โค้ด'}
             </Text>
           </Space>
@@ -371,9 +379,9 @@ export function Stock() {
       sorter: (a, b) => a.price - b.price,
       render: (_, i) => (
         <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
-          <Text strong>{baht(i.price)}</Text>
+          <Text strong style={{ fontSize: 16 }}>{baht(i.price)}</Text>
           {i.cost != null ? (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={{ fontSize: 13 }}>
               ทุน {baht(i.cost)}
             </Text>
           ) : null}
@@ -389,12 +397,12 @@ export function Stock() {
       sorter: (a, b) => a.stock - b.stock,
       render: (s: number, i) => (
         <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
-          <Text strong style={{ fontSize: 18 }} type={statusOf(i) === 'ok' ? undefined : 'danger'}>
+          <Text strong style={{ fontSize: 22, color: STATUS_COLOR[statusOf(i)] }}>
             {s}
-            <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
+            <Text type="secondary" style={{ fontSize: 13 }}> {i.unit ?? 'ชิ้น'}</Text>
           </Text>
           {i.reserved > 0 ? (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={{ fontSize: 13 }}>
               ลูกค้าจองไว้ {i.reserved} · ขายได้อีก {i.available}
             </Text>
           ) : null}
@@ -413,11 +421,11 @@ export function Stock() {
       render: (_, i) => {
         const s = statusOf(i);
         return s === 'out' ? (
-          <Tag color="red">หมด</Tag>
+          <Tag color="red" style={STATUS_TAG}>หมด</Tag>
         ) : s === 'low' ? (
-          <Tag color="orange">ใกล้หมด</Tag>
+          <Tag color="orange" style={STATUS_TAG}>ใกล้หมด</Tag>
         ) : (
-          <Tag color="green">ปกติ</Tag>
+          <Tag color="green" style={STATUS_TAG}>ปกติ</Tag>
         );
       },
     },
@@ -447,7 +455,7 @@ export function Stock() {
               openAction(key as Action, i);
             },
           }}>
-          <Button size="small">
+          <Button>
             จัดการ <RiArrowDownSLine className="w-4 h-4 inline-block align-text-bottom" />
           </Button>
         </Dropdown>
@@ -826,7 +834,13 @@ export function Stock() {
                     loading={loading}
                     pagination={{ pageSize: 25, showSizeChanger: false }}
                     scroll={{ x: 760 }}
-                    size="middle"
+                    rowClassName={(i) =>
+                      statusOf(i) === 'out'
+                        ? 'stock-row-out'
+                        : statusOf(i) === 'low'
+                          ? 'stock-row-low'
+                          : ''
+                    }
                   />
                 </Space>
               </Card>
