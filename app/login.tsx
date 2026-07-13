@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { startLineAuth } from '@/lib/line';
@@ -50,6 +50,9 @@ export default function LoginScreen() {
 
   const [mode, setMode] = useState<Mode>('signin');
   const [step, setStep] = useState<Step>('form');
+  // Web: LINE-only by default (owner pivot); the classic form is opt-in.
+  const [showClassic, setShowClassic] = useState(Platform.OS !== 'web');
+  const lineOnly = Platform.OS === 'web' && !showClassic;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -171,7 +174,33 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {step === 'form' ? (
+        {step === 'form' && lineOnly ? (
+          <>
+            {/* Web-first (owner 2026-07-13): LINE is THE way in — everyone who
+                signs in this way is auto-linked for LINE order notifications.
+                The classic email/Google form stays reachable below for
+                accounts created before the pivot. */}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={t('login.continueLine')}
+              onPress={() => startLineAuth('login')}
+              scaleTo={0.98}
+              style={[styles.social, styles.lineHero, { backgroundColor: BRAND.line }]}>
+              <Ionicons name="chatbubble-ellipses" size={22} color="#FFFFFF" />
+              <Text style={[styles.socialText, { color: '#FFFFFF' }]}>{t('login.continueLine')}</Text>
+            </PressableScale>
+            <Text variant="caption" style={styles.lineHeroHint}>
+              {t('login.lineHint')}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowClassic(true)}
+              hitSlop={8}
+              style={styles.otherMethods}>
+              <Text style={styles.otherMethodsText}>{t('login.otherMethods')}</Text>
+            </Pressable>
+          </>
+        ) : step === 'form' ? (
           <>
             {/* Mode toggle */}
             <View style={styles.modeToggle}>
@@ -288,17 +317,15 @@ export default function LoginScreen() {
               <Ionicons name="logo-google" size={20} color={Colors.text} />
               <Text style={[styles.socialText, { color: Colors.text }]}>{t('login.continueGoogle')}</Text>
             </PressableScale>
-            {/* LINE Login — web-only redirect flow (lib/line.ts). */}
+            {/* Back to the primary LINE sign-in (web classic form only). */}
             {Platform.OS === 'web' ? (
-              <PressableScale
+              <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={t('login.continueLine')}
-                onPress={() => startLineAuth('login')}
-                scaleTo={0.98}
-                style={[styles.social, { backgroundColor: BRAND.line }]}>
-                <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
-                <Text style={[styles.socialText, { color: '#FFFFFF' }]}>{t('login.continueLine')}</Text>
-              </PressableScale>
+                onPress={() => setShowClassic(false)}
+                hitSlop={8}
+                style={styles.otherMethods}>
+                <Text style={styles.otherMethodsText}>{t('login.backToLine')}</Text>
+              </Pressable>
             ) : null}
           </>
         ) : (
@@ -457,6 +484,27 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   socialBordered: { borderWidth: 1, borderColor: Colors.border },
+  /* LINE-first (web): the hero button + hint + escape hatch to the old form */
+  lineHero: {
+    minHeight: 56,
+    marginTop: Spacing.lg,
+    ...Shadow.card,
+  },
+  lineHeroHint: {
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.md,
+  },
+  otherMethods: {
+    alignSelf: 'center',
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  otherMethodsText: {
+    ...Typography.button,
+    color: Colors.textMuted,
+    textDecorationLine: 'underline',
+  },
   /* Native Apple button — must carry explicit dimensions to render; height and
      pill radius mirror the Google row below it. */
   appleButton: {
