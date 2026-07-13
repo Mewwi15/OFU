@@ -337,10 +337,10 @@ export function Stock() {
   };
 
   const ACTION_META: Record<Action, { title: string; hint: string; min: number }> = {
-    receive: { title: 'เติมสต๊อก (รับของเข้า)', hint: 'จำนวนที่รับเข้า', min: 1 },
-    adjust: { title: 'ปรับสต๊อก (+/-)', hint: 'ใส่ค่าลบเพื่อตัดออก เช่น -2 ของเสีย', min: -100000 },
-    set: { title: 'นับสต๊อก (ตั้งค่าคงเหลือ)', hint: 'จำนวนที่นับได้จริงบนชั้น', min: 0 },
-    threshold: { title: 'เกณฑ์เตือนใกล้หมด', hint: 'เตือนทาง LINE เมื่อคงเหลือถึงจำนวนนี้', min: 0 },
+    receive: { title: 'เติมของ', hint: 'ซื้อมากี่ชิ้น ใส่จำนวนนั้น', min: 1 },
+    adjust: { title: 'แก้ยอด (+/-)', hint: 'ของเสีย/หาย ใส่เลขติดลบ เช่น -2', min: -100000 },
+    set: { title: 'นับของจริง', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย ระบบคิดส่วนต่างให้', min: 0 },
+    threshold: { title: 'ตั้งเตือนใกล้หมด', hint: 'เหลือถึงจำนวนนี้เมื่อไหร่ LINE จะเด้งเตือน', min: 0 },
   };
 
   /* ── overview columns ───────────────────────────────────────────────── */
@@ -365,61 +365,41 @@ export function Stock() {
       ),
     },
     {
-      title: 'หมวดหมู่',
-      dataIndex: 'category',
-      width: 120,
-      responsive: ['lg'],
-    },
-    {
-      title: 'ราคา / ทุน',
-      width: 120,
+      title: 'ราคาขาย',
+      width: 110,
       align: 'right',
       sorter: (a, b) => a.price - b.price,
       render: (_, i) => (
         <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
           <Text strong>{baht(i.price)}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {i.cost != null ? `ทุน ${baht(i.cost)}` : 'ไม่ระบุทุน'}
-          </Text>
+          {i.cost != null ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              ทุน {baht(i.cost)}
+            </Text>
+          ) : null}
         </Space>
       ),
     },
     {
       title: 'คงเหลือ',
       dataIndex: 'stock',
-      width: 100,
+      width: 130,
       align: 'right',
+      defaultSortOrder: undefined,
       sorter: (a, b) => a.stock - b.stock,
       render: (s: number, i) => (
-        <Text strong style={{ fontSize: 16 }} type={statusOf(i) === 'ok' ? undefined : 'danger'}>
-          {s}
-          {i.unit ? <Text type="secondary" style={{ fontSize: 12 }}> {i.unit}</Text> : null}
-        </Text>
+        <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
+          <Text strong style={{ fontSize: 18 }} type={statusOf(i) === 'ok' ? undefined : 'danger'}>
+            {s}
+            <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
+          </Text>
+          {i.reserved > 0 ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              ลูกค้าจองไว้ {i.reserved} · ขายได้อีก {i.available}
+            </Text>
+          ) : null}
+        </Space>
       ),
-    },
-    {
-      title: 'จอง',
-      dataIndex: 'reserved',
-      width: 70,
-      align: 'right',
-      responsive: ['md'],
-      render: (r: number) => (r ? r : <Text type="secondary">—</Text>),
-    },
-    {
-      title: 'พร้อมขาย',
-      dataIndex: 'available',
-      width: 90,
-      align: 'right',
-      sorter: (a, b) => a.available - b.available,
-    },
-    {
-      title: 'มูลค่า (ทุน)',
-      width: 110,
-      align: 'right',
-      responsive: ['lg'],
-      sorter: (a, b) => (a.cost ?? 0) * a.stock - (b.cost ?? 0) * b.stock,
-      render: (_, i) =>
-        i.cost != null ? baht(i.cost * i.stock) : <Text type="secondary">—</Text>,
     },
     {
       title: 'สถานะ',
@@ -451,12 +431,12 @@ export function Stock() {
           trigger={['click']}
           menu={{
             items: [
-              { key: 'receive', icon: <RiAddLine className="w-4 h-4" />, label: 'เติมสต๊อก (รับของ)' },
-              { key: 'adjust', icon: <RiPencilLine className="w-4 h-4" />, label: 'ปรับ +/- (ของเสีย/แก้ยอด)' },
-              { key: 'set', icon: <RiScales3Line className="w-4 h-4" />, label: 'นับสต๊อก (ตั้งค่าคงเหลือ)' },
-              { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'เกณฑ์เตือนใกล้หมด' },
+              { key: 'receive', icon: <RiAddLine className="w-4 h-4" />, label: 'เติมของ (ซื้อมาเพิ่ม)' },
+              { key: 'adjust', icon: <RiPencilLine className="w-4 h-4" />, label: 'แก้ยอด +/- (ของเสีย/คลาดเคลื่อน)' },
+              { key: 'set', icon: <RiScales3Line className="w-4 h-4" />, label: 'นับของจริง (ใส่ยอดที่นับได้)' },
+              { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
               { type: 'divider' },
-              { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ประวัติของชิ้นนี้' },
+              { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ดูประวัติชิ้นนี้' },
             ],
             onClick: ({ key }) => {
               if (key === 'history') {
@@ -788,12 +768,12 @@ export function Stock() {
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Statistic title="มูลค่าสต๊อก (ทุน)" value={totals.costValue} prefix="฿" />
+            <Statistic title="เงินจมในสต๊อก (ตามทุน)" value={totals.costValue} prefix="฿" />
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Statistic title="มูลค่าสต๊อก (ราคาขาย)" value={totals.saleValue} prefix="฿" />
+            <Statistic title="ขายหมดได้เงิน (ตามราคาขาย)" value={totals.saleValue} prefix="฿" />
           </Card>
         </Col>
       </Row>
@@ -806,7 +786,7 @@ export function Stock() {
             key: 'overview',
             label: (
               <span className="inline-flex items-center gap-1.5">
-                <RiScales3Line className="w-4 h-4" /> ภาพรวม
+                <RiScales3Line className="w-4 h-4" /> สต๊อกทั้งหมด
                 {lowCount ? <Tag color="red">{lowCount}</Tag> : null}
               </span>
             ),
@@ -845,7 +825,7 @@ export function Stock() {
                     dataSource={shown}
                     loading={loading}
                     pagination={{ pageSize: 25, showSizeChanger: false }}
-                    scroll={{ x: 1080 }}
+                    scroll={{ x: 760 }}
                     size="middle"
                   />
                 </Space>
@@ -856,7 +836,7 @@ export function Stock() {
             key: 'receive',
             label: (
               <span className="inline-flex items-center gap-1.5">
-                <RiInboxArchiveLine className="w-4 h-4" /> รับของเข้า
+                <RiInboxArchiveLine className="w-4 h-4" /> เติมของหลายรายการ
                 {lines.length ? <Tag color="orange">{lines.length}</Tag> : null}
               </span>
             ),
@@ -866,7 +846,7 @@ export function Stock() {
                   <Select
                     showSearch
                     value={search}
-                    placeholder="ค้นหาชื่อสินค้า หรือยิงบาร์โค้ดที่ช่องนี้"
+                    placeholder="ยิงบาร์โค้ด หรือพิมพ์ชื่อของที่ซื้อมา"
                     style={{ width: '100%', maxWidth: 520 }}
                     options={items.map((i) => ({
                       value: i.variantId,
@@ -913,11 +893,11 @@ export function Stock() {
                         style={{ maxWidth: 520 }}
                       />
                       <Button type="primary" loading={saving} onClick={() => void saveReceive()}>
-                        บันทึกรับของ ({lines.reduce((s, l) => s + l.qty, 0)} ชิ้น)
+                        บันทึกเติมของ ({lines.reduce((s, l) => s + l.qty, 0)} ชิ้น)
                       </Button>
                     </>
                   ) : (
-                    <Empty description="ค้นหาสินค้าหรือยิงบาร์โค้ดเพื่อเริ่มรับของ" />
+                    <Empty description="ยิงบาร์โค้ดหรือพิมพ์ชื่อ เพื่อเพิ่มของที่ซื้อมาลงรายการ แล้วบันทึกทีเดียวทั้งบิล" />
                   )}
                 </Space>
               </Card>
