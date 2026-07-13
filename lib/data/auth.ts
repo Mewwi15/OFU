@@ -249,6 +249,18 @@ export const authRepo = {
     }
   },
 
+  /** Is a LINE account linked to the signed-in user (order notifications)? */
+  async getLineLinked(): Promise<boolean> {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) return false;
+    const { data } = await supabase
+      .from('app_users')
+      .select('line_user_id')
+      .eq('id', auth.user.id)
+      .maybeSingle();
+    return !!data?.line_user_id;
+  },
+
   async getConsentStatus(): Promise<Record<string, boolean>> {
     const { data, error } = await supabase.rpc('get_consent_status');
     if (error) throw error;

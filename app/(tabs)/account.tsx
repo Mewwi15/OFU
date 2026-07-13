@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -27,8 +27,9 @@ import {
   hasPendingDeletionRequest,
   requestAccountDeletion,
 } from '@/lib/data/account';
-import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
+import { authRepo, getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
+import { startLineAuth } from '@/lib/line';
 import { showAlert, showConfirm } from '@/lib/showAlert';
 import { useAuth } from '@/store/auth';
 import { useChat } from '@/store/chat';
@@ -71,6 +72,7 @@ const SECTIONS: MenuSection[] = [
   {
     titleKey: 'account.sec.prefs',
     rows: [
+      { key: 'line', labelKey: 'account.menu.line', icon: ICON.member },
       { key: 'settings', labelKey: 'account.menu.notif', icon: ICON.settings },
       { key: 'language', labelKey: 'account.menu.lang', icon: ICON.language },
     ],
@@ -91,6 +93,7 @@ export default function ProfileScreen() {
   const logout = useAuth((s) => s.logout);
   const [identity, setIdentity] = useState<AccountIdentity | null>(null);
   const [deletionPending, setDeletionPending] = useState(false);
+  const [lineLinked, setLineLinked] = useState(false);
   const chatUnread = useChat((s) => s.unread);
   const refreshChatUnread = useChat((s) => s.refreshUnread);
   const t = useT();
@@ -103,12 +106,25 @@ export default function ProfileScreen() {
       hasPendingDeletionRequest()
         .then(setDeletionPending)
         .catch(() => {});
+      authRepo
+        .getLineLinked()
+        .then(setLineLinked)
+        .catch(() => {});
       void refreshChatUnread();
     }, [refreshChatUnread]),
   );
 
   const onRow = (key: string) => {
     switch (key) {
+      case 'line':
+        if (lineLinked) {
+          showAlert(t('line.alreadyLinkedTitle'), t('line.alreadyLinkedBody'));
+        } else if (Platform.OS === 'web') {
+          startLineAuth('link');
+        } else {
+          showAlert(t('line.webOnlyTitle'), t('line.webOnlyBody'));
+        }
+        break;
       case 'orders':
         router.navigate('/orders');
         break;
@@ -291,7 +307,9 @@ export default function ProfileScreen() {
                     pressed && styles.rowPressed,
                   ]}>
                   <Image source={row.icon} style={styles.menuIcon} contentFit="contain" />
-                  <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
+                  <Text style={styles.rowLabel}>
+                    {t(row.key === 'line' && lineLinked ? 'account.menu.lineLinked' : row.labelKey)}
+                  </Text>
                   {row.key === 'chat' && chatUnread > 0 ? (
                     <View style={styles.unreadBadge}>
                       <Text style={styles.unreadText}>

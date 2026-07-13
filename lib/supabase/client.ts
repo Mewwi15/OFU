@@ -31,9 +31,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // Web OAuth returns to the site with ?code=… — let supabase-js pick it up
-    // and complete the PKCE exchange. Native exchanges the code manually.
-    detectSessionInUrl: Platform.OS === 'web',
+    // OFF everywhere: auto-detection grabs ANY ?code= in the URL — including
+    // LINE Login's callback — and tries to PKCE-exchange it against Supabase,
+    // breaking the LINE flow. The root layout exchanges the Google web code
+    // manually (and skips /line-callback); native exchanges manually too.
+    detectSessionInUrl: false,
     // PKCE for the mobile OAuth flow (code exchanged via exchangeCodeForSession).
     flowType: 'pkce',
   },

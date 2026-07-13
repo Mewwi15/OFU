@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { SiteShell } from '@/components/web/SiteShell';
+import { supabase } from '@/lib/supabase/client';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/lib/webAlertPolyfill';
 import '@/lib/webFocusStyle';
@@ -63,6 +64,19 @@ export default function RootLayout() {
     hydrate();
     initAuth();
   }, [hydrate, initAuth]);
+
+  // Web: complete the Google OAuth PKCE return manually (detectSessionInUrl
+  // is off so it can't swallow LINE's ?code= — see lib/supabase/client.ts).
+  // LINE's callback path handles its own code.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (window.location.pathname.startsWith('/line-callback')) return;
+    const code = new URLSearchParams(window.location.search).get('code');
+    if (!code) return;
+    void supabase.auth.exchangeCodeForSession(code).finally(() => {
+      window.history.replaceState({}, '', window.location.pathname);
+    });
+  }, []);
 
   // Web: a tab from a previous deploy requests route chunks that no longer
   // exist (hashed filenames change per deploy) and dies with a white screen.
@@ -172,6 +186,11 @@ export default function RootLayout() {
               <Stack.Screen name="account/legal" />
               <Stack.Screen name="notifications" />
             </Stack.Protected>
+
+            {/* Outside the auth gate (LAST — never the fallback route): LINE
+                OAuth returns here both signed-in (link) and signed-out
+                (login). Web-only route. */}
+            <Stack.Screen name="line-callback" />
           </Stack>
           </SiteShell>
           <StatusBar style="dark" />

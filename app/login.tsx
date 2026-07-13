@@ -30,9 +30,10 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
+import { startLineAuth } from '@/lib/line';
 import { useAuth } from '@/store/auth';
 
-const BRAND = { google: '#FFFFFF' } as const;
+const BRAND = { google: '#FFFFFF', line: '#06C755' } as const;
 const CODE_LENGTH = 6;
 const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -287,6 +288,18 @@ export default function LoginScreen() {
               <Ionicons name="logo-google" size={20} color={Colors.text} />
               <Text style={[styles.socialText, { color: Colors.text }]}>{t('login.continueGoogle')}</Text>
             </PressableScale>
+            {/* LINE Login — web-only redirect flow (lib/line.ts). */}
+            {Platform.OS === 'web' ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={t('login.continueLine')}
+                onPress={() => startLineAuth('login')}
+                scaleTo={0.98}
+                style={[styles.social, { backgroundColor: BRAND.line }]}>
+                <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
+                <Text style={[styles.socialText, { color: '#FFFFFF' }]}>{t('login.continueLine')}</Text>
+              </PressableScale>
+            ) : null}
           </>
         ) : (
           <>
