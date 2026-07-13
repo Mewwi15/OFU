@@ -17,6 +17,7 @@
 import {
   RiAddLine,
   RiArrowDownSLine,
+  RiCoinsLine,
   RiAlarmWarningLine,
   RiDeleteBinLine,
   RiDownload2Line,
@@ -292,7 +293,7 @@ export function Stock() {
   }, [items]);
 
   /* ── row-action modal (เติม / ปรับ / นับ / เกณฑ์เตือน) ─────────────────── */
-  type Action = 'receive' | 'adjust' | 'set' | 'threshold';
+  type Action = 'receive' | 'adjust' | 'set' | 'threshold' | 'cost';
   const [action, setAction] = useState<{ type: Action; item: Item } | null>(null);
   const [actionQty, setActionQty] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState('');
@@ -300,7 +301,12 @@ export function Stock() {
 
   const openAction = (type: Action, item: Item) => {
     setAction({ type, item });
-    setActionQty(type === 'threshold' ? item.threshold : type === 'set' ? item.stock : null);
+    setActionQty(
+      type === 'threshold' ? item.threshold
+      : type === 'set' ? item.stock
+      : type === 'cost' ? item.cost
+      : null,
+    );
     setActionNote('');
   };
 
@@ -326,13 +332,17 @@ export function Stock() {
           product_id: item.productId,
           size: item.size,
           price: item.price,
-          low_stock_threshold: actionQty,
+          low_stock_threshold: type === 'threshold' ? actionQty : item.threshold,
           sku: item.sku,
           barcode: item.barcode,
-          cost_price: item.cost,
+          cost_price: type === 'cost' ? actionQty : item.cost,
           unit: item.unit,
         });
-        message.success(`ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`);
+        message.success(
+          type === 'cost'
+            ? `ตั้งทุน ${itemLabel(item)} = ${baht(actionQty)}`
+            : `ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`,
+        );
       }
       setAction(null);
       void reload();
@@ -349,6 +359,7 @@ export function Stock() {
     adjust: { title: 'แก้ยอด (+/-)', hint: 'ของเสีย/หาย ใส่เลขติดลบ เช่น -2', min: -100000 },
     set: { title: 'นับของจริง', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย ระบบคิดส่วนต่างให้', min: 0 },
     threshold: { title: 'ตั้งเตือนใกล้หมด', hint: 'เหลือถึงจำนวนนี้เมื่อไหร่ LINE จะเด้งเตือน', min: 0 },
+    cost: { title: 'แก้ต้นทุนต่อชิ้น', hint: 'ซื้อมาชิ้นละกี่บาท (ไว้คำนวณกำไรและเงินจมในสต๊อก)', min: 0 },
   };
 
   /* ── overview columns ───────────────────────────────────────────────── */
@@ -377,16 +388,7 @@ export function Stock() {
       width: 110,
       align: 'right',
       sorter: (a, b) => a.price - b.price,
-      render: (_, i) => (
-        <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
-          <Text strong style={{ fontSize: 16 }}>{baht(i.price)}</Text>
-          {i.cost != null ? (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              ทุน {baht(i.cost)}
-            </Text>
-          ) : null}
-        </Space>
-      ),
+      render: (_, i) => <Text strong style={{ fontSize: 16 }}>{baht(i.price)}</Text>,
     },
     {
       title: 'คงเหลือ',
@@ -459,6 +461,87 @@ export function Stock() {
             จัดการ <RiArrowDownSLine className="w-4 h-4 inline-block align-text-bottom" />
           </Button>
         </Dropdown>
+      ),
+    },
+  ];
+
+
+  /* ── ต้นทุน tab ─────────────────────────────────────────────────────── */
+  const costColumns: ColumnsType<Item> = [
+    {
+      title: 'สินค้า',
+      fixed: 'left',
+      width: 260,
+      sorter: (a, b) => a.productName.localeCompare(b.productName, 'th'),
+      render: (_, i) => (
+        <Space>
+          <Avatar shape="square" size={40} src={i.image ?? undefined}>
+            {i.productName[0]}
+          </Avatar>
+          <Text strong style={{ fontSize: 15 }}>{itemLabel(i)}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'ทุน/ชิ้น',
+      width: 110,
+      align: 'right',
+      sorter: (a, b) => (a.cost ?? -1) - (b.cost ?? -1),
+      render: (_, i) =>
+        i.cost != null ? (
+          <Text strong style={{ fontSize: 15 }}>{baht(i.cost)}</Text>
+        ) : (
+          <Tag color="orange">ยังไม่ใส่</Tag>
+        ),
+    },
+    {
+      title: 'ขาย/ชิ้น',
+      dataIndex: 'price',
+      width: 110,
+      align: 'right',
+      sorter: (a, b) => a.price - b.price,
+      render: (v: number) => <Text style={{ fontSize: 15 }}>{baht(v)}</Text>,
+    },
+    {
+      title: 'กำไร/ชิ้น',
+      width: 110,
+      align: 'right',
+      sorter: (a, b) => (a.cost != null ? a.price - a.cost : -1) - (b.cost != null ? b.price - b.cost : -1),
+      render: (_, i) =>
+        i.cost != null ? (
+          <Text strong style={{ fontSize: 15, color: i.price - i.cost >= 0 ? '#15803d' : '#dc2626' }}>
+            {baht(i.price - i.cost)}
+          </Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: 'คงเหลือ',
+      dataIndex: 'stock',
+      width: 90,
+      align: 'right',
+      sorter: (a, b) => a.stock - b.stock,
+      render: (v: number) => <Text style={{ fontSize: 15 }}>{v}</Text>,
+    },
+    {
+      title: 'เงินจม (ทุน x คงเหลือ)',
+      width: 150,
+      align: 'right',
+      sorter: (a, b) => (a.cost ?? 0) * a.stock - (b.cost ?? 0) * b.stock,
+      render: (_, i) =>
+        i.cost != null ? (
+          <Text strong style={{ fontSize: 15 }}>{baht(i.cost * i.stock)}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
+    {
+      title: '',
+      fixed: 'right',
+      width: 110,
+      render: (_, i) => (
+        <Button onClick={() => openAction('cost', i)}>แก้ทุน</Button>
       ),
     },
   ];
@@ -762,7 +845,7 @@ export function Stock() {
       <Row gutter={[12, 12]}>
         <Col xs={12} md={6}>
           <Card size="small">
-            <Statistic title="รายการสินค้า" value={items.length} suffix={`(${totals.pieces} ชิ้น)`} />
+            <Statistic title="รายการสินค้า" value={items.length} />
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -841,6 +924,31 @@ export function Stock() {
                           ? 'stock-row-low'
                           : ''
                     }
+                  />
+                </Space>
+              </Card>
+            ),
+          },
+          {
+            key: 'cost',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <RiCoinsLine className="w-4 h-4" /> ต้นทุน
+              </span>
+            ),
+            children: (
+              <Card>
+                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                  <Text type="secondary">
+                    ใส่ทุนต่อชิ้นไว้ ระบบจะคำนวณกำไรต่อชิ้นและเงินจมในสต๊อกให้อัตโนมัติ
+                  </Text>
+                  <Table
+                    rowKey="variantId"
+                    columns={costColumns}
+                    dataSource={items}
+                    loading={loading}
+                    pagination={{ pageSize: 25, showSizeChanger: false }}
+                    scroll={{ x: 900 }}
                   />
                 </Space>
               </Card>
