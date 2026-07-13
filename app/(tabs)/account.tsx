@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,6 +29,7 @@ import {
 } from '@/lib/data/account';
 import { getAccountIdentity, type AccountIdentity } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
+import { showAlert, showConfirm } from '@/lib/showAlert';
 import { useAuth } from '@/store/auth';
 import { useChat } from '@/store/chat';
 
@@ -136,56 +137,46 @@ export default function ProfileScreen() {
   // with the PIN it already set (ensurePinOwner wipes it only when a DIFFERENT
   // account signs in). Wiping here forced a fresh PIN setup on every re-login.
   // The lock screen's own logout still wipes — that path is the forgot-PIN escape.
-  const confirmLogout = () => {
-    Alert.alert(t('account.logout'), t('account.logoutConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('account.logout'),
-        style: 'destructive',
-        onPress: () => {
-          void logout();
-        },
-      },
-    ]);
+  const confirmLogout = async () => {
+    const ok = await showConfirm(t('account.logout'), t('account.logoutConfirm'), {
+      confirmText: t('account.logout'),
+      cancelText: t('common.cancel'),
+      destructive: true,
+    });
+    if (ok) void logout();
   };
 
   // Request-based deletion (App Store 5.1.1(v) requires in-app initiation;
   // the shop processes it manually — see lib/data/account.ts).
-  const confirmDeletion = () => {
+  const confirmDeletion = async () => {
     if (deletionPending) {
-      Alert.alert(t('account.deleteCancelTitle'), t('account.deleteCancelBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('account.deleteCancelCta'),
-          onPress: async () => {
-            try {
-              await cancelAccountDeletion();
-              setDeletionPending(false);
-              Alert.alert(t('account.deleteCancelled'));
-            } catch {
-              Alert.alert(t('account.deleteFailed'));
-            }
-          },
-        },
-      ]);
+      const ok = await showConfirm(t('account.deleteCancelTitle'), t('account.deleteCancelBody'), {
+        confirmText: t('account.deleteCancelCta'),
+        cancelText: t('common.cancel'),
+      });
+      if (!ok) return;
+      try {
+        await cancelAccountDeletion();
+        setDeletionPending(false);
+        showAlert(t('account.deleteCancelled'));
+      } catch {
+        showAlert(t('account.deleteFailed'));
+      }
       return;
     }
-    Alert.alert(t('account.deleteConfirmTitle'), t('account.deleteConfirmBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('account.deleteConfirmCta'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await requestAccountDeletion();
-            setDeletionPending(true);
-            Alert.alert(t('account.deleteSentTitle'), t('account.deleteSentBody'));
-          } catch {
-            Alert.alert(t('account.deleteFailed'));
-          }
-        },
-      },
-    ]);
+    const ok = await showConfirm(t('account.deleteConfirmTitle'), t('account.deleteConfirmBody'), {
+      confirmText: t('account.deleteConfirmCta'),
+      cancelText: t('common.cancel'),
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await requestAccountDeletion();
+      setDeletionPending(true);
+      showAlert(t('account.deleteSentTitle'), t('account.deleteSentBody'));
+    } catch {
+      showAlert(t('account.deleteFailed'));
+    }
   };
 
   return (

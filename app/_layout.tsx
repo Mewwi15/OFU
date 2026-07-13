@@ -16,6 +16,7 @@ import 'react-native-reanimated';
 
 import { SiteShell } from '@/components/web/SiteShell';
 import { ThemeProvider } from '@/theme/theme-provider';
+import '@/lib/webAlertPolyfill';
 import { useAuth } from '@/store/auth';
 import { useLock } from '@/store/lock';
 

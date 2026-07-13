@@ -13,3 +13,28 @@ export function showAlert(title: string, body?: string): void {
   }
   Alert.alert(title, body);
 }
+
+/**
+ * Confirm dialog → resolves true when the user accepts. Web uses
+ * window.confirm (Alert buttons never fire there); native shows the standard
+ * two-button Alert with the confirm action marked destructive when asked.
+ */
+export function showConfirm(
+  title: string,
+  body: string,
+  opts: { confirmText: string; cancelText: string; destructive?: boolean },
+): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return Promise.resolve(window.confirm(`${title}\n\n${body}`));
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, body, [
+      { text: opts.cancelText, style: 'cancel', onPress: () => resolve(false) },
+      {
+        text: opts.confirmText,
+        style: opts.destructive ? 'destructive' : 'default',
+        onPress: () => resolve(true),
+      },
+    ]);
+  });
+}
