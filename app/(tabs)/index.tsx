@@ -221,18 +221,6 @@ export default function HomeScreen() {
 
         {/* Body (padded) — search floats over the hero's bottom edge */}
         <View style={styles.body}>
-          {/* Search entry — tapping opens the full catalog */}
-          <PressableScale
-            accessibilityRole="search"
-            accessibilityLabel={t('home.searchProducts')}
-            onPress={() => openCatalog()}
-            scaleTo={0.98}
-            style={styles.searchEntry}>
-            <Ionicons name="search" size={20} color={Colors.textMuted} />
-            <Text style={styles.searchPlaceholder}>{t('home.searchProducts')}</Text>
-            <Ionicons name="mic-outline" size={20} color={Colors.primary} />
-          </PressableScale>
-
           {/* Store-closed notice */}
           {!shopOpen ? (
             <View style={styles.closedBanner}>
@@ -361,21 +349,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Mitr_500Medium',
     fontSize: 15,
     color: Colors.text,
-  },
-  searchEntry: {
-    marginTop: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    height: 52,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.surface,
-    ...Shadow.float,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    color: Colors.textMuted,
   },
   closedBanner: {
     flexDirection: 'row',

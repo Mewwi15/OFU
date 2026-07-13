@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -45,7 +45,11 @@ export default function CatalogScreen() {
   // A slim header band below the safe area, at the same aspect the admin crops
   // search_hero to (BANNER_ASPECT) — cropped image fills it with no mismatch.
   const bannerHeight = screenW / BANNER_ASPECT.search_hero;
-  const { category, q: qParam } = useLocalSearchParams<{ category?: string; q?: string }>();
+  const { category, q: qParam, focus } = useLocalSearchParams<{
+    category?: string;
+    q?: string;
+    focus?: string;
+  }>();
 
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>(category ?? 'ทั้งหมด');
@@ -135,16 +139,11 @@ export default function CatalogScreen() {
             <SearchBar
               value={query}
               onChangeText={setQuery}
+              // Home's search shortcut lands here — put the cursor in the
+              // field on web so typing continues seamlessly (native keeps
+              // its no-keyboard-pop behavior).
+              autoFocus={Platform.OS === 'web' && focus === '1'}
               placeholder={t('search.placeholder')}
-              rightIcon={
-                <Pressable
-                  onPress={() => {}}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('search.voiceSearch')}>
-                  <Ionicons name="mic-outline" size={20} color={Colors.primary} />
-                </Pressable>
-              }
               containerStyle={styles.search}
             />
             <View style={styles.cartWrap}>
