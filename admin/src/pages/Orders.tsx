@@ -1,4 +1,4 @@
-import { RiRefreshLine, RiSearchLine } from '@remixicon/react';
+import { RiPrinterLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import {
   App,
   Button,
@@ -29,6 +29,7 @@ import {
   cancelOrder,
   getOrderItems,
   getParcelTracking,
+  getShopName,
   getSlipUrl,
   listOrders,
   nextStatus,
@@ -42,6 +43,7 @@ import {
   type ShopMode,
   type SlipRejectReason,
 } from '../lib/orders';
+import { printAddressLabel, printPickList } from '../lib/printOrder';
 import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
 
 const { Title, Text } = Typography;
@@ -443,6 +445,21 @@ function OrderDrawer({
         ) : null}
         <Descriptions.Item label="เวลา">{fmtTime(order.placed_at)}</Descriptions.Item>
       </Descriptions>
+
+      {/* Print sheets: packing checklist + shop address label (the official
+          Flash waybill still prints from Flash's own system/printer app). */}
+      <Space style={{ marginTop: 12 }} wrap>
+        <Button
+          icon={<RiPrinterLine className="w-4 h-4" />}
+          onClick={async () => printPickList(order, items, await getShopName())}>
+          พิมพ์ใบจัดสินค้า
+        </Button>
+        <Button
+          icon={<RiPrinterLine className="w-4 h-4" />}
+          onClick={async () => printAddressLabel(order, await getShopName(), trackingNo)}>
+          พิมพ์ใบจ่าหน้า
+        </Button>
+      </Space>
 
       <Divider titlePlacement="left" style={{ margin: '20px 0 12px' }}>
         รายการสินค้า

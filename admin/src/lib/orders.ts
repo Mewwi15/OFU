@@ -207,3 +207,9 @@ const NEXT_ONLINE: Partial<Record<OrderStatus, OrderStatus>> = {
 export function nextStatus(mode: ShopMode, current: OrderStatus): OrderStatus | null {
   return (mode === 'delivery' ? NEXT_DELIVERY : NEXT_ONLINE)[current] ?? null;
 }
+
+/** Shop display name — the sender line on printed sheets. */
+export async function getShopName(): Promise<string> {
+  const { data } = await supabase.from('shops').select('name').limit(1).maybeSingle();
+  return (data?.name as string) ?? 'ร้านอู้ฟู่';
+}
