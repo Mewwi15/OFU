@@ -531,3 +531,38 @@ export const createPosSale = (p: PosSaleInput) =>
     p_tax_invoice: p.tax_invoice ?? false,
     p_payments: p.payments ?? undefined,
   });
+
+/* ── Stock workspace (สต๊อก) ───────────────────────────────────────────────── */
+export type StockMovement = {
+  id: string;
+  created_at: string;
+  reason: string;
+  delta_stock: number;
+  delta_reserved: number;
+  variant_id: string;
+  size: string | null;
+  product_name: string;
+  order_number: string | null;
+  actor_name: string | null;
+};
+
+/** Ledger page, newest first; pass `before` (created_at) to page further back. */
+export async function listStockMovements(limit = 200, before?: string): Promise<StockMovement[]> {
+  let q = supabase
+    .from('stock_movements_view')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (before) q = q.lt('created_at', before);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data as StockMovement[];
+}
+
+/** Goods-in: adds qty to a variant with its own 'receive' ledger reason. */
+export const receiveStock = (variantId: string, qty: number, note?: string) =>
+  rpc<{ variant_id: string; stock_qty: number }>('receive_stock', {
+    p_variant_id: variantId,
+    p_qty: qty,
+    p_note: note ?? undefined,
+  });

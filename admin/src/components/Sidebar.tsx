@@ -1,4 +1,5 @@
 import {
+  RiInboxArchiveLine,
   RiBarChart2Line,
   RiBillLine,
   RiCashLine,
@@ -45,6 +46,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
       { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
+      { to: '/stock', label: 'สต๊อก', Icon: RiInboxArchiveLine },
     ],
   },
   {

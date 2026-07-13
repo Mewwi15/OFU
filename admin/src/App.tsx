@@ -19,6 +19,7 @@ import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
+import { Stock } from './pages/Stock';
 import { ScanLab } from './pages/ScanLab';
 import { Settings } from './pages/Settings';
 import { StoreCredit } from './pages/StoreCredit';
@@ -58,6 +59,7 @@ export default function App() {
         <Route index element={<Navigate to="/pos" replace />} />
         <Route path="/pos" element={<Pos />} />
         <Route path="/pos-sales" element={<PosSales />} />
+        <Route path="/stock" element={<Stock />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
