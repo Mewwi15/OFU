@@ -917,7 +917,10 @@ const styles = StyleSheet.create({
   },
   checkoutLeft: {
     flex: 1,
-    gap: 2,
+    // Was a bare `2` — the "รวมที่เลือก · N ชิ้น" caption sat almost touching
+    // the title-sized price below it. Spacing.sm gives the label its own
+    // breathing room without pulling the price row apart from it.
+    gap: Spacing.sm,
   },
   checkoutLabel: {
     ...Typography.caption,
