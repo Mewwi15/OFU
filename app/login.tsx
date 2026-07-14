@@ -184,15 +184,18 @@ export default function LoginScreen() {
           styles.content,
           { paddingTop: insets.top + Spacing.x3, paddingBottom: insets.bottom + Spacing.x2 },
         ]}>
-        {/* Brand */}
+        {/* Brand — a tinted hero band (not just text floating on the plain
+            background) so the screen reads as designed, not placeholder. */}
         <View style={styles.brand}>
           <Image source={require('@/assets/images/logo-oofoo.png')} style={styles.logo} contentFit="contain" />
-          <Text variant="title" style={styles.welcome}>
+          <Text variant="heading" style={styles.welcome}>
             {t('login.welcome')}
           </Text>
-          <Text variant="body" style={styles.tagline}>
-            {t('login.tagline')}
-          </Text>
+          <View style={styles.taglineChip}>
+            <Text variant="body" style={styles.tagline}>
+              {t('login.tagline')}
+            </Text>
+          </View>
         </View>
 
         {socialError ? (
@@ -460,12 +463,36 @@ function authMessage(e: unknown, mode: Mode): string {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { flexGrow: 1, paddingHorizontal: Spacing.x2 },
+  // `justifyContent: 'center'` groups brand+form+consent as one block and
+  // centers it when content is short (the LINE-only view) instead of leaving
+  // a stark empty gap above a footer pinned to the bottom; it's a no-op once
+  // content is tall enough to scroll (the classic email/password form).
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.x2 },
 
-  brand: { alignItems: 'center', marginBottom: Spacing.x2 },
-  logo: { width: 132, height: 58, marginBottom: Spacing.lg },
+  // Tinted hero band (bleeds past the content padding) instead of the logo
+  // and welcome text floating alone on the plain page background.
+  brand: {
+    alignItems: 'center',
+    marginHorizontal: -Spacing.x2,
+    marginBottom: Spacing.x3,
+    paddingHorizontal: Spacing.x2,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.x3,
+    backgroundColor: Colors.primaryTint,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+  },
+  logo: { width: 160, height: 70, marginBottom: Spacing.md },
   welcome: { color: Colors.text },
-  tagline: { color: Colors.textMuted, marginTop: Spacing.xs },
+  taglineChip: {
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surface,
+    ...Shadow.card,
+  },
+  tagline: { color: Colors.textMuted },
 
   socialErrorBanner: {
     flexDirection: 'row',
@@ -540,9 +567,9 @@ const styles = StyleSheet.create({
   socialBordered: { borderWidth: 1, borderColor: Colors.border },
   /* LINE-first (web): the hero button + hint + escape hatch to the old form */
   lineHero: {
-    minHeight: 56,
+    minHeight: 58,
     marginTop: Spacing.lg,
-    ...Shadow.card,
+    ...Shadow.float,
   },
   lineHeroHint: {
     color: Colors.textMuted,
@@ -551,13 +578,16 @@ const styles = StyleSheet.create({
   },
   otherMethods: {
     alignSelf: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   otherMethodsText: {
     ...Typography.button,
     color: Colors.textMuted,
-    textDecorationLine: 'underline',
   },
   /* Native Apple button — must carry explicit dimensions to render; height and
      pill radius mirror the Google row below it. */
@@ -591,6 +621,6 @@ const styles = StyleSheet.create({
   resendText: { ...Typography.button, color: Colors.primaryStrong },
 
   /* Consent */
-  consent: { textAlign: 'center', marginTop: 'auto', paddingTop: Spacing.x2, lineHeight: 19 },
+  consent: { textAlign: 'center', marginTop: Spacing.x3, paddingTop: Spacing.x2, lineHeight: 19 },
   consentLink: { color: Colors.primaryStrong },
 });
