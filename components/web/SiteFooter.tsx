@@ -8,9 +8,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
-
-const PRIVACY_URL = 'https://ofu-ivory.vercel.app/privacy';
-const DELETE_URL = 'https://ofu-ivory.vercel.app/delete-account';
+import { DELETE_ACCOUNT_URL, PRIVACY_URL } from '@/lib/legal';
 
 export function SiteFooter() {
   const t = useT();
@@ -23,7 +21,7 @@ export function SiteFooter() {
             <Text style={styles.link}>{t('site.privacy')}</Text>
           </Pressable>
           <Text style={styles.dot}>·</Text>
-          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(DELETE_URL)}>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(DELETE_ACCOUNT_URL)}>
             <Text style={styles.link}>{t('site.deleteAccount')}</Text>
           </Pressable>
         </View>

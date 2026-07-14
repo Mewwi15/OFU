@@ -10,6 +10,7 @@ type Dict = Record<string, string>;
 
 const th: Dict = {
   'common.cancel': 'ยกเลิก',
+  'common.close': 'ปิด',
   'common.tryAgain': 'กรุณาลองใหม่อีกครั้ง',
   'common.notSet': 'ยังไม่ได้เพิ่ม',
 
@@ -84,6 +85,8 @@ const th: Dict = {
   'login.otpInvalid': 'รหัส OTP ไม่ถูกต้อง',
   'login.socialFailed': 'เข้าสู่ระบบไม่สำเร็จ',
   'login.socialFailedBody': 'ไม่สามารถเข้าสู่ระบบด้วยโซเชียลได้ กรุณาลองใหม่',
+  'login.googleCancelled': 'ยกเลิกการเข้าสู่ระบบด้วย Google',
+  'login.googleFailed': 'เข้าสู่ระบบด้วย Google ไม่สำเร็จ ลองใหม่อีกครั้ง',
 
   'settings.title': 'ตั้งค่าการแจ้งเตือน',
   'settings.promoLabel': 'ข่าวสารและโปรโมชัน',
@@ -98,7 +101,8 @@ const th: Dict = {
   'language.english': 'English',
 
   'legal.title': 'ข้อมูลทางกฎหมาย',
-  'legal.note': 'อัปเดตล่าสุด: เวอร์ชันทดลอง — ข้อความฉบับสมบูรณ์จะประกาศก่อนเปิดให้บริการจริง',
+  'legal.note': 'นี่คือสรุปโดยย่อ — อ่านนโยบายความเป็นส่วนตัวฉบับเต็มได้จากปุ่มด้านบน',
+  'legal.readFull': 'อ่านนโยบายความเป็นส่วนตัวฉบับเต็ม',
   'legal.s1.title': 'ข้อกำหนดการใช้งาน',
   'legal.s1.body':
     'การใช้แอปอู้ฟู่ถือว่าคุณยอมรับข้อกำหนดการใช้งาน คุณตกลงจะใช้บริการตามกฎหมาย ไม่ใช้ในทางที่ผิด และรับผิดชอบข้อมูลในบัญชีของคุณ ราคาสินค้าและค่าจัดส่งเป็นไปตามที่แสดงขณะสั่งซื้อ',
@@ -107,10 +111,10 @@ const th: Dict = {
     'เราเก็บข้อมูลส่วนบุคคล (ชื่อ เบอร์โทร ที่อยู่จัดส่ง) เพื่อให้บริการจัดส่งและติดต่อเรื่องคำสั่งซื้อเท่านั้น เราไม่ขายข้อมูลของคุณ คุณมีสิทธิ์ขอเข้าถึง แก้ไข หรือลบข้อมูล และถอนความยินยอมได้ทุกเมื่อผ่านเมนู "ลบบัญชี"',
   'legal.s3.title': 'การชำระเงินและการคืนเงิน',
   'legal.s3.body':
-    'รองรับการชำระเงินปลายทางและพร้อมเพย์ (แนบสลิป) กรณีสินค้ามีปัญหาหรือยกเลิกก่อนจัดส่ง สามารถติดต่อขอคืนเงินได้ตามเงื่อนไขของร้าน',
+    'ชำระผ่านพร้อมเพย์พร้อมแนบสลิปยืนยัน (ร้านตรวจสอบด้วยตนเอง) กรณีสินค้ามีปัญหาหรือยกเลิกก่อนจัดส่ง สามารถติดต่อขอคืนเงินได้ตามเงื่อนไขของร้าน',
   'legal.s4.title': 'ติดต่อเรา',
   'legal.s4.body':
-    'ร้านอู้ฟู่ · โทร 02-000-0000 เปิดทุกวัน 24 ชั่วโมง สำหรับคำถามเรื่องข้อมูลส่วนบุคคล ติดต่อเจ้าหน้าที่คุ้มครองข้อมูลได้ที่ช่องทางเดียวกัน',
+    'ร้านอู้ฟู่ — ติดต่อผ่านแชตในแอป (เมนูบัญชี) หรือที่หน้าร้าน คำถามเรื่องข้อมูลส่วนบุคคลติดต่อช่องทางเดียวกันได้',
 
   'home.shopNow': 'ช้อปเลย',
   'home.changeAddress': 'เปลี่ยนที่อยู่จัดส่ง',
@@ -559,6 +563,7 @@ const th: Dict = {
 
 const en: Dict = {
   'common.cancel': 'Cancel',
+  'common.close': 'Close',
   'common.tryAgain': 'Please try again.',
   'common.notSet': 'Not set',
 
@@ -633,6 +638,8 @@ const en: Dict = {
   'login.otpInvalid': 'Incorrect OTP code',
   'login.socialFailed': 'Sign-in failed',
   'login.socialFailedBody': 'Could not sign in with social. Please try again.',
+  'login.googleCancelled': 'Google sign-in was cancelled',
+  'login.googleFailed': 'Could not sign in with Google. Please try again.',
 
   'settings.title': 'Notification settings',
   'settings.promoLabel': 'News and promotions',
@@ -647,7 +654,8 @@ const en: Dict = {
   'language.english': 'English',
 
   'legal.title': 'Legal',
-  'legal.note': 'Last updated: preview version — the full text will be published before launch.',
+  'legal.note': 'This is a short summary — read the full privacy policy via the button above.',
+  'legal.readFull': 'Read the full privacy policy',
   'legal.s1.title': 'Terms of use',
   'legal.s1.body':
     'By using Oofoo you accept these terms. You agree to use the service lawfully, not misuse it, and stay responsible for your account. Prices and delivery fees are as shown at checkout.',
@@ -656,10 +664,10 @@ const en: Dict = {
     'We collect personal data (name, phone, delivery address) only to deliver your orders and contact you about them. We do not sell your data. You may request access, correction, or deletion, and withdraw consent anytime via "Delete account".',
   'legal.s3.title': 'Payments and refunds',
   'legal.s3.body':
-    'We support cash on delivery and PromptPay (with slip). For faulty items or cancellations before dispatch, you may request a refund per the shop’s terms.',
+    'We support PromptPay with a payment slip you upload (checked by our staff). For faulty items or cancellations before dispatch, you may request a refund per the shop’s terms.',
   'legal.s4.title': 'Contact us',
   'legal.s4.body':
-    'Oofoo · 02-000-0000, open 24 hours every day. For data-privacy questions, contact our data protection officer through the same channel.',
+    'Oofoo — reach us via in-app chat (Account menu) or at the shop. Data-privacy questions can go through the same channel.',
 
   'home.shopNow': 'Shop now',
   'home.changeAddress': 'Change delivery address',

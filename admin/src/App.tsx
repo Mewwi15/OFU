@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { useAuth } from './auth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { installFlightRecorder, recordNav } from './lib/flightRecorder';
 import { installScannerGuard } from './lib/scannerGuard';
@@ -43,33 +44,35 @@ export default function App() {
   }, [location.pathname]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      {/* Public — store compliance pages (Play Data Safety / App Store links). */}
-      <Route path="/delete-account" element={<DeleteAccountInfo />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route
-        element={
-          <Protected>
-            <Layout />
-          </Protected>
-        }>
-        <Route index element={<Navigate to="/pos" replace />} />
-        <Route path="/pos" element={<Pos />} />
-        <Route path="/pos-sales" element={<PosSales />} />
-        <Route path="/stock" element={<Stock />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/categories" element={<Categories />} />
-        <Route path="/store-credit" element={<StoreCredit />} />
-        <Route path="/broadcast" element={<Broadcast />} />
-        <Route path="/banners" element={<Banners />} />
-        <Route path="/orders" element={<Orders />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/scan-lab" element={<ScanLab />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/pos" replace />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        {/* Public — store compliance pages (Play Data Safety / App Store links). */}
+        <Route path="/delete-account" element={<DeleteAccountInfo />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route
+          element={
+            <Protected>
+              <Layout />
+            </Protected>
+          }>
+          <Route index element={<Navigate to="/pos" replace />} />
+          <Route path="/pos" element={<Pos />} />
+          <Route path="/pos-sales" element={<PosSales />} />
+          <Route path="/stock" element={<Stock />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/store-credit" element={<StoreCredit />} />
+          <Route path="/broadcast" element={<Broadcast />} />
+          <Route path="/banners" element={<Banners />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/scan-lab" element={<ScanLab />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/pos" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

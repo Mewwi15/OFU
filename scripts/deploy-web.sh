@@ -34,7 +34,25 @@ JSON
 
 # Bust the boot scripts' URLs per deploy so any client that ever stored them
 # under an immutable policy refetches (recovers the 2026-07-13 poisoning too).
+# `sed` exits 0 even when it substitutes nothing — if Expo ever changes how it
+# writes these <script> tags, this step would silently no-op and we'd deploy
+# with an unbusted cache again. Count occurrences (NOT `grep -c`, which counts
+# matching LINES — Expo emits all <script> tags on one line, so `-c` would
+# read 1 instead of 3 and never catch a real drop) before/after, and abort
+# loudly instead of shipping that quietly.
+before=$(grep -o '/_expo/static/js/web/[^"]*\.js"' dist/index.html | wc -l | tr -d ' ')
+if [ "$before" -eq 0 ]; then
+  echo "ERROR: no /_expo/static/js/web/*.js script tags found in dist/index.html" >&2
+  echo "        (Expo's export output format may have changed) — aborting before" >&2
+  echo "        deploying with an unbusted cache." >&2
+  exit 1
+fi
 sed -i '' "s|\(/_expo/static/js/web/[^\"]*\.js\)\"|\1?v=$(date +%s)\"|g" dist/index.html
+after=$(grep -o '/_expo/static/js/web/[^"]*\.js?v=[0-9]*"' dist/index.html | wc -l | tr -d ' ')
+if [ "$after" -ne "$before" ]; then
+  echo "ERROR: cache-bust only updated $after of $before script tags — aborting." >&2
+  exit 1
+fi
 
 cat > dist/.vercelignore <<'TXT'
 !assets/node_modules

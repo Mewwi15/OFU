@@ -66,6 +66,16 @@ export type AuthState = {
   changePassword: (newPassword: string) => Promise<void>;
   /** Sign out and return to the login gate. */
   logout: () => Promise<void>;
+  /**
+   * Set by the root layout's web OAuth-return handler when the Google PKCE
+   * exchange fails or the provider redirects back with an error param — the
+   * redirect is a full page load (back to `/`), so this is the only way to
+   * hand the failure to whatever the login screen re-mounts as. The login
+   * screen renders it as a persistent banner and clears it back to null when
+   * the user dismisses it or starts a fresh social sign-in attempt.
+   */
+  socialCallbackError: string | null;
+  setSocialCallbackError: (msg: string | null) => void;
 };
 
 /** Module-level guard so initialize() subscribes at most once. */
@@ -81,6 +91,8 @@ export const useAuth = create<AuthState>((set) => ({
   hydrated: false,
   userId: null,
   user: GUEST,
+  socialCallbackError: null,
+  setSocialCallbackError: (msg) => set({ socialCallbackError: msg }),
 
   initialize: () => {
     if (unsubscribe) return;

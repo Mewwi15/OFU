@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -30,6 +31,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
+import { PRIVACY_URL } from '@/lib/legal';
 import { startLineAuth } from '@/lib/line';
 import { useAuth } from '@/store/auth';
 
@@ -47,6 +49,8 @@ export default function LoginScreen() {
   const signUpEmail = useAuth((s) => s.signUpEmail);
   const verifyEmailCode = useAuth((s) => s.verifyEmailCode);
   const resendEmailCode = useAuth((s) => s.resendEmailCode);
+  const socialCallbackError = useAuth((s) => s.socialCallbackError);
+  const setSocialCallbackError = useAuth((s) => s.setSocialCallbackError);
 
   const [mode, setMode] = useState<Mode>('signin');
   const [step, setStep] = useState<Step>('form');
@@ -71,6 +75,21 @@ export default function LoginScreen() {
       .then(setAppleAvailable)
       .catch(() => {});
   }, []);
+
+  // The web Google OAuth round-trip is a full page redirect back to `/`, so
+  // any failure it hit is stashed in the auth store (see app/_layout.tsx) —
+  // derive the banner straight from the store (regardless of which sub-view,
+  // LINE-hero or classic form, happens to be showing after the remount).
+  // Deliberately NOT auto-cleared on a timer: an effect that clears the store
+  // right after reading it also fires on the very render that's supposed to
+  // show the message, so the banner flashed for under a frame and never
+  // actually appeared. It clears instead when the user dismisses it or starts
+  // a fresh social attempt (see onGoogle/onApple/the LINE button below).
+  const socialError = socialCallbackError
+    ? socialCallbackError === 'GOOGLE_CANCELLED'
+      ? t('login.googleCancelled')
+      : t('login.googleFailed')
+    : null;
 
   const formValid =
     emailValid(email) && password.length >= 6 && (mode === 'signin' || password === confirm);
@@ -124,6 +143,7 @@ export default function LoginScreen() {
 
   const onGoogle = async () => {
     if (socialBusy) return;
+    setSocialCallbackError(null);
     setSocialBusy(true);
     try {
       await signInWithOAuthProvider('google');
@@ -136,6 +156,7 @@ export default function LoginScreen() {
 
   const onApple = async () => {
     if (socialBusy) return;
+    setSocialCallbackError(null);
     setSocialBusy(true);
     try {
       await signInWithAppleNative();
@@ -173,6 +194,20 @@ export default function LoginScreen() {
             {t('login.tagline')}
           </Text>
         </View>
+
+        {socialError ? (
+          <View style={styles.socialErrorBanner}>
+            <Ionicons name="alert-circle" size={18} color={Colors.dangerStrong} />
+            <Text style={styles.socialErrorText}>{socialError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+              hitSlop={8}
+              onPress={() => setSocialCallbackError(null)}>
+              <Ionicons name="close" size={18} color={Colors.dangerStrong} />
+            </Pressable>
+          </View>
+        ) : null}
 
         {step === 'form' && lineOnly ? (
           <>
@@ -384,11 +419,17 @@ export default function LoginScreen() {
           </>
         )}
 
-        {/* PDPA consent */}
+        {/* PDPA consent — both open the same hosted policy page (no separate
+            terms-of-use page exists yet; see lib/legal.ts). */}
         <Text variant="caption" style={styles.consent}>
           {t('login.consentPrefix')}{' '}
-          <Text style={styles.consentLink}>{t('login.terms')}</Text> {t('common.and')}{' '}
-          <Text style={styles.consentLink}>{t('login.privacy')}</Text>
+          <Text style={styles.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+            {t('login.terms')}
+          </Text>{' '}
+          {t('common.and')}{' '}
+          <Text style={styles.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
+            {t('login.privacy')}
+          </Text>
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -425,6 +466,19 @@ const styles = StyleSheet.create({
   logo: { width: 132, height: 58, marginBottom: Spacing.lg },
   welcome: { color: Colors.text },
   tagline: { color: Colors.textMuted, marginTop: Spacing.xs },
+
+  socialErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.dangerStrong,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  socialErrorText: { ...Typography.body, color: Colors.dangerStrong, flex: 1 },
 
   /* Mode toggle */
   modeToggle: {

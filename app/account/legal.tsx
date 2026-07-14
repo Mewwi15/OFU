@@ -1,12 +1,15 @@
 /**
  * Legal — `/account/legal`.
  *
- * Terms of use + PDPA privacy summary. Placeholder copy for v1 — the owner
- * should replace it with lawyer-reviewed text before launch.
+ * Terms of use + PDPA privacy summary. The sections below are a short
+ * in-app summary, not the full legal text — the actual, kept-in-sync privacy
+ * policy is hosted on the admin domain (required for both stores' privacy
+ * links) and linked at the bottom via lib/legal.ts, the same URL the desktop
+ * web footer uses.
  */
 
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
@@ -14,6 +17,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
+import { PRIVACY_URL } from '@/lib/legal';
 
 const SECTION_KEYS = ['s1', 's2', 's3', 's4'];
 
@@ -49,6 +53,12 @@ export default function LegalScreen() {
             </Text>
           </View>
         ))}
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => Linking.openURL(PRIVACY_URL)}
+          style={styles.fullPolicyButton}>
+          <Text style={styles.fullPolicyText}>{t('legal.readFull')}</Text>
+        </Pressable>
         <Text variant="caption" style={styles.note}>
           {t('legal.note')}
         </Text>
@@ -69,5 +79,16 @@ const styles = StyleSheet.create({
   },
   cardTitle: { ...Typography.bodyStrong, color: Colors.text, marginBottom: Spacing.xs },
   cardBody: { color: Colors.textMuted, lineHeight: 22 },
+  fullPolicyButton: {
+    alignSelf: 'center',
+    minHeight: 48,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullPolicyText: { ...Typography.button, color: Colors.primaryStrong },
   note: { color: Colors.textMuted, textAlign: 'center', paddingHorizontal: Spacing.lg },
 });

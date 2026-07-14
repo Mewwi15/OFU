@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SiteShell } from '@/components/web/SiteShell';
 import { supabase } from '@/lib/supabase/client';
 import { ThemeProvider } from '@/theme/theme-provider';
@@ -67,15 +68,38 @@ export default function RootLayout() {
 
   // Web: complete the Google OAuth PKCE return manually (detectSessionInUrl
   // is off so it can't swallow LINE's ?code= — see lib/supabase/client.ts).
-  // LINE's callback path handles its own code.
+  // LINE's callback path handles its own code. Google redirects back to the
+  // site origin (not a dedicated route), so on any failure — cancelled
+  // consent, a rejected exchange — there's no screen of our own to show an
+  // error on; stash it in the auth store and let the login screen (which is
+  // what re-mounts, since the user isn't authenticated yet) surface it once.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     if (window.location.pathname.startsWith('/line-callback')) return;
-    const code = new URLSearchParams(window.location.search).get('code');
-    if (!code) return;
-    void supabase.auth.exchangeCodeForSession(code).finally(() => {
-      window.history.replaceState({}, '', window.location.pathname);
-    });
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    // `error` is the OAuth2 machine code ('access_denied', ...); `error_description`
+    // is a freeform human string — only `error` is safe to compare against.
+    const errorCode = params.get('error');
+    if (!code && !errorCode) return;
+
+    const fail = () =>
+      useAuth.getState().setSocialCallbackError(errorCode === 'access_denied' ? 'GOOGLE_CANCELLED' : 'GOOGLE_FAILED');
+
+    void (async () => {
+      try {
+        if (errorCode) {
+          fail();
+          return;
+        }
+        const { error } = await supabase.auth.exchangeCodeForSession(code!);
+        if (error) fail();
+      } catch {
+        fail();
+      } finally {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    })();
   }, []);
 
   // Web: a tab from a previous deploy requests route chunks that no longer
@@ -154,6 +178,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <SiteShell>
+          <ErrorBoundary>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Protected guard={showOnboarding}>
               <Stack.Screen name="onboarding" />
@@ -192,6 +217,7 @@ export default function RootLayout() {
                 (login). Web-only route. */}
             <Stack.Screen name="line-callback" />
           </Stack>
+          </ErrorBoundary>
           </SiteShell>
           <StatusBar style="dark" />
         </ThemeProvider>
