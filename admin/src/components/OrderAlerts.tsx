@@ -4,8 +4,8 @@
  * postgres_changes on `orders` (RLS scopes the stream to what the admin can
  * read) and, on a new order or a freshly uploaded slip, plays a chime and pops
  * an antd notification with a jump-to-page action. It also broadcasts a window
- * event so an already-open Orders/Payments page refreshes its list without a
- * manual "รีเฟรช".
+ * event so an already-open Orders page refreshes its list without a manual
+ * "รีเฟรช". Both alerts jump to /orders — slip review lives there.
  */
 
 import { App } from 'antd';
@@ -99,7 +99,7 @@ export function OrderAlerts() {
               description: `${now.order_number ?? ''} · ยอด ฿${(now.total ?? 0).toLocaleString('th-TH')} — ลูกค้ารอการยืนยัน`,
               placement: 'topRight',
               duration: 0, // sticky until dismissed — money is waiting
-              onClick: () => nav('/payments'),
+              onClick: () => nav('/orders'),
             });
           }
           window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));

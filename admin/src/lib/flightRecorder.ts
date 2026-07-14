@@ -8,6 +8,9 @@
  * so the tape SURVIVES full page reloads — the first copied tape came back
  * empty, which itself suggested the "jump" is a full browser navigation (the
  * SPA reboots → index route redirects to /pos). Read + copy at /scan-lab.
+ *
+ * Keys typed into a password field, or anywhere on /login, are recorded as
+ * REDACTED — see isSecretTarget.
  */
 
 export type FlightEvent = {
@@ -29,6 +32,7 @@ export type FlightEvent = {
 
 const MAX = 400;
 const STORE_KEY = 'ofu.flightlog';
+const REDACTED = '•';
 let events: FlightEvent[] = [];
 let seq = 0;
 let started = 0;
@@ -53,6 +57,21 @@ function load() {
   } catch {
     /* corrupted — start fresh */
   }
+}
+
+/**
+ * The tape is readable (and copyable) by anyone who can open /scan-lab, so it
+ * must never carry a credential. Keystrokes are redacted inside a password
+ * field and anywhere on the login screen — antd's Input.Password can be toggled
+ * to type="text", and the scanner is never used there anyway.
+ */
+function isSecretTarget(el: HTMLElement | null): boolean {
+  if (location.pathname.startsWith('/login')) return true;
+  const input = el as HTMLInputElement | null;
+  if (!input) return false;
+  if (input.type === 'password') return true;
+  const ac = input.autocomplete ?? '';
+  return ac === 'current-password' || ac === 'new-password' || ac === 'one-time-code';
 }
 
 function push(e: FlightEvent) {
@@ -112,6 +131,7 @@ export function installFlightRecorder() {
       const gap = lastKeyT ? Math.round(now - lastKeyT) : 0;
       lastKeyT = now;
       const t = e.target as HTMLElement | null;
+      const secret = isSecretTarget(t);
       const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.metaKey && 'Meta', e.shiftKey && 'Shift']
         .filter(Boolean)
         .join('+');
@@ -119,8 +139,8 @@ export function installFlightRecorder() {
         seq: ++seq,
         t: Math.round(now - started),
         kind: 'key',
-        key: e.key,
-        code: e.code,
+        key: secret ? REDACTED : e.key,
+        code: secret ? REDACTED : e.code,
         mods: mods || undefined,
         gap,
         target: t ? `${t.tagName}${t.id ? '#' + t.id : ''}` : '?',
