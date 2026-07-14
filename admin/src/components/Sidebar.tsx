@@ -5,6 +5,7 @@ import {
   RiChat1Line,
   RiCouponLine,
   RiFileList3Line,
+  RiHistoryLine,
   RiImageLine,
   RiLogoutBoxRLine,
   RiMegaphoneLine,
@@ -70,6 +71,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
       { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
+      { to: '/audit-log', label: 'ประวัติแก้ไข', Icon: RiHistoryLine, ownerOnly: true },
       { to: '/settings', label: 'ตั้งค่า', Icon: RiSettings3Line },
     ],
   },

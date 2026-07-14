@@ -64,6 +64,7 @@ import {
   type Product,
   type StockMovement,
 } from '../lib/api';
+import { productThumb } from '../lib/image';
 
 const { Title, Text } = Typography;
 
@@ -93,7 +94,7 @@ type Item = {
   productName: string;
   size: string | null;
   category: string;
-  image: string | null;
+  image: string | undefined;
   barcode: string | null;
   sku: string | null;
   unit: string | null;
@@ -107,10 +108,10 @@ type Item = {
 
 function flatten(products: Product[]): Item[] {
   return products.flatMap((p) => {
-    const image =
-      p.product_images.find((i) => i.is_primary)?.storage_path ??
-      p.product_images[0]?.storage_path ??
-      null;
+    const image = productThumb(
+      p.product_images.find((i) => i.is_primary)?.storage_path ?? p.product_images[0]?.storage_path ?? null,
+      88,
+    );
     return p.product_variants.map((v) => ({
       variantId: v.id,
       productId: p.id,
@@ -592,13 +593,22 @@ export function Stock() {
     setImportBusy(true);
     let ok = 0;
     let failed = 0;
-    for (const r of importReady) {
-      try {
-        if (importMode === 'set') await setStockQty(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (นับสต๊อก)');
-        else await receiveStock(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (รับของ)');
-        ok++;
-      } catch {
-        failed++;
+    // Each row is an independent RPC call (server-side atomic update per
+    // variant, safe under concurrency) — batch them instead of one at a time,
+    // a large CSV otherwise took one network round-trip per row in sequence.
+    const BATCH = 10;
+    for (let i = 0; i < importReady.length; i += BATCH) {
+      const batch = importReady.slice(i, i + BATCH);
+      const results = await Promise.allSettled(
+        batch.map((r) =>
+          importMode === 'set'
+            ? setStockQty(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (นับสต๊อก)')
+            : receiveStock(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (รับของ)'),
+        ),
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled') ok++;
+        else failed++;
       }
     }
     setImportBusy(false);
@@ -660,9 +670,9 @@ export function Stock() {
     if (!lines.length) return;
     setSaving(true);
     try {
-      for (const l of lines) {
-        await receiveStock(l.item.variantId, l.qty, note.trim() || undefined);
-      }
+      // Each line is a distinct variant (addItem dedups on variantId above),
+      // so these are independent RPC calls — no need to serialize them.
+      await Promise.all(lines.map((l) => receiveStock(l.item.variantId, l.qty, note.trim() || undefined)));
       message.success(`รับของเข้า ${lines.length} รายการเรียบร้อย`);
       setLines([]);
       setNote('');
@@ -749,7 +759,7 @@ export function Stock() {
     if (!last) return;
     setMovesLoading(true);
     try {
-      const rows = await listStockMovements(200, last.created_at, variantFilter?.id);
+      const rows = await listStockMovements(200, { created_at: last.created_at, id: last.id }, variantFilter?.id);
       setMoves((prev) => [...prev, ...rows]);
       setMoreLeft(rows.length === 200);
     } catch (e) {
@@ -826,9 +836,12 @@ export function Stock() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <Title level={4} style={{ margin: 0 }}>
-          สต๊อก
-        </Title>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            สต๊อก
+          </Title>
+          <Text type="secondary">เติมของ ปรับยอด และดูมูลค่าสต็อกทั้งหมด</Text>
+        </div>
         <Space>
           <Upload accept=".csv" showUploadList={false} beforeUpload={(f) => {
             setImportOpen(true);
@@ -844,26 +857,31 @@ export function Stock() {
 
       <Row gutter={[12, 12]}>
         <Col xs={12} md={6}>
-          <Card size="small">
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic title="รายการสินค้า" value={items.length} />
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card size="small">
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic
               title="ใกล้หมด / หมด"
               value={lowCount}
-              styles={{ content: { color: lowCount ? '#c5410f' : undefined } }}
+              styles={{ content: { color: lowCount ? '#C5410F' : undefined, fontWeight: lowCount ? 700 : undefined } }}
             />
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card size="small">
-            <Statistic title="เงินจมในสต๊อก (ตามทุน)" value={totals.costValue} prefix="฿" />
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+            <Statistic
+              title="เงินจมในสต๊อก (ตามทุน)"
+              value={totals.costValue}
+              prefix="฿"
+              styles={{ content: { color: '#C5410F', fontWeight: 700 } }}
+            />
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card size="small">
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic title="ขายหมดได้เงิน (ตามราคาขาย)" value={totals.saleValue} prefix="฿" />
           </Card>
         </Col>
@@ -917,6 +935,12 @@ export function Stock() {
                     loading={loading}
                     pagination={{ pageSize: 25, showSizeChanger: false }}
                     scroll={{ x: 760 }}
+                    locale={{
+                      emptyText:
+                        query || statusFilter !== 'all' || categoryFilter
+                          ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
+                          : 'ยังไม่มีสินค้าในระบบ',
+                    }}
                     rowClassName={(i) =>
                       statusOf(i) === 'out'
                         ? 'stock-row-out'
@@ -949,6 +973,7 @@ export function Stock() {
                     loading={loading}
                     pagination={{ pageSize: 25, showSizeChanger: false }}
                     scroll={{ x: 900 }}
+                    locale={{ emptyText: 'ยังไม่มีสินค้าในระบบ' }}
                   />
                 </Space>
               </Card>
@@ -1061,6 +1086,9 @@ export function Stock() {
                     pagination={{ pageSize: 20, showSizeChanger: false }}
                     scroll={{ x: 900 }}
                     size="middle"
+                    locale={{
+                      emptyText: reasonFilter || variantFilter ? 'ไม่พบประวัติที่ตรงกับตัวกรอง' : 'ยังไม่มีประวัติการเคลื่อนไหวสต็อก',
+                    }}
                   />
                   {moreLeft && !reasonFilter ? (
                     <Button onClick={() => void loadMore()} loading={movesLoading}>

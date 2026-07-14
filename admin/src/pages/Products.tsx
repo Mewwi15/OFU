@@ -47,6 +47,7 @@ import {
   type Product,
   type ProductImage,
 } from '../lib/api';
+import { productThumb } from '../lib/image';
 
 const { Title, Text } = Typography;
 
@@ -220,7 +221,7 @@ export function Products() {
       key: 'name',
       render: (_, p) => (
         <div className="flex items-center gap-3">
-          <Avatar shape="square" size={44} src={primaryImage(p)} icon={<RiImageLine className="w-5 h-5" />} style={{ background: '#F3EDE9', color: '#B9A79C', flex: 'none' }} />
+          <Avatar shape="square" size={44} src={productThumb(primaryImage(p), 88)} icon={<RiImageLine className="w-5 h-5" />} style={{ background: '#F3EDE9', color: '#B9A79C', flex: 'none' }} />
           <div className="min-w-0">
             <div className="font-medium text-[#2B2320] truncate">{p.name}</div>
             {p.subtitle ? <Text type="secondary" className="text-xs">{p.subtitle}</Text> : null}
@@ -722,7 +723,7 @@ function ProductModal({
           {images.map((img) => (
               <div key={img.id} className="w-24">
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
-                  <img src={img.storage_path} alt="" className="w-full h-full object-cover" />
+                  <img src={productThumb(img.storage_path, 192)} alt="" className="w-full h-full object-cover" />
                   {img.is_primary && (
                     <span className="absolute top-1 left-1 rounded bg-tremor-brand text-white text-[10px] px-1.5 py-0.5">
                       รูปหลัก

@@ -9,6 +9,8 @@ export type ReceiptProps = {
   saleNumber: string;
   at: string;
   taxInvoiceNo?: string | null;
+  customerName?: string | null;
+  customerTaxId?: string | null;
   items: ReceiptLine[];
   subtotal: number;
   discount: number;
@@ -42,6 +44,8 @@ export function Receipt({
   saleNumber,
   at,
   taxInvoiceNo,
+  customerName,
+  customerTaxId,
   items,
   subtotal,
   discount,
@@ -91,6 +95,12 @@ export function Receipt({
         <div className="text-[10px]">{at}</div>
         {cfg.cashierName ? <div className="text-[10px]">พนักงาน {cfg.cashierName}</div> : null}
         {taxInvoiceNo && <div className="text-[10px]">เลขใบกำกับ {taxInvoiceNo}</div>}
+        {taxInvoiceNo && customerName && (
+          <div className="text-[10px]">
+            ชื่อผู้ซื้อ {customerName}
+            {customerTaxId ? ` เลขผู้เสียภาษี ${customerTaxId}` : ''}
+          </div>
+        )}
         {offline && (
           <div className="mt-1 text-[10px] text-center border border-dashed border-black rounded py-0.5">
             บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์

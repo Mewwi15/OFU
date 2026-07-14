@@ -1,8 +1,32 @@
+import { productThumb } from './image';
 import { supabase } from './supabase';
+
+/** VALIDATION is shared by many RPCs for different reasons — the RAISE's
+ * `detail=` (surfaced by PostgREST as `.details`) says which one. Map the
+ * ones a cashier/owner can actually hit to a specific message instead of the
+ * generic fallback, which reads as "it broke" with no clue what to fix. */
+const VALIDATION_DETAIL_TH: Record<string, string> = {
+  'discount exceeds subtotal': 'ส่วนลดเกินยอดซื้อ กรุณาลดจำนวนส่วนลด',
+  'split allows cash/promptpay only': 'แบ่งจ่ายได้เฉพาะเงินสด/พร้อมเพย์เท่านั้น',
+  'payments must sum to total': 'ยอดที่แบ่งจ่ายรวมกันไม่เท่ากับยอดสุทธิ',
+  code_required: 'กรอกโค้ดส่วนลด',
+  value_must_be_positive: 'จำนวนส่วนลดต้องมากกว่า 0',
+  percent_over_100: 'ส่วนลดแบบเปอร์เซ็นต์ต้องไม่เกิน 100%',
+  min_spend_negative: 'ยอดซื้อขั้นต่ำต้องไม่ติดลบ',
+  date_range: 'วันเริ่มต้นต้องมาก่อนวันสิ้นสุด',
+  name_required: 'กรอกชื่อร้าน',
+  negative_amount: 'ตัวเลขต้องไม่ติดลบ',
+  vat_rate_range: 'อัตรา VAT ต้องอยู่ระหว่าง 0-100',
+  promptpay_id_format: 'เลขพร้อมเพย์ต้องเป็นตัวเลข 10 หลัก (มือถือ) 13 หลัก (บัตร ปชช.) หรือ 15 หลัก (e-Wallet)',
+};
 
 /** Surface a Postgres RAISE code (or PostgREST message) for the UI. */
 export function apiError(e: unknown): string {
-  const msg = (e as { message?: string })?.message ?? 'เกิดข้อผิดพลาด';
+  const err = e as { message?: string; details?: string | null };
+  const msg = err?.message ?? 'เกิดข้อผิดพลาด';
+  if (msg === 'VALIDATION' && err?.details && VALIDATION_DETAIL_TH[err.details]) {
+    return VALIDATION_DETAIL_TH[err.details];
+  }
   const th: Record<string, string> = {
     FORBIDDEN: 'ไม่มีสิทธิ์ทำรายการนี้',
     DUPLICATE_CATEGORY: 'มีหมวดหมู่ชื่อนี้แล้ว',
@@ -337,7 +361,7 @@ export type PosProduct = {
   subtitle: string | null;
   category_id: string | null;
   category_name: string | null;
-  image: string | null;
+  image: string | undefined;
   variants: PosVariant[];
 };
 
@@ -367,8 +391,10 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
     subtitle: p.subtitle,
     category_id: p.category_id,
     category_name: p.categories?.name ?? null,
-    image:
-      (p.product_images?.find((i) => i.is_primary) ?? p.product_images?.[0])?.storage_path ?? null,
+    image: productThumb(
+      (p.product_images?.find((i) => i.is_primary) ?? p.product_images?.[0])?.storage_path,
+      300,
+    ),
     variants: (p.product_variants ?? []).filter((v) => !v.archived_at),
   }));
 }
@@ -653,12 +679,17 @@ export type PosSale = {
   payment_method: PosPayMethod;
   status: 'completed' | 'voided' | 'refunded';
   customer_name: string | null;
+  customer_tax_id: string | null;
+  cash_tendered: number | null;
+  change: number | null;
   created_at: string;
 };
 export async function listPosSales(): Promise<PosSale[]> {
   const { data, error } = await supabase
     .from('pos_sales')
-    .select('id, sale_number, tax_invoice_no, total, vat_amount, net_amount, discount, payment_method, status, customer_name, created_at')
+    .select(
+      'id, sale_number, tax_invoice_no, total, vat_amount, net_amount, discount, payment_method, status, customer_name, customer_tax_id, cash_tendered, change, created_at',
+    )
     .order('created_at', { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -715,15 +746,23 @@ export type StockMovement = {
 /** Ledger page, newest first; pass `before` (created_at) to page further back. */
 export async function listStockMovements(
   limit = 200,
-  before?: string,
+  before?: { created_at: string; id: string },
   variantId?: string,
 ): Promise<StockMovement[]> {
   let q = supabase
     .from('stock_movements_view')
     .select('*')
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(limit);
-  if (before) q = q.lt('created_at', before);
+  if (before) {
+    // Compound cursor, not just created_at: several stock_movements rows from
+    // one POS sale (or a batch stock import) share the exact same created_at
+    // (Postgres now() is transaction-start time, identical for every insert
+    // in that transaction) — a plain `created_at < X` cursor silently drops
+    // any row tied with the last row of the previous page.
+    q = q.or(`created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id})`);
+  }
   if (variantId) q = q.eq('variant_id', variantId);
   const { data, error } = await q;
   if (error) throw error;
@@ -746,3 +785,41 @@ export const setStockQty = (variantId: string, qty: number, note?: string) =>
     p_qty: qty,
     p_note: note ?? undefined,
   });
+
+/* ── audit log (owner-only read — write_audit() has been recording since
+   0006; this is the first viewer) ────────────────────────────────────────── */
+export type AuditLogEntry = {
+  id: string;
+  actor_user_id: string | null;
+  actor_role: string;
+  actor_tier: string | null;
+  action: string;
+  target_table: string | null;
+  target_id: string | null;
+  summary: string | null;
+  reason: string | null;
+  created_at: string;
+  app_users: { display_name: string | null } | null;
+};
+
+export async function listAuditLog(
+  limit = 100,
+  before?: { created_at: string; id: string },
+): Promise<AuditLogEntry[]> {
+  let q = supabase
+    .from('audit_log')
+    .select(
+      'id, actor_user_id, actor_role, actor_tier, action, target_table, target_id, summary, reason, created_at, app_users(display_name)',
+    )
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit);
+  if (before) {
+    // Compound cursor — see listStockMovements for why created_at alone isn't
+    // enough (several rows can share the exact same now()).
+    q = q.or(`created_at.lt.${before.created_at},and(created_at.eq.${before.created_at},id.lt.${before.id})`);
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  return data as unknown as AuditLogEntry[];
+}

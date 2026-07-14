@@ -310,6 +310,8 @@ export function PosSales() {
               saleNumber={detail.sale_number}
               at={new Date(detail.created_at).toLocaleString('th-TH')}
               taxInvoiceNo={detail.tax_invoice_no}
+              customerName={detail.customer_name}
+              customerTaxId={detail.customer_tax_id}
               items={items.map((i) => ({
                 name: i.product_name,
                 size: i.size,
@@ -323,6 +325,8 @@ export function PosSales() {
               netAmount={detail.net_amount}
               total={detail.total}
               paymentMethod={detail.payment_method}
+              cashPaid={detail.payment_method === 'cash' && detail.cash_tendered != null ? detail.cash_tendered : null}
+              change={detail.payment_method === 'cash' ? detail.change : null}
             />
           </div>
         )}

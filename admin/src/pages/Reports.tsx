@@ -1,5 +1,5 @@
 import { RiRefund2Line, RiShoppingBag3Line, RiStore2Line } from '@remixicon/react';
-import { App, Card, Col, Progress, Row, Segmented, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, App, Card, Col, Progress, Row, Segmented, Statistic, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiError, listLowStock, posDashboard, type Dashboard, type LowStockItem } from '../lib/api';
@@ -26,6 +26,8 @@ export function Reports() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+  const [lowStockLoading, setLowStockLoading] = useState(true);
+  const [lowStockError, setLowStockError] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -40,12 +42,24 @@ export function Reports() {
     };
   }, [range, message]);
 
-  // Low/out-of-stock is range-independent — load once.
+  // Low/out-of-stock is range-independent — load once. A swallowed fetch
+  // error previously left `lowStock` at its initial [], which the table then
+  // rendered as "สต็อกเพียงพอทุกรายการ" — a false all-clear indistinguishable
+  // from a real empty result. Track loading/error explicitly instead.
   useEffect(() => {
     let alive = true;
+    setLowStockLoading(true);
+    setLowStockError(false);
     listLowStock()
-      .then((rows) => alive && setLowStock(rows))
-      .catch(() => {});
+      .then((rows) => {
+        if (alive) setLowStock(rows);
+      })
+      .catch(() => {
+        if (alive) setLowStockError(true);
+      })
+      .finally(() => {
+        if (alive) setLowStockLoading(false);
+      });
     return () => {
       alive = false;
     };
@@ -152,40 +166,52 @@ export function Reports() {
         />
       </Card>
 
-      <Card title={`สต็อกใกล้หมด / หมด${lowStock.length ? ` (${lowStock.length})` : ''}`} className="mt-4">
-        <Table<LowStockItem>
-          size="small"
-          rowKey={(r) => r.product_name + (r.size ?? '')}
-          pagination={{ pageSize: 8, hideOnSinglePage: true }}
-          locale={{ emptyText: 'สต็อกเพียงพอทุกรายการ' }}
-          dataSource={lowStock}
-          columns={[
-            {
-              title: 'สินค้า',
-              key: 'name',
-              render: (_, r) => (r.size ? `${r.product_name} (${r.size})` : r.product_name),
-            },
-            {
-              title: 'คงเหลือ',
-              key: 'stock',
-              align: 'right',
-              width: 120,
-              render: (_, r) => (
-                <Tag color={r.stock_qty <= 0 ? 'error' : 'warning'} bordered={false}>
-                  {r.stock_qty <= 0 ? 'หมด' : `เหลือ ${r.stock_qty}`}
-                </Tag>
-              ),
-            },
-            {
-              title: 'แจ้งเตือนที่',
-              dataIndex: 'threshold',
-              key: 'threshold',
-              align: 'right',
-              width: 110,
-              render: (t: number) => <span className="text-gray-400">≤ {t}</span>,
-            },
-          ]}
-        />
+      <Card
+        title={`สต็อกใกล้หมด / หมด${!lowStockError && lowStock.length ? ` (${lowStock.length})` : ''}`}
+        className="mt-4"
+        loading={lowStockLoading}>
+        {lowStockError ? (
+          <Alert
+            type="error"
+            showIcon
+            message="โหลดรายการสต็อกใกล้หมดไม่สำเร็จ"
+            description="นี่ไม่ใช่ผลจริงว่าสต็อกพอ — ลองรีเฟรชหน้านี้อีกครั้ง"
+          />
+        ) : (
+          <Table<LowStockItem>
+            size="small"
+            rowKey={(r) => r.product_name + (r.size ?? '')}
+            pagination={{ pageSize: 8, hideOnSinglePage: true }}
+            locale={{ emptyText: 'สต็อกเพียงพอทุกรายการ' }}
+            dataSource={lowStock}
+            columns={[
+              {
+                title: 'สินค้า',
+                key: 'name',
+                render: (_, r) => (r.size ? `${r.product_name} (${r.size})` : r.product_name),
+              },
+              {
+                title: 'คงเหลือ',
+                key: 'stock',
+                align: 'right',
+                width: 120,
+                render: (_, r) => (
+                  <Tag color={r.stock_qty <= 0 ? 'error' : 'warning'} bordered={false}>
+                    {r.stock_qty <= 0 ? 'หมด' : `เหลือ ${r.stock_qty}`}
+                  </Tag>
+                ),
+              },
+              {
+                title: 'แจ้งเตือนที่',
+                dataIndex: 'threshold',
+                key: 'threshold',
+                align: 'right',
+                width: 110,
+                render: (t: number) => <span className="text-gray-400">≤ {t}</span>,
+              },
+            ]}
+          />
+        )}
       </Card>
     </>
   );

@@ -63,10 +63,18 @@ type Line = {
   size: string | null;
   unitPrice: number;
   qty: number;
-  image: string | null;
+  image: string | undefined;
 };
 type PayMethod = 'cash' | 'promptpay';
-type ReceiptData = { sale: SaleResult; lines: Line[]; method: PayMethod; at: string; offline?: boolean };
+type ReceiptData = {
+  sale: SaleResult;
+  lines: Line[];
+  method: PayMethod;
+  at: string;
+  offline?: boolean;
+  customerName?: string;
+  customerTaxId?: string;
+};
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -396,6 +404,12 @@ export function Pos() {
   }, []);
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
+  // Removing a line after setting a discount can leave a stale discount above
+  // the new (smaller) subtotal — clamp it down so the total shown is always
+  // what actually gets charged, not a display that then fails at checkout.
+  useEffect(() => {
+    setDiscount((d) => Math.min(d, subtotal));
+  }, [subtotal]);
   const total = Math.max(0, subtotal - discount);
   const vat =
     shop?.vat_registered && total > 0 ? Math.round((total * shop.vat_rate) / (100 + shop.vat_rate)) : 0;
@@ -417,14 +431,16 @@ export function Pos() {
 
   async function checkout() {
     if (!lines.length || busy) return;
-    if (method === 'cash' && (typeof tendered !== 'number' || tendered < total)) {
+    // A ฿0 total (e.g. a full-discount giveaway) needs no cash tendered at
+    // all — only enforce "enough cash" once there's actually something to pay.
+    if (method === 'cash' && total > 0 && (typeof tendered !== 'number' || tendered < total)) {
       setError('เงินที่รับมาไม่พอ');
       return;
     }
     const baseInput = {
       items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
       payment_method: method,
-      cash_tendered: method === 'cash' ? (tendered as number) : undefined,
+      cash_tendered: method === 'cash' ? (typeof tendered === 'number' ? tendered : total) : undefined,
       discount,
       tax_invoice: taxInvoice,
       customer_name: taxInvoice ? custName || undefined : undefined,
@@ -464,7 +480,14 @@ export function Pos() {
     try {
       if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline');
       const sale = await createPosSale(input);
-      setReceipt({ sale, lines: soldLines, method, at });
+      setReceipt({
+        sale,
+        lines: soldLines,
+        method,
+        at,
+        customerName: taxInvoice ? custName || undefined : undefined,
+        customerTaxId: taxInvoice ? custTaxId || undefined : undefined,
+      });
       setCartOpen(false);
       resetSale();
       reflectStock();
@@ -487,7 +510,15 @@ export function Pos() {
           change,
           replay: false,
         };
-        setReceipt({ sale: provisional, lines: soldLines, method, at, offline: true });
+        setReceipt({
+          sale: provisional,
+          lines: soldLines,
+          method,
+          at,
+          offline: true,
+          customerName: taxInvoice ? custName || undefined : undefined,
+          customerTaxId: taxInvoice ? custTaxId || undefined : undefined,
+        });
         setCartOpen(false);
         resetSale();
         reflectStock();
@@ -774,6 +805,7 @@ export function Pos() {
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
                 <InputNumber
                   min={0}
+                  max={subtotal}
                   precision={0}
                   size="small"
                   controls={false}
@@ -783,7 +815,7 @@ export function Pos() {
                   onKeyDown={digitsOnlyKeyDown}
                   placeholder="฿ 0"
                   value={discount || null}
-                  onChange={(v) => setDiscount(Math.max(0, Number(v) || 0))}
+                  onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
                   style={{ width: 120 }}
                 />
               </div>
@@ -1115,7 +1147,7 @@ function VariantPicker({
 }
 
 function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopInfo; onClose: () => void }) {
-  const { sale, lines, method, at } = data;
+  const { sale, lines, method, at, customerName, customerTaxId } = data;
   return (
     <Modal
       open
@@ -1135,6 +1167,8 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
         saleNumber={sale.sale_number}
         at={at}
         taxInvoiceNo={sale.tax_invoice_no}
+        customerName={customerName}
+        customerTaxId={customerTaxId}
         items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.qty }))}
         subtotal={sale.subtotal}
         discount={sale.discount}
