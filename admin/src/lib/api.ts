@@ -140,6 +140,14 @@ export async function listProducts(force = false): Promise<Product[]> {
   return products;
 }
 
+/** Just enough to count products per category — Categories.tsx only needs a
+ * tally, not the full nested variant/image tree listProducts() fetches. */
+export async function listProductCategoryIds(): Promise<{ category_id: string | null }[]> {
+  const { data, error } = await supabase.from('products').select('category_id').is('archived_at', null);
+  if (error) throw error;
+  return data as { category_id: string | null }[];
+}
+
 /* ── Catalog mutations (0006 RPCs) ─────────────────────────────────────────── */
 export const upsertCategory = (p: { id?: string; name: string; slug?: string; display_order?: number }) =>
   rpc<{ id: string }>('upsert_category', {

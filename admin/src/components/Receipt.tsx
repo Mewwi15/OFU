@@ -141,7 +141,10 @@ export function Receipt({
         <Line2 label={payLabel} value={payValue} />
         {paymentMethod === 'cash' && change != null && <Line2 label="เงินทอน" value={change} />}
 
-        {cfg.showBarcode && (
+        {/* No barcode for an offline provisional receipt — saleNumber is the
+            Thai placeholder "ออฟไลน์" (a real number is issued on sync), which
+            isn't valid CODE128 and rendered as a blank gap. */}
+        {cfg.showBarcode && !offline && (
           <div className="mt-3 text-center">
             <Barcode value={saleNumber} />
             <div className="text-[9px] mt-0.5 tracking-widest">{saleNumber}</div>

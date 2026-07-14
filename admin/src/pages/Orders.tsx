@@ -277,7 +277,10 @@ export function Orders() {
           <Title level={3} style={{ margin: 0 }}>
             ออเดอร์
           </Title>
-          <Text type="secondary">ออเดอร์ออนไลน์จากลูกค้า · แตะที่ออเดอร์เพื่อจัดการ</Text>
+          <Text type="secondary">
+            ออเดอร์ออนไลน์จากลูกค้า · แตะที่ออเดอร์เพื่อจัดการ
+            {orders.length === 100 && ' · แสดงล่าสุด 100 รายการ'}
+          </Text>
         </div>
         <Button icon={<RiRefreshLine className="w-4 h-4" />} onClick={() => void load()}>
           รีเฟรช

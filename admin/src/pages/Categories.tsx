@@ -8,7 +8,7 @@ import {
   apiError,
   deleteCategory,
   listCategories,
-  listProducts,
+  listProductCategoryIds,
   reorderCategories,
   upsertCategory,
   type Category,
@@ -26,7 +26,7 @@ export function Categories() {
   async function load() {
     setLoading(true);
     try {
-      const [cats, prods] = await Promise.all([listCategories(), listProducts()]);
+      const [cats, prods] = await Promise.all([listCategories(), listProductCategoryIds()]);
       setCategories(cats);
       const c: Record<string, number> = {};
       for (const p of prods) if (p.category_id) c[p.category_id] = (c[p.category_id] ?? 0) + 1;
