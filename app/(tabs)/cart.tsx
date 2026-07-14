@@ -39,6 +39,7 @@ import { shopHoursLabel } from '@/data/shop';
 import { validatePromo } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
+import { productThumb } from '@/lib/image';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
@@ -148,7 +149,7 @@ function AddOnRail({
         {items.map((p) => (
           <View key={p.id} style={styles.addonCard}>
             <Image
-              source={{ uri: p.images[0] }}
+              source={{ uri: productThumb(p.images[0], 232, 192) }}
               style={styles.addonImg}
               contentFit="cover"
               transition={200}

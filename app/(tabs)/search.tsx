@@ -25,7 +25,7 @@ import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
 import { DesktopCatalog } from '@/components/web/DesktopCatalog';
 import { useT } from '@/lib/i18n';
 import { useAppWidth, useIsDesktopWeb } from '@/lib/useAppWidth';
-import { useCatalog } from '@/store/catalog';
+import { loadIfStale, useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
 const TAB_BAR_CLEARANCE = 96;
@@ -62,12 +62,12 @@ export default function CatalogScreen() {
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
   const banners = useCatalog((s) => s.banners);
-  const reloadCatalog = useCatalog((s) => s.load);
-  // Pull fresh catalog (incl. admin banners) each time the tab is focused.
+  // Re-fetch on focus only if the catalog is stale — see loadIfStale's doc
+  // comment (store/catalog.ts) for why this isn't an unconditional force.
   useFocusEffect(
     useCallback(() => {
-      void reloadCatalog(true);
-    }, [reloadCatalog]),
+      loadIfStale();
+    }, []),
   );
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 

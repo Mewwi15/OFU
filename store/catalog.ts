@@ -27,6 +27,8 @@ export type CatalogState = {
   loading: boolean;
   loaded: boolean;
   error: string | null;
+  /** `Date.now()` of the last successful load — lets callers decide "stale enough to refetch". */
+  loadedAt: number | null;
   /** Fetch the catalog. No-op while loading or already loaded unless `force`. */
   load: (force?: boolean) => Promise<void>;
 };
@@ -40,6 +42,7 @@ export const useCatalog = create<CatalogState>((set, get) => ({
   loading: false,
   loaded: false,
   error: null,
+  loadedAt: null,
 
   load: async (force = false) => {
     const s = get();
@@ -55,12 +58,30 @@ export const useCatalog = create<CatalogState>((set, get) => ({
         loadFeatured().catch(() => [] as FeaturedRow[]),
         loadBestsellerIds().catch(() => [] as string[]),
       ]);
-      set({ products, banners, categories, featured, bestsellerIds, loaded: true, loading: false });
+      set({
+        products, banners, categories, featured, bestsellerIds,
+        loaded: true, loading: false, loadedAt: Date.now(),
+      });
     } catch {
       set({ error: 'โหลดสินค้าไม่สำเร็จ', loading: false });
     }
   },
 }));
+
+/**
+ * Re-fetch on tab focus only if the catalog is missing or stale — a bare
+ * `load(true)` on every focus re-ran all 5 catalog queries on every single
+ * tab switch (Home<->Search<->Home while browsing easily racked up 20-40
+ * redundant requests in one session). `staleMs` still lets admin-side changes
+ * (new products, prices, banners) show up without restarting the app, just
+ * not on every single glance.
+ */
+export const STALE_MS = 60_000;
+export function loadIfStale(): void {
+  const s = useCatalog.getState();
+  const stale = !s.loadedAt || Date.now() - s.loadedAt > STALE_MS;
+  void s.load(stale);
+}
 
 /** Find a product by id within a loaded list. */
 export function findProduct(products: Product[], id?: string): Product | undefined {

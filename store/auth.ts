@@ -112,16 +112,22 @@ export const useAuth = create<AuthState>((set) => ({
     // onAuthStateChange callback — it runs under the auth lock and awaiting
     // getUser()/queries there can deadlock (login hangs). Flip status now and
     // defer the profile fetch to a later tick.
-    unsubscribe = authRepo.onAuthChange((session) => {
+    unsubscribe = authRepo.onAuthChange((session, event) => {
       if (session) {
         set({ status: 'authenticated', userId: session.user.id });
         setTimeout(() => {
           void loadUser().then((user) => set({ user }));
-          // PDPA consent on EVERY sign-in path — only the email forms used to
+          // PDPA consent on a real sign-in — only the email forms used to
           // grant it, so Google/Apple logins hit CONSENT_REQUIRED at
-          // place_order. grant_consent is latest-row-wins; re-granting on
-          // each sign-in is harmless.
-          void authRepo.grantConsent('data_processing', 'v1').catch(() => {});
+          // place_order. grant_consent is latest-row-wins, so this was
+          // previously fired on EVERY event with a session, including
+          // TOKEN_REFRESHED (Supabase re-fires this roughly hourly while the
+          // app is open) — silently re-granting consent a customer had just
+          // withdrawn via account/settings within the same session. Scope it
+          // to an actual sign-in.
+          if (event === 'SIGNED_IN') {
+            void authRepo.grantConsent('data_processing', 'v1').catch(() => {});
+          }
         }, 0);
       } else {
         set({ status: 'unauthenticated', userId: null, user: GUEST });

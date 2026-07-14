@@ -17,6 +17,7 @@ import 'react-native-reanimated';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SiteShell } from '@/components/web/SiteShell';
 import { supabase } from '@/lib/supabase/client';
+import { installWebIdleGuard, markWebActive } from '@/lib/webIdleGuard';
 import { ThemeProvider } from '@/theme/theme-provider';
 import '@/lib/webAlertPolyfill';
 import '@/lib/webFocusStyle';
@@ -101,6 +102,32 @@ export default function RootLayout() {
       }
     })();
   }, []);
+
+  // Web: there's no PIN lock to re-challenge after a period away (see
+  // lockSupported below — expo-secure-store has no web backend), so a
+  // signed-in session otherwise sits in localStorage indefinitely. On a
+  // shared/public computer that hands the next person the previous
+  // customer's account. Sign out after real inactivity — see lib/webIdleGuard.
+  // Re-installs when `isAuthed` flips: the mount-time staleness check races
+  // session hydration (auth.uid() resolves asynchronously, so `status` often
+  // still reads 'loading' at the exact synchronous instant this first runs)
+  // — re-running once isAuthed is actually known closes that gap instead of
+  // silently missing a stale session on a freshly (re)opened tab.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    return installWebIdleGuard(() => {
+      if (useAuth.getState().status === 'authenticated') {
+        void useAuth.getState().logout();
+      }
+    });
+  }, [isAuthed]);
+
+  // Reset the activity clock right when a session is confirmed authenticated
+  // — see webIdleGuard's own doc comment for why installWebIdleGuard itself
+  // deliberately never does this on install.
+  useEffect(() => {
+    if (Platform.OS === 'web' && isAuthed) markWebActive();
+  }, [isAuthed]);
 
   // Web: a tab from a previous deploy requests route chunks that no longer
   // exist (hashed filenames change per deploy) and dies with a white screen.
@@ -209,6 +236,7 @@ export default function RootLayout() {
               <Stack.Screen name="account/settings" />
               <Stack.Screen name="account/language" />
               <Stack.Screen name="account/legal" />
+              <Stack.Screen name="account/store-credit" />
               <Stack.Screen name="notifications" />
             </Stack.Protected>
 

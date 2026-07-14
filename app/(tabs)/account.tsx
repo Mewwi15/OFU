@@ -58,7 +58,10 @@ function loginAccountLabel(id: AccountIdentity | null, t: (k: string) => string)
 
 const AVATAR_SIZE = 64;
 
-type MenuRow = { key: string; labelKey: string; icon: number };
+// `icon` is a custom clay PNG (assets/icon-src/b1-b9, all already spoken for);
+// `ionicon` is a fallback for a row with no matching custom asset — rendered
+// in a tinted circle at the same footprint instead of leaving it unstyled.
+type MenuRow = { key: string; labelKey: string; icon?: number; ionicon?: keyof typeof Ionicons.glyphMap };
 type MenuSection = { titleKey: string; rows: MenuRow[] };
 
 const SECTIONS: MenuSection[] = [
@@ -67,6 +70,7 @@ const SECTIONS: MenuSection[] = [
     rows: [
       { key: 'orders', labelKey: 'account.menu.orders', icon: ICON.orders },
       { key: 'address', labelKey: 'account.menu.address', icon: ICON.address },
+      { key: 'store-credit', labelKey: 'account.menu.storeCredit', ionicon: 'wallet-outline' },
     ],
   },
   {
@@ -130,6 +134,9 @@ export default function ProfileScreen() {
         break;
       case 'address':
         router.push('/address');
+        break;
+      case 'store-credit':
+        router.push('/account/store-credit');
         break;
       case 'settings':
         router.push('/account/settings');
@@ -306,7 +313,13 @@ export default function ProfileScreen() {
                     i > 0 && styles.rowDivider,
                     pressed && styles.rowPressed,
                   ]}>
-                  <Image source={row.icon} style={styles.menuIcon} contentFit="contain" />
+                  {row.icon ? (
+                    <Image source={row.icon} style={styles.menuIcon} contentFit="contain" />
+                  ) : row.ionicon ? (
+                    <View style={styles.menuIconFallback}>
+                      <Ionicons name={row.ionicon} size={20} color={Colors.primaryStrong} />
+                    </View>
+                  ) : null}
                   <Text style={styles.rowLabel}>
                     {t(row.key === 'line' && lineLinked ? 'account.menu.lineLinked' : row.labelKey)}
                   </Text>
@@ -450,6 +463,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
   },
   menuIcon: { width: 34, height: 34 },
+  menuIconFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rowLabel: {
     flex: 1,
     ...Typography.bodyStrong,

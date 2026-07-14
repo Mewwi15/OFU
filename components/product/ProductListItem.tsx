@@ -25,6 +25,7 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
+import { productThumb } from '@/lib/image';
 import { cartItemId, useCart } from '@/store/cart';
 
 export type ProductListItemVariant = 'cart';
@@ -100,7 +101,7 @@ export function ProductListItem({
 
       {/* Image */}
       <Image
-        source={{ uri: product.images[0] }}
+        source={{ uri: productThumb(product.images[0], 200) }}
         style={[
           isCart ? styles.imageSm : styles.image,
           selectable && styles.imageGap,

@@ -147,8 +147,8 @@ export const authRepo = {
   },
 
   /** Subscribe to sign-in/out; returns an unsubscribe fn. */
-  onAuthChange(cb: (session: Session | null) => void): () => void {
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => cb(session));
+  onAuthChange(cb: (session: Session | null, event: string) => void): () => void {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => cb(session, event));
     return () => data.subscription.unsubscribe();
   },
 
@@ -272,6 +272,11 @@ export const authRepo = {
       p_purpose: purpose,
       p_policy_version: policyVersion ?? undefined,
     });
+    if (error) throw error;
+  },
+
+  async withdrawConsent(purpose: string): Promise<void> {
+    const { error } = await supabase.rpc('withdraw_consent', { p_purpose: purpose });
     if (error) throw error;
   },
 };

@@ -9,18 +9,21 @@
  *    biometrics (and on simulators without a test face/finger).
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { authRepo } from '@/lib/data/auth';
 import { getPushEnabled, setPushEnabled } from '@/lib/data/notifications';
 import { useT } from '@/lib/i18n';
+import { showAlert, showConfirm } from '@/lib/showAlert';
 import { useLock } from '@/store/lock';
 
 export default function SettingsScreen() {
@@ -36,10 +39,20 @@ export default function SettingsScreen() {
   const [bioLabel, setBioLabel] = useState('');
   const [bioSaving, setBioSaving] = useState(false);
 
+  // PDPA data-processing consent — required by place_order (CONSENT_REQUIRED);
+  // withdrawing it blocks new orders until granted again, browsing/cart still
+  // work. null = loading.
+  const [consentGranted, setConsentGranted] = useState<boolean | null>(null);
+  const [consentSaving, setConsentSaving] = useState(false);
+
   useEffect(() => {
     getPushEnabled()
       .then(setPush)
       .catch(() => setPush(true));
+    authRepo
+      .getConsentStatus()
+      .then((s) => setConsentGranted(s.data_processing ?? false))
+      .catch(() => setConsentGranted(true)); // fail open on read — don't alarm on a network hiccup
     if (Platform.OS === 'web') return; // no biometrics / app lock on web
     (async () => {
       const [hasHw, enrolled, types] = await Promise.all([
@@ -65,6 +78,31 @@ export default function SettingsScreen() {
       setPush(!value); // revert on failure
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleConsent = async () => {
+    if (consentGranted) {
+      const ok = await showConfirm(
+        t('settings.consentWithdrawConfirmTitle'),
+        t('settings.consentWithdrawConfirmBody'),
+        { confirmText: t('settings.consentWithdrawBtn'), cancelText: t('common.cancel'), destructive: true },
+      );
+      if (!ok) return;
+    }
+    setConsentSaving(true);
+    try {
+      if (consentGranted) {
+        await authRepo.withdrawConsent('data_processing');
+        setConsentGranted(false);
+      } else {
+        await authRepo.grantConsent('data_processing', 'v1');
+        setConsentGranted(true);
+      }
+    } catch {
+      showAlert(t('settings.consentUpdateFailed'));
+    } finally {
+      setConsentSaving(false);
     }
   };
 
@@ -146,6 +184,52 @@ export default function SettingsScreen() {
           </View>
         ) : null}
 
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>{t('settings.consentTitle')}</Text>
+              <Text variant="caption" style={styles.rowCaption}>
+                {t('settings.consentCap')}
+              </Text>
+            </View>
+            {consentGranted === null ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : (
+              <View style={styles.consentStatusRow}>
+                <Ionicons
+                  name={consentGranted ? 'checkmark-circle' : 'close-circle'}
+                  size={16}
+                  color={consentGranted ? Colors.accentStrong : Colors.dangerStrong}
+                />
+                <Text
+                  variant="caption"
+                  style={[styles.consentStatusText, { color: consentGranted ? Colors.accentStrong : Colors.dangerStrong }]}>
+                  {consentGranted ? t('settings.consentGranted') : t('settings.consentWithdrawn')}
+                </Text>
+              </View>
+            )}
+          </View>
+          {consentGranted !== null ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={consentSaving}
+              onPress={() => void toggleConsent()}
+              style={({ pressed }) => [styles.consentBtn, pressed && styles.consentBtnPressed]}>
+              {consentSaving ? (
+                <ActivityIndicator color={consentGranted ? Colors.dangerStrong : Colors.primaryStrong} />
+              ) : (
+                <Text
+                  style={[
+                    styles.consentBtnText,
+                    { color: consentGranted ? Colors.dangerStrong : Colors.primaryStrong },
+                  ]}>
+                  {consentGranted ? t('settings.consentWithdrawBtn') : t('settings.consentGrantBtn')}
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+
         <Text variant="caption" style={styles.note}>
           {t('settings.note')}
         </Text>
@@ -170,4 +254,14 @@ const styles = StyleSheet.create({
   rowLabel: { ...Typography.bodyStrong, color: Colors.text },
   rowCaption: { color: Colors.textMuted, marginTop: 2 },
   note: { color: Colors.textMuted, paddingHorizontal: Spacing.xs },
+
+  consentStatusRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xxs },
+  consentStatusText: { ...Typography.label },
+  consentBtn: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  consentBtnPressed: { opacity: 0.6 },
+  consentBtnText: { ...Typography.button },
 });

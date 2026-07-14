@@ -29,7 +29,7 @@ import { useT } from '@/lib/i18n';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { selectedAddress, useAddress } from '@/store/address';
-import { useCatalog } from '@/store/catalog';
+import { loadIfStale, useCatalog } from '@/store/catalog';
 import { useShop } from '@/store/shop';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
@@ -56,12 +56,14 @@ export default function HomeScreen() {
   const products = useCatalog((s) => s.products);
   const reloadCatalog = useCatalog((s) => s.load);
   const [refreshing, setRefreshing] = useState(false);
-  // Re-fetch the catalog whenever Home regains focus, so admin changes (new
-  // products, prices, banners) show up without restarting the app.
+  // Re-fetch on focus only if the catalog is stale (loadIfStale), so admin
+  // changes (new products, prices, banners) still show up without a restart,
+  // but bouncing between tabs while browsing doesn't refire all 5 catalog
+  // queries every single time.
   useFocusEffect(
     useCallback(() => {
-      void reloadCatalog(true);
-    }, [reloadCatalog]),
+      loadIfStale();
+    }, []),
   );
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

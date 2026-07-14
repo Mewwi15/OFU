@@ -15,6 +15,7 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
+import { productThumb } from '@/lib/image';
 
 type Props = {
   product: Product;
@@ -37,7 +38,7 @@ export function DesktopProductCard({ product, style }: Props) {
       <View style={styles.photoWrap}>
         {product.images[0] ? (
           <Image
-            source={{ uri: product.images[0] }}
+            source={{ uri: productThumb(product.images[0], 500) }}
             style={styles.photo}
             contentFit="cover"
             transition={200}

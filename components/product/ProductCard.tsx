@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
+import { productThumb } from '@/lib/image';
 
 export type ProductCardProps = {
   product: Product;
@@ -37,7 +38,7 @@ export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
       <PressableScale accessibilityRole="button" onPress={open} style={styles.card}>
         <View>
           <Image
-            source={{ uri: product.images[0] }}
+            source={{ uri: productThumb(product.images[0], 400) }}
             style={[styles.image, soldOut && styles.imageDimmed]}
             contentFit="cover"
             transition={250}

@@ -20,6 +20,7 @@ import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
+import { productThumb } from '@/lib/image';
 import { useCart } from '@/store/cart';
 
 const PERKS = [
@@ -101,7 +102,7 @@ export function DesktopProduct({ product }: Props) {
                       accessibilityRole="button"
                       onPress={() => setActiveImage(i)}
                       style={[styles.thumb, i === activeImage && styles.thumbActive]}>
-                      <Image source={{ uri }} style={styles.thumbImg} contentFit="cover" />
+                      <Image source={{ uri: productThumb(uri, 150) }} style={styles.thumbImg} contentFit="cover" />
                     </Pressable>
                   ))}
                 </View>

@@ -50,12 +50,20 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlacedOrder> {
     const { error } = await supabase.rpc('clear_cart');
     if (error) throw error;
   }
-  for (const item of input.items) {
-    const { error } = await supabase.rpc('add_cart_item', {
-      p_variant_id: item.variantId,
-      p_qty: item.qty,
-    });
-    if (error) throw error;
+  // One request per distinct cart line, fired concurrently — each targets a
+  // different (cart_id, variant_id) row so there's no write conflict between
+  // them (only cart_ensure()'s shared touch on the single carts row briefly
+  // serializes, a sub-millisecond DB-side wait, not a network one). Awaiting
+  // them one at a time here previously turned a 5-8 item cart into 5-8 full
+  // sequential network round trips before checkout could even start.
+  {
+    const results = await Promise.all(
+      input.items.map((item) =>
+        supabase.rpc('add_cart_item', { p_variant_id: item.variantId, p_qty: item.qty }),
+      ),
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw failed.error;
   }
   {
     const { error } = await supabase.rpc('set_cart_mode', { p_shop_mode: input.mode });
