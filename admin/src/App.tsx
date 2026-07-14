@@ -17,6 +17,7 @@ import { Orders } from './pages/Orders';
 import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
+import { Promotions } from './pages/Promotions';
 import { Reports } from './pages/Reports';
 import { Stock } from './pages/Stock';
 import { ScanLab } from './pages/ScanLab';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/promotions" element={<Promotions />} />
           <Route path="/store-credit" element={<StoreCredit />} />
           <Route path="/broadcast" element={<Broadcast />} />
           <Route path="/banners" element={<Banners />} />

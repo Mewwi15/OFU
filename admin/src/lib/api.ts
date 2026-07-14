@@ -27,6 +27,7 @@ export function apiError(e: unknown): string {
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
     EMPTY_SALE: 'ยังไม่มีสินค้าในบิล',
     CUSTOMER_REQUIRED: 'ต้องเลือกลูกค้าสำหรับเครดิตร้าน',
+    DUPLICATE_PROMO_CODE: 'มีโค้ดส่วนลดนี้อยู่แล้ว',
   };
   return th[msg] ?? msg;
 }
@@ -82,7 +83,22 @@ export async function listCategories(): Promise<Category[]> {
   return data as Category[];
 }
 
-export async function listProducts(): Promise<Product[]> {
+/** Cached across navigations (Products/Stock/Categories/Featured all list the
+ * same catalog) — a bare mount-time call reuses a fetch from the last 30s
+ * instead of re-querying the full nested product/variant/image tree on every
+ * page visit. Pass `force: true` right after a mutation so the caller sees
+ * its own write immediately, not a stale cache. */
+let productsCache: { data: Product[]; at: number } | null = null;
+const PRODUCTS_STALE_MS = 30_000;
+
+export function invalidateProductsCache() {
+  productsCache = null;
+}
+
+export async function listProducts(force = false): Promise<Product[]> {
+  if (!force && productsCache && Date.now() - productsCache.at < PRODUCTS_STALE_MS) {
+    return productsCache.data;
+  }
   const { data, error } = await supabase
     .from('products')
     .select(
@@ -92,10 +108,12 @@ export async function listProducts(): Promise<Product[]> {
     .order('created_at', { ascending: false });
   if (error) throw error;
   // Hide archived (retired size) variants — 1 product = 1 live stock row.
-  return (data as unknown as Product[]).map((p) => ({
+  const products = (data as unknown as Product[]).map((p) => ({
     ...p,
     product_variants: p.product_variants.filter((v) => !v.archived_at),
   }));
+  productsCache = { data: products, at: Date.now() };
+  return products;
 }
 
 /* ── Catalog mutations (0006 RPCs) ─────────────────────────────────────────── */
@@ -457,6 +475,150 @@ export async function getShopInfo(): Promise<ShopInfo> {
     promptpay_name: s?.shops?.promptpay_name ?? null,
   };
 }
+
+/* ── shop settings (owner-only write: delivery/online fee, VAT, PromptPay) ──── */
+export type ShopSettingsFull = {
+  name: string;
+  promptpay_id: string | null;
+  promptpay_name: string | null;
+  delivery_fee: number;
+  free_delivery_threshold: number;
+  online_fee: number;
+  online_free_threshold: number;
+  cod_enabled: boolean;
+  cod_cap: number | null;
+  vat_registered: boolean;
+  vat_rate: number;
+  tax_id: string | null;
+  branch_code: string;
+  receipt_header: string | null;
+  receipt_footer: string | null;
+};
+
+export async function getShopSettingsFull(): Promise<ShopSettingsFull> {
+  const { data, error } = await supabase
+    .from('shop_settings')
+    .select(
+      'delivery_fee, free_delivery_threshold, online_fee, online_free_threshold, cod_enabled, cod_cap, vat_registered, vat_rate, tax_id, branch_code, receipt_header, receipt_footer, shops(name, promptpay_id, promptpay_name)',
+    )
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const s = data as unknown as {
+    delivery_fee: number;
+    free_delivery_threshold: number;
+    online_fee: number;
+    online_free_threshold: number;
+    cod_enabled: boolean;
+    cod_cap: number | null;
+    vat_registered: boolean;
+    vat_rate: number;
+    tax_id: string | null;
+    branch_code: string;
+    receipt_header: string | null;
+    receipt_footer: string | null;
+    shops: { name: string; promptpay_id: string | null; promptpay_name: string | null } | null;
+  } | null;
+  return {
+    name: s?.shops?.name ?? 'ร้านค้า',
+    promptpay_id: s?.shops?.promptpay_id ?? null,
+    promptpay_name: s?.shops?.promptpay_name ?? null,
+    delivery_fee: s?.delivery_fee ?? 40,
+    free_delivery_threshold: s?.free_delivery_threshold ?? 200,
+    online_fee: s?.online_fee ?? 150,
+    online_free_threshold: s?.online_free_threshold ?? 500,
+    cod_enabled: s?.cod_enabled ?? true,
+    cod_cap: s?.cod_cap ?? null,
+    vat_registered: s?.vat_registered ?? false,
+    vat_rate: Number(s?.vat_rate ?? 7),
+    tax_id: s?.tax_id ?? null,
+    branch_code: s?.branch_code ?? '00000',
+    receipt_header: s?.receipt_header ?? null,
+    receipt_footer: s?.receipt_footer ?? null,
+  };
+}
+
+export const updateShopSettings = (p: ShopSettingsFull) =>
+  rpc('update_shop_settings', {
+    p_name: p.name,
+    p_promptpay_id: p.promptpay_id,
+    p_promptpay_name: p.promptpay_name,
+    p_delivery_fee: p.delivery_fee,
+    p_free_delivery_threshold: p.free_delivery_threshold,
+    p_online_fee: p.online_fee,
+    p_online_free_threshold: p.online_free_threshold,
+    p_cod_enabled: p.cod_enabled,
+    p_cod_cap: p.cod_cap,
+    p_vat_registered: p.vat_registered,
+    p_vat_rate: p.vat_rate,
+    p_tax_id: p.tax_id,
+    p_branch_code: p.branch_code,
+    p_receipt_header: p.receipt_header,
+    p_receipt_footer: p.receipt_footer,
+  });
+
+/* ── promo codes (owner-only write) ──────────────────────────────────────────── */
+export type PromoType = 'percent' | 'fixed_baht';
+export type PromoScope = 'subtotal' | 'delivery';
+export type PromoCode = {
+  id: string;
+  code: string;
+  type: PromoType;
+  value: number;
+  max_discount: number | null;
+  min_spend: number;
+  scope: PromoScope;
+  active_from: string | null;
+  active_to: string | null;
+  total_limit: number | null;
+  per_user_limit: number | null;
+  total_redeemed: number;
+  active: boolean;
+  created_at: string;
+};
+
+export async function listPromoCodes(): Promise<PromoCode[]> {
+  const { data, error } = await supabase
+    .from('promo_codes')
+    .select(
+      'id, code, type, value, max_discount, min_spend, scope, active_from, active_to, total_limit, per_user_limit, total_redeemed, active, created_at',
+    )
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data as PromoCode[];
+}
+
+export const upsertPromoCode = (p: {
+  id?: string;
+  code: string;
+  type: PromoType;
+  value: number;
+  max_discount?: number | null;
+  min_spend?: number;
+  scope?: PromoScope;
+  active_from?: string | null;
+  active_to?: string | null;
+  total_limit?: number | null;
+  per_user_limit?: number | null;
+  active?: boolean;
+}) =>
+  rpc<{ id: string }>('upsert_promo_code', {
+    p_id: p.id ?? undefined,
+    p_code: p.code,
+    p_type: p.type,
+    p_value: p.value,
+    p_max_discount: p.max_discount ?? undefined,
+    p_min_spend: p.min_spend ?? 0,
+    p_scope: p.scope ?? 'subtotal',
+    p_active_from: p.active_from ?? undefined,
+    p_active_to: p.active_to ?? undefined,
+    p_total_limit: p.total_limit ?? undefined,
+    p_per_user_limit: p.per_user_limit ?? undefined,
+    p_active: p.active ?? true,
+  });
+
+export const setPromoActive = (id: string, active: boolean) =>
+  rpc('set_promo_active', { p_id: id, p_active: active });
 
 export type Dashboard = {
   onsite: {

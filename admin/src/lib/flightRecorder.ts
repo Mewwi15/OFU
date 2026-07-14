@@ -9,8 +9,11 @@
  * empty, which itself suggested the "jump" is a full browser navigation (the
  * SPA reboots → index route redirects to /pos). Read + copy at /scan-lab.
  *
- * Keys typed into a password field, or anywhere on /login, are recorded as
- * REDACTED — see isSecretTarget.
+ * Keys typed into any INPUT/TEXTAREA are recorded as REDACTED by default
+ * (customer phone numbers, chat replies, tracking numbers — anything a staff
+ * member deliberately types is someone's data, not scanner noise) — see
+ * isSecretTarget. Only fields explicitly marked data-flight-log="true" (the
+ * barcode/scan boxes this tool exists to debug) keep their raw key/code.
  */
 
 export type FlightEvent = {
@@ -61,9 +64,14 @@ function load() {
 
 /**
  * The tape is readable (and copyable) by anyone who can open /scan-lab, so it
- * must never carry a credential. Keystrokes are redacted inside a password
- * field and anywhere on the login screen — antd's Input.Password can be toggled
- * to type="text", and the scanner is never used there anyway.
+ * must default to redacted. Any keydown targeting an INPUT/TEXTAREA is
+ * someone deliberately typing — customer phone search, chat drafts, broadcast
+ * text, reject reasons, tax IDs — and stays redacted unless the field opts in
+ * via data-flight-log="true" (the barcode/scan boxes on POS, Products and
+ * Settings). Keydowns that land on anything else (a button, the page body —
+ * where a keyboard-wedge scan lands when nothing is focused, the actual
+ * phenomenon under investigation) are not text a human meant to type, so they
+ * keep their raw key/code.
  */
 function isSecretTarget(el: HTMLElement | null): boolean {
   if (location.pathname.startsWith('/login')) return true;
@@ -71,7 +79,11 @@ function isSecretTarget(el: HTMLElement | null): boolean {
   if (!input) return false;
   if (input.type === 'password') return true;
   const ac = input.autocomplete ?? '';
-  return ac === 'current-password' || ac === 'new-password' || ac === 'one-time-code';
+  if (ac === 'current-password' || ac === 'new-password' || ac === 'one-time-code') return true;
+  if (input.tagName === 'INPUT' || input.tagName === 'TEXTAREA') {
+    return input.dataset.flightLog !== 'true';
+  }
+  return false;
 }
 
 function push(e: FlightEvent) {

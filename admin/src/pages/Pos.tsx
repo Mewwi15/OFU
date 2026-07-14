@@ -553,6 +553,7 @@ export function Pos() {
             // No browser autofill: Chrome remembered old scans and its suggestion
             // popup swallowed the scan's Enter (picking a stale code).
             autoComplete="off"
+            data-flight-log="true"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onSearchKey}

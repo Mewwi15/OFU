@@ -9,6 +9,12 @@
  *
  * Both open a print window (user picks the printer; window stays open for
  * reprints). All order-sourced text is HTML-escaped.
+ *
+ * The window itself must open synchronously, inside the click handler and
+ * before any `await` (openPrintWindow) — browsers only let window.open()
+ * bypass the popup blocker while still inside a user gesture's call stack.
+ * Anything needing an async fetch first (shop name, etc.) resolves after,
+ * and gets written into that already-open window.
  */
 
 import type { Order, OrderItem } from './orders';
@@ -22,9 +28,14 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
   online: 'ส่งพัสดุ',
 };
 
-function openPrint(html: string) {
-  const w = window.open('', '_blank', 'width=460,height=760');
-  if (!w) return;
+/** Open the (still blank) print window. Call this FIRST, synchronously, from
+ * the click handler — before awaiting anything — or the browser may silently
+ * block it as an unrequested popup. Returns null if it got blocked anyway. */
+export function openPrintWindow(): Window | null {
+  return window.open('', '_blank', 'width=460,height=760');
+}
+
+function writePrint(w: Window, html: string) {
   w.document.write(html);
   w.document.close();
   w.focus();
@@ -37,7 +48,7 @@ const BASE_CSS = `
 `;
 
 /** ใบจัดสินค้า — thermal bill format on the same roll as the POS receipt. */
-export function printPickList(order: Order, items: OrderItem[], shopName: string) {
+export function printPickList(w: Window, order: Order, items: OrderItem[], shopName: string) {
   const cfg = getReceiptConfig();
   const width = contentMm(cfg.paperWidth);
   const pieces = items.reduce((s, i) => s + i.qty, 0);
@@ -58,7 +69,7 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
     )
     .join('');
 
-  openPrint(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  writePrint(w, `<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบจัดสินค้า ${esc(order.order_number)}</title>
   <style>
     ${BASE_CSS}
@@ -95,6 +106,7 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
 }
 
 export function printAddressLabel(
+  w: Window,
   order: Order,
   shopName: string,
   trackingNo: string | null,
@@ -104,7 +116,7 @@ export function printAddressLabel(
     .filter(Boolean)
     .map((x) => esc(x as string))
     .join(' · ');
-  openPrint(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  writePrint(w, `<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบจ่าหน้า ${esc(order.order_number)}</title>
   <style>
     ${BASE_CSS}

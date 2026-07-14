@@ -3,6 +3,7 @@ import {
   RiBarChart2Line,
   RiCashLine,
   RiChat1Line,
+  RiCouponLine,
   RiFileList3Line,
   RiImageLine,
   RiLogoutBoxRLine,
@@ -33,7 +34,7 @@ function useChatUnread(): number {
   return unread;
 }
 
-export type NavItem = { to: string; label: string; Icon: typeof RiCashLine };
+export type NavItem = { to: string; label: string; Icon: typeof RiCashLine; ownerOnly?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
 
 /** Sidebar grouped into zones: on-site, online, catalog/app, overview. */
@@ -59,6 +60,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
       { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
+      { to: '/promotions', label: 'โปรโมชั่น', Icon: RiCouponLine, ownerOnly: true },
       { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
       { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
     ],
@@ -124,9 +126,10 @@ export function Sidebar({
 }) {
   const nav = useNavigate();
   const { pathname } = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const chatUnread = useChatUnread();
   const active = NAV.find((n) => navMatches(pathname, n.to))?.to ?? '/pos';
+  const isOwner = profile?.tier === 'owner';
 
   return (
     <div className="flex flex-col h-full">
@@ -144,19 +147,21 @@ export function Sidebar({
           type: 'group' as const,
           key: g.title,
           label: g.title,
-          children: g.items.map((n) => ({
-            key: n.to,
-            icon: <n.Icon className="w-[18px] h-[18px]" />,
-            label:
-              n.to === '/chat' && chatUnread > 0 ? (
-                <span className="flex items-center justify-between gap-2">
-                  {n.label}
-                  <Badge count={chatUnread} size="small" />
-                </span>
-              ) : (
-                n.label
-              ),
-          })),
+          children: g.items
+            .filter((n) => !n.ownerOnly || isOwner)
+            .map((n) => ({
+              key: n.to,
+              icon: <n.Icon className="w-[18px] h-[18px]" />,
+              label:
+                n.to === '/chat' && chatUnread > 0 ? (
+                  <span className="flex items-center justify-between gap-2">
+                    {n.label}
+                    <Badge count={chatUnread} size="small" />
+                  </span>
+                ) : (
+                  n.label
+                ),
+            })),
         }))}
       />
       <div className="p-3 border-t border-[#F0EAE6]">

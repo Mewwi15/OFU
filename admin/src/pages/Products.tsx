@@ -74,10 +74,10 @@ export function Products() {
   // Barcode to prefill when opening the Add modal via a scan (goods intake).
   const [scanBarcode, setScanBarcode] = useState<string | null>(null);
 
-  async function load() {
+  async function load(force = false) {
     setLoading(true);
     try {
-      const [p, c] = await Promise.all([listProducts(), listCategories()]);
+      const [p, c] = await Promise.all([listProducts(force), listCategories()]);
       setProducts(p);
       setCategories(c);
     } catch (e) {
@@ -168,7 +168,7 @@ export function Products() {
   async function togglePublish(p: Product) {
     try {
       await setPublishState(p.id, p.publish_state === 'published' ? 'draft' : 'published', p.row_version);
-      await load();
+      await load(true);
     } catch (e) {
       message.error(apiError(e));
     }
@@ -177,7 +177,7 @@ export function Products() {
     try {
       await archiveProduct(p.id, p.row_version);
       message.success('ลบสินค้าแล้ว');
-      await load();
+      await load(true);
     } catch (e) {
       message.error(apiError(e));
     }
@@ -371,7 +371,7 @@ export function Products() {
           onSaved={() => {
             setEditing(null);
             setScanBarcode(null);
-            void load();
+            void load(true);
           }}
         />
       ) : null}
@@ -707,7 +707,7 @@ function ProductModal({
             <InputNumber min={0} style={{ width: '100%' }} placeholder="5" />
           </Form.Item>
           <Form.Item name="barcode" label="บาร์โค้ด">
-            <Input placeholder="ยิงหรือพิมพ์บาร์โค้ด" autoComplete="off" />
+            <Input placeholder="ยิงหรือพิมพ์บาร์โค้ด" autoComplete="off" data-flight-log="true" />
           </Form.Item>
           <Form.Item name="sku" label="รหัสสินค้า (SKU)">
             <Input placeholder="เช่น RICE-5KG" autoComplete="off" />

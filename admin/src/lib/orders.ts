@@ -208,8 +208,14 @@ export function nextStatus(mode: ShopMode, current: OrderStatus): OrderStatus | 
   return (mode === 'delivery' ? NEXT_DELIVERY : NEXT_ONLINE)[current] ?? null;
 }
 
-/** Shop display name — the sender line on printed sheets. */
+/** Shop display name — the sender line on printed sheets. Cached: it never
+ * changes mid-session and re-fetching on every print click only widens the
+ * async gap between the click and window.open(), risking a blocked popup. */
+let shopNameCache: Promise<string> | null = null;
 export async function getShopName(): Promise<string> {
-  const { data } = await supabase.from('shops').select('name').limit(1).maybeSingle();
-  return (data?.name as string) ?? 'ร้านอู้ฟู่';
+  shopNameCache ??= (async () => {
+    const { data } = await supabase.from('shops').select('name').limit(1).maybeSingle();
+    return (data?.name as string) ?? 'ร้านอู้ฟู่';
+  })();
+  return shopNameCache;
 }

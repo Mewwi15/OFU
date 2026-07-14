@@ -243,10 +243,10 @@ export function Stock() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (force = false) => {
     setLoading(true);
     try {
-      setProducts(await listProducts());
+      setProducts(await listProducts(force));
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -345,7 +345,7 @@ export function Stock() {
         );
       }
       setAction(null);
-      void reload();
+      void reload(true);
       void reloadMoves();
     } catch (e) {
       message.error(apiError(e));
@@ -607,7 +607,7 @@ export function Stock() {
     message[failed ? 'warning' : 'success'](
       `นำเข้าสำเร็จ ${ok} รายการ${failed ? ` · ล้มเหลว ${failed}` : ''}`,
     );
-    void reload();
+    void reload(true);
     void reloadMoves();
   };
 
@@ -666,7 +666,7 @@ export function Stock() {
       message.success(`รับของเข้า ${lines.length} รายการเรียบร้อย`);
       setLines([]);
       setNote('');
-      void reload();
+      void reload(true);
       void reloadMoves();
     } catch (e) {
       message.error(apiError(e));
