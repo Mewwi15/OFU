@@ -28,12 +28,16 @@ import {
 import {
   cacheCatalog,
   cacheShop,
+  dismissFailedSale,
   enqueueSale,
+  type FailedSale,
   flushQueue,
   isNetworkError,
   queueCount,
   readCachedCatalog,
   readCachedShop,
+  readFailedQueue,
+  retryFailedSale,
 } from '../lib/offline';
 import {
   Badge,
@@ -124,12 +128,19 @@ export function Pos() {
   const [cartOpen, setCartOpen] = useState(false); // mobile order drawer
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [pending, setPending] = useState(0); // queued offline sales
+  const [failedSales, setFailedSales] = useState<FailedSale[]>([]); // synced failed for a real reason — needs manual review
+  const [failedOpen, setFailedOpen] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null); // client_op_id currently retrying
   const searchRef = useRef<InputRef>(null);
+  // Remembers the client_op_id used for the CURRENT checkout attempt, keyed
+  // to a snapshot of exactly what was sent — see checkout()'s use of it.
+  const lastAttemptRef = useRef<{ opId: string; signature: string } | null>(null);
 
   const doFlush = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-    const { synced, remaining } = await flushQueue(createPosSale);
+    const { synced, remaining, failed } = await flushQueue(createPosSale);
     setPending(remaining);
+    if (failed > 0) setFailedSales(readFailedQueue());
     if (synced > 0) {
       // pull fresh server stock after syncing queued sales
       try {
@@ -141,6 +152,31 @@ export function Pos() {
       }
     }
   }, []);
+
+  async function retryFailed(clientOpId: string) {
+    setRetrying(clientOpId);
+    try {
+      const res = await retryFailedSale(clientOpId, createPosSale);
+      setFailedSales(readFailedQueue());
+      setPending(queueCount());
+      if (res.ok) {
+        try {
+          const c = await listPosCatalog();
+          setCatalog(c);
+          cacheCatalog(c);
+        } catch {
+          /* ignore */
+        }
+      }
+    } finally {
+      setRetrying(null);
+    }
+  }
+
+  function dismissFailed(clientOpId: string) {
+    dismissFailedSale(clientOpId);
+    setFailedSales(readFailedQueue());
+  }
 
   useEffect(() => {
     (async () => {
@@ -171,6 +207,7 @@ export function Pos() {
   // online/offline listeners + flush queued sales on reconnect
   useEffect(() => {
     setPending(queueCount());
+    setFailedSales(readFailedQueue());
     const goOnline = () => {
       setOnline(true);
       void doFlush();
@@ -374,6 +411,7 @@ export function Pos() {
     setCustTaxId('');
     setMethod('cash');
     setQuery('');
+    lastAttemptRef.current = null;
     searchRef.current?.focus();
   }
 
@@ -383,8 +421,7 @@ export function Pos() {
       setError('เงินที่รับมาไม่พอ');
       return;
     }
-    const input = {
-      client_op_id: crypto.randomUUID(),
+    const baseInput = {
       items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
       payment_method: method,
       cash_tendered: method === 'cash' ? (tendered as number) : undefined,
@@ -393,6 +430,21 @@ export function Pos() {
       customer_name: taxInvoice ? custName || undefined : undefined,
       customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
     };
+    // Reuse the SAME client_op_id for a retry of the exact same attempt. If
+    // the previous try actually committed server-side but the client only
+    // saw an ambiguous (non-network) error — a slow response, a proxy hiccup
+    // — create_pos_sale's idempotent replay-by-client_op_id (0029/0041) then
+    // returns the already-committed sale instead of ringing it up again. A
+    // real change to the sale (items/discount/tender/...) gets a fresh id,
+    // since replaying the OLD id against a MODIFIED input would silently
+    // ignore what the cashier just changed and hand back the stale sale.
+    const signature = JSON.stringify(baseInput);
+    const opId =
+      lastAttemptRef.current?.signature === signature
+        ? lastAttemptRef.current.opId
+        : crypto.randomUUID();
+    lastAttemptRef.current = { opId, signature };
+    const input = { client_op_id: opId, ...baseInput };
     const at = new Date().toLocaleString('th-TH');
     const soldLines = lines;
 
@@ -455,6 +507,22 @@ export function Pos() {
       <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="relative flex flex-col min-h-0">
+          {/* Sales that already happened (cash/goods changed hands, a
+              provisional receipt printed) but failed to sync for a real
+              reason — never auto-dismisses, always visible until someone
+              reviews it, deliberately styled distinct from the routine amber
+              "waiting to sync" pill below. */}
+          {failedSales.length > 0 && (
+            <button
+              onClick={() => setFailedOpen(true)}
+              className="mb-3 flex w-full items-center gap-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-3 py-2 text-left hover:bg-red-100">
+              <RiErrorWarningLine className="w-5 h-5 shrink-0" />
+              <span className="flex-1">
+                {failedSales.length} รายการขายไม่ได้ซิงค์เข้าระบบ (สินค้า/เงินออกไปแล้วจริง) — ต้องตรวจสอบด้วยตนเอง
+              </span>
+              <span className="underline shrink-0">ดูรายการ</span>
+            </button>
+          )}
           {/* status bar — only when offline or has queued sales */}
           {(!online || pending > 0) && (
             <div className="flex items-center gap-2 mb-3">
@@ -811,6 +879,56 @@ export function Pos() {
         />
       )}
       {receipt && shop && <ReceiptModal data={receipt} shop={shop} onClose={() => setReceipt(null)} />}
+      {failedOpen && (
+        <Modal
+          open
+          title={`รายการขายที่ยังไม่ได้ซิงค์ (${failedSales.length})`}
+          onCancel={() => setFailedOpen(false)}
+          footer={null}
+          width={520}>
+          <p className="text-sm text-tremor-content mb-4">
+            รายการเหล่านี้ขายจริงแล้ว (ลูกค้าได้รับสินค้าและร้านได้รับเงินแล้ว) แต่บันทึกเข้าระบบไม่สำเร็จ —
+            กด &quot;ลองใหม่&quot; ถ้าคิดว่าสาเหตุหมดไปแล้ว (เช่น เติมสต๊อกแล้ว) หรือ &quot;รับทราบ&quot;
+            เพื่อปิดรายการหลังตรวจสอบ/บันทึกด้วยมือแล้ว
+          </p>
+          <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto">
+            {failedSales.map((f) => {
+              const itemLabel = f.input.items
+                .map((it) => {
+                  for (const p of catalog) {
+                    const v = p.variants.find((x) => x.id === it.variant_id);
+                    if (v) return `${p.name}${v.size ? ' · ' + v.size : ''} ×${it.qty}`;
+                  }
+                  return `สินค้า (ลบ/เปลี่ยนแล้ว) ×${it.qty}`;
+                })
+                .join(', ');
+              return (
+                <div key={f.input.client_op_id} className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-sm text-[#2B2320] font-medium">{baht(f.total)}</div>
+                    <div className="text-xs text-tremor-content">
+                      {new Date(f.at).toLocaleString('th-TH')}
+                    </div>
+                  </div>
+                  <div className="text-xs text-tremor-content mt-1">{itemLabel}</div>
+                  <div className="text-xs text-red-700 mt-1">เหตุผล: {apiError({ message: f.reason })}</div>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      size="small"
+                      loading={retrying === f.input.client_op_id}
+                      onClick={() => void retryFailed(f.input.client_op_id)}>
+                      ลองใหม่
+                    </Button>
+                    <Button size="small" danger onClick={() => dismissFailed(f.input.client_op_id)}>
+                      รับทราบ (ปิดรายการ)
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
