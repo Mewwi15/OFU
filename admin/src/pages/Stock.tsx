@@ -3,8 +3,11 @@
  *
  *  • ภาพรวม   : every variant in one readable table — photo, barcode/SKU,
  *    price/cost, on-hand / reserved / sellable, threshold, stock value, status.
- *    Row actions: เติม (receive), ปรับ (±), นับ (absolute set), เกณฑ์เตือน,
- *    ประวัติ (jumps to the filtered ledger). Summary cards + search + filters.
+ *    Row actions: "เติมของ" is a direct one-click button (the everyday task);
+ *    the ⋯ menu holds the rest — "ปรับยอดสต๊อก" opens one modal with a
+ *    นับของจริง (absolute set) / แก้ +− (signed delta) mode switch instead of
+ *    two separate menu entries, plus เกณฑ์เตือน and ประวัติ (jumps to the
+ *    filtered ledger). Summary cards + search + filters.
  *    Export = Excel-compatible CSV (BOM). Import = CSV in two modes:
  *    นับสต๊อก (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock),
  *    matched by variant_id → barcode → SKU → ชื่อเต็ม, with a preview first.
@@ -16,14 +19,13 @@
 
 import {
   RiAddLine,
-  RiArrowDownSLine,
   RiCoinsLine,
   RiAlarmWarningLine,
   RiDeleteBinLine,
   RiDownload2Line,
   RiHistoryLine,
   RiInboxArchiveLine,
-  RiPencilLine,
+  RiMore2Line,
   RiScales3Line,
   RiUpload2Line,
 } from '@remixicon/react';
@@ -436,32 +438,38 @@ export function Stock() {
       title: '',
       key: 'actions',
       fixed: 'right',
-      width: 110,
+      width: 156,
       render: (_, i) => (
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: [
-              { key: 'receive', icon: <RiAddLine className="w-4 h-4" />, label: 'เติมของ (ซื้อมาเพิ่ม)' },
-              { key: 'adjust', icon: <RiPencilLine className="w-4 h-4" />, label: 'แก้ยอด +/- (ของเสีย/คลาดเคลื่อน)' },
-              { key: 'set', icon: <RiScales3Line className="w-4 h-4" />, label: 'นับของจริง (ใส่ยอดที่นับได้)' },
-              { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
-              { type: 'divider' },
-              { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ดูประวัติชิ้นนี้' },
-            ],
-            onClick: ({ key }) => {
-              if (key === 'history') {
-                setVariantFilter({ id: i.variantId, label: itemLabel(i) });
-                setTab('history');
-                return;
-              }
-              openAction(key as Action, i);
-            },
-          }}>
-          <Button>
-            จัดการ <RiArrowDownSLine className="w-4 h-4 inline-block align-text-bottom" />
+        <Space size={6}>
+          {/* Restocking is the everyday action — one click, no menu to scan first. */}
+          <Button icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
+            เติมของ
           </Button>
-        </Dropdown>
+          <Dropdown
+            trigger={['click']}
+            menu={{
+              items: [
+                {
+                  key: 'set',
+                  icon: <RiScales3Line className="w-4 h-4" />,
+                  label: 'ปรับยอดสต๊อก (นับใหม่ / แก้ +−)',
+                },
+                { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
+                { type: 'divider' },
+                { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ดูประวัติชิ้นนี้' },
+              ],
+              onClick: ({ key }) => {
+                if (key === 'history') {
+                  setVariantFilter({ id: i.variantId, label: itemLabel(i) });
+                  setTab('history');
+                  return;
+                }
+                openAction(key as Action, i);
+              },
+            }}>
+            <Button icon={<RiMore2Line className="w-4 h-4" />} aria-label="อื่นๆ" />
+          </Dropdown>
+        </Space>
       ),
     },
   ];
@@ -1105,7 +1113,11 @@ export function Stock() {
       {/* row action modal */}
       <Modal
         open={!!action}
-        title={action ? `${ACTION_META[action.type].title} — ${itemLabel(action.item)}` : ''}
+        title={
+          action
+            ? `${action.type === 'set' || action.type === 'adjust' ? 'ปรับยอดสต๊อก' : ACTION_META[action.type].title} — ${itemLabel(action.item)}`
+            : ''
+        }
         onCancel={() => setAction(null)}
         onOk={() => void runAction()}
         okText="บันทึก"
@@ -1114,6 +1126,21 @@ export function Stock() {
         destroyOnHidden>
         {action ? (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            {(action.type === 'set' || action.type === 'adjust') && (
+              <Segmented
+                block
+                value={action.type}
+                onChange={(v) => {
+                  const type = v as 'set' | 'adjust';
+                  setAction({ type, item: action.item });
+                  setActionQty(type === 'set' ? action.item.stock : null);
+                }}
+                options={[
+                  { value: 'set', label: 'นับของจริง' },
+                  { value: 'adjust', label: 'แก้ +/− (ของเสีย/คลาดเคลื่อน)' },
+                ]}
+              />
+            )}
             <Text type="secondary">
               คงเหลือปัจจุบัน {action.item.stock}
               {action.item.unit ? ` ${action.item.unit}` : ''} · {ACTION_META[action.type].hint}
