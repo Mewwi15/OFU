@@ -253,7 +253,9 @@ export function Products() {
         const tone = s === 0 ? 'error' : isLow(p) ? 'warning' : null;
         return (
           <div className="leading-tight">
-            <span className={`font-semibold ${s === 0 ? 'text-red-600' : isLow(p) ? 'text-amber-600' : 'text-[#2B2320]'}`}>
+            <span
+              className="font-semibold"
+              style={{ color: s === 0 ? '#E5484D' : isLow(p) ? '#E08C00' : '#2B2320' }}>
               {s}
             </span>
             {tone && (
@@ -320,10 +322,10 @@ export function Products() {
           <Statistic title="เผยแพร่อยู่" value={summary.published} suffix="รายการ" styles={{ content: { color: '#1E9E5C', fontWeight: 700 } }} />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic title="ใกล้หมดสต็อก" value={summary.low} suffix="รายการ" styles={{ content: { color: summary.low ? '#D97706' : undefined, fontWeight: 700 } }} />
+          <Statistic title="ใกล้หมดสต็อก" value={summary.low} suffix="รายการ" styles={{ content: { color: summary.low ? '#E08C00' : undefined, fontWeight: 700 } }} />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic title="หมดสต็อก" value={summary.out} suffix="รายการ" styles={{ content: { color: summary.out ? '#DC2626' : undefined, fontWeight: 700 } }} />
+          <Statistic title="หมดสต็อก" value={summary.out} suffix="รายการ" styles={{ content: { color: summary.out ? '#E5484D' : undefined, fontWeight: 700 } }} />
         </Card>
       </div>
 
@@ -357,7 +359,7 @@ export function Products() {
         dataSource={shown}
         pagination={{ pageSize: 12, hideOnSinglePage: true }}
         scroll={{ x: 760 }}
-        style={{ background: '#fff', borderRadius: 16 }}
+        style={{ background: '#fff', borderRadius: 12 }}
         locale={{
           emptyText:
             query || catFilter || statusFilter !== 'all' ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง' : 'ยังไม่มีสินค้าในระบบ',

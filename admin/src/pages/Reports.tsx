@@ -86,24 +86,24 @@ export function Reports() {
         />
       </div>
 
-      <Row gutter={[16, 16]} className="mb-1">
+      <Row gutter={[12, 12]} className="mb-1">
         <Col xs={12} lg={6}>
-          <Card loading={loading}>
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }} loading={loading}>
             <Statistic title="ยอดขายรวม" value={totalGross} prefix="฿" valueStyle={{ color: '#C5410F', fontWeight: 700 }} />
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card loading={loading}>
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }} loading={loading}>
             <Statistic title="บิลหน้าร้าน" value={data?.onsite.count ?? 0} suffix="บิล" />
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card loading={loading}>
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }} loading={loading}>
             <Statistic title="ยอดออนไลน์" value={data?.online.gross ?? 0} prefix="฿" />
           </Card>
         </Col>
         <Col xs={12} lg={6}>
-          <Card loading={loading}>
+          <Card size="small" styles={{ body: { padding: '12px 16px' } }} loading={loading}>
             <Statistic title="VAT (ภาษีขาย)" value={data?.onsite.vat ?? 0} prefix="฿" />
           </Card>
         </Col>
@@ -117,7 +117,7 @@ export function Reports() {
                 <ChannelBar Icon={RiStore2Line} label="หน้าร้าน (POS)" amount={data.onsite.gross} count={data.onsite.count} pct={pct(data.onsite.gross, totalGross)} stroke="#F15929" />
                 <ChannelBar Icon={RiShoppingBag3Line} label="ออนไลน์" amount={data.online.gross} count={data.online.count} pct={pct(data.online.gross, totalGross)} stroke="#1E9E5C" />
                 {data.onsite.refunds > 0 && (
-                  <div className="flex items-center gap-2 text-sm" style={{ color: '#C9252B' }}>
+                  <div className="flex items-center gap-2 text-sm" style={{ color: '#E5484D' }}>
                     <RiRefund2Line className="w-4 h-4" />
                     คืนเงิน {baht(data.onsite.refunds)}
                   </div>

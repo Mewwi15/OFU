@@ -291,10 +291,10 @@ export function Orders() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
           <Statistic
-            title="ต้องตรวจสลิป"
-            value={summary.slip}
-            suffix="รายการ"
-            styles={{ content: { color: summary.slip ? '#c5410f' : undefined, fontWeight: 700 } }}
+            title="ยอดขายวันนี้"
+            value={summary.todayRevenue}
+            prefix="฿"
+            styles={{ content: { color: '#C5410F', fontWeight: 700 } }}
           />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
@@ -304,7 +304,12 @@ export function Orders() {
           <Statistic title="กำลังจัดส่ง" value={summary.shipping} suffix="รายการ" />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic title="ยอดขายวันนี้" value={summary.todayRevenue} prefix="฿" styles={{ content: { fontWeight: 700 } }} />
+          <Statistic
+            title="ต้องตรวจสลิป"
+            value={summary.slip}
+            suffix="รายการ"
+            styles={{ content: { color: summary.slip ? '#E5484D' : undefined } }}
+          />
         </Card>
       </div>
 
@@ -349,7 +354,7 @@ export function Orders() {
         onRow={(o) => ({ onClick: () => setSelected(o), style: { cursor: 'pointer' } })}
         pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} รายการ` }}
         scroll={{ x: 820 }}
-        style={{ background: '#fff', borderRadius: 16 }}
+        style={{ background: '#fff', borderRadius: 12 }}
         locale={{
           emptyText:
             query || bucket !== 'all' || mode !== 'all' ? 'ไม่พบออเดอร์ที่ตรงกับตัวกรอง' : 'ยังไม่มีออเดอร์เข้ามา',

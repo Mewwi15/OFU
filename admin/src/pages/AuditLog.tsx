@@ -76,7 +76,9 @@ export function AuditLog() {
       key: 'time',
       width: 150,
       render: (_, r) => (
-        <span className="text-sm text-gray-500">{new Date(r.created_at).toLocaleString('th-TH')}</span>
+        <Text type="secondary" className="text-sm">
+          {new Date(r.created_at).toLocaleString('th-TH')}
+        </Text>
       ),
     },
     {
@@ -110,12 +112,12 @@ export function AuditLog() {
       width: 160,
       render: (_, r) =>
         r.target_table ? (
-          <span className="text-xs text-gray-500">
+          <Text type="secondary" className="text-xs">
             {r.target_table}
             {r.target_id ? ` · ${r.target_id.slice(0, 8)}…` : ''}
-          </span>
+          </Text>
         ) : (
-          '—'
+          <Text type="secondary">—</Text>
         ),
     },
     {
@@ -123,7 +125,7 @@ export function AuditLog() {
       key: 'summary',
       render: (_, r) => (
         <div>
-          <div>{r.summary ?? '—'}</div>
+          {r.summary ? <div>{r.summary}</div> : <Text type="secondary">—</Text>}
           {r.reason && (
             <Text type="secondary" className="text-xs">
               เหตุผล: {r.reason}
