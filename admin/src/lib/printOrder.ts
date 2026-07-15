@@ -17,8 +17,9 @@
  * and gets written into that already-open window.
  */
 
+import { productThumb } from './image';
 import type { Order, OrderItem } from './orders';
-import { contentMm, getReceiptConfig } from './receiptConfig';
+import { getReceiptConfig } from './receiptConfig';
 
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -47,61 +48,109 @@ const BASE_CSS = `
   .muted { color: #333; }
 `;
 
-/** ใบจัดสินค้า — thermal bill format on the same roll as the POS receipt. */
+/** ใบจัดสินค้า — full A4 pack sheet: product photo + qty per line, plus the
+ * recipient / shipping block so the packer sees whose order it is and where it
+ * ships (owner 2026-07-16, replacing the earlier thermal-roll version). */
 export function printPickList(w: Window, order: Order, items: OrderItem[], shopName: string) {
-  const cfg = getReceiptConfig();
-  const width = contentMm(cfg.paperWidth);
   const pieces = items.reduce((s, i) => s + i.qty, 0);
   const when = new Date(order.placed_at).toLocaleString('th-TH', {
     day: 'numeric',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
   const rows = items
-    .map(
-      (i) => `
-      <div class="row">
-        <span class="box"></span>
-        <span class="nm">${esc(i.name_snapshot)}${i.size_snapshot ? `<span class="muted"> (${esc(i.size_snapshot)})</span>` : ''}</span>
-        <span class="qty">×${i.qty}</span>
-      </div>`,
-    )
+    .map((i, idx) => {
+      const thumb = productThumb(i.image, 120);
+      const img = thumb
+        ? `<img src="${esc(thumb)}" alt="">`
+        : `<span class="noimg">ไม่มีรูป</span>`;
+      return `
+      <tr>
+        <td class="no">${idx + 1}</td>
+        <td class="imgcell">${img}</td>
+        <td class="nm">${esc(i.name_snapshot)}${i.size_snapshot ? `<div class="sz">${esc(i.size_snapshot)}</div>` : ''}</td>
+        <td class="qty">${i.qty}</td>
+        <td class="tick"><span class="cbox"></span></td>
+      </tr>`;
+    })
     .join('');
 
   writePrint(w, `<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบจัดสินค้า ${esc(order.order_number)}</title>
   <style>
     ${BASE_CSS}
-    @page { size: ${cfg.paperWidth}mm auto; margin: 0; }
-    body { width: ${width}mm; margin: 0 auto; padding: 2mm 0 6mm; font-size: 12px; }
-    .center { text-align: center; }
-    .shop { font-size: 14px; font-weight: 700; }
-    .doc { font-size: 15px; font-weight: 800; margin: 1mm 0; }
-    .meta { font-size: 11.5px; line-height: 1.5; margin-top: 1mm; }
-    .hr { border-top: 1.5px dashed #000; margin: 2mm 0; }
-    .row { display: flex; align-items: flex-start; gap: 2mm; padding: 1.6mm 0;
-           border-bottom: 1px dashed #888; }
-    .box { flex: none; width: 4.2mm; height: 4.2mm; border: 1.8px solid #000;
-           border-radius: 1mm; margin-top: 0.6mm; }
-    .nm { flex: 1; font-size: 13.5px; font-weight: 700; line-height: 1.35; word-break: break-word; }
-    .qty { flex: none; font-size: 16px; font-weight: 800; }
-    .total { font-size: 13px; font-weight: 800; text-align: right; margin-top: 2mm; }
-    .note { margin-top: 3mm; font-size: 11.5px; }
-    .line { display: inline-block; width: 60%; border-bottom: 1px solid #000; }
+    @page { size: A4; margin: 14mm; }
+    body { font-size: 14px; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid #000; padding-bottom: 8px; }
+    .shop { font-size: 17px; font-weight: 800; }
+    .doc { font-size: 24px; font-weight: 800; }
+    .ord { text-align: right; font-size: 13px; line-height: 1.6; }
+    .to { margin: 12px 0; padding: 10px 14px; border: 1.5px solid #000; }
+    .to .tag { font-size: 12px; color: #555; }
+    .to .name { font-size: 19px; font-weight: 800; line-height: 1.3; }
+    .to .phone { font-size: 15px; font-weight: 700; }
+    .to .addr { font-size: 14px; line-height: 1.5; margin-top: 3px; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #444; padding: 6px 8px; vertical-align: middle; }
+    th { background: #f0f0f0; font-size: 13px; text-align: center; }
+    th.nm, td.nm { text-align: left; }
+    td.no { text-align: center; width: 30px; color: #555; }
+    td.imgcell { width: 76px; text-align: center; padding: 4px; }
+    td.imgcell img { width: 62px; height: 62px; object-fit: cover; border: 1px solid #ccc; display: block; margin: 0 auto; }
+    td.imgcell .noimg { font-size: 11px; color: #999; }
+    td.nm { font-size: 15px; font-weight: 700; line-height: 1.35; }
+    td.nm .sz { font-size: 13px; font-weight: 400; color: #333; }
+    td.qty { text-align: center; font-size: 22px; font-weight: 800; width: 66px; }
+    td.tick { text-align: center; width: 60px; }
+    td.tick .cbox { display: inline-block; width: 20px; height: 20px; border: 2px solid #000; }
+    .foot { display: flex; justify-content: space-between; align-items: center;
+            margin-top: 10px; font-size: 14px; font-weight: 700; }
+    .note { margin-top: 14px; font-size: 13px; }
+    .line { display: inline-block; width: 70%; border-bottom: 1px solid #000; }
   </style></head><body>
-    <div class="center shop">${esc(shopName)}</div>
-    <div class="center doc">ใบจัดสินค้า</div>
-    <div class="meta">
-      ออเดอร์ <b>${esc(order.order_number)}</b><br>
-      ${MODE_LABEL[order.shop_mode]} · ${esc(when)}<br>
-      ผู้รับ: ${esc(order.ship_recipient ?? '-')}${order.ship_phone ? `<br>โทร ${esc(order.ship_phone)}` : ''}
+    <div class="head">
+      <div>
+        <div class="shop">${esc(shopName)}</div>
+        <div class="doc">ใบจัดสินค้า</div>
+      </div>
+      <div class="ord">
+        ออเดอร์ <b>${esc(order.order_number)}</b><br>
+        ${MODE_LABEL[order.shop_mode]}<br>
+        ${esc(when)}
+      </div>
     </div>
-    <div class="hr"></div>
-    ${rows}
-    <div class="total">รวม ${items.length} รายการ · ${pieces} ชิ้น</div>
+
+    <div class="to">
+      <div class="tag">ผู้รับ / ส่งที่</div>
+      <div class="name">${esc(order.ship_recipient ?? '-')}</div>
+      ${order.ship_phone ? `<div class="phone">โทร ${esc(order.ship_phone)}</div>` : ''}
+      <div class="addr">${esc(order.ship_address_text ?? '-')}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>รูป</th>
+          <th class="nm">รายการสินค้า</th>
+          <th>จำนวน</th>
+          <th>จัดแล้ว</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="foot">
+      <span>รวม ${items.length} รายการ · ${pieces} ชิ้น</span>
+    </div>
     <div class="note">หมายเหตุ: <span class="line">&nbsp;</span></div>
-    <script>window.onload = () => window.print();</script>
+    <script>
+      var done = false; function go(){ if(!done){ done = true; window.print(); } }
+      window.onload = go; setTimeout(go, 2500);
+    </script>
   </body></html>`);
 }
 
