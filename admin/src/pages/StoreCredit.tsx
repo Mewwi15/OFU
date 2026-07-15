@@ -83,14 +83,14 @@ export function StoreCredit() {
             styles={{ body: { display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', padding: '12px 16px' } }}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-none grid place-items-center" style={{ background: '#F5F5F5' }}>
-                <RiWallet3Line className="w-6 h-6" style={{ color: '#1E1E1E' }} />
+                <RiWallet3Line className="w-6 h-6" style={{ color: '#14532D' }} />
               </div>
               <div>
                 <div className="font-semibold text-[#2B2320]">{customer.display_name || 'ลูกค้า'}</div>
                 <Text type="secondary">{customer.phone}</Text>
               </div>
             </div>
-            <Statistic title="เครดิตคงเหลือ" value={customer.balance} prefix="฿" valueStyle={{ color: '#1E1E1E', fontWeight: 700 }} />
+            <Statistic title="เครดิตคงเหลือ" value={customer.balance} prefix="฿" valueStyle={{ color: '#14532D', fontWeight: 700 }} />
             <Button type="primary" className="ml-auto" onClick={() => setTopupOpen(true)}>
               เติมเครดิต
             </Button>

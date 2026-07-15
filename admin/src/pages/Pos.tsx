@@ -633,8 +633,8 @@ export function Pos() {
                     overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
                     opacity: oos ? 0.55 : 1,
-                    borderColor: inCart > 0 ? '#1E1E1E' : '#E8E8E8',
-                    boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(30,30,30,0.35)' : undefined,
+                    borderColor: inCart > 0 ? '#14532D' : '#E8E8E8',
+                    boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(20,83,45,0.35)' : undefined,
                   }}
                   cover={
                     <div className="relative aspect-square bg-[#F5F5F5] grid place-items-center overflow-hidden">
@@ -648,7 +648,7 @@ export function Pos() {
                       {inCart > 0 && (
                         <Badge
                           count={inCart}
-                          color="#1E1E1E"
+                          color="#14532D"
                           style={{ position: 'absolute', top: 8, insetInlineEnd: 8, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
                         />
                       )}
@@ -828,7 +828,7 @@ export function Pos() {
                 <Statistic
                   value={total}
                   prefix="฿"
-                  styles={{ content: { color: '#1E1E1E', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
+                  styles={{ content: { color: '#14532D', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
                 />
               </div>
             </Card>
@@ -895,7 +895,7 @@ export function Pos() {
                 height: 52,
                 fontWeight: 600,
                 borderRadius: 0,
-                boxShadow: '0 10px 22px -8px rgba(30,30,30,0.5)',
+                boxShadow: '0 10px 22px -8px rgba(20,83,45,0.5)',
               }}>
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
             </Button>
@@ -1127,7 +1127,7 @@ function VariantPicker({
             key={v.id}
             disabled={v.stock_qty <= 0}
             onClick={() => onPick(v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#1E1E1E] disabled:opacity-40 transition">
+            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#14532D] disabled:opacity-40 transition">
             <span className="text-sm font-medium text-[#2B2320]">{v.size ?? 'ปกติ'}</span>
             <span className="text-sm">
               <span className="font-semibold text-[#2B2320]">{baht(v.price)}</span>
