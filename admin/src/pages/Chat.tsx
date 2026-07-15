@@ -37,6 +37,10 @@ export function Chat() {
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Whether to keep the view pinned to the newest message. True while the user
+  // is at/near the bottom; set false once they scroll up so a realtime refresh
+  // (which re-sets `messages`) doesn't yank them back down mid-read.
+  const stickBottom = useRef(true);
   // The realtime callback needs the CURRENT selection without resubscribing.
   const selectedRef = useRef<ChatThread | null>(null);
   selectedRef.current = selected;
@@ -54,6 +58,7 @@ export function Chat() {
   const openThread = useCallback(
     async (t: ChatThread) => {
       setSelected(t);
+      stickBottom.current = true; // a freshly opened thread always starts at the newest
       try {
         setMessages(await listMessages(t.id));
         await markRead(t.id);
@@ -79,8 +84,15 @@ export function Chat() {
   }, [loadThreads]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    // Only stick to the bottom if the user hasn't scrolled up to read history.
+    if (stickBottom.current) listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages]);
+
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
 
   const onSend = async () => {
     const text = draft.trim();
@@ -184,7 +196,10 @@ export function Chat() {
                 <span className="font-semibold text-[#2B2320]">{customerName(selected)}</span>
               </div>
 
-              <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 max-h-[60vh] lg:max-h-none">
+              <div
+                ref={listRef}
+                onScroll={onListScroll}
+                className="flex-1 min-h-0 overflow-y-auto px-4 py-3 max-h-[60vh] lg:max-h-none">
                 {messages.map((m, idx) => {
                   const mine = m.sender === 'admin';
                   // Group consecutive messages from the same sender — show the
