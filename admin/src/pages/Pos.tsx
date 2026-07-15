@@ -52,14 +52,11 @@ import {
   Segmented,
   Statistic,
   Tag,
-  Typography,
   type InputRef,
 } from 'antd';
 
 import { Receipt } from '../components/Receipt';
 import { promptpayPayload } from '../lib/promptpay';
-
-const { Title } = Typography;
 
 type Line = {
   variantId: string;
@@ -538,11 +535,8 @@ export function Pos() {
     return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
 
   return (
-    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:h-[calc(100vh-4rem)]">
-      <Title level={4} style={{ margin: '0 0 12px' }} className="shrink-0">
-        ขายหน้าร้าน
-      </Title>
-      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:flex-1 lg:min-h-0">
+    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
+      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="relative flex flex-col min-h-0">
           {/* Sales that already happened (cash/goods changed hands, a
