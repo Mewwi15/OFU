@@ -265,6 +265,9 @@ export function PosSales() {
         pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} บิล` }}
         scroll={{ x: 640 }}
         style={{ background: '#fff', borderRadius: 12 }}
+        locale={{
+          emptyText: query || status !== 'all' || pay !== 'all' ? 'ไม่พบบิลที่ตรงกับตัวกรอง' : 'ยังไม่มีบิลขาย',
+        }}
       />
 
       <Drawer

@@ -358,6 +358,10 @@ export function Products() {
         pagination={{ pageSize: 12, hideOnSinglePage: true }}
         scroll={{ x: 760 }}
         style={{ background: '#fff', borderRadius: 16 }}
+        locale={{
+          emptyText:
+            query || catFilter || statusFilter !== 'all' ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง' : 'ยังไม่มีสินค้าในระบบ',
+        }}
       />
 
       {editing ? (

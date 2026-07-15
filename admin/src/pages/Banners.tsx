@@ -1,5 +1,5 @@
 import { RiAddLine, RiDeleteBinLine, RiImageAddLine, RiImageEditLine, RiPencilLine } from '@remixicon/react';
-import { App, Button, Card, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd';
+import { App, Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Tooltip, Typography, Upload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -179,21 +179,14 @@ export function Banners() {
               </div>
             )}
 
-            {rows.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={<span className="text-gray-400 text-sm">ยังไม่มีแบนเนอร์ในจุดนี้</span>}
-                style={{ margin: '12px 0' }}
-              />
-            ) : (
-              <DndTable<Banner>
-                items={rows}
-                onReorder={(next) => void onReorder(pm.value, next)}
-                loading={loading}
-                scroll={{ x: 520 }}
-                columns={columns}
-              />
-            )}
+            <DndTable<Banner>
+              items={rows}
+              onReorder={(next) => void onReorder(pm.value, next)}
+              loading={loading}
+              scroll={{ x: 520 }}
+              columns={columns}
+              locale={{ emptyText: 'ยังไม่มีแบนเนอร์ในจุดนี้' }}
+            />
           </Card>
         );
       })}

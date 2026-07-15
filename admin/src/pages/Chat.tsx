@@ -199,7 +199,7 @@ export function Chat() {
                             className="inline-block px-3 py-2 rounded-xl whitespace-pre-wrap break-words text-left"
                             style={
                               mine
-                                ? { background: '#C2410C', color: '#fff', borderBottomRightRadius: 4 }
+                                ? { background: '#F15929', color: '#fff', borderBottomRightRadius: 4 }
                                 : { background: '#F6ECE5', color: '#2B2320', borderBottomLeftRadius: 4 }
                             }>
                             {m.body}

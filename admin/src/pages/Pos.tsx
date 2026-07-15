@@ -799,7 +799,7 @@ export function Pos() {
 
           {/* totals + pay */}
           <div className="border-t border-tremor-border p-4 space-y-3">
-            <div className="rounded-xl bg-[#FBF7F4] border border-[#F0E7E1] p-3.5">
+            <Card size="small" style={{ background: '#FBF7F4', borderColor: '#F0EAE6' }} styles={{ body: { padding: 14 } }}>
               <Row label="ยอดรวม" value={baht(subtotal)} />
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
@@ -827,10 +827,10 @@ export function Pos() {
                 <Statistic
                   value={total}
                   prefix="฿"
-                  styles={{ content: { color: '#c5410f', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
+                  styles={{ content: { color: '#C5410F', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
                 />
               </div>
-            </div>
+            </Card>
 
             <div className="grid grid-cols-2 gap-2">
               <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>

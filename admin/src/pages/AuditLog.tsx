@@ -161,6 +161,7 @@ export function AuditLog() {
         pagination={false}
         scroll={{ x: 900 }}
         style={{ background: '#fff', borderRadius: 12 }}
+        locale={{ emptyText: actionFilter ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีประวัติแก้ไข' }}
       />
 
       {moreLeft && !actionFilter && (

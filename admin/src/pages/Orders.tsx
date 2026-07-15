@@ -350,6 +350,10 @@ export function Orders() {
         pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} รายการ` }}
         scroll={{ x: 820 }}
         style={{ background: '#fff', borderRadius: 16 }}
+        locale={{
+          emptyText:
+            query || bucket !== 'all' || mode !== 'all' ? 'ไม่พบออเดอร์ที่ตรงกับตัวกรอง' : 'ยังไม่มีออเดอร์เข้ามา',
+        }}
       />
 
       <OrderDrawer order={selected} onClose={() => setSelected(null)} onChanged={load} />

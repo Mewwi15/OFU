@@ -124,6 +124,7 @@ export function Categories() {
         columns={columns}
         scroll={{ x: 520 }}
         style={{ background: '#fff', borderRadius: 12 }}
+        locale={{ emptyText: 'ยังไม่มีหมวดหมู่ — กด "เพิ่มหมวดหมู่" เพื่อเริ่ม' }}
       />
 
       {editing ? (
