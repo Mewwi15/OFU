@@ -3,13 +3,16 @@
  *
  *  • ภาพรวม   : every variant in one readable table — photo, barcode/SKU,
  *    price/cost, on-hand / reserved / sellable, threshold, stock value, status.
- *    Row actions: "เติมของ" is a direct one-click button (the everyday task);
- *    the ⋯ menu holds the rest — "ปรับยอดสต๊อก" opens one modal with a plain-
- *    language mode switch: นับใหม่ (absolute set — "how many are really
- *    there") / ของเสีย/หาย (signed delta, but the field only ever asks for a
- *    positive "how many were lost" and negates it before calling
- *    adjust_stock — no one should have to type a minus sign), instead of two
- *    separate menu entries, plus เกณฑ์เตือน and ประวัติ (jumps to the
+ *    Row actions: "เติมของ" is a direct one-click button (the everyday task,
+ *    additive — receive_stock, its own ledger reason since it's a real
+ *    delivery). The ⋯ menu holds the rest — "ปรับยอดสต๊อก" always asks the
+ *    same single question ("นับได้จริงกี่ชิ้น", pre-filled with the current
+ *    count) and shows a plain-language live preview of the resulting change
+ *    (เพิ่มขึ้น/ลดลง N ชิ้น) instead of making the cashier do the subtraction
+ *    or type a minus sign — one mental model covers a stocktake, shrinkage,
+ *    or a miscount alike (set_stock_qty and the old adjust_stock path write
+ *    the identical ledger reason, admin_adjust, so nothing is lost by not
+ *    asking which one this was). Plus เกณฑ์เตือน and ประวัติ (jumps to the
  *    filtered ledger). Summary cards + search + filters.
  *    Export = Excel-compatible CSV (BOM). Import = CSV in two modes:
  *    นับสต๊อก (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock),
@@ -60,7 +63,6 @@ import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-  adjustStock,
   apiError,
   listProducts,
   listStockMovements,
@@ -298,8 +300,8 @@ export function Stock() {
     return { costValue, saleValue, pieces };
   }, [items]);
 
-  /* ── row-action modal (เติม / ปรับ / นับ / เกณฑ์เตือน) ─────────────────── */
-  type Action = 'receive' | 'adjust' | 'set' | 'threshold' | 'cost';
+  /* ── row-action modal (เติม / นับ / เกณฑ์เตือน) ─────────────────────────── */
+  type Action = 'receive' | 'set' | 'threshold' | 'cost';
   const [action, setAction] = useState<{ type: Action; item: Item } | null>(null);
   const [actionQty, setActionQty] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState('');
@@ -324,15 +326,11 @@ export function Stock() {
       if (type === 'receive') {
         await receiveStock(item.variantId, actionQty, actionNote.trim() || undefined);
         message.success(`เติม ${itemLabel(item)} +${actionQty}`);
-      } else if (type === 'adjust') {
-        if (actionQty === 0) return;
-        // UI collects "how many were lost/damaged" as a plain positive count —
-        // adjust_stock itself takes a signed delta, so negate it here.
-        await adjustStock(item.variantId, -actionQty, actionNote.trim() || undefined);
-        message.success(`ตัดสต๊อก ${itemLabel(item)} -${actionQty} (เสีย/หาย)`);
       } else if (type === 'set') {
+        if (actionQty === item.stock) return;
         await setStockQty(item.variantId, actionQty, actionNote.trim() || undefined);
-        message.success(`นับสต๊อก ${itemLabel(item)} = ${actionQty}`);
+        const delta = actionQty - item.stock;
+        message.success(`ปรับสต๊อก ${itemLabel(item)} ${delta > 0 ? '+' : ''}${delta} (เป็น ${actionQty})`);
       } else {
         const { upsertVariant } = await import('../lib/api');
         await upsertVariant({
@@ -364,8 +362,7 @@ export function Stock() {
 
   const ACTION_META: Record<Action, { title: string; hint: string; min: number }> = {
     receive: { title: 'เติมของ', hint: 'ซื้อมากี่ชิ้น ใส่จำนวนนั้น', min: 1 },
-    adjust: { title: 'ของเสีย/หาย', hint: 'เสียหรือหายไปกี่ชิ้น ใส่จำนวนนั้น ระบบหักออกจากสต๊อกให้เอง', min: 0 },
-    set: { title: 'นับใหม่', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย ระบบคิดส่วนต่างให้', min: 0 },
+    set: { title: 'ปรับยอดสต๊อก', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย (เช่น ของเสีย ของหาย นับผิดครั้งก่อน)', min: 0 },
     threshold: { title: 'ตั้งเตือนใกล้หมด', hint: 'เหลือถึงจำนวนนี้เมื่อไหร่ LINE จะเด้งเตือน', min: 0 },
     cost: { title: 'แก้ต้นทุนต่อชิ้น', hint: 'ซื้อมาชิ้นละกี่บาท (ไว้คำนวณกำไรและเงินจมในสต๊อก)', min: 0 },
   };
@@ -457,7 +454,7 @@ export function Stock() {
                 {
                   key: 'set',
                   icon: <RiScales3Line className="w-4 h-4" />,
-                  label: 'ปรับยอดสต๊อก (นับใหม่ / ของเสีย-หาย)',
+                  label: 'ปรับยอดสต๊อก (นับใหม่)',
                 },
                 { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
                 { type: 'divider' },
@@ -1118,11 +1115,7 @@ export function Stock() {
       {/* row action modal */}
       <Modal
         open={!!action}
-        title={
-          action
-            ? `${action.type === 'set' || action.type === 'adjust' ? 'ปรับยอดสต๊อก' : ACTION_META[action.type].title} — ${itemLabel(action.item)}`
-            : ''
-        }
+        title={action ? `${ACTION_META[action.type].title} — ${itemLabel(action.item)}` : ''}
         onCancel={() => setAction(null)}
         onOk={() => void runAction()}
         okText="บันทึก"
@@ -1131,21 +1124,6 @@ export function Stock() {
         destroyOnHidden>
         {action ? (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            {(action.type === 'set' || action.type === 'adjust') && (
-              <Segmented
-                block
-                value={action.type}
-                onChange={(v) => {
-                  const type = v as 'set' | 'adjust';
-                  setAction({ type, item: action.item });
-                  setActionQty(type === 'set' ? action.item.stock : null);
-                }}
-                options={[
-                  { value: 'set', label: 'นับใหม่' },
-                  { value: 'adjust', label: 'ของเสีย/หาย' },
-                ]}
-              />
-            )}
             <Text type="secondary">
               คงเหลือปัจจุบัน {action.item.stock}
               {action.item.unit ? ` ${action.item.unit}` : ''} · {ACTION_META[action.type].hint}
@@ -1154,10 +1132,20 @@ export function Stock() {
               autoFocus
               style={{ width: 200 }}
               min={ACTION_META[action.type].min}
-              max={action.type === 'adjust' ? action.item.stock : 100000}
+              max={100000}
               value={actionQty}
               onChange={setActionQty}
             />
+            {/* "ปรับยอดสต๊อก" always asks for the real count, never a +/- delta —
+                show what that means as a plain-language preview instead of
+                making the user do the subtraction themselves. */}
+            {action.type === 'set' && actionQty != null && actionQty !== action.item.stock && (
+              <Text style={{ color: actionQty > action.item.stock ? '#1E9E5C' : '#C9252B' }}>
+                {actionQty > action.item.stock
+                  ? `เพิ่มขึ้น ${actionQty - action.item.stock} ชิ้น`
+                  : `ลดลง ${action.item.stock - actionQty} ชิ้น`}
+              </Text>
+            )}
             {action.type !== 'threshold' ? (
               <Input
                 value={actionNote}
