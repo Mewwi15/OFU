@@ -4,9 +4,12 @@
  *  • ภาพรวม   : every variant in one readable table — photo, barcode/SKU,
  *    price/cost, on-hand / reserved / sellable, threshold, stock value, status.
  *    Row actions: "เติมของ" is a direct one-click button (the everyday task);
- *    the ⋯ menu holds the rest — "ปรับยอดสต๊อก" opens one modal with a
- *    นับของจริง (absolute set) / แก้ +− (signed delta) mode switch instead of
- *    two separate menu entries, plus เกณฑ์เตือน and ประวัติ (jumps to the
+ *    the ⋯ menu holds the rest — "ปรับยอดสต๊อก" opens one modal with a plain-
+ *    language mode switch: นับใหม่ (absolute set — "how many are really
+ *    there") / ของเสีย/หาย (signed delta, but the field only ever asks for a
+ *    positive "how many were lost" and negates it before calling
+ *    adjust_stock — no one should have to type a minus sign), instead of two
+ *    separate menu entries, plus เกณฑ์เตือน and ประวัติ (jumps to the
  *    filtered ledger). Summary cards + search + filters.
  *    Export = Excel-compatible CSV (BOM). Import = CSV in two modes:
  *    นับสต๊อก (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock),
@@ -323,8 +326,10 @@ export function Stock() {
         message.success(`เติม ${itemLabel(item)} +${actionQty}`);
       } else if (type === 'adjust') {
         if (actionQty === 0) return;
-        await adjustStock(item.variantId, actionQty, actionNote.trim() || undefined);
-        message.success(`ปรับ ${itemLabel(item)} ${actionQty > 0 ? '+' : ''}${actionQty}`);
+        // UI collects "how many were lost/damaged" as a plain positive count —
+        // adjust_stock itself takes a signed delta, so negate it here.
+        await adjustStock(item.variantId, -actionQty, actionNote.trim() || undefined);
+        message.success(`ตัดสต๊อก ${itemLabel(item)} -${actionQty} (เสีย/หาย)`);
       } else if (type === 'set') {
         await setStockQty(item.variantId, actionQty, actionNote.trim() || undefined);
         message.success(`นับสต๊อก ${itemLabel(item)} = ${actionQty}`);
@@ -359,8 +364,8 @@ export function Stock() {
 
   const ACTION_META: Record<Action, { title: string; hint: string; min: number }> = {
     receive: { title: 'เติมของ', hint: 'ซื้อมากี่ชิ้น ใส่จำนวนนั้น', min: 1 },
-    adjust: { title: 'แก้ยอด (+/-)', hint: 'ของเสีย/หาย ใส่เลขติดลบ เช่น -2', min: -100000 },
-    set: { title: 'นับของจริง', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย ระบบคิดส่วนต่างให้', min: 0 },
+    adjust: { title: 'ของเสีย/หาย', hint: 'เสียหรือหายไปกี่ชิ้น ใส่จำนวนนั้น ระบบหักออกจากสต๊อกให้เอง', min: 0 },
+    set: { title: 'นับใหม่', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย ระบบคิดส่วนต่างให้', min: 0 },
     threshold: { title: 'ตั้งเตือนใกล้หมด', hint: 'เหลือถึงจำนวนนี้เมื่อไหร่ LINE จะเด้งเตือน', min: 0 },
     cost: { title: 'แก้ต้นทุนต่อชิ้น', hint: 'ซื้อมาชิ้นละกี่บาท (ไว้คำนวณกำไรและเงินจมในสต๊อก)', min: 0 },
   };
@@ -452,7 +457,7 @@ export function Stock() {
                 {
                   key: 'set',
                   icon: <RiScales3Line className="w-4 h-4" />,
-                  label: 'ปรับยอดสต๊อก (นับใหม่ / แก้ +−)',
+                  label: 'ปรับยอดสต๊อก (นับใหม่ / ของเสีย-หาย)',
                 },
                 { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
                 { type: 'divider' },
@@ -1136,8 +1141,8 @@ export function Stock() {
                   setActionQty(type === 'set' ? action.item.stock : null);
                 }}
                 options={[
-                  { value: 'set', label: 'นับของจริง' },
-                  { value: 'adjust', label: 'แก้ +/− (ของเสีย/คลาดเคลื่อน)' },
+                  { value: 'set', label: 'นับใหม่' },
+                  { value: 'adjust', label: 'ของเสีย/หาย' },
                 ]}
               />
             )}
@@ -1149,7 +1154,7 @@ export function Stock() {
               autoFocus
               style={{ width: 200 }}
               min={ACTION_META[action.type].min}
-              max={100000}
+              max={action.type === 'adjust' ? action.item.stock : 100000}
               value={actionQty}
               onChange={setActionQty}
             />
