@@ -1,19 +1,19 @@
 import type { ThemeConfig } from 'antd';
 
-// อู้ฟู่ brand tokens for Ant Design — coral accent (buttons, links, active
-// state) on a clean white canvas with square corners. Owner request
-// 2026-07-15: white backgrounds, sharp (0px) frames instead of the earlier
-// warm-cream/rounded look — the coral brand color stays for actions/
-// highlights, only the background tint and corner radius changed. One
-// source of truth for the whole admin.
+// อู้ฟู่ admin tokens for Ant Design — a clean white canvas, square corners,
+// and a monotone ink accent (buttons, links, active state). Owner requests:
+// 2026-07-15 white/square redesign, then 2026-07-16 swap the accent off the
+// customer app's coral (locked brand color there) to a near-black monotone
+// so the internal admin/POS tool reads as its own distinct, serious tool,
+// plus a soft shadow on cards. One source of truth for the whole admin.
 export const oofooTheme: ThemeConfig = {
   token: {
-    colorPrimary: '#F15929',
-    colorInfo: '#F15929',
+    colorPrimary: '#1E1E1E',
+    colorInfo: '#1E1E1E',
     colorSuccess: '#1E9E5C',
     colorWarning: '#E08C00',
     colorError: '#E5484D',
-    colorLink: '#C5410F',
+    colorLink: '#1E1E1E',
     borderRadius: 0,
     fontFamily: "'Mitr', system-ui, 'Noto Sans Thai', sans-serif",
     fontSize: 14,
@@ -32,7 +32,7 @@ export const oofooTheme: ThemeConfig = {
     },
     Menu: {
       itemSelectedBg: '#F5F5F5',
-      itemSelectedColor: '#C5410F',
+      itemSelectedColor: '#1E1E1E',
       itemBorderRadius: 0,
       itemHeight: 40,
       iconSize: 18,

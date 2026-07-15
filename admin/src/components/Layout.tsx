@@ -47,10 +47,10 @@ export function Layout() {
           )}
           <span className="text-[15px] font-medium text-[#2B2320]">{currentNavLabel(pathname)}</span>
           <div className="ml-auto flex items-center gap-3">
-            <Badge dot color="#F15929" offset={[-2, 2]}>
+            <Badge dot color="#1E1E1E" offset={[-2, 2]}>
               <Button type="text" shape="circle" icon={<RiNotification3Line className="w-5 h-5" />} />
             </Badge>
-            <Avatar style={{ backgroundColor: '#C5410F', fontSize: 13 }}>{initials}</Avatar>
+            <Avatar style={{ backgroundColor: '#1E1E1E', fontSize: 13 }}>{initials}</Avatar>
           </div>
         </Header>
         <Content style={{ padding: isDesktop ? 28 : 16, overflowY: 'auto', flex: '1 1 auto' }}>

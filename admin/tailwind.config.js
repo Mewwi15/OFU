@@ -16,14 +16,15 @@ export default {
         sans: ['Mitr', 'system-ui', 'Noto Sans Thai', 'sans-serif'],
       },
       colors: {
-        // อู้ฟู่ coral brand wired into Tremor's semantic tokens (light theme).
+        // อู้ฟู่ admin: monotone ink accent (distinct from the customer app's
+        // locked coral brand) wired into Tremor's semantic tokens (light theme).
         tremor: {
           brand: {
-            faint: '#fdeee7',
-            muted: '#fbd9cb',
-            subtle: '#f3895f',
-            DEFAULT: '#f15929',
-            emphasis: '#c5410f',
+            faint: '#f0f0f0',
+            muted: '#d9d9d9',
+            subtle: '#8c8c8c',
+            DEFAULT: '#1e1e1e',
+            emphasis: '#000000',
             inverted: '#ffffff',
           },
           background: {

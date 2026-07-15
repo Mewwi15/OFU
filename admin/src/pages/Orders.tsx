@@ -294,7 +294,7 @@ export function Orders() {
             title="ยอดขายวันนี้"
             value={summary.todayRevenue}
             prefix="฿"
-            styles={{ content: { color: '#C5410F', fontWeight: 700 } }}
+            styles={{ content: { color: '#1E1E1E', fontWeight: 700 } }}
           />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>

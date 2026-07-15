@@ -29,7 +29,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center p-5" style={{ background: '#FAFAFA' }}>
       <Card style={{ maxWidth: 380, width: '100%' }} styles={{ body: { padding: 28 } }}>
         <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-none bg-[#F15929] text-white grid place-items-center text-xl font-semibold">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-none bg-[#1E1E1E] text-white grid place-items-center text-xl font-semibold">
             อ
           </div>
           <Title level={4} style={{ margin: 0 }}>อู้ฟู่ แอดมิน</Title>

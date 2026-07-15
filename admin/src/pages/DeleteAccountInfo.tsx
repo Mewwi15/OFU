@@ -51,7 +51,7 @@ export function DeleteAccountInfo() {
           </ul>
           <p style={{ color: '#6A6A6A', marginTop: 12, marginBottom: 0 }}>
             รายละเอียดการใช้ข้อมูลทั้งหมดอยู่ใน{' '}
-            <a href="/privacy" style={{ color: '#B23E0A' }}>
+            <a href="/privacy" style={{ color: '#1E1E1E' }}>
               นโยบายความเป็นส่วนตัว
             </a>
           </p>

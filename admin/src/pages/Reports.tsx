@@ -89,7 +89,7 @@ export function Reports() {
       <Row gutter={[12, 12]} className="mb-1">
         <Col xs={12} lg={6}>
           <Card size="small" styles={{ body: { padding: '12px 16px' } }} loading={loading}>
-            <Statistic title="ยอดขายรวม" value={totalGross} prefix="฿" valueStyle={{ color: '#C5410F', fontWeight: 700 }} />
+            <Statistic title="ยอดขายรวม" value={totalGross} prefix="฿" valueStyle={{ color: '#1E1E1E', fontWeight: 700 }} />
           </Card>
         </Col>
         <Col xs={12} lg={6}>
@@ -114,7 +114,7 @@ export function Reports() {
           <Card title="ตามช่องทาง" loading={loading}>
             {data && (
               <div className="space-y-4">
-                <ChannelBar Icon={RiStore2Line} label="หน้าร้าน (POS)" amount={data.onsite.gross} count={data.onsite.count} pct={pct(data.onsite.gross, totalGross)} stroke="#F15929" />
+                <ChannelBar Icon={RiStore2Line} label="หน้าร้าน (POS)" amount={data.onsite.gross} count={data.onsite.count} pct={pct(data.onsite.gross, totalGross)} stroke="#1E1E1E" />
                 <ChannelBar Icon={RiShoppingBag3Line} label="ออนไลน์" amount={data.online.gross} count={data.online.count} pct={pct(data.online.gross, totalGross)} stroke="#1E9E5C" />
                 {data.onsite.refunds > 0 && (
                   <div className="flex items-center gap-2 text-sm" style={{ color: '#E5484D' }}>
@@ -156,7 +156,7 @@ export function Reports() {
               key: 'rank',
               width: 48,
               render: (_, __, i) => (
-                <Tag color="#F5F5F5" style={{ color: '#C5410F', border: 'none', margin: 0 }}>{i + 1}</Tag>
+                <Tag color="#F5F5F5" style={{ color: '#1E1E1E', border: 'none', margin: 0 }}>{i + 1}</Tag>
               ),
             },
             { title: 'สินค้า', dataIndex: 'name', key: 'name' },

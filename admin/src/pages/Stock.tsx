@@ -876,7 +876,7 @@ export function Stock() {
             <Statistic
               title="ใกล้หมด / หมด"
               value={lowCount}
-              styles={{ content: { color: lowCount ? '#C5410F' : undefined, fontWeight: lowCount ? 700 : undefined } }}
+              styles={{ content: { color: lowCount ? '#1E1E1E' : undefined, fontWeight: lowCount ? 700 : undefined } }}
             />
           </Card>
         </Col>
@@ -886,7 +886,7 @@ export function Stock() {
               title="เงินจมในสต๊อก (ตามทุน)"
               value={totals.costValue}
               prefix="฿"
-              styles={{ content: { color: '#C5410F', fontWeight: 700 } }}
+              styles={{ content: { color: '#1E1E1E', fontWeight: 700 } }}
             />
           </Card>
         </Col>
