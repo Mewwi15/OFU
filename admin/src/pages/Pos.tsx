@@ -535,7 +535,7 @@ export function Pos() {
     return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
 
   return (
-    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
+    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-white min-h-[calc(100vh-4rem)]">
       <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="relative flex flex-col min-h-0">
@@ -547,7 +547,7 @@ export function Pos() {
           {failedSales.length > 0 && (
             <button
               onClick={() => setFailedOpen(true)}
-              className="mb-3 flex w-full items-center gap-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-3 py-2 text-left hover:bg-red-100">
+              className="mb-3 flex w-full items-center gap-2 rounded-none bg-red-50 border border-red-200 text-red-700 text-sm font-medium px-3 py-2 text-left hover:bg-red-100">
               <RiErrorWarningLine className="w-5 h-5 shrink-0" />
               <span className="flex-1">
                 {failedSales.length} รายการขายไม่ได้ซิงค์เข้าระบบ (สินค้า/เงินออกไปแล้วจริง) — ต้องตรวจสอบด้วยตนเอง
@@ -559,8 +559,8 @@ export function Pos() {
           {(!online || pending > 0) && (
             <div className="flex items-center gap-2 mb-3">
               {!online && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="inline-flex items-center gap-1.5 rounded-none bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-none bg-amber-500" />
                   ออฟไลน์ — ขายต่อได้ ระบบจะซิงค์ให้เมื่อกลับมาออนไลน์
                 </span>
               )}
@@ -569,8 +569,8 @@ export function Pos() {
                   onClick={() => void doFlush()}
                   disabled={!online}
                   title="ซิงค์บิลที่ค้าง"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm disabled:opacity-60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  className="inline-flex items-center gap-1.5 rounded-none bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 shadow-sm disabled:opacity-60">
+                  <span className="w-1.5 h-1.5 rounded-none bg-amber-500" />
                   รอซิงค์ {pending}
                 </button>
               )}
@@ -595,12 +595,12 @@ export function Pos() {
               <Tag
                 variant="filled"
                 icon={<RiQrScanLine className="w-3.5 h-3.5" />}
-                className="!m-0 !inline-flex !items-center !gap-1 !text-[11px] !bg-[#F5EFEB] !text-tremor-content">
+                className="!m-0 !inline-flex !items-center !gap-1 !text-[11px] !bg-[#F5F5F5] !text-tremor-content">
                 พร้อมยิง
               </Tag>
             }
             className="mb-4"
-            style={{ borderRadius: 14, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+            style={{ borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
           />
 
           <div className="flex flex-wrap gap-2 mb-4 shrink-0">
@@ -633,11 +633,11 @@ export function Pos() {
                     overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
                     opacity: oos ? 0.55 : 1,
-                    borderColor: inCart > 0 ? '#f15929' : '#EFE6E0',
+                    borderColor: inCart > 0 ? '#f15929' : '#E8E8E8',
                     boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(241,89,41,0.45)' : undefined,
                   }}
                   cover={
-                    <div className="relative aspect-square bg-[#F6ECE5] grid place-items-center overflow-hidden">
+                    <div className="relative aspect-square bg-[#F5F5F5] grid place-items-center overflow-hidden">
                       {p.image ? (
                         // absolute-fill so a portrait image can't stretch the
                         // square box (Safari/prod otherwise grow the card tall).
@@ -694,7 +694,7 @@ export function Pos() {
           {/* scan feedback — floats above the grid, never covers search/categories */}
           {scanMsg && (
             <div
-              className={`pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full pl-3 pr-4 py-2.5 text-sm font-medium shadow-lg ${
+              className={`pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-none pl-3 pr-4 py-2.5 text-sm font-medium shadow-lg ${
                 scanMsg.tone === 'ok'
                   ? 'bg-emerald-600 text-white'
                   : scanMsg.tone === 'warn'
@@ -718,14 +718,14 @@ export function Pos() {
 
         {/* ── right: order panel (drawer < lg, column ≥ lg) ────────────────── */}
         <div
-          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-2xl fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
+          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
             cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}>
           <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
             <div className="flex items-center gap-2">
               <span className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</span>
               {lines.length > 0 && (
-                <span className="min-w-[22px] h-[22px] px-1.5 grid place-items-center rounded-full bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold">
+                <span className="min-w-[22px] h-[22px] px-1.5 grid place-items-center rounded-none bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold">
                   {lines.reduce((s, l) => s + l.qty, 0)}
                 </span>
               )}
@@ -752,22 +752,22 @@ export function Pos() {
           </div>
 
           {error && (
-            <div className="mx-4 mt-3 rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>
+            <div className="mx-4 mt-3 rounded-none bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>
           )}
 
           <div className="flex-1 overflow-y-auto px-2">
             {lines.length === 0 ? (
               <div className="h-full grid place-items-center">
                 <Empty
-                  image={<RiShoppingBasket2Line className="w-12 h-12 text-[#E7D8CE] mx-auto" />}
+                  image={<RiShoppingBasket2Line className="w-12 h-12 text-[#D9D9D9] mx-auto" />}
                   styles={{ image: { height: 48 } }}
                   description={<span className="text-tremor-content-subtle">เลือกสินค้าเพื่อเริ่มบิล</span>}
                 />
               </div>
             ) : (
               lines.map((l) => (
-                <div key={l.variantId} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-[#FBF5F1]">
-                  <div className="w-11 h-11 rounded-lg overflow-hidden bg-[#F6ECE5] grid place-items-center shrink-0">
+                <div key={l.variantId} className="flex items-center gap-3 px-2 py-2.5 rounded-none hover:bg-[#FAFAFA]">
+                  <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] grid place-items-center shrink-0">
                     {l.image ? (
                       <img src={l.image} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -800,7 +800,7 @@ export function Pos() {
 
           {/* totals + pay */}
           <div className="border-t border-tremor-border p-4 space-y-3">
-            <Card size="small" style={{ background: '#FBF7F4', borderColor: '#F0EAE6' }} styles={{ body: { padding: 14 } }}>
+            <Card size="small" style={{ background: '#FAFAFA', borderColor: '#E8E8E8' }} styles={{ body: { padding: 14 } }}>
               <Row label="ยอดรวม" value={baht(subtotal)} />
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
@@ -894,7 +894,7 @@ export function Pos() {
               style={{
                 height: 52,
                 fontWeight: 600,
-                borderRadius: 16,
+                borderRadius: 0,
                 boxShadow: '0 10px 22px -8px rgba(241,89,41,0.6)',
               }}>
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
@@ -907,9 +907,9 @@ export function Pos() {
       {lines.length > 0 && !cartOpen && (
         <button
           onClick={() => setCartOpen(true)}
-          className="lg:hidden fixed bottom-3 inset-x-3 z-30 rounded-2xl bg-tremor-brand text-white shadow-lg flex items-center justify-between px-5 py-3.5 hover:bg-tremor-brand-emphasis">
+          className="lg:hidden fixed bottom-3 inset-x-3 z-30 rounded-none bg-tremor-brand text-white shadow-lg flex items-center justify-between px-5 py-3.5 hover:bg-tremor-brand-emphasis">
           <span className="flex items-center gap-2 font-medium">
-            <span className="grid place-items-center min-w-[1.5rem] h-6 px-1.5 rounded-full bg-white/25 text-xs font-bold">
+            <span className="grid place-items-center min-w-[1.5rem] h-6 px-1.5 rounded-none bg-white/25 text-xs font-bold">
               {lines.reduce((s, l) => s + l.qty, 0)}
             </span>
             ดูบิล
@@ -953,7 +953,7 @@ export function Pos() {
                 })
                 .join(', ');
               return (
-                <div key={f.input.client_op_id} className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <div key={f.input.client_op_id} className="rounded-none border border-red-200 bg-red-50 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-sm text-[#2B2320] font-medium">{baht(f.total)}</div>
                     <div className="text-xs text-tremor-content">
@@ -1006,15 +1006,15 @@ function Pill({
   children: React.ReactNode;
 }) {
   return (
-    <Button shape="round" onClick={onClick} type={active ? 'primary' : 'default'} style={{ fontWeight: 500 }}>
+    <Button onClick={onClick} type={active ? 'primary' : 'default'} style={{ fontWeight: 500 }}>
       {children}
       {count != null && (
         <Badge
           count={count}
           showZero
           overflowCount={999}
-          color={active ? 'rgba(255,255,255,0.28)' : '#EDE4DE'}
-          style={{ color: active ? '#fff' : '#8a807a', marginInlineStart: 6, fontWeight: 600, boxShadow: 'none' }}
+          color={active ? 'rgba(255,255,255,0.28)' : '#F0F0F0'}
+          style={{ color: active ? '#fff' : '#8C8C8C', marginInlineStart: 6, fontWeight: 600, boxShadow: 'none' }}
         />
       )}
     </Button>
@@ -1063,7 +1063,7 @@ function CashPay({
         ))}
       </div>
       {typeof tendered === 'number' && tendered >= total && (
-        <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm">
+        <div className="flex items-center justify-between rounded-none bg-emerald-50 px-3 py-2 text-sm">
           <span className="text-emerald-700">เงินทอน</span>
           <span className="font-bold text-emerald-700">{baht(change)}</span>
         </div>
@@ -1094,12 +1094,12 @@ function PromptPayPanel({
 
   if (!target)
     return (
-      <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+      <div className="text-sm text-amber-700 bg-amber-50 rounded-none px-3 py-2">
         ยังไม่ได้ตั้งค่าพร้อมเพย์ของร้าน (ตั้งใน settings)
       </div>
     );
   return (
-    <div className="flex flex-col items-center gap-1 py-2 rounded-xl bg-[#FBF5F1]">
+    <div className="flex flex-col items-center gap-1 py-2 rounded-none bg-[#FAFAFA]">
       {uri ? <img src={uri} alt="PromptPay QR" className="w-40 h-40" /> : <div className="w-40 h-40" />}
       <div className="text-sm font-semibold text-tremor-content-strong">{baht(amount)}</div>
       {name && <div className="text-xs text-tremor-content-subtle">{name}</div>}
@@ -1127,7 +1127,7 @@ function VariantPicker({
             key={v.id}
             disabled={v.stock_qty <= 0}
             onClick={() => onPick(v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-[#EFE4DD] hover:border-[#F15929] disabled:opacity-40 transition">
+            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#F15929] disabled:opacity-40 transition">
             <span className="text-sm font-medium text-[#2B2320]">{v.size ?? 'ปกติ'}</span>
             <span className="text-sm">
               <span className="font-semibold text-[#2B2320]">{baht(v.price)}</span>

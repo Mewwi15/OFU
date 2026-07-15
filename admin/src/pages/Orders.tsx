@@ -354,7 +354,7 @@ export function Orders() {
         onRow={(o) => ({ onClick: () => setSelected(o), style: { cursor: 'pointer' } })}
         pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} รายการ` }}
         scroll={{ x: 820 }}
-        style={{ background: '#fff', borderRadius: 12 }}
+        style={{ background: '#fff', borderRadius: 0 }}
         locale={{
           emptyText:
             query || bucket !== 'all' || mode !== 'all' ? 'ไม่พบออเดอร์ที่ตรงกับตัวกรอง' : 'ยังไม่มีออเดอร์เข้ามา',
@@ -509,11 +509,11 @@ function OrderDrawer({
                     alt=""
                     width={40}
                     height={40}
-                    className="rounded-lg object-cover shrink-0"
+                    className="rounded-none object-cover shrink-0"
                     preview={false}
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-lg bg-[#F6ECE5] shrink-0" />
+                  <div className="w-10 h-10 rounded-none bg-[#F5F5F5] shrink-0" />
                 )}
                 <div>
                   <div className="text-[#2B2320]">{it.name_snapshot}</div>
@@ -537,7 +537,7 @@ function OrderDrawer({
         ]}
       />
 
-      <div className="mt-4 rounded-xl p-3" style={{ background: '#FAF7F5' }}>
+      <div className="mt-4 rounded-none p-3" style={{ background: '#FAFAFA' }}>
         <Row label="ยอดสินค้า" value={baht(order.subtotal)} />
         {order.delivery_fee ? <Row label="ค่าจัดส่ง" value={baht(order.delivery_fee)} /> : null}
         {order.discount_amount ? (
@@ -553,7 +553,7 @@ function OrderDrawer({
             สลิปการชำระเงิน
           </Divider>
           {slipUrl ? (
-            <Image src={slipUrl} alt="สลิป" style={{ borderRadius: 12, maxHeight: 360 }} />
+            <Image src={slipUrl} alt="สลิป" style={{ borderRadius: 0, maxHeight: 360 }} />
           ) : (
             <Text type="secondary">ไม่พบรูปสลิป (อาจยังไม่แนบ หรือเปิดดูไม่ได้)</Text>
           )}

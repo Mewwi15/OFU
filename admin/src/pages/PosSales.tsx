@@ -264,7 +264,7 @@ export function PosSales() {
         onRow={(s) => ({ onClick: () => void openDetail(s), style: { cursor: 'pointer' } })}
         pagination={{ pageSize: 15, hideOnSinglePage: true, showTotal: (t) => `${t} บิล` }}
         scroll={{ x: 640 }}
-        style={{ background: '#fff', borderRadius: 12 }}
+        style={{ background: '#fff', borderRadius: 0 }}
         locale={{
           emptyText: query || status !== 'all' || pay !== 'all' ? 'ไม่พบบิลที่ตรงกับตัวกรอง' : 'ยังไม่มีบิลขาย',
         }}
@@ -275,7 +275,7 @@ export function PosSales() {
         onClose={() => setDetail(null)}
         size="default"
         title={detail ? `บิล ${detail.sale_number}` : ''}
-        styles={{ body: { background: '#F3EEEA' } }}
+        styles={{ body: { background: '#FAFAFA' } }}
         extra={
           detail?.status === 'completed' ? (
             <Popconfirm
@@ -307,7 +307,7 @@ export function PosSales() {
           </Button>
         }>
         {detail && shop && (
-          <div className="mx-auto max-w-[300px] bg-white rounded-lg shadow-sm px-4 py-4">
+          <div className="mx-auto max-w-[300px] bg-white rounded-none shadow-sm px-4 py-4">
             <Receipt
               shop={shop}
               saleNumber={detail.sale_number}

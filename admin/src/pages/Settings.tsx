@@ -254,7 +254,7 @@ export function Settings() {
             className="mb-3 no-print"
             message="ในหน้าพิมพ์ ตั้ง ระยะขอบ = ไม่มี, ปรับขนาด = ค่าเริ่มต้น"
           />
-          <div className="bg-[#f6f2ee] rounded-lg py-3">
+          <div className="bg-[#FAFAFA] rounded-none py-3">
             <Receipt {...sampleReceipt(shop)} />
           </div>
         </Modal>
@@ -328,7 +328,7 @@ function ShopSettingsCard({
             </Form.Item>
           </div>
 
-          <div className="border-t border-dashed border-[#F0EAE6] my-3" />
+          <div className="border-t border-dashed border-[#E8E8E8] my-3" />
           <Text type="secondary" className="text-xs">
             บัญชีรับเงินพร้อมเพย์ — เลขนี้คือปลายทางเงินจริงของ QR ทุกใบที่ลูกค้าจ่าย พิมพ์ผิดเงินจะไม่เข้าบัญชีร้าน
           </Text>
@@ -349,7 +349,7 @@ function ShopSettingsCard({
             </Form.Item>
           </div>
 
-          <div className="border-t border-dashed border-[#F0EAE6] my-3" />
+          <div className="border-t border-dashed border-[#E8E8E8] my-3" />
           <div className="grid gap-x-4 md:grid-cols-2">
             <Form.Item name="delivery_fee" label="ค่าส่งเดลิเวอรี่ (บาท)" rules={[{ required: true }]}>
               <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
@@ -365,7 +365,7 @@ function ShopSettingsCard({
             </Form.Item>
           </div>
 
-          <div className="border-t border-dashed border-[#F0EAE6] my-3" />
+          <div className="border-t border-dashed border-[#E8E8E8] my-3" />
           <div className="grid gap-x-4 md:grid-cols-3">
             <Form.Item name="vat_registered" label="จดทะเบียน VAT" valuePropName="checked">
               <Switch checkedChildren="จด" unCheckedChildren="ไม่จด" />
@@ -381,7 +381,7 @@ function ShopSettingsCard({
             </Form.Item>
           </div>
 
-          <div className="border-t border-dashed border-[#F0EAE6] my-3" />
+          <div className="border-t border-dashed border-[#E8E8E8] my-3" />
           <div className="grid gap-x-4 md:grid-cols-2 items-end">
             <Form.Item name="cod_enabled" label="เก็บเงินปลายทาง (COD)" valuePropName="checked">
               <Switch checkedChildren="เปิด" unCheckedChildren="ปิด" />

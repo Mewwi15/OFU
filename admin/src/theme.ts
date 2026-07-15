@@ -1,7 +1,11 @@
 import type { ThemeConfig } from 'antd';
 
-// อู้ฟู่ brand tokens for Ant Design — coral primary on a warm canvas,
-// green reserved for success/discount. One source of truth for the whole admin.
+// อู้ฟู่ brand tokens for Ant Design — coral accent (buttons, links, active
+// state) on a clean white canvas with square corners. Owner request
+// 2026-07-15: white backgrounds, sharp (0px) frames instead of the earlier
+// warm-cream/rounded look — the coral brand color stays for actions/
+// highlights, only the background tint and corner radius changed. One
+// source of truth for the whole admin.
 export const oofooTheme: ThemeConfig = {
   token: {
     colorPrimary: '#F15929',
@@ -10,33 +14,33 @@ export const oofooTheme: ThemeConfig = {
     colorWarning: '#E08C00',
     colorError: '#E5484D',
     colorLink: '#C5410F',
-    borderRadius: 8,
+    borderRadius: 0,
     fontFamily: "'Mitr', system-ui, 'Noto Sans Thai', sans-serif",
     fontSize: 14,
-    colorBgLayout: '#FBF2EC',
+    colorBgLayout: '#ffffff',
     colorTextBase: '#2B2320',
     colorTextSecondary: '#6E625C',
-    colorBorderSecondary: '#F0EAE6',
+    colorBorderSecondary: '#E8E8E8',
   },
   components: {
     Layout: {
       headerBg: '#ffffff',
       siderBg: '#ffffff',
-      bodyBg: '#FBF2EC',
+      bodyBg: '#ffffff',
       headerHeight: 60,
       headerPadding: '0 20px',
     },
     Menu: {
-      itemSelectedBg: '#FDEEE7',
+      itemSelectedBg: '#F5F5F5',
       itemSelectedColor: '#C5410F',
-      itemBorderRadius: 8,
+      itemBorderRadius: 0,
       itemHeight: 40,
       iconSize: 18,
     },
     Button: { fontWeight: 500, primaryShadow: 'none', defaultShadow: 'none' },
-    Table: { headerBg: '#FBF7F4', headerColor: '#6E625C', borderColor: '#F0EAE6', cellPaddingBlock: 12 },
-    Card: { borderRadiusLG: 12 },
-    Modal: { borderRadiusLG: 12 },
+    Table: { headerBg: '#FAFAFA', headerColor: '#6E625C', borderColor: '#E8E8E8', cellPaddingBlock: 12 },
+    Card: { borderRadiusLG: 0 },
+    Modal: { borderRadiusLG: 0 },
     Statistic: { titleFontSize: 13 },
   },
 };

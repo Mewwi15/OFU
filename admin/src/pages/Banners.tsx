@@ -100,9 +100,9 @@ export function Banners() {
       width: 120,
       render: (_, b) =>
         b.image_path ? (
-          <img src={b.image_path} alt="" className="w-24 h-12 object-cover rounded-md border border-[#F0EAE6]" />
+          <img src={b.image_path} alt="" className="w-24 h-12 object-cover rounded-none border border-[#E8E8E8]" />
         ) : (
-          <div className="w-24 h-12 rounded-md bg-[#F6ECE5] grid place-items-center text-gray-300">
+          <div className="w-24 h-12 rounded-none bg-[#F5F5F5] grid place-items-center text-gray-300">
             <RiImageAddLine className="w-5 h-5" />
           </div>
         ),
@@ -174,7 +174,7 @@ export function Banners() {
             </div>
 
             {!pm.multi && pubCount > 1 && (
-              <div className="mb-2 rounded-lg bg-amber-50 text-amber-700 text-xs px-3 py-2">
+              <div className="mb-2 rounded-none bg-amber-50 text-amber-700 text-xs px-3 py-2">
                 ตำแหน่งนี้ใช้รูปเดียว — แอปจะแสดงรูปที่เปิดไว้เป็นอันแรก
               </div>
             )}
@@ -309,7 +309,7 @@ function BannerModal({
             );
             return image ? (
               <div className="relative w-full">
-                <img src={image} alt="" className="w-full object-cover rounded-lg border border-[#F0EAE6]" style={{ aspectRatio: String(aspect) }} />
+                <img src={image} alt="" className="w-full object-cover rounded-none border border-[#E8E8E8]" style={{ aspectRatio: String(aspect) }} />
                 <div className="absolute top-2 right-2 flex gap-2">
                   {uploader(
                     <Button size="small" icon={<RiImageEditLine className="w-[15px] h-[15px]" />}>
@@ -323,7 +323,7 @@ function BannerModal({
               </div>
             ) : (
               uploader(
-                <button type="button" className="w-full h-28 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
+                <button type="button" className="w-full h-28 rounded-none border border-dashed border-[#D9D9D9] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
                   <div className="text-center">
                     <RiImageAddLine className="w-7 h-7 mx-auto" />
                     <div className="text-xs mt-1">เลือกรูป แล้วครอบตัด {ratioLabel(aspect)}</div>

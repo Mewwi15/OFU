@@ -15,7 +15,7 @@ export function DeleteAccountInfo() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FBF7F4',
+        background: '#FAFAFA',
         color: '#2B2320',
         fontFamily: "'Mitr', 'Noto Sans Thai', system-ui, sans-serif",
         display: 'flex',
@@ -28,7 +28,7 @@ export function DeleteAccountInfo() {
           วิธีขอลบบัญชีและข้อมูลส่วนตัวออกจากระบบของร้านอู้ฟู่
         </p>
 
-        <section style={{ background: '#fff', borderRadius: 16, padding: 24, marginBottom: 16 }}>
+        <section style={{ background: '#fff', borderRadius: 0, padding: 24, marginBottom: 16 }}>
           <h2 style={{ fontSize: 18, marginBottom: 12 }}>ขั้นตอนการขอลบบัญชี</h2>
           <ol style={{ paddingLeft: 20, lineHeight: 2 }}>
             {STEPS.map((s) => (
@@ -41,7 +41,7 @@ export function DeleteAccountInfo() {
           </p>
         </section>
 
-        <section style={{ background: '#fff', borderRadius: 16, padding: 24 }}>
+        <section style={{ background: '#fff', borderRadius: 0, padding: 24 }}>
           <h2 style={{ fontSize: 18, marginBottom: 12 }}>ข้อมูลที่ถูกลบและระยะเวลา</h2>
           <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
             <li>ทางร้านจะลบบัญชีภายใน 7 วันนับจากวันที่ส่งคำขอ</li>

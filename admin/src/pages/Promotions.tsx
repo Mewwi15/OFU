@@ -203,7 +203,7 @@ export function Promotions() {
         dataSource={promos}
         pagination={false}
         scroll={{ x: 900 }}
-        style={{ background: '#fff', borderRadius: 12 }}
+        style={{ background: '#fff', borderRadius: 0 }}
         locale={{ emptyText: 'ยังไม่มีโค้ดส่วนลด — กด "เพิ่มโค้ดส่วนลด" เพื่อเริ่ม' }}
       />
 

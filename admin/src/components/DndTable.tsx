@@ -48,7 +48,7 @@ function DraggableRow(props: HTMLAttributes<HTMLTableRowElement> & { 'data-row-k
     ...props.style,
     transform: CSS.Translate.toString(transform),
     transition,
-    ...(isDragging ? { position: 'relative', zIndex: 9, background: '#FBF5F1' } : {}),
+    ...(isDragging ? { position: 'relative', zIndex: 9, background: '#FAFAFA' } : {}),
   };
   const ctx = useMemo<RowContext>(() => ({ setActivatorNodeRef, listeners }), [setActivatorNodeRef, listeners]);
   return (

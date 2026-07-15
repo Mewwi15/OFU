@@ -221,7 +221,7 @@ export function Products() {
       key: 'name',
       render: (_, p) => (
         <div className="flex items-center gap-3">
-          <Avatar shape="square" size={44} src={productThumb(primaryImage(p), 88)} icon={<RiImageLine className="w-5 h-5" />} style={{ background: '#F3EDE9', color: '#B9A79C', flex: 'none' }} />
+          <Avatar shape="square" size={44} src={productThumb(primaryImage(p), 88)} icon={<RiImageLine className="w-5 h-5" />} style={{ background: '#F5F5F5', color: '#BFBFBF', flex: 'none' }} />
           <div className="min-w-0">
             <div className="font-medium text-[#2B2320] truncate">{p.name}</div>
             {p.subtitle ? <Text type="secondary" className="text-xs">{p.subtitle}</Text> : null}
@@ -359,7 +359,7 @@ export function Products() {
         dataSource={shown}
         pagination={{ pageSize: 12, hideOnSinglePage: true }}
         scroll={{ x: 760 }}
-        style={{ background: '#fff', borderRadius: 12 }}
+        style={{ background: '#fff', borderRadius: 0 }}
         locale={{
           emptyText:
             query || catFilter || statusFilter !== 'all' ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง' : 'ยังไม่มีสินค้าในระบบ',
@@ -728,7 +728,7 @@ function ProductModal({
         <div className="flex flex-wrap gap-3">
           {images.map((img) => (
               <div key={img.id} className="w-24">
-                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
+                <div className="relative w-24 h-24 rounded-none overflow-hidden border border-[#E8E8E8]">
                   <img src={productThumb(img.storage_path, 192)} alt="" className="w-full h-full object-cover" />
                   {img.is_primary && (
                     <span className="absolute top-1 left-1 rounded bg-tremor-brand text-white text-[10px] px-1.5 py-0.5">
@@ -775,13 +775,13 @@ function ProductModal({
             ))}
             {pending.map((p, i) => (
               <div key={p.url} className="w-24">
-                <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#F0EAE6]">
+                <div className="relative w-24 h-24 rounded-none overflow-hidden border border-[#E8E8E8]">
                   <img src={p.url} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removePending(i)}
                     title="ลบรูป"
-                    className="absolute top-1 right-1 w-5 h-5 grid place-items-center rounded-full bg-black/55 text-white text-xs leading-none hover:bg-black/75">
+                    className="absolute top-1 right-1 w-5 h-5 grid place-items-center rounded-none bg-black/55 text-white text-xs leading-none hover:bg-black/75">
                     ×
                   </button>
                 </div>
@@ -812,7 +812,7 @@ function ProductModal({
                 }}>
                 <button
                   type="button"
-                  className="w-24 h-24 rounded-lg border border-dashed border-[#D9CFC8] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
+                  className="w-24 h-24 rounded-none border border-dashed border-[#D9D9D9] grid place-items-center text-gray-400 hover:border-tremor-brand hover:text-tremor-brand transition">
                   <div className="text-center">
                     <RiImageAddLine className="w-6 h-6 mx-auto" />
                     <div className="text-[11px] mt-1">เพิ่มรูป</div>

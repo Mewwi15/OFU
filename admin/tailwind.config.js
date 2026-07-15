@@ -27,13 +27,13 @@ export default {
             inverted: '#ffffff',
           },
           background: {
-            muted: '#faf6f3',
-            subtle: '#f3eeea',
+            muted: '#fafafa',
+            subtle: '#f5f5f5',
             DEFAULT: '#ffffff',
             emphasis: '#374151',
           },
-          border: { DEFAULT: '#ece6e2' },
-          ring: { DEFAULT: '#ece6e2' },
+          border: { DEFAULT: '#e8e8e8' },
+          ring: { DEFAULT: '#e8e8e8' },
           content: {
             subtle: '#a89c93',
             DEFAULT: '#8a807a',

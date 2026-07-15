@@ -133,7 +133,7 @@ export function Reports() {
                 <PayRow label="เงินสด" value={data.onsite.cash} pct={pct(data.onsite.cash, data.onsite.gross)} />
                 <PayRow label="พร้อมเพย์" value={data.onsite.promptpay} pct={pct(data.onsite.promptpay, data.onsite.gross)} />
                 <PayRow label="เครดิตร้าน" value={data.onsite.store_credit} pct={pct(data.onsite.store_credit, data.onsite.gross)} />
-                <div className="flex items-center justify-between text-sm pt-2 border-t" style={{ borderColor: '#F0EAE6' }}>
+                <div className="flex items-center justify-between text-sm pt-2 border-t" style={{ borderColor: '#E8E8E8' }}>
                   <Text type="secondary">ส่วนลดที่ให้</Text>
                   <span className="font-medium">{baht(data.onsite.discount)}</span>
                 </div>
@@ -156,7 +156,7 @@ export function Reports() {
               key: 'rank',
               width: 48,
               render: (_, __, i) => (
-                <Tag color="#FDEEE7" style={{ color: '#C5410F', border: 'none', margin: 0 }}>{i + 1}</Tag>
+                <Tag color="#F5F5F5" style={{ color: '#C5410F', border: 'none', margin: 0 }}>{i + 1}</Tag>
               ),
             },
             { title: 'สินค้า', dataIndex: 'name', key: 'name' },
@@ -242,7 +242,7 @@ function ChannelBar({
         </span>
         <span className="font-semibold">{baht(amount)}</span>
       </div>
-      <Progress percent={pct} showInfo={false} strokeColor={stroke} trailColor="#F3EDE9" />
+      <Progress percent={pct} showInfo={false} strokeColor={stroke} trailColor="#F0F0F0" />
     </div>
   );
 }

@@ -123,7 +123,7 @@ export function Categories() {
         loading={loading}
         columns={columns}
         scroll={{ x: 520 }}
-        style={{ background: '#fff', borderRadius: 12 }}
+        style={{ background: '#fff', borderRadius: 0 }}
         locale={{ emptyText: 'ยังไม่มีหมวดหมู่ — กด "เพิ่มหมวดหมู่" เพื่อเริ่ม' }}
       />
 

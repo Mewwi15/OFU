@@ -142,7 +142,7 @@ export function Featured() {
                 <div className="flex gap-1.5">
                   {pubBanners.slice(0, 4).map((b) =>
                     b.image_path ? (
-                      <img key={b.id} src={b.image_path} alt="" className="w-14 h-7 rounded object-cover border border-[#F0EAE6]" />
+                      <img key={b.id} src={b.image_path} alt="" className="w-14 h-7 rounded-none object-cover border border-[#E8E8E8]" />
                     ) : null,
                   )}
                 </div>
@@ -300,7 +300,7 @@ function SectionCard({
   return (
     <Card size="small" styles={{ body: { padding: 16 } }} className="mb-4">
       <div className="flex items-center gap-2.5 mb-3">
-        <span className="w-6 h-6 grid place-items-center rounded-full bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold shrink-0">
+        <span className="w-6 h-6 grid place-items-center rounded-none bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold shrink-0">
           {index}
         </span>
         <div className="flex-1 min-w-0">
@@ -329,16 +329,16 @@ function HomePreview({
   return (
     <div className="hidden lg:block sticky top-0">
       <Card size="small" styles={{ body: { padding: 0 } }} style={{ overflow: 'hidden' }}>
-        <div className="px-4 py-2.5 border-b border-[#F0EAE6] flex items-center justify-between">
+        <div className="px-4 py-2.5 border-b border-[#E8E8E8] flex items-center justify-between">
           <span className="text-sm font-semibold text-[#2B2320]">ตัวอย่างหน้าแรก</span>
           <span className="text-xs text-gray-400">มุมมองในแอป</span>
         </div>
-        <div className="bg-[#FBF2EC] max-h-[560px] overflow-y-auto pb-4">
+        <div className="bg-[#FAFAFA] max-h-[560px] overflow-y-auto pb-4">
           {/* banner */}
           {banner ? (
             <img src={banner} alt="" className="w-full object-cover" style={{ aspectRatio: '2 / 1' }} />
           ) : (
-            <div className="w-full grid place-items-center bg-[#F3EDE9] text-gray-400" style={{ aspectRatio: '2 / 1' }}>
+            <div className="w-full grid place-items-center bg-[#F5F5F5] text-gray-400" style={{ aspectRatio: '2 / 1' }}>
               <RiImageLine className="w-7 h-7" />
             </div>
           )}
@@ -348,7 +348,7 @@ function HomePreview({
             <div className="px-3 pt-3 flex gap-3 overflow-x-auto">
               {categories.slice(0, 6).map((c) => (
                 <div key={c} className="flex flex-col items-center gap-1 shrink-0">
-                  <div className="w-11 h-11 rounded-2xl bg-white border border-[#F0EAE6] grid place-items-center">
+                  <div className="w-11 h-11 rounded-none bg-white border border-[#E8E8E8] grid place-items-center">
                     <RiPriceTag3Line className="w-5 h-5 text-tremor-brand" />
                   </div>
                   <span className="text-[10px] text-[#2B2320] max-w-[52px] truncate">{c}</span>
@@ -367,7 +367,7 @@ function HomePreview({
                 ) : (
                   s.products.slice(0, 5).map((p) => (
                     <div key={p.id} className="w-20 shrink-0">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-[#F0EAE6] grid place-items-center">
+                      <div className="w-20 h-20 rounded-none overflow-hidden bg-white border border-[#E8E8E8] grid place-items-center">
                         {previewImg(p) ? (
                           <img src={previewImg(p)!} alt="" className="w-full h-full object-cover" />
                         ) : (
@@ -487,9 +487,9 @@ function ProductPicker({ section, onClose, onSaved }: { section: FeaturedSection
                 key={p.id}
                 role="button"
                 onClick={() => toggle(p.id)}
-                className={`flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer ${checked ? 'bg-[#FBF1EC]' : 'hover:bg-gray-50'}`}>
+                className={`flex items-center gap-3 px-2 py-2 rounded-none cursor-pointer ${checked ? 'bg-[#F5F5F5]' : 'hover:bg-gray-50'}`}>
                 <Checkbox checked={checked} style={{ pointerEvents: 'none' }} />
-                <div className="w-10 h-10 rounded-md overflow-hidden bg-[#F3EDE9] grid place-items-center shrink-0">
+                <div className="w-10 h-10 rounded-none overflow-hidden bg-[#F5F5F5] grid place-items-center shrink-0">
                   {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : null}
                 </div>
                 <span className="flex-1 min-w-0 truncate text-sm text-[#2B2320]">{p.name}</span>

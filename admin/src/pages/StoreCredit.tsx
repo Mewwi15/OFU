@@ -82,7 +82,7 @@ export function StoreCredit() {
             className="mb-4"
             styles={{ body: { display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', padding: '12px 16px' } }}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl grid place-items-center" style={{ background: '#FDEEE7' }}>
+              <div className="w-12 h-12 rounded-none grid place-items-center" style={{ background: '#F5F5F5' }}>
                 <RiWallet3Line className="w-6 h-6" style={{ color: '#F15929' }} />
               </div>
               <div>

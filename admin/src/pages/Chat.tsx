@@ -139,10 +139,10 @@ export function Chat() {
                 <button
                   key={t.id}
                   onClick={() => void openThread(t)}
-                  className="w-full flex items-center gap-3 text-left cursor-pointer hover:bg-[#FBF5F1] border-b border-[#F7F1ED]"
+                  className="w-full flex items-center gap-3 text-left cursor-pointer hover:bg-[#FAFAFA] border-b border-[#E8E8E8]"
                   style={{
                     padding: '10px 14px',
-                    background: selected?.id === t.id ? '#F6ECE5' : undefined,
+                    background: selected?.id === t.id ? '#F5F5F5' : undefined,
                   }}>
                   <Badge count={t.admin_unread} size="small">
                     <Avatar style={{ background: '#F15929' }}>
@@ -177,7 +177,7 @@ export function Chat() {
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-[#F0EAE6] font-semibold text-[#2B2320]">
+              <div className="px-4 py-3 border-b border-[#E8E8E8] font-semibold text-[#2B2320]">
                 {customerName(selected)}
               </div>
 
@@ -192,15 +192,15 @@ export function Chat() {
                             src={m.imageUrl}
                             alt="รูปภาพ"
                             width={200}
-                            style={{ borderRadius: 12 }}
+                            style={{ borderRadius: 0 }}
                           />
                         ) : (
                           <div
-                            className="inline-block px-3 py-2 rounded-xl whitespace-pre-wrap break-words text-left"
+                            className="inline-block px-3 py-2 rounded-none whitespace-pre-wrap break-words text-left"
                             style={
                               mine
                                 ? { background: '#F15929', color: '#fff', borderBottomRightRadius: 4 }
-                                : { background: '#F6ECE5', color: '#2B2320', borderBottomLeftRadius: 4 }
+                                : { background: '#F5F5F5', color: '#2B2320', borderBottomLeftRadius: 4 }
                             }>
                             {m.body}
                           </div>
@@ -212,7 +212,7 @@ export function Chat() {
                 })}
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-3 border-t border-[#F0EAE6]">
+              <div className="flex items-center gap-2 px-3 py-3 border-t border-[#E8E8E8]">
                 <input
                   ref={fileRef}
                   type="file"

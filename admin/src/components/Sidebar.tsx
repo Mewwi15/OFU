@@ -91,24 +91,24 @@ function Brand({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => 
   // Collapsed: just the fold toggle (click to expand). Expanded: logo + name + fold toggle.
   if (collapsed) {
     return (
-      <div className="h-[60px] flex items-center justify-center border-b border-[#F0EAE6]">
+      <div className="h-[60px] flex items-center justify-center border-b border-[#E8E8E8]">
         <button
           onClick={onToggle}
           title="ขยายเมนู"
-          className="w-9 h-9 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-50">
+          className="w-9 h-9 grid place-items-center rounded-none text-gray-500 hover:bg-gray-50">
           <RiMenuUnfoldLine className="w-5 h-5" />
         </button>
       </div>
     );
   }
   return (
-    <div className="h-[60px] flex items-center border-b border-[#F0EAE6] px-4">
+    <div className="h-[60px] flex items-center border-b border-[#E8E8E8] px-4">
       <img src="/logo-oofoo.png" alt="อู้ฟู่" style={{ height: 36 }} className="object-contain" />
       {onToggle && (
         <button
           onClick={onToggle}
           title="ยุบเมนู"
-          className="ml-auto w-8 h-8 grid place-items-center rounded-lg text-gray-400 hover:bg-gray-50 hover:text-gray-700">
+          className="ml-auto w-8 h-8 grid place-items-center rounded-none text-gray-400 hover:bg-gray-50 hover:text-gray-700">
           <RiMenuFoldLine className="w-5 h-5" />
         </button>
       )}
@@ -166,7 +166,7 @@ export function Sidebar({
             })),
         }))}
       />
-      <div className="p-3 border-t border-[#F0EAE6]">
+      <div className="p-3 border-t border-[#E8E8E8]">
         <Button
           type="text"
           block

@@ -57,7 +57,7 @@ export function PrivacyPolicy() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FBF7F4',
+        background: '#FAFAFA',
         color: '#2B2320',
         fontFamily: "'Mitr', 'Noto Sans Thai', system-ui, sans-serif",
         display: 'flex',
@@ -74,7 +74,7 @@ export function PrivacyPolicy() {
         {SECTIONS.map((s) => (
           <section
             key={s.title}
-            style={{ background: '#fff', borderRadius: 16, padding: 24, marginBottom: 16 }}>
+            style={{ background: '#fff', borderRadius: 0, padding: 24, marginBottom: 16 }}>
             <h2 style={{ fontSize: 18, marginBottom: 12 }}>{s.title}</h2>
             <ul style={{ paddingLeft: 20, lineHeight: 2, margin: 0 }}>
               {s.items.map((it) => (
@@ -84,7 +84,7 @@ export function PrivacyPolicy() {
           </section>
         ))}
 
-        <section style={{ background: '#fff', borderRadius: 16, padding: 24 }}>
+        <section style={{ background: '#fff', borderRadius: 0, padding: 24 }}>
           <h2 style={{ fontSize: 18, marginBottom: 12 }}>ติดต่อเรา</h2>
           <p style={{ lineHeight: 2, margin: 0 }}>
             ร้านอู้ฟู่ — ติดต่อผ่านแชตในแอป หรือที่หน้าร้าน

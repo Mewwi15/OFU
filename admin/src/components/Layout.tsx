@@ -29,7 +29,7 @@ export function Layout() {
           collapsedWidth={72}
           collapsed={collapsed}
           theme="light"
-          style={{ height: '100vh', borderInlineEnd: '1px solid #F0EAE6', overflow: 'hidden' }}>
+          style={{ height: '100vh', borderInlineEnd: '1px solid #E8E8E8', overflow: 'hidden' }}>
           <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
         </Sider>
       )}
@@ -39,7 +39,7 @@ export function Layout() {
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            borderBottom: '1px solid #F0EAE6',
+            borderBottom: '1px solid #E8E8E8',
             flex: '0 0 auto',
           }}>
           {!isDesktop && (
