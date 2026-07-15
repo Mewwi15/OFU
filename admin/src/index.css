@@ -84,6 +84,17 @@ body {
   box-shadow: 0 1px 2px rgba(30, 30, 30, 0.04), 0 4px 12px rgba(30, 30, 30, 0.06);
 }
 
+/* Icon-only buttons (shape="circle" add/close buttons etc): antd nudges the
+   icon's vertical-align to line up with a text label, but an icon-only
+   button has no label — the nudge just pushes the icon a couple px off
+   center inside the circle. Flex-center the icon slot directly instead of
+   relying on line-height/vertical-align. */
+.ant-btn-icon-only .ant-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Formal/classic table look (owner reference 2026-07-16): full grid borders
    on every cell + alternating row stripe, instead of the plain borderless
    rows antd ships by default. `:not(.ant-table-measure-row)` skips antd's
