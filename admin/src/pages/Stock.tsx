@@ -1,35 +1,26 @@
 /**
- * สต๊อก — full stock workspace (owner request 2026-07-13 "มีให้หมดทุกฟังก์ชั่น").
+ * สต๊อก — the shop's single stock list (owner trimmed it to just this view
+ * 2026-07-16: removed the ต้นทุน / เติมของหลายรายการ / ประวัติ tabs).
  *
- *  • ภาพรวม   : every variant in one readable table — photo, barcode/SKU,
- *    price/cost, on-hand / reserved / sellable, threshold, stock value, status.
- *    Row actions: "เติมของ" is a direct one-click button (the everyday task,
- *    additive — receive_stock, its own ledger reason since it's a real
- *    delivery). The ⋯ menu holds the rest — "ปรับยอดสต๊อก" always asks the
- *    same single question ("นับได้จริงกี่ชิ้น", pre-filled with the current
- *    count) and shows a plain-language live preview of the resulting change
- *    (เพิ่มขึ้น/ลดลง N ชิ้น) instead of making the cashier do the subtraction
- *    or type a minus sign — one mental model covers a stocktake, shrinkage,
- *    or a miscount alike (set_stock_qty and the old adjust_stock path write
- *    the identical ledger reason, admin_adjust, so nothing is lost by not
- *    asking which one this was). Plus เกณฑ์เตือน and ประวัติ (jumps to the
- *    filtered ledger). Summary cards + search + filters.
- *    Export = Excel-compatible CSV (BOM). Import = CSV in two modes:
- *    นับสต๊อก (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock),
- *    matched by variant_id → barcode → SKU → ชื่อเต็ม, with a preview first.
- *  • รับของเข้า: scan/search → receiving list → one save ('receive' ledger).
- *  • ประวัติ   : stock_movements ledger, filter by type or a single product.
+ * One readable table of every sellable variant: photo, barcode/SKU, price,
+ * on-hand / reserved / sellable, status. Row actions: "เติมของ" is a direct
+ * one-click button (the everyday task, additive — receive_stock). The ⋯ menu
+ * holds "ปรับยอดสต๊อก" (always asks "นับได้จริงกี่ชิ้น", pre-filled with the
+ * current count, with a plain-language live preview เพิ่มขึ้น/ลดลง N ชิ้น) and
+ * "ตั้งเตือนใกล้หมด". Summary cards + search + status/category filters on top.
+ * Export = Excel-compatible CSV (BOM). Import = CSV in two modes: นับสต๊อก
+ * (absolute, set_stock_qty) / รับของเข้า (additive, receive_stock), matched by
+ * variant_id → barcode → SKU → ชื่อเต็ม, with a preview first.
  *
- * LINE low-stock alerts fire from the DB trigger (0055) — nothing to do here.
+ * Cost/profit editing lives in the product editor (Products.tsx). Admin-action
+ * history is on the ประวัติแก้ไข page. LINE low-stock alerts fire from the DB
+ * trigger (0055) — nothing to do here.
  */
 
 import {
   RiAddLine,
-  RiCoinsLine,
   RiAlarmWarningLine,
-  RiDeleteBinLine,
   RiDownload2Line,
-  RiHistoryLine,
   RiInboxArchiveLine,
   RiMore2Line,
   RiScales3Line,
@@ -53,47 +44,26 @@ import {
   Space,
   Statistic,
   Table,
-  Tabs,
-  Tag,
   Typography,
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ACTION_COLOR } from '../lib/actionColors';
 import {
   apiError,
   listProducts,
-  listStockMovements,
   receiveStock,
   setStockQty,
   type Product,
-  type StockMovement,
 } from '../lib/api';
 import { productThumb } from '../lib/image';
 
 const { Text } = Typography;
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
-
-/** Ledger reason → Thai label + tag colour. */
-const REASONS: Record<string, { label: string; color: string }> = {
-  receive: { label: 'รับของเข้า', color: 'green' },
-  admin_adjust: { label: 'ปรับ/นับสต๊อก', color: 'blue' },
-  pos_sale: { label: 'ขายหน้าร้าน', color: 'volcano' },
-  pos_refund: { label: 'คืนสินค้า POS', color: 'purple' },
-  reserve_placed: { label: 'จอง (ออเดอร์ใหม่)', color: 'gold' },
-  commit_confirmed: { label: 'ตัดสต๊อก (ยืนยันออเดอร์)', color: 'volcano' },
-  commit_understocked: { label: 'ตัดสต๊อก (ของขาด)', color: 'red' },
-  release_cancel: { label: 'คืนจอง (ยกเลิก)', color: 'default' },
-  release_payment_rejected: { label: 'คืนจอง (สลิปไม่ผ่าน)', color: 'default' },
-  release_expiry: { label: 'คืนจอง (หมดเวลา)', color: 'default' },
-  restock_cancel: { label: 'คืนสต๊อก (ยกเลิก)', color: 'cyan' },
-  restock_delivery_failed: { label: 'คืนสต๊อก (ส่งไม่สำเร็จ)', color: 'cyan' },
-};
-const reasonMeta = (r: string) => REASONS[r] ?? { label: r, color: 'default' };
 
 /** One sellable item (variant) flattened with its product facts. */
 type Item = {
@@ -152,7 +122,6 @@ const STATUS_COLOR: Record<'ok' | 'low' | 'out', string> = {
   low: '#c2410c',
   out: '#dc2626',
 };
-const STATUS_TAG = { fontSize: 14, lineHeight: '26px', paddingInline: 12 } as const;
 
 /* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
 
@@ -250,7 +219,6 @@ export function Stock() {
   const { message } = App.useApp();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('overview');
 
   const reload = useCallback(async (force = false) => {
     setLoading(true);
@@ -268,11 +236,14 @@ export function Stock() {
 
   const items = useMemo(() => flatten(products), [products]);
   const lowCount = useMemo(() => items.filter((i) => statusOf(i) !== 'ok').length, [items]);
+  const outCount = useMemo(() => items.filter((i) => statusOf(i) === 'out').length, [items]);
 
-  /* ── ภาพรวม: filters ─────────────────────────────────────────────────── */
+  /* ── filters ─────────────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  // Scroll target for the clickable "ใกล้หมด/หมด" summary card.
+  const listRef = useRef<HTMLDivElement>(null);
 
   const categories = useMemo(
     () => [...new Set(items.map((i) => i.category))].sort(),
@@ -281,7 +252,7 @@ export function Stock() {
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((i) => {
+    const filtered = items.filter((i) => {
       if (statusFilter === 'low' && statusOf(i) === 'ok') return false;
       if (statusFilter === 'out' && statusOf(i) !== 'out') return false;
       if (categoryFilter && i.category !== categoryFilter) return false;
@@ -292,17 +263,25 @@ export function Stock() {
         (i.sku ?? '').toLowerCase().includes(q)
       );
     });
+    // Triage order: หมด → ใกล้หมด → ปกติ, then lowest stock first — so with
+    // 400+ products the handful that need restocking sit at the top on load.
+    // Only re-derives when items change (reload), never live, so a just-
+    // restocked row doesn't jump away mid-action; column click-sorters still
+    // override (no column sets defaultSortOrder).
+    const rank = { out: 0, low: 1, ok: 2 } as const;
+    return filtered.sort(
+      (a, b) => rank[statusOf(a)] - rank[statusOf(b)] || a.stock - b.stock,
+    );
   }, [items, query, statusFilter, categoryFilter]);
 
   const totals = useMemo(() => {
     const costValue = items.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
     const saleValue = items.reduce((s, i) => s + i.price * i.stock, 0);
-    const pieces = items.reduce((s, i) => s + i.stock, 0);
-    return { costValue, saleValue, pieces };
+    return { costValue, saleValue };
   }, [items]);
 
   /* ── row-action modal (เติม / นับ / เกณฑ์เตือน) ─────────────────────────── */
-  type Action = 'receive' | 'set' | 'threshold' | 'cost';
+  type Action = 'receive' | 'set' | 'threshold';
   const [action, setAction] = useState<{ type: Action; item: Item } | null>(null);
   const [actionQty, setActionQty] = useState<number | null>(null);
   const [actionNote, setActionNote] = useState('');
@@ -313,7 +292,6 @@ export function Stock() {
     setActionQty(
       type === 'threshold' ? item.threshold
       : type === 'set' ? item.stock
-      : type === 'cost' ? item.cost
       : null,
     );
     setActionNote('');
@@ -339,21 +317,16 @@ export function Stock() {
           product_id: item.productId,
           size: item.size,
           price: item.price,
-          low_stock_threshold: type === 'threshold' ? actionQty : item.threshold,
+          low_stock_threshold: actionQty,
           sku: item.sku,
           barcode: item.barcode,
-          cost_price: type === 'cost' ? actionQty : item.cost,
+          cost_price: item.cost,
           unit: item.unit,
         });
-        message.success(
-          type === 'cost'
-            ? `ตั้งทุน ${itemLabel(item)} = ${baht(actionQty)}`
-            : `ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`,
-        );
+        message.success(`ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`);
       }
       setAction(null);
       void reload(true);
-      void reloadMoves();
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -365,10 +338,9 @@ export function Stock() {
     receive: { title: 'เติมของ', hint: 'ซื้อมากี่ชิ้น ใส่จำนวนนั้น', min: 1 },
     set: { title: 'ปรับยอดสต๊อก', hint: 'นับบนชั้นได้กี่ชิ้น ใส่เลขนั้นเลย (เช่น ของเสีย ของหาย นับผิดครั้งก่อน)', min: 0 },
     threshold: { title: 'ตั้งเตือนใกล้หมด', hint: 'เหลือถึงจำนวนนี้เมื่อไหร่ LINE จะเด้งเตือน', min: 0 },
-    cost: { title: 'แก้ต้นทุนต่อชิ้น', hint: 'ซื้อมาชิ้นละกี่บาท (ไว้คำนวณกำไรและเงินจมในสต๊อก)', min: 0 },
   };
 
-  /* ── overview columns ───────────────────────────────────────────────── */
+  /* ── columns ────────────────────────────────────────────────────────── */
   const overviewColumns: ColumnsType<Item> = [
     {
       title: 'สินค้า',
@@ -377,12 +349,19 @@ export function Stock() {
       sorter: (a, b) => a.productName.localeCompare(b.productName, 'th'),
       render: (_, i) => (
         <Space>
-          <Avatar shape="square" size={44} src={i.image ?? undefined}>
-            {i.productName[0]}
-          </Avatar>
+          {/* Photoless products (the majority) get a uniform muted box icon
+              instead of a grey first-letter square — calm and intentional,
+              carries no colour so it never competes with the status signal. */}
+          <Avatar
+            shape="square"
+            size={32}
+            src={i.image ?? undefined}
+            style={{ background: '#F5F5F5', color: '#BFBFBF' }}
+            icon={<RiInboxArchiveLine style={{ fontSize: 16 }} />}
+          />
           <Space direction="vertical" size={0}>
-            <Text strong style={{ fontSize: 16 }}>{itemLabel(i)}</Text>
-            <Text type="secondary" style={{ fontSize: 13 }}>
+            <Text style={{ fontSize: 15, fontWeight: 500 }}>{itemLabel(i)}</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>
               {[i.barcode, i.sku].filter(Boolean).join(' · ') || 'ไม่มีบาร์โค้ด'}
             </Text>
           </Space>
@@ -391,49 +370,38 @@ export function Stock() {
     },
     {
       title: 'ราคาขาย',
-      width: 110,
+      width: 100,
       align: 'right',
       sorter: (a, b) => a.price - b.price,
-      render: (_, i) => <Text strong style={{ fontSize: 16 }}>{baht(i.price)}</Text>,
+      render: (_, i) => <Text style={{ fontSize: 14 }}>{baht(i.price)}</Text>,
     },
     {
       title: 'คงเหลือ',
       dataIndex: 'stock',
-      width: 130,
+      width: 150,
       align: 'right',
-      defaultSortOrder: undefined,
       sorter: (a, b) => a.stock - b.stock,
-      render: (s: number, i) => (
-        <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
-          <Text strong style={{ fontSize: 22, color: STATUS_COLOR[statusOf(i)] }}>
-            {s}
-            <Text type="secondary" style={{ fontSize: 13 }}> {i.unit ?? 'ชิ้น'}</Text>
-          </Text>
-          {i.reserved > 0 ? (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              ลูกค้าจองไว้ {i.reserved} · ขายได้อีก {i.available}
+      render: (s: number, i) => {
+        const st = statusOf(i);
+        return (
+          <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
+            <Text strong style={{ fontSize: 18, color: STATUS_COLOR[st] }}>
+              {s}
+              <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
             </Text>
-          ) : null}
-        </Space>
-      ),
-    },
-    {
-      title: 'สถานะ',
-      width: 100,
-      filters: [
-        { text: 'ปกติ', value: 'ok' },
-        { text: 'ใกล้หมด', value: 'low' },
-        { text: 'หมด', value: 'out' },
-      ],
-      onFilter: (v, i) => statusOf(i) === v,
-      render: (_, i) => {
-        const s = statusOf(i);
-        return s === 'out' ? (
-          <Tag color="red" style={STATUS_TAG}>หมด</Tag>
-        ) : s === 'low' ? (
-          <Tag color="orange" style={STATUS_TAG}>ใกล้หมด</Tag>
-        ) : (
-          <Tag color="green" style={STATUS_TAG}>ปกติ</Tag>
+            {/* One status signal, folded in here — problem rows only. The old
+                standalone สถานะ Tag column was the exact same signal twice. */}
+            {st !== 'ok' ? (
+              <Text style={{ fontSize: 12, color: STATUS_COLOR[st] }}>
+                {st === 'out' ? 'หมดแล้ว' : 'ใกล้หมด'}
+              </Text>
+            ) : null}
+            {i.reserved > 0 ? (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                ลูกค้าจองไว้ {i.reserved} · ขายได้อีก {i.available}
+              </Text>
+            ) : null}
+          </Space>
         );
       },
     },
@@ -441,12 +409,14 @@ export function Stock() {
       title: '',
       key: 'actions',
       fixed: 'right',
-      width: 156,
+      width: 120,
       render: (_, i) => (
         <Space size={6}>
-          {/* Restocking is the everyday action — one click, no menu to scan first. */}
-          <Button color="blue" variant="solid" icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
-            เติมของ
+          {/* Restocking is the everyday action — one click, no menu to scan first.
+              variant="filled" (light blue) instead of solid so 400 rows read as
+              quiet texture, not a saturated wall; still blue, still labelled. */}
+          <Button color="blue" variant="filled" icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
+            เติม
           </Button>
           <Dropdown
             trigger={['click']}
@@ -458,102 +428,12 @@ export function Stock() {
                   label: 'ปรับยอดสต๊อก (นับใหม่)',
                 },
                 { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" style={{ color: ACTION_COLOR.edit }} />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
-                { type: 'divider' },
-                { key: 'history', icon: <RiHistoryLine className="w-4 h-4" style={{ color: ACTION_COLOR.history }} />, label: 'ดูประวัติชิ้นนี้' },
               ],
-              onClick: ({ key }) => {
-                if (key === 'history') {
-                  setVariantFilter({ id: i.variantId, label: itemLabel(i) });
-                  setTab('history');
-                  return;
-                }
-                openAction(key as Action, i);
-              },
+              onClick: ({ key }) => openAction(key as Action, i),
             }}>
             <Button icon={<RiMore2Line className="w-4 h-4" />} aria-label="อื่นๆ" />
           </Dropdown>
         </Space>
-      ),
-    },
-  ];
-
-
-  /* ── ต้นทุน tab ─────────────────────────────────────────────────────── */
-  const costColumns: ColumnsType<Item> = [
-    {
-      title: 'สินค้า',
-      fixed: 'left',
-      width: 260,
-      sorter: (a, b) => a.productName.localeCompare(b.productName, 'th'),
-      render: (_, i) => (
-        <Space>
-          <Avatar shape="square" size={40} src={i.image ?? undefined}>
-            {i.productName[0]}
-          </Avatar>
-          <Text strong style={{ fontSize: 15 }}>{itemLabel(i)}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'ทุน/ชิ้น',
-      width: 110,
-      align: 'right',
-      sorter: (a, b) => (a.cost ?? -1) - (b.cost ?? -1),
-      render: (_, i) =>
-        i.cost != null ? (
-          <Text strong style={{ fontSize: 15 }}>{baht(i.cost)}</Text>
-        ) : (
-          <Tag color="orange">ยังไม่ใส่</Tag>
-        ),
-    },
-    {
-      title: 'ขาย/ชิ้น',
-      dataIndex: 'price',
-      width: 110,
-      align: 'right',
-      sorter: (a, b) => a.price - b.price,
-      render: (v: number) => <Text style={{ fontSize: 15 }}>{baht(v)}</Text>,
-    },
-    {
-      title: 'กำไร/ชิ้น',
-      width: 110,
-      align: 'right',
-      sorter: (a, b) => (a.cost != null ? a.price - a.cost : -1) - (b.cost != null ? b.price - b.cost : -1),
-      render: (_, i) =>
-        i.cost != null ? (
-          <Text strong style={{ fontSize: 15, color: i.price - i.cost >= 0 ? '#15803d' : '#dc2626' }}>
-            {baht(i.price - i.cost)}
-          </Text>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
-    },
-    {
-      title: 'คงเหลือ',
-      dataIndex: 'stock',
-      width: 90,
-      align: 'right',
-      sorter: (a, b) => a.stock - b.stock,
-      render: (v: number) => <Text style={{ fontSize: 15 }}>{v}</Text>,
-    },
-    {
-      title: 'เงินจม (ทุน x คงเหลือ)',
-      width: 150,
-      align: 'right',
-      sorter: (a, b) => (a.cost ?? 0) * a.stock - (b.cost ?? 0) * b.stock,
-      render: (_, i) =>
-        i.cost != null ? (
-          <Text strong style={{ fontSize: 15 }}>{baht(i.cost * i.stock)}</Text>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
-    },
-    {
-      title: '',
-      fixed: 'right',
-      width: 110,
-      render: (_, i) => (
-        <Button color="orange" variant="solid" onClick={() => openAction('cost', i)}>แก้ทุน</Button>
       ),
     },
   ];
@@ -629,7 +509,6 @@ export function Stock() {
       `นำเข้าสำเร็จ ${ok} รายการ${failed ? ` · ล้มเหลว ${failed}` : ''}`,
     );
     void reload(true);
-    void reloadMoves();
   };
 
   const importColumns: ColumnsType<ImportRow> = [
@@ -656,190 +535,6 @@ export function Stock() {
       width: 110,
       align: 'right',
       render: (_, r) => (r.item ? r.item.stock : '—'),
-    },
-  ];
-
-  /* ── รับของเข้า (receiving list) ─────────────────────────────────────── */
-  const [lines, setLines] = useState<{ item: Item; qty: number }[]>([]);
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState<string | null>(null);
-
-  const addItem = useCallback((item: Item, qty = 1) => {
-    setLines((prev) => {
-      const at = prev.findIndex((l) => l.item.variantId === item.variantId);
-      if (at >= 0) {
-        const next = [...prev];
-        next[at] = { ...next[at], qty: next[at].qty + qty };
-        return next;
-      }
-      return [...prev, { item, qty }];
-    });
-  }, []);
-
-  const saveReceive = async () => {
-    if (!lines.length) return;
-    setSaving(true);
-    try {
-      // Each line is a distinct variant (addItem dedups on variantId above),
-      // so these are independent RPC calls — no need to serialize them.
-      await Promise.all(lines.map((l) => receiveStock(l.item.variantId, l.qty, note.trim() || undefined)));
-      message.success(`รับของเข้า ${lines.length} รายการเรียบร้อย`);
-      setLines([]);
-      setNote('');
-      void reload(true);
-      void reloadMoves();
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const receiveColumns: ColumnsType<{ item: Item; qty: number }> = [
-    {
-      title: 'สินค้า',
-      render: (_, l) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{itemLabel(l.item)}</Text>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            คงเหลือปัจจุบัน {l.item.stock}
-          </Text>
-        </Space>
-      ),
-    },
-    {
-      title: 'จำนวนรับเข้า',
-      width: 160,
-      render: (_, l) => (
-        <InputNumber
-          min={1}
-          max={100000}
-          value={l.qty}
-          onChange={(v) =>
-            setLines((prev) =>
-              prev.map((x) =>
-                x.item.variantId === l.item.variantId ? { ...x, qty: v ?? 1 } : x,
-              ),
-            )
-          }
-        />
-      ),
-    },
-    {
-      title: '',
-      width: 56,
-      render: (_, l) => (
-        <Button
-          type="text"
-          danger
-          icon={<RiDeleteBinLine className="w-4 h-4" />}
-          onClick={() =>
-            setLines((prev) => prev.filter((x) => x.item.variantId !== l.item.variantId))
-          }
-        />
-      ),
-    },
-  ];
-
-  /* ── ประวัติ ────────────────────────────────────────────────────────── */
-  const [moves, setMoves] = useState<StockMovement[]>([]);
-  const [movesLoading, setMovesLoading] = useState(false);
-  const [moreLeft, setMoreLeft] = useState(true);
-  const [reasonFilter, setReasonFilter] = useState<string | null>(null);
-  const [variantFilter, setVariantFilter] = useState<{ id: string; label: string } | null>(null);
-
-  const reloadMoves = useCallback(async () => {
-    setMovesLoading(true);
-    try {
-      const rows = await listStockMovements(200, undefined, variantFilter?.id);
-      setMoves(rows);
-      setMoreLeft(rows.length === 200);
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setMovesLoading(false);
-    }
-  }, [message, variantFilter]);
-  useEffect(() => {
-    void reloadMoves();
-  }, [reloadMoves]);
-
-  const loadMore = async () => {
-    const last = moves[moves.length - 1];
-    if (!last) return;
-    setMovesLoading(true);
-    try {
-      const rows = await listStockMovements(200, { created_at: last.created_at, id: last.id }, variantFilter?.id);
-      setMoves((prev) => [...prev, ...rows]);
-      setMoreLeft(rows.length === 200);
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setMovesLoading(false);
-    }
-  };
-
-  const shownMoves = useMemo(
-    () => (reasonFilter ? moves.filter((m) => m.reason === reasonFilter) : moves),
-    [moves, reasonFilter],
-  );
-
-  const moveColumns: ColumnsType<StockMovement> = [
-    {
-      title: 'เวลา',
-      dataIndex: 'created_at',
-      width: 150,
-      render: (v: string) => dayjs(v).format('D MMM HH:mm'),
-    },
-    {
-      title: 'สินค้า',
-      render: (_, m) => <Text strong>{m.product_name + (m.size ? ` (${m.size})` : '')}</Text>,
-    },
-    {
-      title: 'รายการ',
-      dataIndex: 'reason',
-      width: 200,
-      render: (r: string) => {
-        const meta = reasonMeta(r);
-        return <Tag color={meta.color}>{meta.label}</Tag>;
-      },
-    },
-    {
-      title: 'สต๊อก',
-      dataIndex: 'delta_stock',
-      width: 90,
-      align: 'right',
-      render: (d: number) =>
-        d === 0 ? (
-          <Text type="secondary">—</Text>
-        ) : (
-          <Text strong type={d > 0 ? 'success' : 'danger'}>
-            {d > 0 ? `+${d}` : d}
-          </Text>
-        ),
-    },
-    {
-      title: 'จอง',
-      dataIndex: 'delta_reserved',
-      width: 80,
-      align: 'right',
-      responsive: ['md'],
-      render: (d: number) =>
-        d === 0 ? <Text type="secondary">—</Text> : <Text>{d > 0 ? `+${d}` : d}</Text>,
-    },
-    {
-      title: 'ออเดอร์',
-      dataIndex: 'order_number',
-      width: 110,
-      render: (v: string | null) => v ?? <Text type="secondary">—</Text>,
-    },
-    {
-      title: 'โดย',
-      dataIndex: 'actor_name',
-      width: 140,
-      responsive: ['lg'],
-      render: (v: string | null) => v ?? <Text type="secondary">ระบบ</Text>,
     },
   ];
 
@@ -870,22 +565,39 @@ export function Stock() {
           </Card>
         </Col>
         <Col xs={12} md={6}>
-          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          {/* The fast path into what matters: tap to filter down to low/out
+              and jump to the list. Splits the count so หมด vs ใกล้หมด read apart. */}
+          <Card
+            size="small"
+            hoverable
+            styles={{ body: { padding: '12px 16px' } }}
+            onClick={() => {
+              setStatusFilter('low');
+              listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}>
             <Statistic
               title="ใกล้หมด / หมด"
               value={lowCount}
-              styles={{ content: { color: lowCount ? '#5B8C6E' : undefined, fontWeight: lowCount ? 700 : undefined } }}
+              formatter={() =>
+                lowCount === 0 ? (
+                  <span style={{ fontSize: 20, color: '#15803d' }}>ครบทุกอย่าง</span>
+                ) : (
+                  <span style={{ fontSize: 20, fontWeight: 700 }}>
+                    <span style={{ color: '#dc2626' }}>หมด {outCount}</span>
+                    <span style={{ color: '#BFBFBF', fontWeight: 400 }}> · </span>
+                    <span style={{ color: '#c2410c' }}>ใกล้หมด {lowCount - outCount}</span>
+                  </span>
+                )
+              }
             />
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+              {lowCount === 0 ? 'สต๊อกเพียงพอ' : 'แตะเพื่อดูรายการ'}
+            </div>
           </Card>
         </Col>
         <Col xs={12} md={6}>
           <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-            <Statistic
-              title="เงินจมในสต๊อก (ตามทุน)"
-              value={totals.costValue}
-              prefix="฿"
-              styles={{ content: { color: '#5B8C6E', fontWeight: 700 } }}
-            />
+            <Statistic title="เงินจมในสต๊อก (ตามทุน)" value={totals.costValue} prefix="฿" />
           </Card>
         </Col>
         <Col xs={12} md={6}>
@@ -895,220 +607,68 @@ export function Stock() {
         </Col>
       </Row>
 
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          {
-            key: 'overview',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <RiScales3Line className="w-4 h-4" /> สต๊อกทั้งหมด
-                {lowCount ? <Tag color="red">{lowCount}</Tag> : null}
-              </span>
-            ),
-            children: (
-              <Card>
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Space wrap>
-                    <Input.Search
-                      allowClear
-                      placeholder="ค้นหาชื่อ / บาร์โค้ด / SKU"
-                      style={{ width: 280 }}
-                      onSearch={setQuery}
-                      onChange={(e) => !e.target.value && setQuery('')}
-                    />
-                    <Segmented
-                      value={statusFilter}
-                      onChange={(v) => setStatusFilter(v as typeof statusFilter)}
-                      options={[
-                        { label: 'ทั้งหมด', value: 'all' },
-                        { label: `ใกล้หมด (${lowCount})`, value: 'low' },
-                        { label: 'หมด', value: 'out' },
-                      ]}
-                    />
-                    <Select
-                      allowClear
-                      placeholder="หมวดหมู่"
-                      style={{ width: 160 }}
-                      value={categoryFilter}
-                      onChange={(v) => setCategoryFilter(v ?? null)}
-                      options={categories.map((c) => ({ value: c, label: c }))}
-                    />
-                  </Space>
-                  <Table
-                    rowKey="variantId"
-                    columns={overviewColumns}
-                    dataSource={shown}
-                    loading={loading}
-                    pagination={{ pageSize: 25, showSizeChanger: false }}
-                    scroll={{ x: 760 }}
-                    locale={{
-                      emptyText:
-                        query || statusFilter !== 'all' || categoryFilter
-                          ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
-                          : 'ยังไม่มีสินค้าในระบบ',
-                    }}
-                    rowClassName={(i) =>
-                      statusOf(i) === 'out'
-                        ? 'stock-row-out'
-                        : statusOf(i) === 'low'
-                          ? 'stock-row-low'
-                          : ''
-                    }
-                  />
-                </Space>
-              </Card>
-            ),
-          },
-          {
-            key: 'cost',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <RiCoinsLine className="w-4 h-4" /> ต้นทุน
-              </span>
-            ),
-            children: (
-              <Card>
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Text type="secondary">
-                    ใส่ทุนต่อชิ้นไว้ ระบบจะคำนวณกำไรต่อชิ้นและเงินจมในสต๊อกให้อัตโนมัติ
-                  </Text>
-                  <Table
-                    rowKey="variantId"
-                    columns={costColumns}
-                    dataSource={items}
-                    loading={loading}
-                    pagination={{ pageSize: 25, showSizeChanger: false }}
-                    scroll={{ x: 900 }}
-                    locale={{ emptyText: 'ยังไม่มีสินค้าในระบบ' }}
-                  />
-                </Space>
-              </Card>
-            ),
-          },
-          {
-            key: 'receive',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <RiInboxArchiveLine className="w-4 h-4" /> เติมของหลายรายการ
-                {lines.length ? <Tag color="orange">{lines.length}</Tag> : null}
-              </span>
-            ),
-            children: (
-              <Card>
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Select
-                    showSearch
-                    value={search}
-                    placeholder="ยิงบาร์โค้ด หรือพิมพ์ชื่อของที่ซื้อมา"
-                    style={{ width: '100%', maxWidth: 520 }}
-                    options={items.map((i) => ({
-                      value: i.variantId,
-                      label: `${itemLabel(i)} · คงเหลือ ${i.stock}`,
-                      name: itemLabel(i),
-                      barcode: i.barcode ?? '',
-                    }))}
-                    filterOption={(input, opt) => {
-                      const q = input.trim().toLowerCase();
-                      const name = String(opt?.name ?? '').toLowerCase();
-                      const barcode = String(opt?.barcode ?? '');
-                      return name.includes(q) || (!!barcode && barcode === input.trim());
-                    }}
-                    onSelect={(id: string) => {
-                      const i = items.find((x) => x.variantId === id);
-                      if (i) addItem(i);
-                      setSearch(null);
-                    }}
-                    onInputKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const el = e.target as HTMLInputElement;
-                        const hit = items.find((i) => i.barcode && i.barcode === el.value.trim());
-                        if (hit) {
-                          addItem(hit);
-                          setSearch(null);
-                        }
-                      }
-                    }}
-                  />
-                  {lines.length ? (
-                    <>
-                      <Table
-                        rowKey={(l) => l.item.variantId}
-                        columns={receiveColumns}
-                        dataSource={lines}
-                        pagination={false}
-                        size="middle"
-                      />
-                      <Input
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="หมายเหตุ (เช่น ชื่อร้านค้าส่ง / เลขบิล) — ใส่หรือไม่ก็ได้"
-                        maxLength={120}
-                        style={{ maxWidth: 520 }}
-                      />
-                      <Button type="primary" loading={saving} onClick={() => void saveReceive()}>
-                        บันทึกเติมของ ({lines.reduce((s, l) => s + l.qty, 0)} ชิ้น)
-                      </Button>
-                    </>
-                  ) : (
-                    <Empty description="ยิงบาร์โค้ดหรือพิมพ์ชื่อ เพื่อเพิ่มของที่ซื้อมาลงรายการ แล้วบันทึกทีเดียวทั้งบิล" />
-                  )}
-                </Space>
-              </Card>
-            ),
-          },
-          {
-            key: 'history',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <RiHistoryLine className="w-4 h-4" /> ประวัติ
-              </span>
-            ),
-            children: (
-              <Card>
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  <Space wrap>
-                    <Select
-                      allowClear
-                      value={reasonFilter}
-                      onChange={(v) => setReasonFilter(v ?? null)}
-                      placeholder="กรองตามประเภทรายการ"
-                      style={{ width: 240 }}
-                      options={Object.entries(REASONS).map(([value, m]) => ({
-                        value,
-                        label: m.label,
-                      }))}
-                    />
-                    {variantFilter ? (
-                      <Tag closable onClose={() => setVariantFilter(null)} color="orange">
-                        เฉพาะ: {variantFilter.label}
-                      </Tag>
-                    ) : null}
-                  </Space>
-                  <Table
-                    rowKey="id"
-                    columns={moveColumns}
-                    dataSource={shownMoves}
-                    loading={movesLoading}
-                    pagination={{ pageSize: 20, showSizeChanger: false }}
-                    scroll={{ x: 900 }}
-                    size="middle"
-                    locale={{
-                      emptyText: reasonFilter || variantFilter ? 'ไม่พบประวัติที่ตรงกับตัวกรอง' : 'ยังไม่มีประวัติการเคลื่อนไหวสต็อก',
-                    }}
-                  />
-                  {moreLeft && !reasonFilter ? (
-                    <Button onClick={() => void loadMore()} loading={movesLoading}>
-                      โหลดเพิ่ม
-                    </Button>
-                  ) : null}
-                </Space>
-              </Card>
-            ),
-          },
-        ]}
-      />
+      <div ref={listRef}>
+        <Card>
+          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+            <Space wrap>
+              <Input.Search
+                allowClear
+                placeholder="ค้นหาชื่อ / บาร์โค้ด / SKU"
+                style={{ width: 320 }}
+                onSearch={setQuery}
+                onChange={(e) => !e.target.value && setQuery('')}
+              />
+              <Segmented
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                options={[
+                  { label: `ทั้งหมด (${items.length})`, value: 'all' },
+                  { label: `ใกล้หมด (${lowCount})`, value: 'low' },
+                  { label: `หมด (${outCount})`, value: 'out' },
+                ]}
+              />
+              <Select
+                allowClear
+                placeholder="หมวดหมู่"
+                style={{ width: 160 }}
+                value={categoryFilter}
+                onChange={(v) => setCategoryFilter(v ?? null)}
+                options={categories.map((c) => ({ value: c, label: c }))}
+              />
+            </Space>
+            {/* Trust line — after the auto-triage-sort, tell the owner nothing
+                actionable is hidden below the fold. */}
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {lowCount > 0
+                ? `แสดง ${shown.length} รายการ · เรียงของที่ต้องเติม (ใกล้หมด ${lowCount} · หมด ${outCount}) ขึ้นบนสุดให้แล้ว`
+                : `แสดง ${shown.length} รายการ · สต๊อกเพียงพอทุกรายการ`}
+            </Text>
+            <Table
+              rowKey="variantId"
+              size="small"
+              sticky
+              columns={overviewColumns}
+              dataSource={shown}
+              loading={loading}
+              pagination={{ pageSize: 50, showSizeChanger: false }}
+              scroll={{ x: 640 }}
+              locale={{
+                emptyText:
+                  query || statusFilter !== 'all' || categoryFilter
+                    ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
+                    : 'ยังไม่มีสินค้าในระบบ',
+              }}
+              rowClassName={(i) =>
+                statusOf(i) === 'out'
+                  ? 'stock-row-out'
+                  : statusOf(i) === 'low'
+                    ? 'stock-row-low'
+                    : ''
+              }
+            />
+          </Space>
+        </Card>
+      </div>
 
       {/* row action modal */}
       <Modal
