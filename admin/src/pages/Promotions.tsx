@@ -157,7 +157,7 @@ export function Promotions() {
       align: 'right',
       render: (_, p) => (
         <Space size={6}>
-          <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(p)}>
+          <Button size="small" color="orange" variant="solid" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(p)}>
             แก้ไข
           </Button>
           <Popconfirm

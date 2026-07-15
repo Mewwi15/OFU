@@ -62,6 +62,7 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { ACTION_COLOR } from '../lib/actionColors';
 import {
   apiError,
   listProducts,
@@ -444,7 +445,7 @@ export function Stock() {
       render: (_, i) => (
         <Space size={6}>
           {/* Restocking is the everyday action — one click, no menu to scan first. */}
-          <Button icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
+          <Button color="blue" variant="solid" icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
             เติมของ
           </Button>
           <Dropdown
@@ -453,12 +454,12 @@ export function Stock() {
               items: [
                 {
                   key: 'set',
-                  icon: <RiScales3Line className="w-4 h-4" />,
+                  icon: <RiScales3Line className="w-4 h-4" style={{ color: ACTION_COLOR.adjust }} />,
                   label: 'ปรับยอดสต๊อก (นับใหม่)',
                 },
-                { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
+                { key: 'threshold', icon: <RiAlarmWarningLine className="w-4 h-4" style={{ color: ACTION_COLOR.edit }} />, label: 'ตั้งเตือนใกล้หมด (LINE)' },
                 { type: 'divider' },
-                { key: 'history', icon: <RiHistoryLine className="w-4 h-4" />, label: 'ดูประวัติชิ้นนี้' },
+                { key: 'history', icon: <RiHistoryLine className="w-4 h-4" style={{ color: ACTION_COLOR.history }} />, label: 'ดูประวัติชิ้นนี้' },
               ],
               onClick: ({ key }) => {
                 if (key === 'history') {
@@ -552,7 +553,7 @@ export function Stock() {
       fixed: 'right',
       width: 110,
       render: (_, i) => (
-        <Button onClick={() => openAction('cost', i)}>แก้ทุน</Button>
+        <Button color="orange" variant="solid" onClick={() => openAction('cost', i)}>แก้ทุน</Button>
       ),
     },
   ];

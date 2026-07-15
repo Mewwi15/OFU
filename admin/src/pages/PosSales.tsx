@@ -175,6 +175,8 @@ export function PosSales() {
       render: (_, s) => (
         <Button
           size="small"
+          color="cyan"
+          variant="solid"
           icon={<RiFileList3Line className="w-4 h-4" />}
           onClick={(e) => {
             e.stopPropagation();

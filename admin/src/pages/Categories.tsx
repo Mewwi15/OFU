@@ -90,7 +90,7 @@ export function Categories() {
       align: 'right',
       render: (_, c) => (
         <Space size={6}>
-          <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(c)}>
+          <Button size="small" color="orange" variant="solid" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(c)}>
             แก้ไข
           </Button>
           <Popconfirm title="ลบหมวดหมู่นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(c)}>

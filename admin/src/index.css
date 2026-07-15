@@ -84,6 +84,21 @@ body {
   box-shadow: 0 1px 2px rgba(30, 30, 30, 0.04), 0 4px 12px rgba(30, 30, 30, 0.06);
 }
 
+/* Formal/classic table look (owner reference 2026-07-16): full grid borders
+   on every cell + alternating row stripe, instead of the plain borderless
+   rows antd ships by default. `:not(.ant-table-measure-row)` skips antd's
+   hidden width-probe row so the nth-child count matches the visible rows. */
+.ant-table-wrapper .ant-table-thead > tr > th,
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border: 1px solid #E8E8E8 !important;
+}
+.ant-table-tbody > tr:not(.ant-table-measure-row):nth-child(even) > td {
+  background: #FAFAFA;
+}
+.ant-table-tbody > tr:not(.ant-table-measure-row):hover > td {
+  background: #F5F5F5 !important;
+}
+
 /* สต๊อก: row tint by stock status (pairs with STATUS_COLOR in Stock.tsx) */
 .stock-row-low > td { background: #fff7ed !important; }
 .stock-row-low:hover > td { background: #ffedd5 !important; }

@@ -260,6 +260,8 @@ export function Orders() {
       render: (_, o) => (
         <Button
           size="small"
+          color="cyan"
+          variant="solid"
           onClick={(e) => {
             e.stopPropagation();
             setSelected(o);

@@ -231,7 +231,7 @@ export function Featured() {
                     align: 'right',
                     render: (_, s) => (
                       <Space size={6}>
-                        <Button size="small" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(s)}>
+                        <Button size="small" color="orange" variant="solid" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(s)}>
                           แก้ชื่อ
                         </Button>
                         <Popconfirm title="ลบแถวนี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(s)}>
