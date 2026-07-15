@@ -2,9 +2,10 @@
 // made while offline. Sync is idempotent server-side (create_pos_sale dedups on
 // client_op_id), so flushing the queue can safely retry.
 
-import type { PosProduct, PosSaleInput, Shift, ShopInfo } from './api';
+import type { Category, PosProduct, PosSaleInput, Shift, ShopInfo } from './api';
 
 const CATALOG_KEY = 'pos.catalog.v1';
+const CATEGORIES_KEY = 'pos.categories.v1';
 const SHOP_KEY = 'pos.shop.v1';
 const SHIFT_KEY = 'pos.shift.v1';
 const QUEUE_KEY = 'pos.queue.v1';
@@ -22,6 +23,24 @@ export function readCachedCatalog(): PosProduct[] | null {
   try {
     const raw = localStorage.getItem(CATALOG_KEY);
     return raw ? (JSON.parse(raw) as PosProduct[]) : null;
+  } catch {
+    return null;
+  }
+}
+// The full shop category list — not just the ones with products currently in
+// the catalog, so the POS category-pill row always shows every category, even
+// a freshly-created one with no products in it yet.
+export function cacheCategories(data: Category[]) {
+  try {
+    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore */
+  }
+}
+export function readCachedCategories(): Category[] | null {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_KEY);
+    return raw ? (JSON.parse(raw) as Category[]) : null;
   } catch {
     return null;
   }

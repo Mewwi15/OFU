@@ -19,7 +19,9 @@ import {
   apiError,
   createPosSale,
   getShopInfo,
+  listCategories,
   listPosCatalog,
+  type Category,
   type PosProduct,
   type PosVariant,
   type SaleResult,
@@ -27,6 +29,7 @@ import {
 } from '../lib/api';
 import {
   cacheCatalog,
+  cacheCategories,
   cacheShop,
   dismissFailedSale,
   enqueueSale,
@@ -35,6 +38,7 @@ import {
   isNetworkError,
   queueCount,
   readCachedCatalog,
+  readCachedCategories,
   readCachedShop,
   readFailedQueue,
   retryFailedSale,
@@ -117,6 +121,7 @@ function beep() {
 export function Pos() {
   const [shop, setShop] = useState<ShopInfo | null>(null);
   const [catalog, setCatalog] = useState<PosProduct[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,18 +195,22 @@ export function Pos() {
   useEffect(() => {
     (async () => {
       try {
-        const [s, c] = await Promise.all([getShopInfo(), listPosCatalog()]);
+        const [s, c, cats] = await Promise.all([getShopInfo(), listPosCatalog(), listCategories()]);
         setShop(s);
         cacheShop(s);
         setCatalog(c);
         cacheCatalog(c);
+        setAllCategories(cats);
+        cacheCategories(cats);
       } catch (e) {
         if (isNetworkError(e)) {
-          // offline: fall back to the last cached catalog / shop
+          // offline: fall back to the last cached catalog / shop / categories
           const cc = readCachedCatalog();
           const cs = readCachedShop();
+          const ccats = readCachedCategories();
           if (cc) setCatalog(cc);
           if (cs) setShop(cs);
+          if (ccats) setAllCategories(ccats);
           setOnline(false);
           if (!cc) setError('ออฟไลน์ และยังไม่มีข้อมูลที่แคชไว้ — เชื่อมต่อครั้งแรกออนไลน์ก่อน');
         } else {
@@ -231,16 +240,17 @@ export function Pos() {
     };
   }, [doFlush]);
 
+  // Every category the shop has, not just the ones with products currently in
+  // the catalog — a freshly-created category with nothing assigned to it yet
+  // still shows up as a (0-count) filter pill instead of silently vanishing.
   const categories = useMemo(() => {
-    const map = new Map<string, { name: string; count: number }>();
+    const counts = new Map<string, number>();
     for (const p of catalog) {
       if (!p.category_id) continue;
-      const cur = map.get(p.category_id);
-      if (cur) cur.count++;
-      else map.set(p.category_id, { name: p.category_name ?? '—', count: 1 });
+      counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
     }
-    return [...map.entries()].map(([id, v]) => ({ id, ...v }));
-  }, [catalog]);
+    return allCategories.map((c) => ({ id: c.id, name: c.name, count: counts.get(c.id) ?? 0 }));
+  }, [catalog, allCategories]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
