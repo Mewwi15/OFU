@@ -104,28 +104,23 @@ export function Settings() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ── ข้อมูลบนบิล ─────────────────────────────────────────────── */}
         <Card title="ข้อมูลบนบิล" size="small">
-          <Space direction="vertical" size={14} className="w-full">
-            <div>
-              <div className="text-sm mb-1 text-[#4b443f]">เบอร์โทร</div>
+          <Form layout="vertical" requiredMark={false}>
+            <Form.Item label="เบอร์โทร">
               <Input placeholder="เช่น 084-650-3494" value={cfg.phone} onChange={(e) => update({ phone: e.target.value })} />
-            </div>
-            <div>
-              <div className="text-sm mb-1 text-[#4b443f]">ที่อยู่ (ถ้ามี)</div>
+            </Form.Item>
+            <Form.Item label="ที่อยู่ (ถ้ามี)">
               <Input placeholder="เช่น 123 ถ.สุขุมวิท" value={cfg.address} onChange={(e) => update({ address: e.target.value })} />
-            </div>
-            <div>
-              <div className="text-sm mb-1 text-[#4b443f]">ชื่อพนักงาน/แคชเชียร์</div>
+            </Form.Item>
+            <Form.Item label="ชื่อพนักงาน/แคชเชียร์">
               <Input placeholder="เช่น แคชเชียร์ 01" value={cfg.cashierName} onChange={(e) => update({ cashierName: e.target.value })} />
-            </div>
-            <div>
-              <div className="text-sm mb-1 text-[#4b443f]">ข้อความท้ายบิล</div>
+            </Form.Item>
+            <Form.Item label="ข้อความท้ายบิล">
               <Input placeholder="เช่น สินค้าซื้อแล้วไม่รับคืน" value={cfg.footerNote} onChange={(e) => update({ footerNote: e.target.value })} />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#4b443f]">พิมพ์บาร์โค้ดเลขบิล</span>
+            </Form.Item>
+            <Form.Item label="พิมพ์บาร์โค้ดเลขบิล" className="mb-0">
               <Switch checked={cfg.showBarcode} onChange={(v) => update({ showBarcode: v })} checkedChildren="พิมพ์" unCheckedChildren="ปิด" />
-            </div>
-          </Space>
+            </Form.Item>
+          </Form>
         </Card>
 
         {/* ── ขนาดกระดาษ + ทดสอบอุปกรณ์ ──────────────────────────────── */}

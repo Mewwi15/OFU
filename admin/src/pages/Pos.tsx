@@ -49,13 +49,17 @@ import {
   Input,
   InputNumber,
   Modal,
+  Segmented,
   Statistic,
   Tag,
+  Typography,
   type InputRef,
 } from 'antd';
 
 import { Receipt } from '../components/Receipt';
 import { promptpayPayload } from '../lib/promptpay';
+
+const { Title } = Typography;
 
 type Line = {
   variantId: string;
@@ -534,8 +538,11 @@ export function Pos() {
     return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
 
   return (
-    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)]">
-      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
+    <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-[#FBF2EC] min-h-[calc(100vh-4rem)] lg:flex lg:flex-col lg:h-[calc(100vh-4rem)]">
+      <Title level={4} style={{ margin: '0 0 12px' }} className="shrink-0">
+        ขายหน้าร้าน
+      </Title>
+      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:flex-1 lg:min-h-0">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="relative flex flex-col min-h-0">
           {/* Sales that already happened (cash/goods changed hands, a
@@ -832,14 +839,30 @@ export function Pos() {
               </div>
             </Card>
 
-            <div className="grid grid-cols-2 gap-2">
-              <PayTab active={method === 'cash'} onClick={() => setMethod('cash')} Icon={RiMoneyDollarCircleLine}>
-                เงินสด
-              </PayTab>
-              <PayTab active={method === 'promptpay'} onClick={() => setMethod('promptpay')} Icon={RiQrCodeLine}>
-                พร้อมเพย์
-              </PayTab>
-            </div>
+            <Segmented
+              block
+              size="large"
+              value={method}
+              onChange={(v) => setMethod(v as PayMethod)}
+              options={[
+                {
+                  value: 'cash',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5 justify-center py-0.5">
+                      <RiMoneyDollarCircleLine className="w-4 h-4" /> เงินสด
+                    </span>
+                  ),
+                },
+                {
+                  value: 'promptpay',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5 justify-center py-0.5">
+                      <RiQrCodeLine className="w-4 h-4" /> พร้อมเพย์
+                    </span>
+                  ),
+                },
+              ]}
+            />
 
             {method === 'cash' && (
               <CashPay total={total} tendered={tendered} setTendered={setTendered} change={change} />
@@ -1006,29 +1029,6 @@ function Pill({
 
 function StepBtn({ onClick, children, brand }: { onClick: () => void; children: React.ReactNode; brand?: boolean }) {
   return <Button size="small" shape="circle" type={brand ? 'primary' : 'default'} onClick={onClick} icon={children} />;
-}
-
-function PayTab({
-  active,
-  onClick,
-  Icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  Icon: typeof RiQrCodeLine;
-  children: React.ReactNode;
-}) {
-  return (
-    <Button
-      onClick={onClick}
-      type={active ? 'primary' : 'default'}
-      icon={<Icon className="w-4 h-4" />}
-      block
-      style={{ height: 44, justifyContent: 'center', fontWeight: 500 }}>
-      {children}
-    </Button>
-  );
 }
 
 function CashPay({
