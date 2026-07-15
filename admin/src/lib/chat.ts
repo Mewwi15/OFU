@@ -16,7 +16,8 @@ export type ChatThread = {
   last_message_at: string | null;
   last_message_preview: string | null;
   admin_unread: number;
-  customer: { display_name: string | null } | null;
+  // avatar_path holds a full public/provider URL (or null) — usable as an <img> src.
+  customer: { display_name: string | null; avatar_path: string | null } | null;
 };
 
 export type ChatMessage = {
@@ -34,7 +35,7 @@ export async function listThreads(): Promise<ChatThread[]> {
   const { data, error } = await supabase
     .from('chat_threads')
     .select(
-      'id, user_id, last_message_at, last_message_preview, admin_unread, customer:app_users(display_name)',
+      'id, user_id, last_message_at, last_message_preview, admin_unread, customer:app_users(display_name, avatar_path)',
     )
     .not('last_message_at', 'is', null)
     .order('last_message_at', { ascending: false });

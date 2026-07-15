@@ -112,61 +112,64 @@ export function Chat() {
   };
 
   const customerName = (t: ChatThread) => t.customer?.display_name || 'ลูกค้า';
+  const customerAvatar = (t: ChatThread) => t.customer?.avatar_path || undefined;
 
   return (
-    <>
-      <div className="mb-4">
+    <div className="flex flex-col lg:h-[calc(100vh-8.5rem)]">
+      <div className="mb-3 shrink-0">
         <Text type="secondary">
           ตอบคำถามลูกค้าจากแอป · ลูกค้าได้รับแจ้งเตือนบนมือถือเมื่อร้านตอบ
         </Text>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4" style={{ minHeight: 520 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
         {/* Thread list */}
-        <Card styles={{ body: { padding: 0 } }}>
+        <Card className="min-h-0" styles={{ body: { padding: 0, height: '100%', overflowY: 'auto' } }}>
           {loading ? (
-            <Card loading variant="borderless" />
+            <div className="p-6 text-center text-tremor-content">กำลังโหลด…</div>
           ) : threads.length === 0 ? (
             <div className="py-16">
               <Empty description="ยังไม่มีแชตจากลูกค้า" />
             </div>
           ) : (
-            <div>
-              {threads.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => void openThread(t)}
-                  className="w-full flex items-center gap-3 text-left cursor-pointer hover:bg-[#FAFAFA] border-b border-[#E8E8E8]"
-                  style={{
-                    padding: '10px 14px',
-                    background: selected?.id === t.id ? '#F5F5F5' : undefined,
-                  }}>
-                  <Badge count={t.admin_unread} size="small">
-                    <Avatar style={{ background: '#5B8C6E' }}>
-                      {customerName(t).slice(0, 1).toUpperCase()}
-                    </Avatar>
-                  </Badge>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-semibold text-[#2B2320]">
-                        {customerName(t)}
-                      </span>
-                      <span className="text-xs text-[#B7ACA5] shrink-0">
-                        {threadTime(t.last_message_at)}
-                      </span>
-                    </div>
-                    <div className="line-clamp-1 text-sm text-[#6E625C]">
-                      {t.last_message_preview ?? ''}
-                    </div>
+            threads.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => void openThread(t)}
+                className="w-full flex items-center gap-3 text-left cursor-pointer hover:bg-[#FAFAFA] border-b border-[#E8E8E8]"
+                style={{
+                  padding: '10px 14px',
+                  background: selected?.id === t.id ? '#F5F5F5' : undefined,
+                }}>
+                <Avatar src={customerAvatar(t)} style={{ background: '#5B8C6E', flex: 'none' }}>
+                  {customerName(t).slice(0, 1).toUpperCase()}
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate font-semibold text-[#2B2320]">
+                      {customerName(t)}
+                    </span>
+                    <span className="text-xs text-[#B7ACA5] shrink-0">
+                      {threadTime(t.last_message_at)}
+                    </span>
                   </div>
-                </button>
-              ))}
-            </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="line-clamp-1 text-sm text-[#6E625C]">
+                      {t.last_message_preview ?? ''}
+                    </span>
+                    {t.admin_unread > 0 ? (
+                      <Badge count={t.admin_unread} size="small" style={{ flex: 'none' }} />
+                    ) : null}
+                  </div>
+                </div>
+              </button>
+            ))
           )}
         </Card>
 
         {/* Conversation */}
         <Card
+          className="min-h-0"
           styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}>
           {!selected ? (
             <div className="flex-1 grid place-items-center py-20">
@@ -174,42 +177,49 @@ export function Chat() {
             </div>
           ) : (
             <>
-              <div className="px-4 py-3 border-b border-[#E8E8E8] font-semibold text-[#2B2320]">
-                {customerName(selected)}
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#E8E8E8] shrink-0">
+                <Avatar src={customerAvatar(selected)} size="small" style={{ background: '#5B8C6E', flex: 'none' }}>
+                  {customerName(selected).slice(0, 1).toUpperCase()}
+                </Avatar>
+                <span className="font-semibold text-[#2B2320]">{customerName(selected)}</span>
               </div>
 
-              <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2" style={{ maxHeight: 480 }}>
-                {messages.map((m) => {
+              <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 max-h-[60vh] lg:max-h-none">
+                {messages.map((m, idx) => {
                   const mine = m.sender === 'admin';
+                  // Group consecutive messages from the same sender — show the
+                  // time only on the last of a run, so it isn't repeated on
+                  // every bubble (owner: cluttered/บั๊ก).
+                  const next = messages[idx + 1];
+                  const endOfRun = !next || next.sender !== m.sender;
                   return (
-                    <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] ${mine ? 'text-right' : 'text-left'}`}>
+                    <div
+                      key={m.id}
+                      className={`flex ${mine ? 'justify-end' : 'justify-start'} ${endOfRun ? 'mb-3' : 'mb-0.5'}`}>
+                      <div className={`max-w-[75%] ${mine ? 'text-right' : 'text-left'}`}>
                         {m.imageUrl ? (
-                          <Image
-                            src={m.imageUrl}
-                            alt="รูปภาพ"
-                            width={200}
-                            style={{ borderRadius: 0 }}
-                          />
+                          <Image src={m.imageUrl} alt="รูปภาพ" width={200} style={{ borderRadius: 0 }} />
                         ) : (
                           <div
                             className="inline-block px-3 py-2 rounded-none whitespace-pre-wrap break-words text-left"
                             style={
                               mine
-                                ? { background: '#5B8C6E', color: '#fff', borderBottomRightRadius: 4 }
-                                : { background: '#F5F5F5', color: '#2B2320', borderBottomLeftRadius: 4 }
+                                ? { background: '#5B8C6E', color: '#fff' }
+                                : { background: '#F5F5F5', color: '#2B2320' }
                             }>
                             {m.body}
                           </div>
                         )}
-                        <div className="text-[10px] text-[#B7ACA5] mt-0.5">{timeLabel(m.created_at)}</div>
+                        {endOfRun ? (
+                          <div className="text-[10px] text-[#B7ACA5] mt-0.5">{timeLabel(m.created_at)}</div>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-3 border-t border-[#E8E8E8]">
+              <div className="flex items-center gap-2 px-3 py-3 border-t border-[#E8E8E8] shrink-0">
                 <input
                   ref={fileRef}
                   type="file"
@@ -247,6 +257,6 @@ export function Chat() {
           )}
         </Card>
       </div>
-    </>
+    </div>
   );
 }
