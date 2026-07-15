@@ -82,33 +82,33 @@ export function printPickList(w: Window, order: Order, items: OrderItem[], shopN
   <style>
     ${BASE_CSS}
     @page { size: A4; margin: 14mm; }
-    body { font-size: 14px; }
+    body { font-size: 15px; }
     .head { display: flex; justify-content: space-between; align-items: flex-start;
-            border-bottom: 2px solid #000; padding-bottom: 8px; }
-    .shop { font-size: 17px; font-weight: 800; }
-    .doc { font-size: 24px; font-weight: 800; }
-    .ord { text-align: right; font-size: 13px; line-height: 1.6; }
-    .to { margin: 12px 0; padding: 10px 14px; border: 1.5px solid #000; }
-    .to .tag { font-size: 12px; color: #555; }
-    .to .name { font-size: 19px; font-weight: 800; line-height: 1.3; }
-    .to .phone { font-size: 15px; font-weight: 700; }
-    .to .addr { font-size: 14px; line-height: 1.5; margin-top: 3px; word-break: break-word; }
-    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    th, td { border: 1px solid #444; padding: 6px 8px; vertical-align: middle; }
-    th { background: #f0f0f0; font-size: 13px; text-align: center; }
+            border-bottom: 2.5px solid #000; padding-bottom: 10px; }
+    .shop { font-size: 19px; font-weight: 800; }
+    .doc { font-size: 30px; font-weight: 800; margin-top: 2px; }
+    .ord { text-align: right; font-size: 15px; line-height: 1.7; }
+    .to { margin: 16px 0; padding: 14px 18px; border: 2px solid #000; }
+    .to .tag { font-size: 13px; color: #555; }
+    .to .name { font-size: 24px; font-weight: 800; line-height: 1.3; }
+    .to .phone { font-size: 19px; font-weight: 700; margin-top: 2px; }
+    .to .addr { font-size: 17px; line-height: 1.5; margin-top: 5px; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #444; padding: 12px 12px; vertical-align: middle; }
+    th { background: #f0f0f0; font-size: 15px; text-align: center; }
     th.nm, td.nm { text-align: left; }
-    td.no { text-align: center; width: 30px; color: #555; }
-    td.imgcell { width: 76px; text-align: center; padding: 4px; }
-    td.imgcell img { width: 62px; height: 62px; object-fit: cover; border: 1px solid #ccc; display: block; margin: 0 auto; }
-    td.imgcell .noimg { font-size: 11px; color: #999; }
-    td.nm { font-size: 15px; font-weight: 700; line-height: 1.35; }
-    td.nm .sz { font-size: 13px; font-weight: 400; color: #333; }
-    td.qty { text-align: center; font-size: 22px; font-weight: 800; width: 66px; }
-    td.tick { text-align: center; width: 60px; }
-    td.tick .cbox { display: inline-block; width: 20px; height: 20px; border: 2px solid #000; }
+    td.no { text-align: center; width: 36px; font-size: 16px; color: #555; }
+    td.imgcell { width: 116px; text-align: center; padding: 6px; }
+    td.imgcell img { width: 96px; height: 96px; object-fit: cover; border: 1px solid #ccc; display: block; margin: 0 auto; }
+    td.imgcell .noimg { font-size: 12px; color: #999; }
+    td.nm { font-size: 19px; font-weight: 700; line-height: 1.35; }
+    td.nm .sz { font-size: 15px; font-weight: 400; color: #333; margin-top: 2px; }
+    td.qty { text-align: center; font-size: 30px; font-weight: 800; width: 90px; }
+    td.tick { text-align: center; width: 80px; }
+    td.tick .cbox { display: inline-block; width: 30px; height: 30px; border: 2.5px solid #000; }
     .foot { display: flex; justify-content: space-between; align-items: center;
-            margin-top: 10px; font-size: 14px; font-weight: 700; }
-    .note { margin-top: 14px; font-size: 13px; }
+            margin-top: 14px; font-size: 17px; font-weight: 700; }
+    .note { margin-top: 20px; font-size: 15px; }
     .line { display: inline-block; width: 70%; border-bottom: 1px solid #000; }
   </style></head><body>
     <div class="head">
