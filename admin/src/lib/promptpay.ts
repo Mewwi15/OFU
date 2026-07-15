@@ -1,37 +1,15 @@
-// PromptPay QR (EMVCo / Thai QR standard) payload generator.
-// target = shop PromptPay id: a mobile number (0812345678) or a 13-digit
-// national/tax id. amount (baht) makes it a one-time dynamic QR.
-
-const AID = 'A000000677010111';
-
-const tlv = (id: string, value: string) => id + value.length.toString().padStart(2, '0') + value;
-
-function crc16(data: string): string {
-  let crc = 0xffff;
-  for (let i = 0; i < data.length; i++) {
-    crc ^= data.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-      crc &= 0xffff;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
+/**
+ * PromptPay QR payload — thin wrapper over `promptpay-qr` (the same library
+ * the customer app uses, lib/promptpay.ts), replacing a hand-rolled EMVCo
+ * encoder that only ever emitted proxy type 01 (mobile) or 02 (13-digit
+ * national/tax id). This shop's real PromptPay account is a 15-digit
+ * e-Wallet proxy (type 03, see 0050_shop_promptpay_account.sql) — the old
+ * encoder misclassified it as a type-02 id, producing a QR that scanned as
+ * "invalid" in banking apps. `promptpay-qr` handles all three proxy types
+ * (10-digit mobile, 13-digit citizen/tax id, 15-digit e-Wallet) correctly.
+ */
+import generatePayload from 'promptpay-qr';
 
 export function promptpayPayload(target: string, amount?: number): string {
-  const id = target.replace(/[^0-9]/g, '');
-  const proxy =
-    id.length >= 13
-      ? tlv('02', id) // national / tax id
-      : tlv('01', '0066' + id.replace(/^0/, '')); // mobile → 0066 + number w/o leading 0
-  const merchant = tlv('29', tlv('00', AID) + proxy);
-  const body =
-    tlv('00', '01') +
-    tlv('01', amount != null ? '12' : '11') +
-    merchant +
-    tlv('53', '764') + // THB
-    (amount != null ? tlv('54', amount.toFixed(2)) : '') +
-    tlv('58', 'TH');
-  const payload = body + '6304';
-  return payload + crc16(payload);
+  return generatePayload(target, amount != null ? { amount } : {});
 }
