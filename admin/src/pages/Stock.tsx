@@ -74,7 +74,7 @@ import {
 } from '../lib/api';
 import { productThumb } from '../lib/image';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -848,9 +848,6 @@ export function Stock() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            สต๊อก
-          </Title>
           <Text type="secondary">เติมของ ปรับยอด และดูมูลค่าสต็อกทั้งหมด</Text>
         </div>
         <Space>

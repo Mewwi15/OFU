@@ -46,7 +46,7 @@ import {
 import { openPrintWindow, printAddressLabel, printPickList } from '../lib/printOrder';
 import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 const fmtTime = (iso: string) =>
@@ -276,9 +276,6 @@ export function Orders() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            ออเดอร์
-          </Title>
           <Text type="secondary">
             ออเดอร์ออนไลน์จากลูกค้า · แตะที่ออเดอร์เพื่อจัดการ
             {orders.length === 100 && ' · แสดงล่าสุด 100 รายการ'}

@@ -49,7 +49,7 @@ import {
 } from '../lib/api';
 import { productThumb } from '../lib/image';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const primaryImage = (p: Product) =>
   p.product_images.find((i) => i.is_primary)?.storage_path ?? p.product_images[0]?.storage_path ?? null;
@@ -305,7 +305,6 @@ export function Products() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <Title level={3} style={{ margin: 0 }}>สินค้า</Title>
           <Text type="secondary">จัดการสินค้า ราคา สต็อก และการเผยแพร่ในแอป</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>

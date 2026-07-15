@@ -11,7 +11,7 @@ import {
   type Customer,
 } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 const REASON_LABEL: Record<string, string> = { topup: 'เติมเครดิต', pos_sale: 'ใช้ซื้อสินค้า', pos_refund: 'คืนเงิน' };
@@ -51,7 +51,6 @@ export function StoreCredit() {
   return (
     <>
       <div className="mb-4">
-        <Title level={3} style={{ margin: 0 }}>เครดิตร้าน</Title>
         <Text type="secondary">ค้นหาลูกค้าด้วยเบอร์โทร เติมเครดิต และดูประวัติ</Text>
       </div>
 

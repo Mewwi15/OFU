@@ -32,7 +32,7 @@ import {
 } from '../lib/deletionRequests';
 import { contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 /** A fake sale so the print test looks like a real bill. */
 function sampleReceipt(shop: ShopSettingsFull): ReceiptProps {
@@ -89,9 +89,6 @@ export function Settings() {
   return (
     <>
       <div className="mb-4">
-        <Title level={3} style={{ margin: 0 }}>
-          ตั้งค่า
-        </Title>
         <Text type="secondary">ตั้งค่าใบเสร็จ ขนาดกระดาษ และทดสอบเครื่องพิมพ์ / เครื่องยิงบาร์โค้ด</Text>
       </div>
 

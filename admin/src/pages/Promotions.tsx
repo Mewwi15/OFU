@@ -31,7 +31,7 @@ import {
   type PromoType,
 } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const SCOPE_LABEL: Record<PromoScope, string> = { subtotal: 'ยอดซื้อ', delivery: 'ค่าส่ง' };
@@ -186,9 +186,6 @@ export function Promotions() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            โปรโมชั่น
-          </Title>
           <Text type="secondary">โค้ดส่วนลดที่ลูกค้าใช้ตอนสั่งซื้อออนไลน์ · ทั้งหมด {promos.length} โค้ด</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>

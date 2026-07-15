@@ -14,7 +14,7 @@ import {
   type ChatThread,
 } from '../lib/chat';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const timeLabel = (iso: string) =>
   new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
@@ -116,9 +116,6 @@ export function Chat() {
   return (
     <>
       <div className="mb-4">
-        <Title level={3} style={{ margin: 0 }}>
-          แชตลูกค้า
-        </Title>
         <Text type="secondary">
           ตอบคำถามลูกค้าจากแอป · ลูกค้าได้รับแจ้งเตือนบนมือถือเมื่อร้านตอบ
         </Text>

@@ -14,7 +14,7 @@ import {
   type Category,
 } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export function Categories() {
   const { message } = App.useApp();
@@ -107,9 +107,6 @@ export function Categories() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            หมวดหมู่
-          </Title>
           <Text type="secondary">ลากเพื่อจัดลำดับที่แสดงในแอป · ทั้งหมด {categories.length} หมวดหมู่</Text>
         </div>
         <Button type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setEditing('new')}>

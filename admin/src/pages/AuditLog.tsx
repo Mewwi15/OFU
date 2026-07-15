@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../auth';
 import { apiError, listAuditLog, type AuditLogEntry } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const ROLE_LABEL: Record<string, string> = { admin: 'แอดมิน', customer: 'ลูกค้า', rider: 'ไรเดอร์' };
 const TIER_LABEL: Record<string, string> = { owner: 'เจ้าของร้าน', staff: 'พนักงาน' };
@@ -140,9 +140,6 @@ export function AuditLog() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <Title level={3} style={{ margin: 0 }}>
-            ประวัติแก้ไข
-          </Title>
           <Text type="secondary">รายการที่แอดมิน/พนักงานแก้ไขในระบบ · เรียงล่าสุดก่อน</Text>
         </div>
         <Select

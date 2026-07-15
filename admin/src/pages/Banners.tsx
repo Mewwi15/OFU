@@ -16,7 +16,7 @@ import {
   type BannerPlacement,
 } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 type PlacementMeta = { value: BannerPlacement; label: string; hint: string; multi: boolean };
 const PLACEMENTS: PlacementMeta[] = [
@@ -145,9 +145,6 @@ export function Banners() {
   return (
     <>
       <div className="mb-4">
-        <Title level={3} style={{ margin: 0 }}>
-          แบนเนอร์
-        </Title>
         <Text type="secondary">จัดการแบนเนอร์ทุกจุดในแอปจากที่เดียว — แยกตามตำแหน่งที่แสดง</Text>
       </div>
 
