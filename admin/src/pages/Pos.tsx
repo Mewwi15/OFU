@@ -628,7 +628,7 @@ export function Pos() {
                   key={p.id}
                   hoverable={!oos}
                   onClick={() => !oos && pick(p)}
-                  styles={{ body: { padding: 12 } }}
+                  styles={{ body: { padding: '12px 14px 14px' } }}
                   style={{
                     overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
@@ -765,36 +765,30 @@ export function Pos() {
                 />
               </div>
             ) : (
-              lines.map((l) => (
-                <div key={l.variantId} className="flex items-center gap-3 px-2 py-2.5 rounded-none hover:bg-[#FAFAFA]">
-                  <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] grid place-items-center shrink-0">
-                    {l.image ? (
-                      <img src={l.image} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-tremor-content-strong truncate">{l.name}</div>
-                    <div className="text-xs text-tremor-content-subtle">
-                      {l.size ? `${l.size} · ` : ''}
-                      {baht(l.unitPrice)}
+              <div className="divide-y divide-[#F0F0F0]">
+                {lines.map((l) => (
+                  <div key={l.variantId} className="flex items-center gap-3 px-2 py-3 hover:bg-[#FAFAFA]">
+                    <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
+                      {l.image ? (
+                        <img src={l.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-tremor-content-strong truncate">{l.name}</div>
+                      <div className="text-xs text-tremor-content-subtle">
+                        {l.size ? `${l.size} · ` : ''}
+                        {baht(l.unitPrice)}
+                      </div>
+                    </div>
+                    <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
+                    <div className="w-16 text-right text-sm font-bold text-tremor-content-strong">
+                      {baht(l.unitPrice * l.qty)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <StepBtn onClick={() => setQty(l.variantId, l.qty - 1)}>
-                      <RiSubtractLine className="w-4 h-4" />
-                    </StepBtn>
-                    <span className="w-6 text-center text-sm font-semibold">{l.qty}</span>
-                    <StepBtn brand onClick={() => setQty(l.variantId, l.qty + 1)}>
-                      <RiAddLine className="w-4 h-4" />
-                    </StepBtn>
-                  </div>
-                  <div className="w-16 text-right text-sm font-bold text-tremor-content-strong">
-                    {baht(l.unitPrice * l.qty)}
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
 
@@ -1021,8 +1015,30 @@ function Pill({
   );
 }
 
-function StepBtn({ onClick, children, brand }: { onClick: () => void; children: React.ReactNode; brand?: boolean }) {
-  return <Button size="small" shape="circle" type={brand ? 'primary' : 'default'} onClick={onClick} icon={children} />;
+/** Quantity stepper for a cart line: one bordered group instead of two loose
+ * circular buttons — reads as a single control, not two unrelated actions. */
+function QtyStepper({ qty, onChange }: { qty: number; onChange: (qty: number) => void }) {
+  return (
+    <div className="inline-flex items-center border border-[#E8E8E8] shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange(qty - 1)}
+        aria-label="ลดจำนวน"
+        className="w-7 h-7 grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition">
+        <RiSubtractLine className="w-3.5 h-3.5" />
+      </button>
+      <span className="w-7 text-center text-sm font-semibold text-tremor-content-strong border-x border-[#E8E8E8]">
+        {qty}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(qty + 1)}
+        aria-label="เพิ่มจำนวน"
+        className="w-7 h-7 grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition">
+        <RiAddLine className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
 }
 
 function CashPay({
