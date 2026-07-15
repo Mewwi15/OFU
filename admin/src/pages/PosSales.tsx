@@ -227,14 +227,14 @@ export function PosSales() {
       </div>
 
       {/* filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b-2 border-[#D9D9D9]">
         <Input
           allowClear
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="ค้นหาเลขบิล / ชื่อลูกค้า"
           prefix={<RiSearchLine className="w-4 h-4 text-gray-400" />}
-          style={{ width: 240 }}
+          style={{ width: 240, borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
         />
         <Select
           value={pay}
