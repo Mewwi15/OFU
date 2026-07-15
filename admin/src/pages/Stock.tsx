@@ -49,7 +49,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ACTION_COLOR } from '../lib/actionColors';
 import {
@@ -242,8 +242,6 @@ export function Stock() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  // Scroll target for the clickable "ใกล้หมด/หมด" summary card.
-  const listRef = useRef<HTMLDivElement>(null);
 
   const categories = useMemo(
     () => [...new Set(items.map((i) => i.category))].sort(),
@@ -398,16 +396,16 @@ export function Stock() {
       ),
     },
     {
-      title: '',
+      title: 'จัดการ',
       key: 'actions',
       fixed: 'right',
-      width: 120,
+      width: 130,
+      align: 'right',
       render: (_, i) => (
-        <Space size={6}>
-          {/* Restocking is the everyday action — one click, no menu to scan first.
-              variant="filled" (light blue) instead of solid so 400 rows read as
-              quiet texture, not a saturated wall; still blue, still labelled. */}
-          <Button color="blue" variant="filled" icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
+        // เติม + ⋯ as one tight right-aligned group. Outlined blue restock reads
+        // crisper than the washed-out light fill; the ⋯ sits right beside it.
+        <div className="inline-flex items-center gap-1">
+          <Button color="blue" variant="outlined" icon={<RiAddLine className="w-4 h-4" />} onClick={() => openAction('receive', i)}>
             เติม
           </Button>
           <Dropdown
@@ -425,7 +423,7 @@ export function Stock() {
             }}>
             <Button type="text" icon={<RiMore2Line className="w-4 h-4" />} aria-label="อื่นๆ" />
           </Dropdown>
-        </Space>
+        </div>
       ),
     },
   ];
@@ -551,58 +549,26 @@ export function Stock() {
       </div>
 
       <Row gutter={[12, 12]}>
-        <Col xs={12} md={6}>
+        <Col xs={12} md={8}>
           <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic title="รายการสินค้า" value={items.length} />
           </Card>
         </Col>
-        <Col xs={12} md={6}>
-          {/* The fast path into what matters: tap to filter down to low/out
-              and jump to the list. Splits the count so หมด vs ใกล้หมด read apart. */}
-          <Card
-            size="small"
-            hoverable
-            styles={{ body: { padding: '12px 16px' } }}
-            onClick={() => {
-              setStatusFilter('low');
-              listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}>
-            <Statistic
-              title="ใกล้หมด / หมด"
-              value={lowCount}
-              formatter={() =>
-                lowCount === 0 ? (
-                  <span style={{ fontSize: 20, color: '#15803d' }}>ครบทุกอย่าง</span>
-                ) : (
-                  <span style={{ fontSize: 20, fontWeight: 700 }}>
-                    <span style={{ color: '#dc2626' }}>หมด {outCount}</span>
-                    <span style={{ color: '#BFBFBF', fontWeight: 400 }}> · </span>
-                    <span style={{ color: '#c2410c' }}>ใกล้หมด {lowCount - outCount}</span>
-                  </span>
-                )
-              }
-            />
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
-              {lowCount === 0 ? 'สต๊อกเพียงพอ' : 'แตะเพื่อดูรายการ'}
-            </div>
-          </Card>
-        </Col>
-        <Col xs={12} md={6}>
+        <Col xs={12} md={8}>
           <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic title="เงินจมในสต๊อก (ตามทุน)" value={totals.costValue} prefix="฿" />
           </Card>
         </Col>
-        <Col xs={12} md={6}>
+        <Col xs={12} md={8}>
           <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
             <Statistic title="ขายหมดได้เงิน (ตามราคาขาย)" value={totals.saleValue} prefix="฿" />
           </Card>
         </Col>
       </Row>
 
-      <div ref={listRef}>
-        <Card>
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            <Space wrap>
+      <Card>
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space wrap>
               <Input.Search
                 allowClear
                 placeholder="ค้นหาชื่อ / บาร์โค้ด / SKU"
@@ -660,7 +626,6 @@ export function Stock() {
             />
           </Space>
         </Card>
-      </div>
 
       {/* row action modal */}
       <Modal
