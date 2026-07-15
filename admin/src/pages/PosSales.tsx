@@ -15,7 +15,7 @@ import {
   type ShopInfo,
 } from '../lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 const PAY: Record<string, { label: string; color: string }> = {
@@ -191,12 +191,7 @@ export function PosSales() {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            บิลขายหน้าร้าน
-          </Title>
-          <Text type="secondary">ประวัติการขาย POS · แตะที่บิลเพื่อดูรายละเอียด / คืนเงิน</Text>
-        </div>
+        <Text type="secondary">ประวัติการขาย POS · แตะที่บิลเพื่อดูรายละเอียด / คืนเงิน</Text>
         <Button onClick={() => void load()}>รีเฟรช</Button>
       </div>
 
