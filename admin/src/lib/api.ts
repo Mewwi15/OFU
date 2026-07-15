@@ -518,7 +518,8 @@ export type ShopSettingsFull = {
   delivery_fee: number;
   free_delivery_threshold: number;
   online_fee: number;
-  online_free_threshold: number;
+  // null = ไม่มีส่งฟรีออนไลน์ (ทุกออเดอร์คิดค่าส่ง) — see migration 0049.
+  online_free_threshold: number | null;
   cod_enabled: boolean;
   cod_cap: number | null;
   vat_registered: boolean;
@@ -542,7 +543,7 @@ export async function getShopSettingsFull(): Promise<ShopSettingsFull> {
     delivery_fee: number;
     free_delivery_threshold: number;
     online_fee: number;
-    online_free_threshold: number;
+    online_free_threshold: number | null;
     cod_enabled: boolean;
     cod_cap: number | null;
     vat_registered: boolean;
@@ -560,7 +561,10 @@ export async function getShopSettingsFull(): Promise<ShopSettingsFull> {
     delivery_fee: s?.delivery_fee ?? 40,
     free_delivery_threshold: s?.free_delivery_threshold ?? 200,
     online_fee: s?.online_fee ?? 150,
-    online_free_threshold: s?.online_free_threshold ?? 500,
+    // NULL = no free online shipping (0049). Do NOT default to a number, or the
+    // owner's first Settings save would silently re-enable a free tier and the
+    // server would then charge ฿0 while the customer QR still adds the fee.
+    online_free_threshold: s?.online_free_threshold ?? null,
     cod_enabled: s?.cod_enabled ?? true,
     cod_cap: s?.cod_cap ?? null,
     vat_registered: s?.vat_registered ?? false,

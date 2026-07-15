@@ -290,7 +290,8 @@ function ShopSettingsCard({
         delivery_fee: v.delivery_fee,
         free_delivery_threshold: v.free_delivery_threshold,
         online_fee: v.online_fee,
-        online_free_threshold: v.online_free_threshold,
+        // Empty field → null = keep "no free online shipping" (never coerce to 0/500).
+        online_free_threshold: v.online_free_threshold ?? null,
         cod_enabled: v.cod_enabled,
         cod_cap: v.cod_cap ?? null,
         vat_registered: v.vat_registered,
@@ -357,8 +358,11 @@ function ShopSettingsCard({
             <Form.Item name="online_fee" label="ค่าส่งพัสดุ (ออนไลน์)" rules={[{ required: true }]}>
               <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
             </Form.Item>
-            <Form.Item name="online_free_threshold" label="ยอดซื้อที่ส่งฟรี (พัสดุ)" rules={[{ required: true }]}>
-              <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
+            <Form.Item
+              name="online_free_threshold"
+              label="ยอดซื้อที่ส่งฟรี (พัสดุ)"
+              extra="เว้นว่าง = ไม่มีส่งฟรี (คิดค่าส่งทุกออเดอร์)">
+              <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" placeholder="เว้นว่าง = ไม่มีส่งฟรี" />
             </Form.Item>
           </div>
 
