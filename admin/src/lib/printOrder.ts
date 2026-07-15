@@ -33,7 +33,9 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
  * the click handler — before awaiting anything — or the browser may silently
  * block it as an unrequested popup. Returns null if it got blocked anyway. */
 export function openPrintWindow(): Window | null {
-  return window.open('', '_blank', 'width=460,height=760');
+  // A4-sized so the sheet renders full-width on screen (not squished into a
+  // narrow thermal-roll column); print still uses each sheet's own @page.
+  return window.open('', '_blank', 'width=860,height=1040');
 }
 
 function writePrint(w: Window, html: string) {
@@ -83,6 +85,14 @@ export function printPickList(w: Window, order: Order, items: OrderItem[], shopN
     ${BASE_CSS}
     @page { size: A4; margin: 14mm; }
     body { font-size: 15px; }
+    /* On screen (the preview window) show a real A4 page — fixed width + the
+       same 14mm inset — so it never squishes to the window width. Print
+       ignores this and uses @page above. */
+    @media screen {
+      html { background: #e9e9e9; padding: 16px 0; }
+      body { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 14mm;
+             background: #fff; box-shadow: 0 1px 12px rgba(0,0,0,0.25); }
+    }
     .head { display: flex; justify-content: space-between; align-items: flex-start;
             border-bottom: 2.5px solid #000; padding-bottom: 10px; }
     .shop { font-size: 19px; font-weight: 800; }
