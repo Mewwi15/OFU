@@ -90,7 +90,7 @@ export function PrivacyPolicy() {
             ร้านอู้ฟู่ — ติดต่อผ่านแชตในแอป หรือที่หน้าร้าน
             <br />
             การลบบัญชี: ดูขั้นตอนได้ที่{' '}
-            <a href="/delete-account" style={{ color: '#14532D' }}>
+            <a href="/delete-account" style={{ color: '#5B8C6E' }}>
               หน้าการลบบัญชี
             </a>
           </p>

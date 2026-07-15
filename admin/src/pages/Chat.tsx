@@ -145,7 +145,7 @@ export function Chat() {
                     background: selected?.id === t.id ? '#F5F5F5' : undefined,
                   }}>
                   <Badge count={t.admin_unread} size="small">
-                    <Avatar style={{ background: '#14532D' }}>
+                    <Avatar style={{ background: '#5B8C6E' }}>
                       {customerName(t).slice(0, 1).toUpperCase()}
                     </Avatar>
                   </Badge>
@@ -199,7 +199,7 @@ export function Chat() {
                             className="inline-block px-3 py-2 rounded-none whitespace-pre-wrap break-words text-left"
                             style={
                               mine
-                                ? { background: '#14532D', color: '#fff', borderBottomRightRadius: 4 }
+                                ? { background: '#5B8C6E', color: '#fff', borderBottomRightRadius: 4 }
                                 : { background: '#F5F5F5', color: '#2B2320', borderBottomLeftRadius: 4 }
                             }>
                             {m.body}

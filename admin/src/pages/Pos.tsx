@@ -536,9 +536,9 @@ export function Pos() {
 
   return (
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-white min-h-[calc(100vh-4rem)]">
-      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:gap-5 lg:h-[calc(100vh-6.5rem)]">
+      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
-        <div className="relative flex flex-col min-h-0">
+        <div className="relative flex flex-col min-h-0 lg:pr-5">
           {/* Sales that already happened (cash/goods changed hands, a
               provisional receipt printed) but failed to sync for a real
               reason — never auto-dismisses, always visible until someone
@@ -603,7 +603,7 @@ export function Pos() {
             style={{ borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
           />
 
-          <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+          <div className="flex flex-wrap gap-2 mb-4 pb-4 shrink-0 border-b-2 border-[#D9D9D9]">
             <Pill active={cat === null} onClick={() => setCat(null)} count={catalog.length}>
               ทั้งหมด
             </Pill>
@@ -633,22 +633,29 @@ export function Pos() {
                     overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
                     opacity: oos ? 0.55 : 1,
-                    borderColor: inCart > 0 ? '#14532D' : '#E8E8E8',
-                    boxShadow: inCart > 0 ? '0 6px 16px -8px rgba(20,83,45,0.35)' : undefined,
+                    borderColor: inCart > 0 ? '#5B8C6E' : '#E8E8E8',
                   }}
                   cover={
-                    <div className="relative aspect-square bg-[#F5F5F5] grid place-items-center overflow-hidden">
+                    <div className="relative aspect-square bg-[#FAFAFA] grid place-items-center overflow-hidden">
                       {p.image ? (
                         // absolute-fill so a portrait image can't stretch the
                         // square box (Safari/prod otherwise grow the card tall).
                         <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
-                        <RiShoppingBasket2Line className="w-8 h-8 text-tremor-brand-subtle" />
+                        // No photo yet: a per-product initial in a soft brand
+                        // circle reads as "designed" and gives each card its
+                        // own identity — a repeated generic icon on every
+                        // card made the whole grid look identical/unfinished.
+                        <div className="w-16 h-16 rounded-full grid place-items-center" style={{ background: '#EDF3EF' }}>
+                          <span className="text-2xl font-bold" style={{ color: '#3F6B52' }}>
+                            {p.name.trim().charAt(0)}
+                          </span>
+                        </div>
                       )}
                       {inCart > 0 && (
                         <Badge
                           count={inCart}
-                          color="#14532D"
+                          color="#5B8C6E"
                           style={{ position: 'absolute', top: 8, insetInlineEnd: 8, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
                         />
                       )}
@@ -718,7 +725,7 @@ export function Pos() {
 
         {/* ── right: order panel (drawer < lg, column ≥ lg) ────────────────── */}
         <div
-          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
+          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none lg:shadow-none lg:border-l-2 lg:border-[#D9D9D9] lg:pl-5 fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
             cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}>
           <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
@@ -822,7 +829,7 @@ export function Pos() {
                 <Statistic
                   value={total}
                   prefix="฿"
-                  styles={{ content: { color: '#14532D', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
+                  styles={{ content: { color: '#5B8C6E', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
                 />
               </div>
             </Card>
@@ -889,7 +896,6 @@ export function Pos() {
                 height: 52,
                 fontWeight: 600,
                 borderRadius: 0,
-                boxShadow: '0 10px 22px -8px rgba(20,83,45,0.5)',
               }}>
               {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
             </Button>
@@ -1143,7 +1149,7 @@ function VariantPicker({
             key={v.id}
             disabled={v.stock_qty <= 0}
             onClick={() => onPick(v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#14532D] disabled:opacity-40 transition">
+            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#5B8C6E] disabled:opacity-40 transition">
             <span className="text-sm font-medium text-[#2B2320]">{v.size ?? 'ปกติ'}</span>
             <span className="text-sm">
               <span className="font-semibold text-[#2B2320]">{baht(v.price)}</span>
