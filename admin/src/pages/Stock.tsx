@@ -21,7 +21,7 @@ import {
   RiAddLine,
   RiAlarmWarningLine,
   RiDownload2Line,
-  RiInboxArchiveLine,
+  RiImage2Line,
   RiMore2Line,
   RiScales3Line,
   RiUpload2Line,
@@ -344,33 +344,39 @@ export function Stock() {
   const overviewColumns: ColumnsType<Item> = [
     {
       title: 'สินค้า',
-      fixed: 'left',
-      width: 260,
+      // No fixed width — the product name absorbs the slack so price/คงเหลือ/
+      // actions cluster tight on the right instead of floating with big gaps.
       sorter: (a, b) => a.productName.localeCompare(b.productName, 'th'),
       render: (_, i) => (
-        <Space>
-          {/* Photoless products (the majority) get a uniform muted box icon
-              instead of a grey first-letter square — calm and intentional,
-              carries no colour so it never competes with the status signal. */}
+        <div className="flex items-center gap-3">
           <Avatar
             shape="square"
-            size={32}
+            size={36}
             src={i.image ?? undefined}
-            style={{ background: '#F5F5F5', color: '#BFBFBF' }}
-            icon={<RiInboxArchiveLine style={{ fontSize: 16 }} />}
+            style={{ background: '#F5F5F5', color: '#BFBFBF', flex: 'none' }}
+            icon={<RiImage2Line style={{ fontSize: 17 }} />}
           />
-          <Space direction="vertical" size={0}>
-            <Text style={{ fontSize: 15, fontWeight: 500 }}>{itemLabel(i)}</Text>
+          <div className="min-w-0">
+            <div className="truncate" style={{ fontSize: 15, fontWeight: 500, color: '#2B2320' }}>
+              {itemLabel(i)}
+            </div>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {[i.barcode, i.sku].filter(Boolean).join(' · ') || 'ไม่มีบาร์โค้ด'}
             </Text>
-          </Space>
-        </Space>
+          </div>
+        </div>
       ),
     },
     {
+      title: 'หมวดหมู่',
+      dataIndex: 'category',
+      width: 150,
+      responsive: ['lg'],
+      render: (c: string) => <Text type="secondary" style={{ fontSize: 13 }}>{c}</Text>,
+    },
+    {
       title: 'ราคาขาย',
-      width: 100,
+      width: 110,
       align: 'right',
       sorter: (a, b) => a.price - b.price,
       render: (_, i) => <Text style={{ fontSize: 14 }}>{baht(i.price)}</Text>,
@@ -389,16 +395,12 @@ export function Stock() {
               {s}
               <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
             </Text>
-            {/* One status signal, folded in here — problem rows only. The old
-                standalone สถานะ Tag column was the exact same signal twice. */}
-            {st !== 'ok' ? (
-              <Text style={{ fontSize: 12, color: STATUS_COLOR[st] }}>
-                {st === 'out' ? 'หมดแล้ว' : 'ใกล้หมด'}
-              </Text>
-            ) : null}
+            {/* Status is already carried by the number colour + the row tint —
+                no separate caption line (owner: "เยอะไป"). Only reserved gets a
+                sub-line, and only when there actually are reservations. */}
             {i.reserved > 0 ? (
               <Text type="secondary" style={{ fontSize: 12 }}>
-                ลูกค้าจองไว้ {i.reserved} · ขายได้อีก {i.available}
+                จองไว้ {i.reserved} · ขายได้อีก {i.available}
               </Text>
             ) : null}
           </Space>
@@ -431,7 +433,7 @@ export function Stock() {
               ],
               onClick: ({ key }) => openAction(key as Action, i),
             }}>
-            <Button icon={<RiMore2Line className="w-4 h-4" />} aria-label="อื่นๆ" />
+            <Button type="text" icon={<RiMore2Line className="w-4 h-4" />} aria-label="อื่นๆ" />
           </Dropdown>
         </Space>
       ),
@@ -651,7 +653,7 @@ export function Stock() {
               dataSource={shown}
               loading={loading}
               pagination={{ pageSize: 50, showSizeChanger: false }}
-              scroll={{ x: 640 }}
+              scroll={{ x: 720 }}
               locale={{
                 emptyText:
                   query || statusFilter !== 'all' || categoryFilter
