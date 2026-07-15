@@ -1,20 +1,16 @@
 /**
  * Order print sheets (owner 2026-07-13):
- *  • printPickList     — ใบจัดสินค้าแบบบิลความร้อน: same roll + width as the
- *    POS receipt (receiptConfig 48/58mm), big type, tick box per line.
+ *  • printPickList     — ใบจัดสินค้า A4: product photo + qty per line, plus the
+ *    recipient / shipping block. Big type for arm's-length reading while packing.
  *  • printAddressLabel — ใบจ่าหน้า 100×150มม. (สติ๊กเกอร์/A6): sender (shop
  *    name + phone/address from receiptConfig) + big recipient block + order/
  *    tracking no. The official Flash waybill still comes from Flash's own
  *    system/printer app once the shipment exists there.
  *
- * Both open a print window (user picks the printer; window stays open for
- * reprints). All order-sourced text is HTML-escaped.
- *
- * The window itself must open synchronously, inside the click handler and
- * before any `await` (openPrintWindow) — browsers only let window.open()
- * bypass the popup blocker while still inside a user gesture's call stack.
- * Anything needing an async fetch first (shop name, etc.) resolves after,
- * and gets written into that already-open window.
+ * Both print through a HIDDEN IFRAME (no second popup window — owner: "ทำไมมัน
+ * เปิด 2 หน้าต่าง"), so the only thing that appears is the browser's own print
+ * dialog. All order-sourced text is HTML-escaped. No popup-blocker dance needed
+ * (an iframe isn't a popup), so these can be called after an await.
  */
 
 import { productThumb } from './image';
@@ -29,19 +25,41 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
   online: 'ส่งพัสดุ',
 };
 
-/** Open the (still blank) print window. Call this FIRST, synchronously, from
- * the click handler — before awaiting anything — or the browser may silently
- * block it as an unrequested popup. Returns null if it got blocked anyway. */
-export function openPrintWindow(): Window | null {
-  // A4-sized so the sheet renders full-width on screen (not squished into a
-  // narrow thermal-roll column); print still uses each sheet's own @page.
-  return window.open('', '_blank', 'width=860,height=1040');
-}
+/** Print `html` via an off-screen iframe: fires the print dialog once the
+ * content (incl. images) has loaded, then removes the iframe afterwards. No
+ * visible popup window. A timeout fallback prints even if `onload` is missed
+ * (e.g. a slow/broken image) and a longer one guarantees cleanup. */
+function printHtml(html: string) {
+  const iframe = document.createElement('iframe');
+  Object.assign(iframe.style, {
+    position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0',
+  });
+  document.body.appendChild(iframe);
+  const win = iframe.contentWindow;
+  if (!win) {
+    iframe.remove();
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 
-function writePrint(w: Window, html: string) {
-  w.document.write(html);
-  w.document.close();
-  w.focus();
+  let printed = false;
+  const doPrint = () => {
+    if (printed) return;
+    printed = true;
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      /* ignore — nothing else we can do */
+    }
+  };
+  const cleanup = () => setTimeout(() => iframe.remove(), 1000);
+  win.onafterprint = cleanup;
+  win.onload = doPrint;
+  setTimeout(doPrint, 2500); // fallback if onload never fires
+  setTimeout(cleanup, 60000); // safety net so the iframe never lingers
 }
 
 const BASE_CSS = `
@@ -53,7 +71,7 @@ const BASE_CSS = `
 /** ใบจัดสินค้า — full A4 pack sheet: product photo + qty per line, plus the
  * recipient / shipping block so the packer sees whose order it is and where it
  * ships (owner 2026-07-16, replacing the earlier thermal-roll version). */
-export function printPickList(w: Window, order: Order, items: OrderItem[], shopName: string) {
+export function printPickList(order: Order, items: OrderItem[], shopName: string) {
   const pieces = items.reduce((s, i) => s + i.qty, 0);
   const when = new Date(order.placed_at).toLocaleString('th-TH', {
     day: 'numeric',
@@ -79,20 +97,12 @@ export function printPickList(w: Window, order: Order, items: OrderItem[], shopN
     })
     .join('');
 
-  writePrint(w, `<!doctype html><html lang="th"><head><meta charset="utf-8">
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบจัดสินค้า ${esc(order.order_number)}</title>
   <style>
     ${BASE_CSS}
     @page { size: A4; margin: 14mm; }
     body { font-size: 15px; }
-    /* On screen (the preview window) show a real A4 page — fixed width + the
-       same 14mm inset — so it never squishes to the window width. Print
-       ignores this and uses @page above. */
-    @media screen {
-      html { background: #e9e9e9; padding: 16px 0; }
-      body { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 14mm;
-             background: #fff; box-shadow: 0 1px 12px rgba(0,0,0,0.25); }
-    }
     .head { display: flex; justify-content: space-between; align-items: flex-start;
             border-bottom: 2.5px solid #000; padding-bottom: 10px; }
     .shop { font-size: 19px; font-weight: 800; }
@@ -157,25 +167,16 @@ export function printPickList(w: Window, order: Order, items: OrderItem[], shopN
       <span>รวม ${items.length} รายการ · ${pieces} ชิ้น</span>
     </div>
     <div class="note">หมายเหตุ: <span class="line">&nbsp;</span></div>
-    <script>
-      var done = false; function go(){ if(!done){ done = true; window.print(); } }
-      window.onload = go; setTimeout(go, 2500);
-    </script>
   </body></html>`);
 }
 
-export function printAddressLabel(
-  w: Window,
-  order: Order,
-  shopName: string,
-  trackingNo: string | null,
-) {
+export function printAddressLabel(order: Order, shopName: string, trackingNo: string | null) {
   const cfg = getReceiptConfig();
   const senderBits = [shopName, cfg.phone && `โทร ${cfg.phone}`, cfg.address]
     .filter(Boolean)
     .map((x) => esc(x as string))
     .join(' · ');
-  writePrint(w, `<!doctype html><html lang="th"><head><meta charset="utf-8">
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบจ่าหน้า ${esc(order.order_number)}</title>
   <style>
     ${BASE_CSS}
@@ -199,6 +200,5 @@ export function printAddressLabel(
       ออเดอร์ ${esc(order.order_number)}<br>
       เลขพัสดุ: ${trackingNo ? esc(trackingNo) : '________________'}
     </div>
-    <script>window.onload = () => window.print();</script>
   </body></html>`);
 }

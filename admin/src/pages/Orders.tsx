@@ -43,7 +43,7 @@ import {
   type ShopMode,
   type SlipRejectReason,
 } from '../lib/orders';
-import { openPrintWindow, printAddressLabel, printPickList } from '../lib/printOrder';
+import { printAddressLabel, printPickList } from '../lib/printOrder';
 import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
 
 const { Text } = Typography;
@@ -462,26 +462,12 @@ function OrderDrawer({
       <Space style={{ marginTop: 12 }} wrap>
         <Button
           icon={<RiPrinterLine className="w-4 h-4" />}
-          onClick={async () => {
-            const w = openPrintWindow();
-            if (!w) {
-              message.error('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — กรุณาอนุญาตป๊อปอัพสำหรับเว็บนี้แล้วลองใหม่');
-              return;
-            }
-            printPickList(w, order, items, await getShopName());
-          }}>
+          onClick={async () => printPickList(order, items, await getShopName())}>
           พิมพ์ใบจัดสินค้า
         </Button>
         <Button
           icon={<RiPrinterLine className="w-4 h-4" />}
-          onClick={async () => {
-            const w = openPrintWindow();
-            if (!w) {
-              message.error('เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — กรุณาอนุญาตป๊อปอัพสำหรับเว็บนี้แล้วลองใหม่');
-              return;
-            }
-            printAddressLabel(w, order, await getShopName(), trackingNo);
-          }}>
+          onClick={async () => printAddressLabel(order, await getShopName(), trackingNo)}>
           พิมพ์ใบจ่าหน้า
         </Button>
       </Space>
