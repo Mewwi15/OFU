@@ -122,9 +122,9 @@ export function Chat() {
         </Text>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 flex-1 min-h-0 lg:grid-rows-1">
         {/* Thread list */}
-        <Card className="min-h-0" styles={{ body: { padding: 0, height: '100%', overflowY: 'auto' } }}>
+        <Card className="h-full min-h-0" styles={{ body: { padding: 0, height: '100%', overflowY: 'auto' } }}>
           {loading ? (
             <div className="p-6 text-center text-tremor-content">กำลังโหลด…</div>
           ) : threads.length === 0 ? (
@@ -169,7 +169,7 @@ export function Chat() {
 
         {/* Conversation */}
         <Card
-          className="min-h-0"
+          className="h-full min-h-0"
           styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column', height: '100%' } }}>
           {!selected ? (
             <div className="flex-1 grid place-items-center py-20">

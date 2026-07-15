@@ -31,6 +31,16 @@ export type ChatMessage = {
 
 const SIGNED_URL_TTL = 60 * 60;
 
+/** avatar_path is usually a full public/provider URL (customer app stores
+ * getPublicUrl(...)), but tolerate a bare storage path too → public URL. */
+function resolveAvatarUrl(p: string | null | undefined): string | null {
+  if (!p) return null;
+  // Already a URL (http/https/data/blob…) → use as-is; only a bare storage
+  // path needs resolving to the avatars bucket's public URL.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(p)) return p;
+  return supabase.storage.from('avatars').getPublicUrl(p).data.publicUrl;
+}
+
 export async function listThreads(): Promise<ChatThread[]> {
   const { data, error } = await supabase
     .from('chat_threads')
@@ -40,7 +50,12 @@ export async function listThreads(): Promise<ChatThread[]> {
     .not('last_message_at', 'is', null)
     .order('last_message_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []) as unknown as ChatThread[];
+  return ((data ?? []) as unknown as ChatThread[]).map((t) => ({
+    ...t,
+    customer: t.customer
+      ? { ...t.customer, avatar_path: resolveAvatarUrl(t.customer.avatar_path) }
+      : null,
+  }));
 }
 
 export async function listMessages(threadId: string): Promise<ChatMessage[]> {
