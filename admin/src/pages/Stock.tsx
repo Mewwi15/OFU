@@ -387,25 +387,15 @@ export function Stock() {
       width: 150,
       align: 'right',
       sorter: (a, b) => a.stock - b.stock,
-      render: (s: number, i) => {
-        const st = statusOf(i);
-        return (
-          <Space direction="vertical" size={0} style={{ textAlign: 'right', width: '100%' }}>
-            <Text strong style={{ fontSize: 18, color: STATUS_COLOR[st] }}>
-              {s}
-              <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
-            </Text>
-            {/* Status is already carried by the number colour + the row tint —
-                no separate caption line (owner: "เยอะไป"). Only reserved gets a
-                sub-line, and only when there actually are reservations. */}
-            {i.reserved > 0 ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                จองไว้ {i.reserved} · ขายได้อีก {i.available}
-              </Text>
-            ) : null}
-          </Space>
-        );
-      },
+      render: (s: number, i) => (
+        // One line only — status is carried by the number colour + the row tint.
+        // No reserved/sellable sub-line: this shop deducts stock on order, there
+        // is no reservation hold (owner 2026-07-16).
+        <Text strong style={{ fontSize: 18, color: STATUS_COLOR[statusOf(i)] }}>
+          {s}
+          <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
+        </Text>
+      ),
     },
     {
       title: '',
