@@ -16,6 +16,9 @@
  *   4. slip attached → untouched (the customer paid)
  *   5. re-run        → idempotent: no double cancel, no double release
  *   6. attach vs expire → ONE outcome, and the loser fails loudly
+ *   7. the cutoff follows shop_settings.payment_window_min — the owner's
+ *      setting, not a constant in the migration. Same order, only the setting
+ *      moves, opposite outcomes.
  *
  * Run (LOCAL Supabase only):
  *   SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=<anon> \
@@ -70,6 +73,9 @@ const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
+let SHOP_ID = null;
+let ORIGINAL_WINDOW = null;
+
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 
 async function fillCart(variantId, qty, mode) {
@@ -99,11 +105,21 @@ async function backdate(orderId, minutes) {
   if (error) throw new Error(`backdate: ${error.message}`);
 }
 
+/** No argument = the production path: each shop's own payment_window_min. */
 async function expire(before) {
   const args = before === undefined ? {} : { p_before: before };
   const { data, error } = await admin.rpc('expire_stale_orders', args);
   if (error) throw new Error(`expire_stale_orders: ${error.message}`);
   return data;
+}
+
+/** The owner moving the payment window in the admin. */
+async function setPaymentWindow(minutes) {
+  const { error } = await admin
+    .from('shop_settings')
+    .update({ payment_window_min: minutes })
+    .eq('shop_id', SHOP_ID);
+  if (error) throw new Error(`set payment_window_min: ${error.message}`);
 }
 
 async function getOrder(orderId) {
@@ -183,8 +199,14 @@ async function setup() {
     .single();
   if (variant.error) throw new Error(`variant: ${variant.error.message}`);
 
+  const s = await admin.from('shop_settings').select('shop_id, payment_window_min').limit(1).single();
+  if (s.error) throw new Error(`shop_settings: ${s.error.message}`);
+  SHOP_ID = s.data.shop_id;
+  ORIGINAL_WINDOW = s.data.payment_window_min;
+
   console.log(`  user ${uid}`);
   console.log(`  variant ${variant.data.id} (available ${variant.data.available_qty})`);
+  console.log(`  shop ${SHOP_ID} · payment_window_min = ${ORIGINAL_WINDOW}`);
   return { addressId, variantId: variant.data.id };
 }
 
@@ -347,6 +369,50 @@ async function main() {
       `expire won → attach was refused LOUDLY, not silently (${attachErr})`);
   } else {
     check(6, e1.order_status !== 'cancelled', 'attach won → the order survived and was not expired');
+  }
+
+  /* 7 — the window is the OWNER'S, not a constant in the migration. */
+  console.log("\n[7] payment_window_min drives the cutoff (the owner's setting, not a magic 30)");
+  try {
+    await setPaymentWindow(30);
+    await fillCart(variantId, 1, 'online');
+    const F = await place(addressId, 'online', 'promptpay_slip');
+    // 10 minutes old: inside a 30-minute window, outside a 5-minute one. The
+    // ONLY thing that changes between the two checks below is the setting.
+    await backdate(F.id, 10);
+
+    await expire();
+    const f30 = await getOrder(F.id);
+    check(7, f30.order_status === 'placed',
+      `window=30: a 10-minute-old order survives (${f30.order_status})`);
+
+    // The owner shortens the window in the admin.
+    await setPaymentWindow(5);
+    await expire();
+    const f5 = await getOrder(F.id);
+    check(7, f5.order_status === 'cancelled',
+      `window=5: the SAME order now expires (${f5.order_status}) — the setting drove it`,
+      'the cutoff is not reading shop_settings.payment_window_min');
+    check(7, f5.cancel_reason === 'payment_timeout', `still payment_timeout (${f5.cancel_reason})`);
+
+    // And a longer window must protect an order the default would have killed.
+    await setPaymentWindow(240);
+    await fillCart(variantId, 1, 'online');
+    const G = await place(addressId, 'online', 'promptpay_slip');
+    await backdate(G.id, 60); // would die under the old hardcoded 30
+    await expire();
+    const g = await getOrder(G.id);
+    check(7, g.order_status === 'placed',
+      `window=240: a 60-minute-old order is spared (${g.order_status}) — a hardcoded 30 would have cancelled it`);
+  } finally {
+    if (ORIGINAL_WINDOW !== null) {
+      try {
+        await setPaymentWindow(ORIGINAL_WINDOW);
+        console.log(`      (payment_window_min restored to ${ORIGINAL_WINDOW})`);
+      } catch (e) {
+        console.error(`      WARNING: could not restore payment_window_min: ${e.message}`);
+      }
+    }
   }
 
   console.log(`\n${failures === 0 ? 'ALL PASS' : `${failures} FAILURE(S)`}`);
