@@ -271,6 +271,10 @@ export async function listOrders(): Promise<TrackedOrder[]> {
   return ((data ?? []) as unknown as OrderRow[]).map(toTracked);
 }
 
+// Channel topics must be unique per subscriber: supabase-js reuses a channel
+// with the same topic, and screen remounts can overlap with teardown.
+let orderChanSeq = 0;
+
 /**
  * Subscribe to live updates for one order (Realtime postgres_changes on orders;
  * RLS limits the stream to the caller's own orders). Calls `onChange` when the
@@ -278,14 +282,26 @@ export async function listOrders(): Promise<TrackedOrder[]> {
  */
 export function subscribeOrder(orderNumber: string, onChange: () => void): () => void {
   const channel = supabase
-    .channel(`order:${orderNumber}`)
+    .channel(`order:${orderNumber}:${++orderChanSeq}`)
     .on(
       'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'orders' },
-      (payload) => {
-        const row = payload.new as { order_number?: string };
-        if (row.order_number === orderNumber) onChange();
-      },
+      { event: 'UPDATE', schema: 'public', table: 'orders', filter: `order_number=eq.${orderNumber}` },
+      () => onChange(),
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
+/** Live order list: fire onChange whenever one of the customer's orders changes. */
+export function subscribeOrders(onChange: () => void): () => void {
+  const channel = supabase
+    .channel(`orders:${++orderChanSeq}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders' },
+      () => onChange(),
     )
     .subscribe();
   return () => {

@@ -5,16 +5,16 @@
  * orders (`history`). `createOrder` is called on a verified checkout (cart →
  * payment → success) and seeds a `preparing` order; the tracking screen advances
  * `status` through the delivery lifecycle and records the rating. When the order
- * wraps up, `archive` moves it into `history`. Frontend-first: status is driven
- * by the UI today and will be fed by realtime order events once the backend
- * lands. Persisted so a reload keeps the active order + history.
+ * wraps up, `archive` moves it into `history`. Backend order rows feed the
+ * active tracking screen and order list through Supabase Realtime. Persisted so
+ * a reload keeps the active order + history.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
-import { getOrderByNumber, listOrders } from '@/lib/data/order';
+import { getOrderByNumber, listOrders, subscribeOrders } from '@/lib/data/order';
 import { zustandStorage } from '@/lib/storage';
 
 export type CreateOrderInput = {
@@ -58,6 +58,8 @@ export type OrderState = {
   clear: () => void;
 };
 
+let unsubscribeOrders: (() => void) | null = null;
+
 const THAI_MONTHS = [
   'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
   'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
@@ -98,6 +100,9 @@ export const useOrder = create<OrderState>()(
           set({ list: await listOrders(), listLoading: false });
         } catch {
           set({ listLoading: false });
+        }
+        if (!unsubscribeOrders) {
+          unsubscribeOrders = subscribeOrders(() => void get().loadList());
         }
       },
 
