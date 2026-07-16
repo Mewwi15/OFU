@@ -710,15 +710,18 @@ function ProductModal({
             {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
             <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
           </Form.Item>
-          <Form.Item
-            name="stock_qty"
-            label="สต็อกคงเหลือ"
-            extra={isNewProduct ? undefined : 'แก้ไขสต็อกที่หน้าสต็อกเพื่อบันทึกประวัติการเคลื่อนไหว'}>
-            {isNewProduct ? (
+          {isNewProduct ? (
+            <Form.Item name="stock_qty" label="สต็อกคงเหลือ">
               <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
-            ) : (
+            </Form.Item>
+          ) : (
+            <Form.Item
+              label="สต็อกคงเหลือ"
+              extra="แก้ไขสต็อกที่หน้าสต็อกเพื่อบันทึกประวัติการเคลื่อนไหว">
               <Space.Compact style={{ width: '100%' }}>
-                <InputNumber min={0} disabled style={{ width: '100%' }} placeholder="0" />
+                <Form.Item name="stock_qty" noStyle>
+                  <InputNumber min={0} disabled style={{ width: '100%' }} placeholder="0" />
+                </Form.Item>
                 <Button
                   onClick={() => {
                     if (variantId) navigate(`/stock?variant=${variantId}&action=set`);
@@ -726,8 +729,8 @@ function ProductModal({
                   ปรับสต็อก
                 </Button>
               </Space.Compact>
-            )}
-          </Form.Item>
+            </Form.Item>
+          )}
           <Form.Item name="low_stock_threshold" label="แจ้งเตือนเมื่อเหลือ ≤">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="5" />
           </Form.Item>
