@@ -263,6 +263,32 @@ export default function CartScreen() {
     }
   };
 
+  // A promo is only ever priced against a subtotal, so the moment the basket
+  // moves that price is stale — keeping it on screen is how the customer ends
+  // up transferring one amount while place_order charges another (H2). Re-ask
+  // the server instead of trusting the number we captured at apply time; if the
+  // code no longer qualifies (dropped under min-spend, say) it goes away here
+  // rather than failing after the money has left their bank.
+  useEffect(() => {
+    const code = appliedPromo?.code;
+    if (!code) return;
+    let cancelled = false;
+    validatePromo(code, subtotal, mode)
+      .then((res) => {
+        if (cancelled) return;
+        setAppliedPromo((cur) =>
+          cur?.code !== code ? cur : res.valid ? { code, discount: res.discount } : null,
+        );
+      })
+      .catch(() => {
+        // Preview only — a failed re-check must not wipe a valid promo. The
+        // authoritative pricing still happens in place_order.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appliedPromo?.code, subtotal, mode]);
+
   const confirmRemoveLine = (item: CartItem) => {
     Alert.alert(
       t('cart.removeTitle'),
@@ -295,9 +321,10 @@ export default function CartScreen() {
   // the stores). The cart is cleared there only once payment is verified.
   const onConfirmOrder = () => {
     setSheetOpen(false);
-    const params = appliedPromo
-      ? { promo: appliedPromo.code, discount: String(appliedPromo.discount) }
-      : undefined;
+    // Code only. A discount handed over here is a price frozen at tap time, and
+    // checkout would have had no way to tell it had gone stale (H2) — the
+    // server re-prices it against the live subtotal instead.
+    const params = appliedPromo ? { promo: appliedPromo.code } : undefined;
     // Let the sheet finish sliding out before the route transition.
     setTimeout(() => router.push({ pathname: '/checkout', params }), 240);
   };

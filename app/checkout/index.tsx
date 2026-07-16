@@ -5,9 +5,17 @@
  * reads the ticked cart lines + current mode, shows the amount due, lets the
  * customer pick a payment method, and — for PromptPay — renders a scannable Thai
  * QR for the exact amount, the shop account (with copy), and a slip-upload zone.
- * Confirming places the order via `place_order` (and, for prepay, uploads the
- * slip to Storage + records it) through idle -> verifying -> success, then clears
- * the paid lines and opens live order tracking.
+ *
+ * The money shown here is the SERVER'S, never ours. The client cannot price an
+ * order: the promo is re-priced by `validate_promo`/`place_order` against the
+ * live subtotal, and the parcel fee lives in `shop_settings` where the owner
+ * edits it. So PromptPay runs in two steps — place the order first, then render
+ * the QR from `placed.total` — and every amount before that is labelled an
+ * estimate and carries no QR. A QR is a payment instruction: showing one we
+ * computed ourselves is how a customer transfers the wrong amount.
+ *
+ * idle -> placing -> awaiting_payment -> verifying -> success  (PromptPay)
+ * idle -> placing -> success                                   (COD)
  *
  * Coral is the sole interactive/price accent; ink carries the amount due; green
  * marks the verified-success state. Tokens-only, zero emoji.
@@ -19,7 +27,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -38,7 +46,13 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { attachSlip, orderErrorMessage, placeOrder, type PlacedOrder } from '@/lib/data/order';
+import {
+  attachSlip,
+  orderErrorMessage,
+  placeOrder,
+  validatePromo,
+  type PlacedOrder,
+} from '@/lib/data/order';
 import { uploadSlip } from '@/lib/data/storage';
 import { compressForUpload } from '@/lib/images';
 import { useShop } from '@/store/shop';
@@ -47,10 +61,37 @@ import { useT } from '@/lib/i18n';
 import { type PaymentMethod } from '@/lib/payment';
 import { uuidv4 } from '@/lib/uuid';
 import { selectedAddress, useAddress } from '@/store/address';
-import { cartCount, cartSubtotal, selectedItems, useCart } from '@/store/cart';
+import { useAuth } from '@/store/auth';
+import { cartCount, cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
 import { deliveryFeeFor, useMode } from '@/store/mode';
 
-type Status = 'idle' | 'verifying' | 'success';
+type Status = 'idle' | 'placing' | 'awaiting_payment' | 'verifying' | 'success';
+
+/**
+ * Survives unmount for the app session. Placing the order before the QR means
+ * backing out of checkout leaves a real awaiting-payment order behind that is
+ * already holding committed stock — so coming back has to resume THAT order
+ * rather than place a second one. Keyed by what the order is made of: an
+ * identical attempt reuses the idempotency key, and `place_order` replays the
+ * order it already created (H1). A genuinely different cart is a different
+ * order and correctly gets a new key.
+ */
+let pendingAttempt: { signature: string; key: string; order: PlacedOrder | null } | null = null;
+
+/** What the order is made of — payment method is deliberately NOT part of it
+ *  (see H1: once a key is submitted, an order may exist under it).
+ *  `userId` scopes it: the cart persists per device, so without it a sign-out
+ *  and a new sign-in with the same basket would resume the previous person's
+ *  order and show them its QR. */
+function attemptSignature(
+  userId: string | null,
+  items: CartItem[],
+  mode: string,
+  promoCode: string | null,
+): string {
+  const lines = items.map((i) => `${i.variantId}:${i.qty}`).sort().join(',');
+  return `${userId ?? 'anon'}|${mode}|${promoCode ?? ''}|${lines}`;
+}
 
 /** A selectable payment method row. Text is resolved via i18n at render. */
 type MethodOption = {
@@ -85,15 +126,17 @@ export default function CheckoutScreen() {
   const mode = useMode((s) => s.mode);
   const promptPay = useShop((s) => s.info.promptPay);
   const address = useAddress(selectedAddress);
+  const userId = useAuth((s) => s.userId);
 
-  const { promo, discount } = useLocalSearchParams<{ promo?: string; discount?: string }>();
-  const promoDiscount = discount ? Number(discount) : 0;
+  // Only the promo CODE crosses the route — a discount amount handed over from
+  // the cart is a price frozen at tap time, and the subtotal it was priced
+  // against may not exist any more (H2).
+  const { promo } = useLocalSearchParams<{ promo?: string }>();
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
   const count = cartCount(chosen);
   const deliveryFee = deliveryFeeFor(mode, subtotal);
-  const total = subtotal + deliveryFee - promoDiscount;
 
   // Online flow pays up-front (PromptPay only); delivery defaults to COD but may
   // also pay by PromptPay.
@@ -105,9 +148,21 @@ export default function CheckoutScreen() {
   );
   const [slipUri, setSlipUri] = useState<string | null>(null);
   const [slipBase64, setSlipBase64] = useState<string | null>(null);
-  const [status, setStatus] = useState<Status>('idle');
-  const [placed, setPlaced] = useState<PlacedOrder | null>(null);
+
+  // An order placed earlier this session for this exact cart — resume it rather
+  // than place a second one. Read once, at mount: `useState`/`useRef` keep the
+  // initial value, so later renders can't thrash it.
+  const resumed =
+    pendingAttempt?.signature === attemptSignature(userId, chosen, mode, promo ?? null)
+      ? pendingAttempt.order
+      : null;
+
+  const [status, setStatus] = useState<Status>(resumed ? 'awaiting_payment' : 'idle');
+  const [placed, setPlaced] = useState<PlacedOrder | null>(resumed);
   const [copied, setCopied] = useState(false);
+  /** Best-effort discount for the pre-order estimate. Re-priced against the live
+   *  subtotal on every change, so it cannot freeze the way the cart's did. */
+  const [estDiscount, setEstDiscount] = useState(0);
 
   // One idempotency key per checkout attempt, minted at the first confirm and
   // held across retries: if the server committed the order but the response
@@ -115,23 +170,63 @@ export default function CheckoutScreen() {
   // second one. Minting it per call (the old behaviour) is exactly the bug.
   // It deliberately survives cart/method/promo edits — once a key has been
   // submitted an order may exist under it, and a fresh key would double-charge.
-  // The screen is the key's whole lifetime: leaving checkout unmounts it.
-  const checkoutKeyRef = useRef<string | null>(null);
+  // Since the order is now placed BEFORE the QR, the key also has to outlive the
+  // screen (see `pendingAttempt`): backing out and returning must land on the
+  // same order, not mint a second one holding its own stock.
+  const checkoutKeyRef = useRef<string | null>(resumed ? (pendingAttempt?.key ?? null) : null);
   // The server cart is authoritative for this key once synced; a committed
   // place_order consumes it, so re-syncing on retry would rebuild a phantom
   // cart under an order that already exists.
-  const cartSyncedRef = useRef(false);
+  const cartSyncedRef = useRef(!!resumed);
   // `status` is stale inside two taps dispatched in the same tick — a ref is
   // the only guard that closes the double-submit window synchronously.
   const inFlightRef = useRef(false);
 
-  const needsSlip = method === 'promptpay';
-  const canConfirm = !needsSlip || !!slipUri;
-  const ctaLabel =
-    method === 'cod' ? t('checkout.confirmOrder') : t('checkout.confirmPayment');
+  // Re-price the promo whenever the basket moves. Preview only — `place_order`
+  // is what actually decides, and it re-prices again server-side.
+  useEffect(() => {
+    if (!promo || subtotal <= 0) {
+      setEstDiscount(0);
+      return;
+    }
+    let cancelled = false;
+    validatePromo(promo, subtotal, mode)
+      .then((r) => {
+        if (!cancelled) setEstDiscount(r.valid ? r.discount : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setEstDiscount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [promo, subtotal, mode]);
 
-  /* ----- Guard: nothing to pay for (e.g. opened with an empty selection) ---- */
-  if (chosen.length === 0 && status !== 'success') {
+  const estimateTotal = subtotal + deliveryFee - estDiscount;
+  /** Once the order exists its numbers are the only true ones. */
+  const shownTotal = placed ? placed.total : estimateTotal;
+  const shownSubtotal = placed ? placed.subtotal : subtotal;
+  const shownFee = placed ? placed.deliveryFee : deliveryFee;
+  const shownDiscount = placed ? placed.discountAmount : estDiscount;
+
+  const needsSlip = method === 'promptpay';
+  // The QR is only ever drawn from a placed order's total.
+  const showQr = needsSlip && !!placed;
+  const awaiting = status === 'awaiting_payment';
+  const busy = status === 'placing' || status === 'verifying';
+
+  // Step 1 places the order; step 2 (PromptPay only) submits the slip against it.
+  const ctaLabel = placed
+    ? t('checkout.confirmPayment')
+    : method === 'cod'
+      ? t('checkout.confirmOrder')
+      : t('checkout.continueToPay');
+  const canConfirm = awaiting ? !!slipUri : status === 'idle';
+
+  /* ----- Guard: nothing to pay for (e.g. opened with an empty selection) ----
+   * `placed` exempts the awaiting-payment screen: that order is real and owed,
+   * so it must stay reachable even if the cart underneath it empties. */
+  if (chosen.length === 0 && !placed && status !== 'success') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <ScreenHeader
@@ -185,15 +280,11 @@ export default function CheckoutScreen() {
     }
   };
 
-  const onConfirm = async () => {
-    // Covers 'success' too: the CTA stays mounted under the success toast, and
-    // re-confirming there would re-attach a slip the order already has (which
-    // attach_payment_slip rejects once payment_status left awaiting_payment).
+  /* ── Step 1: place the order. Nothing payable is shown before this lands ─── */
+  const onPlaceOrder = async () => {
+    // Covers every non-idle status: the CTA stays mounted under the success
+    // toast, and `status` alone is stale across two taps in one tick.
     if (inFlightRef.current || status !== 'idle') return;
-    if (needsSlip && !slipUri) {
-      Alert.alert(t('checkout.noSlipTitle'), t('checkout.noSlipBody'));
-      return;
-    }
     if (!address) {
       // พาไปหน้าเพิ่มที่อยู่ได้ทันที ไม่ต้องย้อนหาเอง
       Alert.alert(t('checkout.noAddressTitle'), t('checkout.noAddressBody'), [
@@ -204,10 +295,16 @@ export default function CheckoutScreen() {
     }
     if (chosen.length === 0) return;
     inFlightRef.current = true;
-    setStatus('verifying');
+    setStatus('placing');
     // Minted lazily, so the key always reflects the cart as it stands at the
-    // first confirm; every retry after that reuses it.
-    if (!checkoutKeyRef.current) checkoutKeyRef.current = uuidv4();
+    // first confirm; every retry after that reuses it. An identical attempt
+    // from earlier this session resumes its key so place_order replays that
+    // order instead of placing a second one that holds more stock.
+    if (!checkoutKeyRef.current) {
+      const sig = attemptSignature(userId, chosen, mode, promo ?? null);
+      checkoutKeyRef.current = pendingAttempt?.signature === sig ? pendingAttempt.key : uuidv4();
+      pendingAttempt = { signature: sig, key: checkoutKeyRef.current, order: null };
+    }
     try {
       // The selected address is already a backend row; place the order on it.
       const order = await placeOrder({
@@ -222,28 +319,53 @@ export default function CheckoutScreen() {
           cartSyncedRef.current = true;
         },
       });
-      // Prepay: upload the slip to Storage, then record its path.
-      if (method !== 'cod' && slipBase64) {
-        try {
-          const path = await uploadSlip(order.id, slipBase64);
-          await attachSlip(order.id, path, order.total);
-        } catch {
-          Alert.alert(
-            t('checkout.slipUploadFailedTitle'),
-            t('checkout.slipUploadFailedBody'),
-          );
-        }
-      }
       setPlaced(order);
+      if (pendingAttempt) pendingAttempt.order = order;
+      if (method === 'cod') {
+        // COD owes nothing now — the old single-confirm flow, unchanged.
+        if (Platform.OS !== 'web') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+        setStatus('success');
+      } else {
+        // Only now is there an authoritative amount to render a QR for.
+        if (Platform.OS !== 'web') Haptics.selectionAsync();
+        setStatus('awaiting_payment');
+      }
+    } catch (e) {
+      // Key and cart-synced flag survive on purpose — the throw may be a lost
+      // response over an order that did commit, so the retry has to carry them.
+      // A rejected promo / min-spend lands here too: an error before any QR,
+      // which is the whole point of placing first.
+      setStatus('idle');
+      Alert.alert(t('checkout.orderFailedTitle'), orderErrorMessage(e));
+    } finally {
+      inFlightRef.current = false;
+    }
+  };
+
+  /* ── Step 2: attach the slip to the order that already exists ───────────── */
+  const onSubmitSlip = async () => {
+    if (inFlightRef.current || status !== 'awaiting_payment') return;
+    if (!placed) return;
+    if (!slipUri || !slipBase64) {
+      Alert.alert(t('checkout.noSlipTitle'), t('checkout.noSlipBody'));
+      return;
+    }
+    inFlightRef.current = true;
+    setStatus('verifying');
+    try {
+      const path = await uploadSlip(placed.id, slipBase64);
+      await attachSlip(placed.id, path, placed.total);
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       setStatus('success');
-    } catch (e) {
-      // Key and cart-synced flag survive on purpose — the throw may be a lost
-      // response over an order that did commit, so the retry has to carry them.
-      setStatus('idle');
-      Alert.alert(t('checkout.orderFailedTitle'), orderErrorMessage(e));
+    } catch {
+      // The order is already placed and paid for — a failed upload must drop
+      // back to the SAME order to retry, never place another one.
+      setStatus('awaiting_payment');
+      Alert.alert(t('checkout.slipUploadFailedTitle'), t('checkout.slipUploadFailedBody'));
     } finally {
       inFlightRef.current = false;
     }
@@ -252,9 +374,11 @@ export default function CheckoutScreen() {
   // Once the success card is closed: clear the paid lines, then start tracking —
   // delivery → live rider map, online → parcel timeline.
   const finishSuccess = () => {
-    // The attempt is closed: retire the key so nothing can replay this order.
+    // The attempt is closed: retire the key so nothing can replay this order,
+    // and drop the session resume so the next checkout starts clean.
     checkoutKeyRef.current = null;
     cartSyncedRef.current = false;
+    pendingAttempt = null;
     removeSelected();
     // The order lives in the DB now; the tracking screen loads it by number.
     if (placed) router.replace(`/order/${placed.orderNumber}`);
@@ -284,10 +408,17 @@ export default function CheckoutScreen() {
           styles.content,
           { paddingBottom: insets.bottom + 120 },
         ]}>
-        {/* Amount due */}
+        {/* Amount — an estimate until the order exists, then the server's */}
         <View style={styles.amountCard}>
-          <Text variant="caption">{t('checkout.amountDue')}</Text>
-          <Text style={styles.amountValue}>{money(total)}</Text>
+          <Text variant="caption">
+            {placed ? t('checkout.amountDue') : t('checkout.amountEstimate')}
+          </Text>
+          <Text style={styles.amountValue}>{money(shownTotal)}</Text>
+          {!placed ? (
+            <Text variant="caption" style={styles.estimateNote}>
+              {t('checkout.estimateNote')}
+            </Text>
+          ) : null}
           <View style={styles.amountMeta}>
             <Ionicons
               name={mode === 'delivery' ? 'bicycle-outline' : 'cube-outline'}
@@ -304,28 +435,28 @@ export default function CheckoutScreen() {
           <View style={styles.breakdown}>
             <View style={styles.breakRow}>
               <Text variant="caption">{t('checkout.subtotal')}</Text>
-              <Text style={styles.breakValue}>{money(subtotal)}</Text>
+              <Text style={styles.breakValue}>{money(shownSubtotal)}</Text>
             </View>
             <View style={[styles.breakRow, styles.breakRowGap]}>
               <Text variant="caption">
                 {mode === 'delivery' ? t('checkout.deliveryFee') : t('checkout.flashFee')}
               </Text>
-              {deliveryFee === 0 ? (
+              {shownFee === 0 ? (
                 <Text style={[styles.breakValue, { color: Colors.accentStrong }]}>
                   {t('checkout.free')}
                 </Text>
               ) : (
-                <Text style={styles.breakValue}>{money(deliveryFee)}</Text>
+                <Text style={styles.breakValue}>{money(shownFee)}</Text>
               )}
             </View>
-            {promoDiscount > 0 ? (
+            {shownDiscount > 0 ? (
               <View style={[styles.breakRow, styles.breakRowGap]}>
                 <Text variant="caption">
                   {t('checkout.discount')}
                   {promo ? ` (${promo})` : ''}
                 </Text>
                 <Text style={[styles.breakValue, { color: Colors.accentStrong }]}>
-                  -{money(promoDiscount)}
+                  -{money(shownDiscount)}
                 </Text>
               </View>
             ) : null}
@@ -359,8 +490,11 @@ export default function CheckoutScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={t(m.titleKey)}
                   scaleTo={0.99}
+                  // The placed order already carries its payment_method; letting
+                  // it be switched underneath would just desync the two.
+                  disabled={!!placed || busy}
                   onPress={() => setMethod(m.key)}
-                  style={styles.methodRow}>
+                  style={[styles.methodRow, !!placed && m.key !== method && styles.methodRowOff]}>
                   <View style={[styles.methodIcon, active && styles.methodIconOn]}>
                     <Ionicons
                       name={m.icon}
@@ -383,12 +517,23 @@ export default function CheckoutScreen() {
           })}
         </View>
 
-        {/* PromptPay detail */}
-        {method === 'promptpay' ? (
+        {/* PromptPay — before the order exists there is no amount we're allowed
+            to put on a QR, so the customer gets the reason instead. */}
+        {needsSlip && !placed ? (
+          <View style={styles.codNote}>
+            <Ionicons name="lock-closed-outline" size={18} color={Colors.primaryStrong} />
+            <Text variant="caption" style={styles.codNoteText}>
+              {t('checkout.qrAfterOrder')}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* PromptPay detail — amount is the order's, never ours */}
+        {showQr && placed ? (
           <Animated.View entering={FadeIn.duration(220)}>
             <PromptPayQR
               target={promptPay.target}
-              amount={total}
+              amount={placed.total}
               displayName={promptPay.displayName}
               onCopyNumber={copyNumber}
             />
@@ -447,14 +592,16 @@ export default function CheckoutScreen() {
               </PressableScale>
             )}
           </Animated.View>
-        ) : (
+        ) : null}
+
+        {method === 'cod' ? (
           <View style={styles.codNote}>
             <Ionicons name="information-circle-outline" size={18} color={Colors.primaryStrong} />
             <Text variant="caption" style={styles.codNoteText}>
-              {t('checkout.prepareCash')} {money(total)} {t('checkout.payRiderOnReceive')}
+              {t('checkout.prepareCash')} {money(shownTotal)} {t('checkout.payRiderOnReceive')}
             </Text>
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
       {/* Sticky confirm bar */}
@@ -463,7 +610,7 @@ export default function CheckoutScreen() {
           styles.confirmBar,
           { paddingBottom: insets.bottom + Spacing.sm },
         ]}>
-        {needsSlip && !slipUri ? (
+        {awaiting && !slipUri ? (
           <Text variant="caption" style={styles.confirmHint}>
             {t('checkout.attachSlipHint')}
           </Text>
@@ -471,25 +618,27 @@ export default function CheckoutScreen() {
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={ctaLabel}
-          disabled={!canConfirm || status !== 'idle'}
-          onPress={onConfirm}
+          disabled={!canConfirm || busy || status === 'success'}
+          onPress={awaiting ? onSubmitSlip : onPlaceOrder}
           style={[
             styles.confirmCta,
-            (!canConfirm || status !== 'idle') && styles.confirmCtaOff,
+            (!canConfirm || busy || status === 'success') && styles.confirmCtaOff,
           ]}>
           <Text style={styles.confirmCtaText}>{ctaLabel}</Text>
-          <Text style={styles.confirmCtaAmount}>{money(total)}</Text>
+          <Text style={styles.confirmCtaAmount}>{money(shownTotal)}</Text>
         </PressableScale>
       </View>
 
-      {/* Verifying overlay */}
-      {status === 'verifying' ? (
+      {/* Busy overlay — the two steps say different things */}
+      {busy ? (
         <Animated.View entering={FadeIn.duration(150)} style={styles.verifyOverlay}>
           <View style={styles.verifyCard}>
             <ActivityIndicator size="large" color={Colors.primary} />
-            <Text style={styles.verifyText}>{t('checkout.verifying')}</Text>
+            <Text style={styles.verifyText}>
+              {status === 'placing' ? t('checkout.placing') : t('checkout.verifying')}
+            </Text>
             <Text variant="caption" style={styles.verifySub}>
-              {t('checkout.verifyingSub')}
+              {status === 'placing' ? t('checkout.placingSub') : t('checkout.verifyingSub')}
             </Text>
           </View>
         </Animated.View>
@@ -564,6 +713,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginTop: Spacing.xxs,
   },
+  estimateNote: {
+    marginTop: Spacing.xxs,
+  },
   amountMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -614,6 +766,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     padding: Spacing.lg,
+  },
+  methodRowOff: {
+    opacity: 0.45,
   },
   methodIcon: {
     width: 40,
