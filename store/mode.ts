@@ -64,15 +64,24 @@ export const FREE_DELIVERY_MIN = 200;
 export const MIN_ORDER = 100;
 
 /** Flat parcel-shipping fee (online), waived above the threshold.
-    MUST match shop_settings.online_fee (0048) — place_order recomputes there. */
+    ESTIMATE ONLY — the owner edits the real one in shop_settings.online_fee
+    (0048) and place_order charges from there, so this copy goes stale the day
+    they change it and no rebuild can be assumed. See `deliveryFeeFor`. */
 export const FLASH_FEE = 150;
 /** No free-shipping tier for parcels (owner decision) — every online order
-    pays the fee. Mirrors shop_settings.online_free_threshold = NULL (0049). */
+    pays the fee. Mirrors shop_settings.online_free_threshold = NULL (0049).
+    ESTIMATE ONLY, same caveat as FLASH_FEE. */
 export const FLASH_FREE_MIN = Number.POSITIVE_INFINITY;
 
 /**
  * Fulfilment fee for a subtotal + mode — rider delivery fee (`delivery`) or
  * parcel-shipping fee (`online`), each waived above its free threshold.
+ *
+ * AN ESTIMATE, NOT A PRICE. The owner can change the online fee/threshold in
+ * shop_settings whenever they like, and `place_order` charges from there — this
+ * is a client-side copy that cannot know it has gone stale (M1). Use it for
+ * pre-order "ประมาณการ" UI only. Anything the customer actually pays — above
+ * all a PromptPay QR — must come from `PlacedOrder.total`.
  */
 export function deliveryFeeFor(mode: ShopMode, subtotal: number): number {
   if (mode === 'delivery') {
