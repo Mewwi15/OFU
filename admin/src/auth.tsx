@@ -9,6 +9,7 @@ export type AdminProfile = {
   displayName: string;
   role: string;
   tier: string | null;
+  accountState: string;
 };
 
 type AuthCtx = {
@@ -36,12 +37,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from('app_users')
-      .select('id, display_name, role, admin_tier')
+      .select('id, display_name, role, admin_tier, account_state')
       .eq('id', s.user.id)
+      .eq('account_state', 'active')
       .maybeSingle();
     setProfile(
       data
-        ? { id: data.id, displayName: data.display_name ?? '', role: data.role, tier: data.admin_tier }
+        ? {
+            id: data.id,
+            displayName: data.display_name ?? '',
+            role: data.role,
+            tier: data.admin_tier,
+            accountState: data.account_state,
+          }
         : null,
     );
   }
@@ -79,7 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ ready, session, profile, isAdmin: profile?.role === 'admin', signIn, signOut }}>
+      value={{
+        ready,
+        session,
+        profile,
+        isAdmin: profile?.role === 'admin' && profile.accountState === 'active',
+        signIn,
+        signOut,
+      }}>
       {children}
     </Ctx.Provider>
   );
