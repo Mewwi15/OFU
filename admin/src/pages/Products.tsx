@@ -30,6 +30,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   apiError,
@@ -400,11 +401,14 @@ function ProductModal({
   onSaved: () => void;
 }) {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const [busy, setBusy] = useState(false);
   const [images, setImages] = useState<ProductImage[]>(product?.product_images as ProductImage[] ?? []);
   // Images picked while creating a NEW product (no id yet) — uploaded on save.
   const [pending, setPending] = useState<{ file: File; url: string }[]>([]);
+  const isNewProduct = !product;
+  const variantId = product?.product_variants?.[0]?.id;
 
   // Scanner wedge v3 — deterministic, no more timing guesswork ("หน้าสินค้าหลอน").
   //
@@ -629,7 +633,7 @@ function ProductModal({
         barcode: v.barcode?.trim() || null,
         cost_price: v.cost_price ?? null,
         price: Number(v.price),
-        stock_qty: v.stock_qty ?? 0,
+        ...(isNewProduct ? { stock_qty: v.stock_qty ?? 0 } : {}),
         low_stock_threshold: v.low_stock_threshold ?? undefined,
       });
       // Upload any images staged while creating (new products can't upload until they exist).
@@ -706,8 +710,23 @@ function ProductModal({
             {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
             <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
           </Form.Item>
-          <Form.Item name="stock_qty" label="สต็อกคงเหลือ">
-            <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
+          <Form.Item
+            name="stock_qty"
+            label="สต็อกคงเหลือ"
+            extra={isNewProduct ? undefined : 'แก้ไขสต็อกที่หน้าสต็อกเพื่อบันทึกประวัติการเคลื่อนไหว'}>
+            {isNewProduct ? (
+              <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
+            ) : (
+              <Space.Compact style={{ width: '100%' }}>
+                <InputNumber min={0} disabled style={{ width: '100%' }} placeholder="0" />
+                <Button
+                  onClick={() => {
+                    if (variantId) navigate(`/stock?variant=${variantId}&action=set`);
+                  }}>
+                  ปรับสต็อก
+                </Button>
+              </Space.Compact>
+            )}
           </Form.Item>
           <Form.Item name="low_stock_threshold" label="แจ้งเตือนเมื่อเหลือ ≤">
             <InputNumber min={0} style={{ width: '100%' }} placeholder="5" />
