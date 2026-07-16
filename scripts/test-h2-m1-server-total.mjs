@@ -42,6 +42,14 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('FATAL: set SUPABASE_URL and SUPABASE_ANON_KEY (never hardcode prod).');
   process.exit(1);
 }
+// The fee/promo cases ARE this test — without them it proves nothing about H2
+// or M1. Stop here rather than run a rump of it and report success.
+if (!SERVICE_KEY) {
+  console.error('FATAL: SUPABASE_SERVICE_ROLE_KEY is required — the M1 fee case and');
+  console.error('the H2 min-spend case both need it, and they are the whole point.');
+  console.error('  Get it with: npx supabase status -o env');
+  process.exit(1);
+}
 
 // Places real orders and edits shop settings. Local only, no override flag.
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '::1', 'host.docker.internal']);
@@ -52,13 +60,20 @@ if (!LOCAL_HOSTS.has(host)) {
 }
 
 let failures = 0;
+let skipped = 0;
 const pass = (c, m) => console.log(`  PASS  [${c}] ${m}`);
 const fail = (c, m, d) => {
   failures++;
   console.log(`  FAIL  [${c}] ${m}`);
   if (d !== undefined) console.log(`        ↳ ${d}`);
 };
-const skip = (c, m) => console.log(`  SKIP  [${c}] ${m}`);
+/** A skipped case is an UNPROVEN case. It must never read as green — this
+ *  previously logged and moved on, so a run with no service key skipped the
+ *  only two cases that matter and still printed ALL PASS + exit 0. */
+const skip = (c, m) => {
+  skipped++;
+  console.log(`  SKIP  [${c}] ${m}`);
+};
 const check = (c, cond, m, d) => (cond ? pass(c, m) : fail(c, m, d));
 
 const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -289,9 +304,13 @@ async function main() {
     }
   }
 
-  console.log(`\n${failures === 0 ? 'ALL PASS' : `${failures} FAILURE(S)`}`);
+  // Green ONLY when everything actually ran and passed. Anything else exits
+  // nonzero: an unproven case is not a pass.
+  if (failures > 0) console.log(`\n${failures} FAILURE(S)`);
+  else if (skipped > 0) console.log(`\nINCOMPLETE — ${skipped} case(s) SKIPPED and therefore NOT PROVEN`);
+  else console.log('\nALL PASS');
   await supa.auth.signOut();
-  process.exit(failures === 0 ? 0 : 1);
+  process.exit(failures === 0 && skipped === 0 ? 0 : 1);
 }
 
 main().catch((e) => {
