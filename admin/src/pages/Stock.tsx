@@ -50,6 +50,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { ACTION_COLOR } from '../lib/actionColors';
 import {
@@ -217,6 +218,7 @@ function matchItem(items: Item[], cells: Record<string, string>): Item | null {
 
 export function Stock() {
   const { message } = App.useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -294,6 +296,15 @@ export function Stock() {
     );
     setActionNote('');
   };
+
+  useEffect(() => {
+    const variantId = searchParams.get('variant');
+    if (!variantId || loading || action) return;
+    const item = items.find((i) => i.variantId === variantId);
+    if (!item) return;
+    openAction(searchParams.get('action') === 'receive' ? 'receive' : 'set', item);
+    setSearchParams({}, { replace: true });
+  }, [action, items, loading, searchParams, setSearchParams]);
 
   const runAction = async () => {
     if (!action || actionQty == null) return;
