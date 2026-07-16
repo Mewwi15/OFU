@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -45,6 +45,7 @@ import { useShop } from '@/store/shop';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { type PaymentMethod } from '@/lib/payment';
+import { uuidv4 } from '@/lib/uuid';
 import { selectedAddress, useAddress } from '@/store/address';
 import { cartCount, cartSubtotal, selectedItems, useCart } from '@/store/cart';
 import { deliveryFeeFor, useMode } from '@/store/mode';
@@ -108,6 +109,22 @@ export default function CheckoutScreen() {
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // One idempotency key per checkout attempt, minted at the first confirm and
+  // held across retries: if the server committed the order but the response
+  // never made it back, the retry replays that order instead of placing a
+  // second one. Minting it per call (the old behaviour) is exactly the bug.
+  // It deliberately survives cart/method/promo edits — once a key has been
+  // submitted an order may exist under it, and a fresh key would double-charge.
+  // The screen is the key's whole lifetime: leaving checkout unmounts it.
+  const checkoutKeyRef = useRef<string | null>(null);
+  // The server cart is authoritative for this key once synced; a committed
+  // place_order consumes it, so re-syncing on retry would rebuild a phantom
+  // cart under an order that already exists.
+  const cartSyncedRef = useRef(false);
+  // `status` is stale inside two taps dispatched in the same tick — a ref is
+  // the only guard that closes the double-submit window synchronously.
+  const inFlightRef = useRef(false);
+
   const needsSlip = method === 'promptpay';
   const canConfirm = !needsSlip || !!slipUri;
   const ctaLabel =
@@ -169,7 +186,10 @@ export default function CheckoutScreen() {
   };
 
   const onConfirm = async () => {
-    if (status === 'verifying') return;
+    // Covers 'success' too: the CTA stays mounted under the success toast, and
+    // re-confirming there would re-attach a slip the order already has (which
+    // attach_payment_slip rejects once payment_status left awaiting_payment).
+    if (inFlightRef.current || status !== 'idle') return;
     if (needsSlip && !slipUri) {
       Alert.alert(t('checkout.noSlipTitle'), t('checkout.noSlipBody'));
       return;
@@ -183,7 +203,11 @@ export default function CheckoutScreen() {
       return;
     }
     if (chosen.length === 0) return;
+    inFlightRef.current = true;
     setStatus('verifying');
+    // Minted lazily, so the key always reflects the cart as it stands at the
+    // first confirm; every retry after that reuses it.
+    if (!checkoutKeyRef.current) checkoutKeyRef.current = uuidv4();
     try {
       // The selected address is already a backend row; place the order on it.
       const order = await placeOrder({
@@ -192,6 +216,11 @@ export default function CheckoutScreen() {
         paymentMethod: method === 'cod' ? 'cod' : 'promptpay_slip',
         addressId: address.id,
         promoCode: promo ?? null,
+        idempotencyKey: checkoutKeyRef.current,
+        skipCartSync: cartSyncedRef.current,
+        onCartSynced: () => {
+          cartSyncedRef.current = true;
+        },
       });
       // Prepay: upload the slip to Storage, then record its path.
       if (method !== 'cod' && slipBase64) {
@@ -211,14 +240,21 @@ export default function CheckoutScreen() {
       }
       setStatus('success');
     } catch (e) {
+      // Key and cart-synced flag survive on purpose — the throw may be a lost
+      // response over an order that did commit, so the retry has to carry them.
       setStatus('idle');
       Alert.alert(t('checkout.orderFailedTitle'), orderErrorMessage(e));
+    } finally {
+      inFlightRef.current = false;
     }
   };
 
   // Once the success card is closed: clear the paid lines, then start tracking —
   // delivery → live rider map, online → parcel timeline.
   const finishSuccess = () => {
+    // The attempt is closed: retire the key so nothing can replay this order.
+    checkoutKeyRef.current = null;
+    cartSyncedRef.current = false;
     removeSelected();
     // The order lives in the DB now; the tracking screen loads it by number.
     if (placed) router.replace(`/order/${placed.orderNumber}`);
@@ -435,9 +471,12 @@ export default function CheckoutScreen() {
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={ctaLabel}
-          disabled={!canConfirm || status === 'verifying'}
+          disabled={!canConfirm || status !== 'idle'}
           onPress={onConfirm}
-          style={[styles.confirmCta, !canConfirm && styles.confirmCtaOff]}>
+          style={[
+            styles.confirmCta,
+            (!canConfirm || status !== 'idle') && styles.confirmCtaOff,
+          ]}>
           <Text style={styles.confirmCtaText}>{ctaLabel}</Text>
           <Text style={styles.confirmCtaAmount}>{money(total)}</Text>
         </PressableScale>

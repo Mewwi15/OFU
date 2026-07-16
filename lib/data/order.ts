@@ -3,12 +3,16 @@
  * via the 0005 commerce RPCs. The local cart is synced into the authoritative
  * server cart (clear → add → set mode) and then `place_order` creates the order
  * atomically (reserves/commits stock, applies promo, idempotent).
+ *
+ * The idempotency key belongs to the *checkout attempt*, not to a call: if the
+ * response is lost after the server commits, the retry must carry the same key
+ * so `place_order` replays that order instead of charging the customer twice.
+ * That's why `placeOrder` takes the key rather than minting one per call.
  */
 
 import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
 import type { CartItem } from '@/store/cart';
 import { supabase } from '@/lib/supabase/client';
-import { uuidv4 } from '@/lib/uuid';
 
 export type ShopMode = 'delivery' | 'online';
 export type RpcPaymentMethod = 'cod' | 'promptpay_slip';
@@ -41,38 +45,59 @@ export type PlaceOrderInput = {
   paymentMethod: RpcPaymentMethod;
   addressId: string;
   promoCode?: string | null;
+  /**
+   * Stable across every retry of one checkout attempt, so a retry after a lost
+   * response replays the order the server already committed instead of placing
+   * a second one. The caller owns the key's lifetime — minting it here would
+   * make each retry a fresh key and defeat the whole mechanism.
+   */
+  idempotencyKey: string;
+  /**
+   * Set on a retry whose earlier attempt already synced the cart. A committed
+   * `place_order` consumes the server cart, so re-running the sync would
+   * rebuild it under an order that already exists.
+   */
+  skipCartSync?: boolean;
+  /** Fired once the server cart matches `items` — lets the caller set `skipCartSync` on retry. */
+  onCartSynced?: () => void;
 };
 
 /** Sync the cart to the server then place the order. Returns the created order. */
 export async function placeOrder(input: PlaceOrderInput): Promise<PlacedOrder> {
   // 1) make the server cart match the selected local lines
-  {
-    const { error } = await supabase.rpc('clear_cart');
-    if (error) throw error;
-  }
-  // One request per distinct cart line, fired concurrently — each targets a
-  // different (cart_id, variant_id) row so there's no write conflict between
-  // them (only cart_ensure()'s shared touch on the single carts row briefly
-  // serializes, a sub-millisecond DB-side wait, not a network one). Awaiting
-  // them one at a time here previously turned a 5-8 item cart into 5-8 full
-  // sequential network round trips before checkout could even start.
-  {
-    const results = await Promise.all(
-      input.items.map((item) =>
-        supabase.rpc('add_cart_item', { p_variant_id: item.variantId, p_qty: item.qty }),
-      ),
-    );
-    const failed = results.find((r) => r.error);
-    if (failed?.error) throw failed.error;
-  }
-  {
-    const { error } = await supabase.rpc('set_cart_mode', { p_shop_mode: input.mode });
-    if (error) throw error;
+  if (!input.skipCartSync) {
+    {
+      const { error } = await supabase.rpc('clear_cart');
+      if (error) throw error;
+    }
+    // One request per distinct cart line, fired concurrently — each targets a
+    // different (cart_id, variant_id) row so there's no write conflict between
+    // them (only cart_ensure()'s shared touch on the single carts row briefly
+    // serializes, a sub-millisecond DB-side wait, not a network one). Awaiting
+    // them one at a time here previously turned a 5-8 item cart into 5-8 full
+    // sequential network round trips before checkout could even start.
+    {
+      const results = await Promise.all(
+        input.items.map((item) =>
+          supabase.rpc('add_cart_item', { p_variant_id: item.variantId, p_qty: item.qty }),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    }
+    {
+      const { error } = await supabase.rpc('set_cart_mode', { p_shop_mode: input.mode });
+      if (error) throw error;
+    }
+    // Only now is the server cart authoritative for this attempt; a sync that
+    // threw above leaves this unfired so the retry rebuilds from scratch.
+    input.onCartSynced?.();
   }
 
-  // 2) place the order (idempotency key per attempt)
+  // 2) place the order (idempotency key is per checkout attempt, not per call:
+  // `place_order` replays the matching orders.idempotency_key row untouched)
   const { data, error } = await supabase.rpc('place_order', {
-    p_idempotency_key: uuidv4(),
+    p_idempotency_key: input.idempotencyKey,
     p_shop_mode: input.mode,
     p_payment_method: input.paymentMethod,
     p_address_id: input.addressId,
