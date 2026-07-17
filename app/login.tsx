@@ -20,6 +20,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   TextInput,
   View,
@@ -45,6 +46,21 @@ type Step = 'form' | 'verify';
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const t = useT();
+
+  // The reported bug is the welcome title sitting under the status bar and the
+  // privacy link under the Android nav buttons — i.e. these insets arriving as
+  // 0 on a device that IS drawing edge-to-edge, since the padding below is
+  // otherwise correct. `StatusBar.currentHeight` is a second, independent
+  // reading of the Android status bar, so take whichever is larger rather than
+  // trusting one source. Both agree on a healthy device (max is then a no-op);
+  // if safe-area-context under-reports, this still clears the bar.
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
+  );
+  // No equivalent OS reading for the nav bar, so the floor is a plain minimum:
+  // enough that the consent links stay tappable rather than pinned to the edge.
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? Spacing.x2 : 0);
   const signInEmail = useAuth((s) => s.signInEmail);
   const signUpEmail = useAuth((s) => s.signUpEmail);
   const verifyEmailCode = useAuth((s) => s.verifyEmailCode);
@@ -182,7 +198,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top + Spacing.x3, paddingBottom: insets.bottom + Spacing.x2 },
+          { paddingTop: topInset + Spacing.x3, paddingBottom: bottomInset + Spacing.x3 },
         ]}>
         {/* Brand — a tinted hero band (not just text floating on the plain
             background) so the screen reads as designed, not placeholder. */}
@@ -423,17 +439,37 @@ export default function LoginScreen() {
         )}
 
         {/* PDPA consent — both open the same hosted policy page (no separate
-            terms-of-use page exists yet; see lib/legal.ts). */}
-        <Text variant="caption" style={styles.consent}>
-          {t('login.consentPrefix')}{' '}
-          <Text style={styles.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
-            {t('login.terms')}
-          </Text>{' '}
-          {t('common.and')}{' '}
-          <Text style={styles.consentLink} onPress={() => Linking.openURL(PRIVACY_URL)}>
-            {t('login.privacy')}
+            terms-of-use page exists yet; see lib/legal.ts).
+            Real Pressables, not `<Text onPress>` nested in a sentence: that
+            gives a tap target the exact size of the glyphs and takes no
+            hitSlop. Both stores require the privacy policy to be reachable, so
+            a link that is merely *technically* present fails review. */}
+        <View style={styles.consentBlock}>
+          <Text variant="caption" style={styles.consent}>
+            {t('login.consentPrefix')}
           </Text>
-        </Text>
+          <View style={styles.consentLinkRow}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('login.terms')}
+              hitSlop={12}
+              onPress={() => Linking.openURL(PRIVACY_URL)}
+              style={styles.consentHit}>
+              <Text style={styles.consentLink}>{t('login.terms')}</Text>
+            </Pressable>
+            <Text variant="caption" style={styles.consent}>
+              {t('common.and')}
+            </Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('login.privacy')}
+              hitSlop={12}
+              onPress={() => Linking.openURL(PRIVACY_URL)}
+              style={styles.consentHit}>
+              <Text style={styles.consentLink}>{t('login.privacy')}</Text>
+            </Pressable>
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -621,6 +657,18 @@ const styles = StyleSheet.create({
   resendText: { ...Typography.button, color: Colors.primaryStrong },
 
   /* Consent */
-  consent: { textAlign: 'center', marginTop: Spacing.x3, paddingTop: Spacing.x2, lineHeight: 19 },
-  consentLink: { color: Colors.primaryStrong },
+  consentBlock: { marginTop: Spacing.x3, paddingTop: Spacing.x2 },
+  consent: { textAlign: 'center', lineHeight: 19 },
+  consentLinkRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Keeps the row readable when the OS font scale is turned up and the links
+    // wrap onto separate lines.
+    columnGap: Spacing.xs,
+  },
+  // A real touch target around the link text rather than the glyphs alone.
+  consentHit: { paddingVertical: Spacing.xs, paddingHorizontal: Spacing.xxs },
+  consentLink: { ...Typography.caption, color: Colors.primaryStrong },
 });
