@@ -27,6 +27,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+// ⚠️ TEMPORARY DIAGNOSTIC import — remove with the <SafeAreaProbe /> line below.
+import { SafeAreaProbe } from '@/components/dev/SafeAreaProbe';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
@@ -471,6 +473,13 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* ⚠️ TEMPORARY DIAGNOSTIC — DELETE THIS LINE (and components/dev/SafeAreaProbe.tsx)
+          BEFORE THE STORE BUILD. Reads the real inset numbers off the device,
+          since a standalone APK has no console to log to.
+          LAST sibling on purpose: later children paint on top, so the probe
+          can't end up hidden behind the ScrollView. */}
+      <SafeAreaProbe padTop={topInset + Spacing.x3} padBottom={bottomInset + Spacing.x3} />
     </KeyboardAvoidingView>
   );
 }
