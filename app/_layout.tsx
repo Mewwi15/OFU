@@ -244,6 +244,13 @@ export default function RootLayout() {
                 OAuth returns here both signed-in (link) and signed-out
                 (login). Web-only route. */}
             <Stack.Screen name="line-callback" />
+
+            {/* Also outside the gate, and that is the whole point: Google's
+                deep link (myrnapp://auth-callback?code=…) arrives while the
+                user is still signed out, so behind `showLogin` only /login
+                exists and the OS-delivered link hit "Unmatched Route" with the
+                code unread. Native OAuth return. */}
+            <Stack.Screen name="auth-callback" />
           </Stack>
           </ErrorBoundary>
           </SiteShell>
