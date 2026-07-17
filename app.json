@@ -9,8 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.oofoo.shop"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.oofoo.shop",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -73,19 +76,24 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ให้ อู้ฟู่ ใช้ตำแหน่งของคุณ เพื่อปักหมุดที่อยู่จัดส่ง"
+          "locationWhenInUsePermission": "ให้ อู้ฟู่ ใช้ตำแหน่งของคุณ เพื่อปักหมุดที่อยู่จัดส่ง",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "ให้ อู้ฟู่ เข้าถึงรูปภาพ เพื่อแนบสลิปการโอนเงิน"
+          "photosPermission": "ให้ อู้ฟู่ เข้าถึงรูปภาพ เพื่อแนบสลิปการโอนเงิน",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
         "expo-media-library",
         {
-          "savePhotosPermission": "ให้ อู้ฟู่ บันทึกรูป QR ชำระเงินลงในอัลบั้มรูปของคุณ"
+          "savePhotosPermission": "ให้ อู้ฟู่ บันทึกรูป QR ชำระเงินลงในอัลบั้มรูปของคุณ",
+          "granularPermissions": ["photo"]
         }
       ],
       [
