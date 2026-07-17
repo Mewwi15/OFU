@@ -27,8 +27,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ⚠️ TEMPORARY DIAGNOSTIC import — remove with the <SafeAreaProbe /> line below.
-import { SafeAreaProbe } from '@/components/dev/SafeAreaProbe';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
@@ -49,13 +47,14 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const t = useT();
 
-  // The reported bug is the welcome title sitting under the status bar and the
-  // privacy link under the Android nav buttons — i.e. these insets arriving as
-  // 0 on a device that IS drawing edge-to-edge, since the padding below is
-  // otherwise correct. `StatusBar.currentHeight` is a second, independent
-  // reading of the Android status bar, so take whichever is larger rather than
-  // trusting one source. Both agree on a healthy device (max is then a no-op);
-  // if safe-area-context under-reports, this still clears the bar.
+  // Defensive, not a fix for an observed bug: on-device the insets are correct
+  // (measured T33 == StatusBar 33), and the overlap that kicked this off turned
+  // out to be a stale build. This is kept anyway because it can only ever ADD
+  // top padding (Math.max), never remove it — so it cannot regress the healthy
+  // case — while still clearing the status bar on an Android OEM that
+  // under-reports insets.top. Safe because SDK 54 forces edge-to-edge (this app
+  // always draws under the bar), so insets.top is the real value and
+  // StatusBar.currentHeight only ever matches or backstops it.
   const topInset = Math.max(
     insets.top,
     Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0,
@@ -473,13 +472,6 @@ export default function LoginScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* ⚠️ TEMPORARY DIAGNOSTIC — DELETE THIS LINE (and components/dev/SafeAreaProbe.tsx)
-          BEFORE THE STORE BUILD. Reads the real inset numbers off the device,
-          since a standalone APK has no console to log to.
-          LAST sibling on purpose: later children paint on top, so the probe
-          can't end up hidden behind the ScrollView. */}
-      <SafeAreaProbe padTop={topInset + Spacing.x3} padBottom={bottomInset + Spacing.x3} />
     </KeyboardAvoidingView>
   );
 }
