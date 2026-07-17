@@ -254,7 +254,7 @@ export default function RootLayout() {
           </Stack>
           </ErrorBoundary>
           </SiteShell>
-          <StatusBar style="dark" />
+          <StatusBar style="auto" />
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
