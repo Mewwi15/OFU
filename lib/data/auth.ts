@@ -44,6 +44,64 @@ export async function getAccountIdentity(): Promise<AccountIdentity | null> {
 export type OAuthProvider = 'google' | 'apple';
 
 /**
+ * In-flight/settled PKCE exchanges, keyed by the auth code.
+ *
+ * A code is single-use. On native the redirect can arrive TWICE — once as the
+ * `openAuthSessionAsync` promise resolving, and once as the OS handing the deep
+ * link to expo-router (/auth-callback) — and whichever loses would exchange a
+ * burnt code and report a failure over a sign-in that actually worked. Both
+ * paths go through here, so the second caller awaits the first one's promise
+ * instead of racing it: one code, one exchange, one answer.
+ *
+ * Entries are kept after settling (not deleted): a late duplicate must resolve
+ * from the same result rather than re-burn the code. A handful of short strings
+ * per app run.
+ */
+const codeExchanges = new Map<string, Promise<boolean>>();
+
+/**
+ * Exchange an OAuth `code` for a session — at most once per code, no matter how
+ * many callers ask. Resolves true when a session exists; rejects with Supabase's
+ * error if the exchange genuinely failed.
+ */
+export function exchangeAuthCodeOnce(code: string): Promise<boolean> {
+  const existing = codeExchanges.get(code);
+  if (existing) return existing;
+  const p = supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+    if (error) throw error;
+    return true;
+  });
+  codeExchanges.set(code, p);
+  return p;
+}
+
+/**
+ * Finish an OAuth redirect from its full return URL: prefer the PKCE `code`,
+ * fall back to implicit-flow tokens in the hash. Shared by the browser-session
+ * path and the /auth-callback route so the parsing rules can't drift apart.
+ * Throws the provider's `error` param if the user was bounced back with one.
+ */
+export async function completeOAuthRedirect(returnUrl: string): Promise<boolean> {
+  const url = new URL(returnUrl);
+  const providerError = url.searchParams.get('error');
+  if (providerError) throw new Error(providerError);
+
+  const code = url.searchParams.get('code');
+  if (code) return exchangeAuthCodeOnce(code);
+
+  // Implicit flow returns tokens in the URL hash fragment instead.
+  const params = new URLSearchParams(returnUrl.split('#')[1] ?? '');
+  const access_token = params.get('access_token');
+  const refresh_token = params.get('refresh_token');
+  if (access_token && refresh_token) {
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (error) throw error;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Social sign-in via Supabase OAuth (PKCE). Opens the provider in an auth
  * browser session, then exchanges the returned code for a session. The auth
  * store's onAuthStateChange picks the session up and flips the gate.
@@ -73,26 +131,14 @@ export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<
   if (error) throw error;
   if (!data?.url) throw new Error('NO_OAUTH_URL');
 
+  // Still the primary path — SDK 54 intends the browser session to hand the
+  // redirect straight back here. /auth-callback is the fallback for when the OS
+  // routes the deep link into expo-router instead (which is what happens on a
+  // standalone build), and `completeOAuthRedirect` dedupes the two.
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   if (result.type !== 'success' || !result.url) return false; // dismissed
 
-  const url = new URL(result.url);
-  const code = url.searchParams.get('code');
-  if (code) {
-    const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
-    if (exErr) throw exErr;
-    return true;
-  }
-  // Fallback: implicit flow returns tokens in the URL hash fragment.
-  const params = new URLSearchParams(result.url.split('#')[1] ?? '');
-  const access_token = params.get('access_token');
-  const refresh_token = params.get('refresh_token');
-  if (access_token && refresh_token) {
-    const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
-    if (setErr) throw setErr;
-    return true;
-  }
-  return false;
+  return completeOAuthRedirect(result.url);
 }
 
 /**

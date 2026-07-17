@@ -533,6 +533,10 @@ const th: Dict = {
   'login.backToLine': 'กลับไปเข้าสู่ระบบด้วย LINE',
   'account.menu.line': 'เชื่อมต่อ LINE รับแจ้งเตือน',
   'account.menu.lineLinked': 'LINE เชื่อมต่อแล้ว',
+  'authCallback.working': 'กำลังเข้าสู่ระบบ...',
+  'authCallback.failed': 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+  'authCallback.backToLogin': 'กลับไปหน้าเข้าสู่ระบบ',
+
   'line.working': 'กำลังเชื่อมต่อกับ LINE...',
   'line.cancelled': 'ยกเลิกการเชื่อมต่อ LINE',
   'line.failed': 'เชื่อมต่อ LINE ไม่สำเร็จ ลองใหม่อีกครั้ง',
@@ -1109,6 +1113,10 @@ const en: Dict = {
   'login.backToLine': 'Back to LINE sign-in',
   'account.menu.line': 'Link LINE for notifications',
   'account.menu.lineLinked': 'LINE linked',
+  'authCallback.working': 'Signing you in...',
+  'authCallback.failed': 'Sign-in failed. Please try again',
+  'authCallback.backToLogin': 'Back to sign in',
+
   'line.working': 'Connecting to LINE...',
   'line.cancelled': 'LINE connection cancelled',
   'line.failed': 'LINE connection failed, please try again',
