@@ -60,6 +60,7 @@ import {
 } from 'antd';
 
 import { Receipt } from '../components/Receipt';
+import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
 
 type Line = {
@@ -1188,24 +1189,28 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           ขายต่อ
         </Button>,
       ]}>
-      <Receipt
-        shop={shop}
-        saleNumber={sale.sale_number}
-        at={at}
-        taxInvoiceNo={sale.tax_invoice_no}
-        customerName={customerName}
-        customerTaxId={customerTaxId}
-        items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.qty }))}
-        subtotal={sale.subtotal}
-        discount={sale.discount}
-        vatAmount={sale.vat_amount}
-        netAmount={sale.net_amount}
-        total={sale.total}
-        paymentMethod={method}
-        cashPaid={method === 'cash' ? sale.total + sale.change : null}
-        change={method === 'cash' ? sale.change : null}
-        offline={data.offline}
-      />
+      {/* Scoped boundary: a throw while rendering the receipt dismisses the
+          receipt instead of white-screening the till (H5). */}
+      <ReceiptBoundary onClose={onClose}>
+        <Receipt
+          shop={shop}
+          saleNumber={sale.sale_number}
+          at={at}
+          taxInvoiceNo={sale.tax_invoice_no}
+          customerName={customerName}
+          customerTaxId={customerTaxId}
+          items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.qty }))}
+          subtotal={sale.subtotal}
+          discount={sale.discount}
+          vatAmount={sale.vat_amount}
+          netAmount={sale.net_amount}
+          total={sale.total}
+          paymentMethod={method}
+          cashPaid={method === 'cash' ? sale.total + sale.change : null}
+          change={method === 'cash' ? sale.change : null}
+          offline={data.offline}
+        />
+      </ReceiptBoundary>
     </Modal>
   );
 }
