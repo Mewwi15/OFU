@@ -64,14 +64,15 @@ type OrderRow = {
   total?: number;
 };
 
-/* Voice announce (new orders only) — a single FIFO queue so a burst of orders
- * chimes and speaks one at a time without overlapping. speechSynthesis is
- * browser-only; a missing engine (or no Thai voice) degrades silently. The
- * header toggle (default OFF) is read fresh at speak time via localStorage, so
- * flipping it never needs a re-subscribe. See ../lib/voiceAnnounce. */
+/* Voice announce (new orders only). The chime is rung IMMEDIATELY per order in
+ * the handler below — it must never wait on this queue. The queue only carries
+ * the delayed SPEECH (gap → count → speak), one order at a time so voices don't
+ * overlap. speechSynthesis is browser-only; a missing engine or no Thai voice
+ * degrades silently. The header toggle (default OFF) is read fresh at speak time
+ * via localStorage, so flipping it never needs a re-subscribe. See
+ * ../lib/voiceAnnounce. */
 const speak = createSpeaker(typeof window !== 'undefined' ? window.speechSynthesis : undefined);
-const announce = createAnnounceQueue({
-  chime,
+const announceQueue = createAnnounceQueue({
   speak,
   delay: (ms) => new Promise((r) => setTimeout(r, ms)),
   isEnabled: () => {
@@ -89,6 +90,14 @@ export function OrderAlerts() {
   const nav = useNavigate();
 
   useEffect(() => {
+    // Warm the voice list so the first order can find a Thai voice — getVoices()
+    // is often empty until the engine loads and fires `voiceschanged`.
+    try {
+      window.speechSynthesis?.getVoices();
+    } catch {
+      /* no speech engine — announcements degrade to chime + notification */
+    }
+
     const channel = supabase
       .channel('admin-order-alerts')
       .on(
@@ -107,11 +116,13 @@ export function OrderAlerts() {
             onClick: () => nav('/orders'),
           });
           window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));
-          // The chime lives inside the queue now so it stays FIFO-ordered with
-          // the speech; the count query runs lazily, only if this order is
-          // actually going to be spoken. On any query failure we speak the base
-          // line without the "N รายการ" tail rather than nothing.
-          void announce(async () => {
+          // Chime NOW, unconditionally, for every order — the audible alert must
+          // never be delayed or swallowed by a slow/stuck utterance ahead of it.
+          chime();
+          // The queue only carries the delayed speech. The count query runs
+          // lazily inside it, only if this order will actually be spoken; on any
+          // query failure we speak the base line without the "N รายการ" tail.
+          void announceQueue.enqueue(async () => {
             const num = o.order_number ?? '';
             if (!o.id) return buildAnnouncement(num, null);
             try {
@@ -154,6 +165,8 @@ export function OrderAlerts() {
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
+      // Drop any speech still queued so nothing is announced after logout.
+      announceQueue.dispose();
     };
     // notification/nav are stable from antd App + react-router
     // eslint-disable-next-line react-hooks/exhaustive-deps
