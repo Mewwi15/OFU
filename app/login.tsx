@@ -342,6 +342,19 @@ export default function LoginScreen() {
               </Text>
             </PressableScale>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {/* Nudge new users to sign up — shown only after a failed sign-in,
+                never revealing whether the email exists (no enumeration). */}
+            {error && mode === 'signin' ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => switchMode('signup')}
+                hitSlop={8}
+                style={styles.signupHint}>
+                <Text style={styles.signupHintText}>
+                  ยังไม่มีบัญชี? <Text style={styles.signupHintLink}>สมัครสมาชิก</Text>
+                </Text>
+              </Pressable>
+            ) : null}
 
             {/* Divider + Google */}
             <View style={styles.dividerRow}>
@@ -585,6 +598,9 @@ const styles = StyleSheet.create({
   },
   primaryBtnOff: { opacity: 0.45 },
   errorText: { ...Typography.caption, color: Colors.dangerStrong, textAlign: 'center', marginTop: Spacing.md },
+  signupHint: { alignSelf: 'center', marginTop: Spacing.sm, padding: Spacing.xs },
+  signupHintText: { ...Typography.caption, color: Colors.textMuted },
+  signupHintLink: { color: Colors.primaryStrong },
   primaryText: { ...Typography.button, fontSize: 16, color: Colors.textOnPrimary },
 
   /* Divider */
