@@ -102,12 +102,9 @@ export function createAnnounceQueue(deps: AnnounceDeps): AnnounceQueue {
 export type SpeakerOpts = {
   /** How often to poll `synth.speaking` for natural completion (default 250ms). */
   pollMs?: number;
-  /** If the engine never begins speaking within this window (and isn't
-   *  speaking), treat it as "won't play" and move on (default 4000ms). */
-  startGraceMs?: number;
-  /** Absolute last-resort ceiling for a genuinely stuck engine — the ONLY case
-   *  where the utterance is cancelled. Normal speech never reaches it. Default
-   *  30000ms. */
+  /** Absolute last-resort ceiling for an engine that never starts or gets stuck
+   *  — the ONLY case where the utterance is cancelled. Normal speech never
+   *  reaches it. Default 30000ms. */
   ceilingMs?: number;
   /** Injectable for tests — defaults to `new SpeechSynthesisUtterance(text)`. */
   makeUtterance?: (text: string) => SpeechSynthesisUtterance;
@@ -122,17 +119,21 @@ export type SpeakerOpts = {
  * "…รหัส OF00042 3 รายการ" line runs past the estimated time and got cancelled
  * mid-sentence, dropping the "N รายการ" tail on a real POS.
  *
- * Completion is detected three ways, in order of preference:
+ * Completion is detected two ways:
  *  - onend/onerror → finish immediately (the normal path),
  *  - polling `synth.speaking`: once it has been speaking and then stops, finish
- *    — this covers the real Chrome bug where onend never fires on long text,
- *  - a start-grace timer: if the engine never begins within startGraceMs and
- *    isn't speaking, it won't play, so stop waiting.
+ *    — this covers the real Chrome bug where onend never fires on long text.
+ *    `sawSpeaking` is load-bearing here: it distinguishes "hasn't started yet"
+ *    (async engine start) from "finished", so the poll can't resolve early.
  *
  * The ONLY place the utterance is cancelled is the absolute ceiling (default
- * 30s) for a genuinely stuck engine, so the FIFO queue can never hang forever.
- * Normal speech never reaches it. A `done` guard resolves exactly once and
- * every timer/interval is cleared on all paths.
+ * 30s). It is the single guard for both "never started" and "stuck": because
+ * the ceiling CANCELS before resolving, a slow engine that would otherwise
+ * begin speaking after we've moved on is silenced rather than speaking late
+ * over the next order. (There is deliberately no earlier "start-grace" resolve
+ * — that path resolved WITHOUT cancelling, so a late-starting utterance could
+ * play out of order.) A `done` guard resolves exactly once; every
+ * timer/interval is cleared on all paths.
  *
  * Still degrades silently: no TTS, or no Thai voice → resolves without speaking
  * (chime + notification carry the alert).
@@ -147,7 +148,6 @@ export function createSpeaker(
     ((s: SpeechSynthesis) =>
       (s.getVoices?.() ?? []).find((v) => v.lang?.toLowerCase().startsWith('th')) ?? null);
   const pollMs = opts.pollMs ?? 250;
-  const startGraceMs = opts.startGraceMs ?? 4_000;
   const ceilingMs = opts.ceilingMs ?? 30_000;
 
   return (text: string) =>
@@ -155,13 +155,11 @@ export function createSpeaker(
       let done = false;
       let sawSpeaking = false;
       let poll: ReturnType<typeof setInterval> | undefined;
-      let graceTimer: ReturnType<typeof setTimeout> | undefined;
       let ceilTimer: ReturnType<typeof setTimeout> | undefined;
       const finish = () => {
         if (done) return; // resolves exactly once; a late onend after finish is a no-op
         done = true;
         if (poll) clearInterval(poll);
-        if (graceTimer) clearTimeout(graceTimer);
         if (ceilTimer) clearTimeout(ceilTimer);
         resolve();
       };
@@ -180,34 +178,38 @@ export function createSpeaker(
         u.voice = voice;
         u.onend = finish; // normal, fast path
         u.onerror = finish;
+
+        // Arm the timers BEFORE speak() so a synchronous onend inside speak()
+        // (some engines fire it inline) still finds them to clear — otherwise a
+        // timer created afterwards would leak. `!done` skips arming if onend has
+        // already fired synchronously by now.
+        if (!done) {
+          // Poll for a natural finish, purely from synth.speaking (no reliance on
+          // onstart/onend), so it catches Chrome dropping onend on long text
+          // WITHOUT ever cancelling active speech.
+          poll = setInterval(() => {
+            if (synth.speaking) {
+              sawSpeaking = true;
+              return;
+            }
+            if (sawSpeaking) finish(); // it spoke and has now stopped
+          }, pollMs);
+
+          // The single guard for "never started" AND "stuck": cancel then
+          // finish. Cancelling means a slow engine that would start speaking
+          // after this can't play late over the next order. Normal speech
+          // finishes via the poll long before this.
+          ceilTimer = setTimeout(() => {
+            try {
+              synth.cancel?.();
+            } catch {
+              /* ignore */
+            }
+            finish();
+          }, ceilingMs);
+        }
+
         synth.speak(u);
-
-        // Poll for a natural finish. Derives "spoke then stopped" purely from
-        // synth.speaking (no reliance on onstart/onend), so it catches Chrome
-        // dropping onend on long utterances WITHOUT ever cancelling active speech.
-        poll = setInterval(() => {
-          if (synth.speaking) {
-            sawSpeaking = true;
-            return;
-          }
-          if (sawSpeaking) finish(); // it spoke and has now stopped
-        }, pollMs);
-
-        // Engine never began and is idle → it will not play; stop waiting.
-        graceTimer = setTimeout(() => {
-          if (!sawSpeaking && !synth.speaking) finish();
-        }, startGraceMs);
-
-        // Last resort for a truly stuck engine — the only cancel. Never hit by
-        // normal speech (it finishes via the poll long before this).
-        ceilTimer = setTimeout(() => {
-          try {
-            synth.cancel?.();
-          } catch {
-            /* ignore */
-          }
-          finish();
-        }, ceilingMs);
       } catch {
         finish();
       }

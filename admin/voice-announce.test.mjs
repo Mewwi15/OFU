@@ -50,6 +50,22 @@ function mockSynth({ voices = [{ lang: 'th-TH', name: 'Thai' }], speaking = fals
 }
 const fakeUtterance = (t) => ({ __text: t });
 
+/** Track live timers so a test can assert nothing leaked (Blocking 1). Wraps the
+ *  globals for the duration of one synchronous stretch, then restores them. */
+function trackTimers() {
+  const active = new Set();
+  const g = globalThis;
+  const o = { si: g.setInterval, ci: g.clearInterval, st: g.setTimeout, ct: g.clearTimeout };
+  g.setInterval = (...a) => { const h = o.si(...a); active.add(h); return h; };
+  g.clearInterval = (h) => { active.delete(h); return o.ci(h); };
+  g.setTimeout = (...a) => { const h = o.st(...a); active.add(h); return h; };
+  g.clearTimeout = (h) => { active.delete(h); return o.ct(h); };
+  return {
+    active,
+    restore() { g.setInterval = o.si; g.clearInterval = o.ci; g.setTimeout = o.st; g.clearTimeout = o.ct; },
+  };
+}
+
 console.log('\n[message builder]');
 await test('count 3 → "…รหัส X 3 รายการ"', () => {
   assert.equal(buildAnnouncement('OF00042', 3), 'ออเดอร์เข้าแล้ว รหัส OF00042 3 รายการ');
@@ -100,7 +116,7 @@ await test('one order throwing in makeText does not break the next', async () =>
 console.log('\n[speaker — never cuts active speech (the fix)]');
 await test('speaking stays true → does NOT finish, does NOT cancel; finishes when it stops', async () => {
   const synth = mockSynth({ speaking: true }); // begins speaking immediately, never fires onend
-  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, startGraceMs: 1000, ceilingMs: 5000 });
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, ceilingMs: 5000 });
   let resolved = false;
   const p = speak('ออเดอร์เข้าแล้ว รหัส OF00042 3 รายการ').then(() => { resolved = true; });
   await wait(40); // many poll ticks while still speaking
@@ -116,30 +132,69 @@ await test('onend fires normally → finishes immediately, not via poll/ceiling'
   const synth = mockSynth();
   synth.speak = function (u) { this.last = u; u.onend?.(); }; // synchronous natural end
   // Huge poll/ceiling so, if it resolves, it can only be the onend path.
-  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 100000, startGraceMs: 100000, ceilingMs: 100000 });
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 100000, ceilingMs: 100000 });
   await speak('quick');
   assert.equal(synth.cancelCount, 0);
 });
-await test('stuck engine (speaking forever) → ceiling cancels so the queue proceeds', async () => {
-  const synth = mockSynth({ speaking: true });
-  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, startGraceMs: 1000, ceilingMs: 30 });
+
+/* ── Blocking 1: a synchronous onend inside speak() must leave no timer behind. */
+await test('synchronous onend → finishes once, NO timer/interval leak', async () => {
+  const synth = mockSynth();
+  synth.speak = function (u) { this.last = u; u.onend?.(); }; // onend fires inline, before speak returns
+  const t = trackTimers();
+  try {
+    await createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, ceilingMs: 50 })('x');
+  } finally {
+    t.restore();
+  }
+  assert.equal(t.active.size, 0, 'poll + ceiling armed before speak() and both cleared by the sync onend');
+});
+
+/* ── Blocking 2: no start-grace early-resolve. A late-starting engine speaks to
+ *    the end and is never dropped; a never-starting one is cancelled at the
+ *    ceiling so it can't play late over the next order. ──────────────────────── */
+await test('engine starts speaking LATE → speaks to completion, never dropped early', async () => {
+  const synth = mockSynth({ speaking: false }); // not speaking yet (engine loading)
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, ceilingMs: 5000 });
+  let resolved = false;
+  const p = speak('long line').then(() => { resolved = true; });
+  await wait(60); // long past where the old 4s start-grace concept lived, still not speaking
+  assert.equal(resolved, false, 'no early resolve while the engine has not started (start-grace is gone)');
+  assert.equal(synth.cancelCount, 0, 'and nothing cancelled');
+  synth.speaking = true; // engine finally begins
+  await wait(20);
+  assert.equal(resolved, false, 'still speaking → still not resolved');
+  synth.speaking = false; // finishes
+  await wait(20);
+  await p;
+  assert.equal(resolved, true, 'resolves only after the late speech actually finished');
+  assert.equal(synth.cancelCount, 0, 'full late-started sentence played, never cut');
+});
+await test('engine never starts → ceiling CANCELS (no late speech) and the queue proceeds', async () => {
+  const synth = mockSynth({ speaking: false }); // never speaks, never onend
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, ceilingMs: 30 });
   const spoken = [];
   const { enqueue } = createAnnounceQueue({
     speak: async (t) => { spoken.push(t); await speak(t); }, delay: async () => {}, isEnabled: () => true, gapMs: 0,
   });
   await Promise.all([enqueue(async () => 'A'), enqueue(async () => 'B')]);
-  assert.deepEqual(spoken, ['A', 'B'], 'ceiling frees the stuck utterance so the next order speaks');
-  assert.equal(synth.cancelCount, 2, 'each stuck utterance cancelled only at the ceiling');
+  assert.deepEqual(spoken, ['A', 'B'], 'ceiling frees each order so the next one runs');
+  assert.equal(synth.cancelCount, 2, 'cancelled at the ceiling so a slow engine cannot speak late/out of order');
 });
-await test('engine never starts (idle, no onend) → start-grace finishes it', async () => {
-  const synth = mockSynth({ speaking: false }); // never speaks, never fires onend
-  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, startGraceMs: 25, ceilingMs: 5000 });
-  await speak('x'); // resolves at the grace window, not the ceiling
-  assert.equal(synth.cancelCount, 0, 'nothing to cancel — it never played');
+await test('stuck engine (speaking forever) → ceiling cancels so the queue proceeds', async () => {
+  const synth = mockSynth({ speaking: true });
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 5, ceilingMs: 30 });
+  const spoken = [];
+  const { enqueue } = createAnnounceQueue({
+    speak: async (t) => { spoken.push(t); await speak(t); }, delay: async () => {}, isEnabled: () => true, gapMs: 0,
+  });
+  await Promise.all([enqueue(async () => 'A'), enqueue(async () => 'B')]);
+  assert.deepEqual(spoken, ['A', 'B']);
+  assert.equal(synth.cancelCount, 2);
 });
 await test('late onend after ceiling is a harmless no-op (resolves once)', async () => {
   const synth = mockSynth({ speaking: true });
-  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 1000, startGraceMs: 1000, ceilingMs: 25 });
+  const speak = createSpeaker(synth, { makeUtterance: fakeUtterance, pollMs: 1000, ceilingMs: 25 });
   await speak('x'); // ceiling → cancel + finish
   const before = synth.cancelCount;
   synth.last.onend?.(); // stale onend arrives late
