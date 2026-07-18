@@ -382,8 +382,52 @@ export async function cancelOrder(orderNumber: string, note?: string): Promise<v
 }
 
 /** Map a place_order / cancel error (RAISE message = the code) to friendly Thai. */
+/** One shortage line from place_order's OUT_OF_STOCK detail (M10, version 1). */
+type ShortageItem = {
+  variant_id?: string;
+  name?: string;
+  size?: string | null;
+  requested_qty?: number;
+  available_qty?: number;
+};
+
+/**
+ * Turn place_order's versioned OUT_OF_STOCK `detail` JSON into a per-item Thai
+ * message, e.g. "โอโมพลัส เหลือ 1 ชิ้น (ต้องการ 2)". Returns null on anything it
+ * can't confidently parse (an older comma-separated detail, or a shape it
+ * doesn't recognise) so the caller falls back to the generic message rather
+ * than showing a broken line.
+ */
+function outOfStockMessage(detail: string | undefined | null): string | null {
+  if (!detail) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(detail);
+  } catch {
+    return null; // old format (comma-separated variant ids) → generic fallback
+  }
+  const d = parsed as { code?: unknown; version?: unknown; items?: unknown } | null;
+  // Only trust the exact versioned contract; anything else → generic fallback.
+  if (!d || d.code !== 'OUT_OF_STOCK' || d.version !== 1 || !Array.isArray(d.items) || d.items.length === 0) {
+    return null;
+  }
+  const lines: string[] = [];
+  for (const raw of d.items as ShortageItem[]) {
+    // Each item must carry real numbers; a malformed line drops the whole parse.
+    if (typeof raw?.available_qty !== 'number' || typeof raw?.requested_qty !== 'number') return null;
+    const label = [raw.name, raw.size].filter(Boolean).join(' ') || 'สินค้า';
+    lines.push(`${label} เหลือ ${raw.available_qty} ชิ้น (ต้องการ ${raw.requested_qty})`);
+  }
+  return lines.join('\n');
+}
+
 export function orderErrorMessage(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? '';
+  if (msg === 'OUT_OF_STOCK') {
+    // Supabase surfaces a RAISE `detail` as `error.details` (older shapes: `detail`).
+    const err = e as { details?: string; detail?: string };
+    return outOfStockMessage(err.details ?? err.detail) ?? 'สินค้าบางรายการมีไม่พอ กรุณาปรับจำนวนแล้วลองใหม่';
+  }
   const table: Record<string, string> = {
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ กรุณาปรับจำนวนแล้วลองใหม่',
     EMPTY_CART: 'ไม่มีสินค้าที่เลือก',
