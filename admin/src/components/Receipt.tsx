@@ -12,11 +12,15 @@ export type ReceiptProps = {
   customerName?: string | null;
   customerTaxId?: string | null;
   items: ReceiptLine[];
-  subtotal: number;
-  discount: number;
-  vatAmount: number;
-  netAmount: number;
-  total: number;
+  // Nullable on purpose: a replayed sale (double-tap / re-pay) can arrive with
+  // these missing if it came from an older create_pos_sale, and a receipt that
+  // renders a stale/undefined amount must degrade to 0, never crash the till
+  // (H5). The DB replay contract is the real fix; this is defence in depth.
+  subtotal: number | null | undefined;
+  discount: number | null | undefined;
+  vatAmount: number | null | undefined;
+  netAmount: number | null | undefined;
+  total: number | null | undefined;
   paymentMethod: string; // 'cash' | 'promptpay' | 'store_credit'
   cashPaid?: number | null; // amount tendered (only known right after a cash sale)
   change?: number | null;
@@ -24,9 +28,11 @@ export type ReceiptProps = {
 };
 
 const PAY_LABEL: Record<string, string> = { cash: 'เงินสด', promptpay: 'พร้อมเพย์', store_credit: 'เครดิตร้าน' };
-const baht = (n: number) => n.toLocaleString('th-TH');
+// Null-safe: `undefined.toLocaleString()` is exactly what blanked the whole POS
+// on a receipt replay (H5). A missing amount prints as 0 rather than throwing.
+const baht = (n: number | null | undefined) => (n ?? 0).toLocaleString('th-TH');
 
-function Line2({ label, value, bold }: { label: string; value: number; bold?: boolean }) {
+function Line2({ label, value, bold }: { label: string; value: number | null | undefined; bold?: boolean }) {
   return (
     <div className={`flex justify-between ${bold ? 'font-bold text-sm' : ''}`}>
       <span>{label}</span>
@@ -129,7 +135,7 @@ export function Receipt({
 
         <div className="border-t border-dashed border-black my-1.5" />
         <Line2 label="ยอดรวม" value={subtotal} />
-        {discount > 0 && <Line2 label="ส่วนลด" value={-discount} />}
+        {(discount ?? 0) > 0 && <Line2 label="ส่วนลด" value={-(discount ?? 0)} />}
         {shop.vat_registered && (
           <>
             <Line2 label="มูลค่าก่อน VAT" value={netAmount} />
