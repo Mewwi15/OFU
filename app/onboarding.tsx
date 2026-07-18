@@ -6,7 +6,7 @@
  * root gate hands off to /login. Tokens only, zero emoji, Mitr.
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
@@ -28,7 +28,7 @@ import { useLock } from '@/store/lock';
 
 type Slide = {
   id: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  image: number;
   titleKey: string;
   bodyKey: string;
 };
@@ -36,19 +36,19 @@ type Slide = {
 const SLIDES: Slide[] = [
   {
     id: 's1',
-    icon: 'leaf-outline',
+    image: require('../assets/images/onboard-1.png'),
     titleKey: 'onboarding.slide1Title',
     bodyKey: 'onboarding.slide1Body',
   },
   {
     id: 's2',
-    icon: 'bicycle-outline',
+    image: require('../assets/images/onboard-2.png'),
     titleKey: 'onboarding.slide2Title',
     bodyKey: 'onboarding.slide2Body',
   },
   {
     id: 's3',
-    icon: 'shield-checkmark-outline',
+    image: require('../assets/images/onboard-3.png'),
     titleKey: 'onboarding.slide3Title',
     bodyKey: 'onboarding.slide3Body',
   },
@@ -105,9 +105,7 @@ export default function OnboardingScreen() {
           onMomentumScrollEnd={onScroll}>
           {SLIDES.map((slide) => (
             <View key={slide.id} style={[styles.slide, { width }]}>
-              <View style={styles.art}>
-                <Ionicons name={slide.icon} size={92} color={Colors.primaryStrong} />
-              </View>
+              <Image source={slide.image} style={styles.art} contentFit="contain" />
               <Text variant="title" style={styles.title}>
                 {t(slide.titleKey)}
               </Text>
@@ -161,12 +159,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.x2,
   },
   art: {
-    width: 180,
-    height: 180,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 260,
+    height: 260,
     marginBottom: Spacing.x3,
   },
   title: {
