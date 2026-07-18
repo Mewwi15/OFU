@@ -33,6 +33,7 @@ const check = (c, cond, m, d) => (cond ? pass(c, m) : fail(c, m, d));
 
 const db = createClient(URL, SERVICE, { auth: { persistSession: false } });
 const cust = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+const cust2 = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
 const admin = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
 
 async function stockOf(variantId) {
@@ -79,6 +80,18 @@ async function main() {
   if (!addr) {
     addr = (await cust.from('addresses').insert({ user_id: uid, label: 'test', recipient_name: 'T', recipient_phone: '0812345678', address_line: '1', subdistrict: 'ในเมือง', district: 'เมือง', province: 'ขอนแก่น', postal_code: '40000', is_default: true }).select('id').single()).data.id;
   }
+
+  // A SECOND customer (email/password) for real concurrent races — two orders
+  // from one user serialize on the cart, so oversell needs two users.
+  const C2 = 'stockcust2@oofoo.local';
+  let c2u = (await db.auth.admin.listUsers({ perPage: 200 })).data.users.find((u) => u.email === C2);
+  if (!c2u) c2u = (await db.auth.admin.createUser({ email: C2, password: 'cust1234', email_confirm: true })).data.user;
+  else await db.auth.admin.updateUserById(c2u.id, { password: 'cust1234' });
+  await db.from('app_users').upsert({ id: c2u.id, shop_id: shop.id, role: 'customer', account_state: 'active', display_name: 'Cust2' }, { onConflict: 'id' });
+  await cust2.auth.signInWithPassword({ email: C2, password: 'cust1234' });
+  await cust2.rpc('grant_consent', { p_purpose: 'data_processing' });
+  let addr2 = (await cust2.from('addresses').select('id').limit(1)).data?.[0]?.id;
+  if (!addr2) addr2 = (await cust2.from('addresses').insert({ user_id: c2u.id, label: 'test2', recipient_name: 'T2', recipient_phone: '0899999999', address_line: '2', subdistrict: 'ในเมือง', district: 'เมือง', province: 'ขอนแก่น', postal_code: '40000', is_default: true }).select('id').single()).data.id;
 
   // A variant with a known name to place against (online prepay).
   const variant = (await db.from('product_variants').select('id, price, products(name)').is('archived_at', null).gt('stock_qty', 0).order('id').limit(1).single()).data;
@@ -169,8 +182,79 @@ async function main() {
   check(7, !cod.error && cod.data?.order_status === 'confirmed', `COD auto-confirmed (${cod.data?.order_status ?? cod.error?.message})`);
   check(7, (await stockOf(variant.id)).stock_qty === 4, `COD decremented stock (5 → 4)`);
 
+  /* 8 — CONCURRENCY: online + online at stock=1 → one wins, one OUT_OF_STOCK,
+   *     stock never goes negative (recheck happens UNDER the variant lock). */
+  console.log('\n[8] concurrent online+online at stock=1 → one wins, one OUT_OF_STOCK, stock ≥ 0');
+  await setStock(variant.id, 1);
+  await clearCart(cust);  await addItem(cust, variant.id, 1);  await setMode(cust, 'online');
+  await clearCart(cust2); await addItem(cust2, variant.id, 1); await setMode(cust2, 'online');
+  const [a, b] = await Promise.all([
+    place(cust,  { mode: 'online', method: 'promptpay_slip', address: addr }),
+    place(cust2, { mode: 'online', method: 'promptpay_slip', address: addr2 }),
+  ]);
+  const wins = [a, b].filter((r) => !r.error).length;
+  const oosN = [a, b].filter((r) => r.error?.message === 'OUT_OF_STOCK').length;
+  check(8, wins === 1 && oosN === 1, `exactly one success, one OUT_OF_STOCK (win=${wins}, oos=${oosN})`, `${a.error?.message}/${b.error?.message}`);
+  const s8 = (await stockOf(variant.id)).stock_qty;
+  check(8, s8 === 0, `stock landed at 0, never −1 (${s8})`);
+
+  /* 9 — CONCURRENCY: online + POS at stock=1 → one wins. */
+  console.log('\n[9] concurrent online+POS at stock=1 → one wins, stock ≥ 0');
+  await setStock(variant.id, 1);
+  await clearCart(cust); await addItem(cust, variant.id, 1); await setMode(cust, 'online');
+  const [onl, pos] = await Promise.all([
+    place(cust, { mode: 'online', method: 'promptpay_slip', address: addr }),
+    admin.rpc('create_pos_sale', { p_client_op_id: randomUUID(), p_items: [{ variant_id: variant.id, qty: 1 }], p_payment_method: 'cash', p_cash_tendered: 100000 }),
+  ]);
+  const onlOk = !onl.error, posOk = !pos.error;
+  check(9, (onlOk ? 1 : 0) + (posOk ? 1 : 0) === 1, `exactly one of online/POS won (online=${onlOk}, pos=${posOk})`, `${onl.error?.message}/${pos.error?.message}`);
+  const s9 = (await stockOf(variant.id)).stock_qty;
+  check(9, s9 >= 0, `stock never negative (${s9})`);
+
+  /* 10 — CONCURRENCY: multi-variant carts placed at once → no deadlock (both
+   *      lock variants in id order). */
+  console.log('\n[10] concurrent multi-variant places → no deadlock');
+  const v2 = (await db.from('product_variants').select('id').is('archived_at', null).neq('id', variant.id).order('id').limit(1).single()).data;
+  await setStock(variant.id, 10); await setStock(v2.id, 10);
+  await clearCart(cust);  await addItem(cust, variant.id, 1);  await addItem(cust, v2.id, 1);  await setMode(cust, 'online');
+  await clearCart(cust2); await addItem(cust2, v2.id, 1);      await addItem(cust2, variant.id, 1); await setMode(cust2, 'online');
+  const [m1, m2] = await Promise.all([
+    place(cust,  { mode: 'online', method: 'promptpay_slip', address: addr }),
+    place(cust2, { mode: 'online', method: 'promptpay_slip', address: addr2 }),
+  ]);
+  const deadlock = [m1, m2].some((r) => /deadlock/i.test(r.error?.message ?? ''));
+  check(10, !deadlock, 'no deadlock on swapped-add-order multi-variant carts');
+  check(10, !m1.error && !m2.error, `both succeeded (10 stock each) (${m1.error?.message ?? 'ok'}/${m2.error?.message ?? 'ok'})`);
+
+  /* 11 — EXPIRE (live): backdate an online order, run expire → restock +qty once;
+   *      racing a cancel does not double-restock. */
+  console.log('\n[11] expire live: restock +qty once; cancel race does not double-restock');
+  await setStock(variant.id, 5);
+  await clearCart(cust); await addItem(cust, variant.id, 2); await setMode(cust, 'online');
+  const pE = await place(cust, { mode: 'online', method: 'promptpay_slip', address: addr });
+  const afterPlaceE = (await stockOf(variant.id)).stock_qty; // 3
+  await db.from('orders').update({ placed_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', pE.data.id);
+  const n = await db.rpc('expire_stale_orders', { p_before: new Date(Date.now() - 60_000).toISOString() });
+  check(11, !n.error, `expire ran (${n.error?.message ?? `cancelled ${n.data}`})`);
+  const afterExpire = (await stockOf(variant.id)).stock_qty;
+  check(11, afterExpire === afterPlaceE + 2, `expire restocked +2 (${afterPlaceE} → ${afterExpire})`);
+  const eo = (await db.from('orders').select('order_status').eq('id', pE.data.id).single()).data;
+  check(11, eo.order_status === 'cancelled', `order is cancelled (${eo.order_status})`);
+  // Race: place another, backdate, fire cancel + expire together → single restock.
+  await setStock(variant.id, 5);
+  await clearCart(cust); await addItem(cust, variant.id, 2); await setMode(cust, 'online');
+  const pF = await place(cust, { mode: 'online', method: 'promptpay_slip', address: addr });
+  const afterPlaceF = (await stockOf(variant.id)).stock_qty; // 3
+  await db.from('orders').update({ placed_at: new Date(Date.now() - 3600_000).toISOString() }).eq('id', pF.data.id);
+  await Promise.all([
+    cust.rpc('cancel_order', { p_order_id: pF.data.id, p_reason: 'customer_request' }),
+    db.rpc('expire_stale_orders', { p_before: new Date(Date.now() - 60_000).toISOString() }),
+  ]);
+  const afterRace = (await stockOf(variant.id)).stock_qty;
+  check(11, afterRace === afterPlaceF + 2, `cancel+expire race restocked ONCE, not twice (${afterPlaceF} → ${afterRace})`);
+
   console.log(`\n${failures === 0 ? 'ALL PASS' : `${failures} FAILURE(S)`}`);
-  await cust.auth.signOut(); await admin.auth.signOut();
+  await cust.auth.signOut(); await cust2.auth.signOut(); await admin.auth.signOut();
   process.exit(failures === 0 ? 0 : 1);
 }
 main().catch((e) => { console.error(`\nFATAL: ${e.message}`); process.exit(1); });

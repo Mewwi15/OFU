@@ -1,4 +1,4 @@
--- 0066_stock_physical_model.sql
+-- 0067_stock_physical_model.sql
 -- อู้ฟู่ (Oofoo) — "sell by physical stock": stock_qty is the single source of
 -- truth and reserved_qty is forced to 0.
 --
@@ -32,61 +32,76 @@
 -- Wrapped in an explicit begin/commit: the Supabase migration runner executes
 -- statements in autocommit, but this must be ONE atomic transaction (the LOCK,
 -- the preflight abort, the conversion, the CHECK and the verify all stand or
--- fall together). The new enum values are already committed by 0065, so using
+-- fall together). The new enum values are already committed by 0066, so using
 -- them here is fine.
 begin;
 
-lock table public.product_variants in share row exclusive mode;
+-- Freeze the whole write path so an order cannot change (e.g. claim_slip moving
+-- it to payment_verifying) between the preflight and the conversion. Locks are
+-- taken orders → order_items → product_variants — the SAME order the RPCs take
+-- their row locks in (place/cancel/reject/expire touch the order row, then
+-- variants by id) — so this migration and any straggler RPC can't deadlock.
+-- EXCLUSIVE blocks all writes and SELECT ... FOR UPDATE while still allowing
+-- plain reads (catalog browsing); the migration runs once, in a maintenance
+-- window, so the brief freeze is acceptable.
+lock table public.orders            in exclusive mode;
+lock table public.order_items       in exclusive mode;
+lock table public.product_variants  in exclusive mode;
 
 -- ── 1+2. Preflight / reconcile ───────────────────────────────────────────────
--- "held" = qty locked up by orders that placed a reservation and have not paid,
--- been rejected, cancelled, or expired: order_status='placed' and
--- payment_status in (awaiting_payment, slip_uploaded, verifying). COD orders are
--- 'confirmed' (already committed, reserved back to 0); terminal orders released.
+-- The set of orders still HOLDING reserved stock, defined from the LEDGER (not a
+-- fragile status list): an order holds reserved iff it has a reserve_placed
+-- movement and NO commit_confirmed / release_cancel / release_payment_rejected /
+-- release_expiry movement. This is exactly what cancel/reject/expire release,
+-- and it spans every pre-confirmation state — placed, slip_uploaded AND
+-- payment_verifying (a slip mid-review) — which the old order_status='placed'
+-- filter wrongly dropped. COD orders have reserve_placed + commit_confirmed, so
+-- they're correctly excluded. The SAME set drives preflight and conversion.
+create temp table _held on commit drop as
+select oi.variant_id, oi.order_id, sum(oi.qty)::int as qty
+from public.order_items oi
+where oi.variant_id is not null
+  and exists (
+    select 1 from public.stock_movements sm
+    where sm.order_id = oi.order_id and sm.reason = 'reserve_placed'::public.stock_reason_t)
+  and not exists (
+    select 1 from public.stock_movements sm
+    where sm.order_id = oi.order_id
+      and sm.reason in ('commit_confirmed'::public.stock_reason_t,
+                        'release_cancel'::public.stock_reason_t,
+                        'release_payment_rejected'::public.stock_reason_t,
+                        'release_expiry'::public.stock_reason_t))
+group by oi.variant_id, oi.order_id;
+
 do $$
 declare
   v_bad int;
 begin
   select count(*) into v_bad
   from public.product_variants v
-  left join (
-    select oi.variant_id, sum(oi.qty)::int as held
-    from public.order_items oi
-    join public.orders o on o.id = oi.order_id
-    where o.order_status = 'placed'::public.order_status_t
-      and o.payment_status in ('awaiting_payment'::public.payment_status_t,
-                               'slip_uploaded'::public.payment_status_t,
-                               'verifying'::public.payment_status_t)
-      and oi.variant_id is not null
-    group by oi.variant_id
-  ) h on h.variant_id = v.id
+  left join (select variant_id, sum(qty)::int as held from _held group by variant_id) h
+    on h.variant_id = v.id
   where v.reserved_qty <> coalesce(h.held, 0)
      or v.stock_qty < v.reserved_qty;
   if v_bad > 0 then
     raise exception
-      'stock reconcile preflight FAILED: % variant(s) where reserved_qty <> open-order hold, or stock_qty < reserved_qty. Aborting — investigate before converting (no greatest(0,) cover-up).',
+      'stock reconcile preflight FAILED: % variant(s) where reserved_qty <> held (reserve_placed not yet committed/released), or stock_qty < reserved_qty. Aborting — investigate before converting (no greatest(0,) cover-up).',
       v_bad using errcode = 'P0001';
   end if;
 end $$;
 
 -- ── 3. Convert reservations → physical decrement ─────────────────────────────
--- One order-bound ledger row per open reservation line, so the physical
+-- One order-bound ledger row per held reservation line, so the physical
 -- decrement is auditable back to the order that held it. delta_reserved = -qty
 -- (removes the original reserve_placed hold), delta_stock = -qty (takes it off
 -- the shelf) — net reserved for the variant returns to 0.
 insert into public.stock_movements (variant_id, order_id, delta_stock, delta_reserved, reason, actor_user_id)
-select oi.variant_id, o.id, -sum(oi.qty)::int, -sum(oi.qty)::int, 'online_place'::public.stock_reason_t, null
-from public.order_items oi
-join public.orders o on o.id = oi.order_id
-where o.order_status = 'placed'::public.order_status_t
-  and o.payment_status in ('awaiting_payment'::public.payment_status_t,
-                           'slip_uploaded'::public.payment_status_t,
-                           'verifying'::public.payment_status_t)
-  and oi.variant_id is not null
-group by oi.variant_id, o.id;
+select variant_id, order_id, -qty, -qty, 'online_place'::public.stock_reason_t, null
+from _held;
 
 -- Aggregate flip: physical stock absorbs the reservation; reserved → 0.
--- Example: 3/2 → 1/0, 6/4 → 2/0 (available_qty unchanged).
+-- reserved_qty was preflight-verified to equal the held sum. Example: 3/2 → 1/0,
+-- 6/4 → 2/0 (available_qty unchanged).
 update public.product_variants
    set stock_qty = stock_qty - reserved_qty,
        reserved_qty = 0

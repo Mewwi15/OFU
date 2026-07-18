@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * 0064 proof — stale prepay orders expire and their stock comes back.
+ * 0064/0067 proof — stale prepay orders expire and their stock comes back.
  *
- * A prepay order reserves stock at placement and only commits it when the slip
- * is approved, so an abandoned PromptPay checkout holds inventory nobody can
- * buy. 0064 cancels those past the payment window and releases the hold. This
- * drives the real RPC and proves both the release AND — more importantly — the
- * four things it must never touch.
+ * Physical-stock model (0067): placement decrements stock_qty and expiry
+ * restocks it (reserved_qty stays 0). An abandoned PromptPay checkout holds
+ * physical stock nobody can buy; expire_stale_orders cancels those past the
+ * payment window and puts the stock back. This drives the real RPC and proves
+ * the restock AND — more importantly — the four things it must never touch.
  *
- *   1. stale prepay  → cancelled(payment_timeout), reserved_qty returned,
- *                      a release_expiry ledger row written
+ *   1. stale prepay  → cancelled(payment_timeout), stock_qty restocked +qty,
+ *                      an online_expiry_restock ledger row written
  *   2. fresh prepay  → untouched (inside the window)
  *   3. COD           → untouched (COD also sits at awaiting_payment for life;
  *                      only payment_method separates it from a dead prepay)
@@ -142,6 +142,18 @@ async function reservedQty(variantId) {
   return data.reserved_qty;
 }
 
+// Physical-stock model (0067): placement decrements stock_qty; expire restocks
+// it. reserved_qty stays 0 throughout.
+async function stockQty(variantId) {
+  const { data, error } = await admin
+    .from('product_variants')
+    .select('stock_qty')
+    .eq('id', variantId)
+    .single();
+  if (error) throw new Error(`stockQty: ${error.message}`);
+  return data.stock_qty;
+}
+
 async function movements(orderId, reason) {
   const { data, error } = await admin
     .from('stock_movements')
@@ -216,14 +228,17 @@ async function main() {
   const { addressId, variantId } = await setup();
   const QTY = 2;
 
-  /* 1 — the whole point: stale prepay is cancelled and the hold comes back. */
-  console.log('\n[1] stale prepay order → cancelled + reserved stock released');
-  const reservedBefore = await reservedQty(variantId);
+  /* 1 — the whole point: stale prepay is cancelled and the stock comes back
+   *     (physical-stock model 0067: place decrements stock, expire restocks it;
+   *     reserved_qty stays 0 throughout). */
+  console.log('\n[1] stale prepay order → cancelled + physical stock restocked (reserved stays 0)');
+  const stockBefore = await stockQty(variantId);
   await fillCart(variantId, QTY, 'online');
   const A = await place(addressId, 'online', 'promptpay_slip');
-  const reservedHeld = await reservedQty(variantId);
-  check(1, reservedHeld === reservedBefore + QTY,
-    `placing reserves the stock (${reservedBefore} → ${reservedHeld})`);
+  const stockHeld = await stockQty(variantId);
+  check(1, stockHeld === stockBefore - QTY,
+    `placing decrements physical stock (${stockBefore} → ${stockHeld})`);
+  check(1, (await reservedQty(variantId)) === 0, 'reserved_qty stays 0 at placement');
 
   await backdate(A.id, 60); // well past the 30-minute window
   const n = await expire();
@@ -234,14 +249,15 @@ async function main() {
   check(1, a1.cancel_reason === 'payment_timeout', `reason is payment_timeout (${a1.cancel_reason})`);
   check(1, a1.terminal_at !== null, 'terminal_at is stamped');
 
-  const reservedAfter = await reservedQty(variantId);
-  check(1, reservedAfter === reservedBefore,
-    `reserved_qty handed back (${reservedHeld} → ${reservedAfter}, started ${reservedBefore})`);
+  const stockAfter = await stockQty(variantId);
+  check(1, stockAfter === stockBefore,
+    `stock restocked (${stockHeld} → ${stockAfter}, started ${stockBefore})`);
+  check(1, (await reservedQty(variantId)) === 0, 'reserved_qty still 0 after expire');
 
-  const rel = await movements(A.id, 'release_expiry');
-  check(1, rel.length > 0, 'a release_expiry movement was written');
-  check(1, rel.every((m) => m.delta_reserved < 0 && m.delta_stock === 0),
-    'the movement releases the reservation and leaves stock alone',
+  const rel = await movements(A.id, 'online_expiry_restock');
+  check(1, rel.length > 0, 'an online_expiry_restock movement was written');
+  check(1, rel.every((m) => m.delta_stock > 0 && m.delta_reserved === 0),
+    'the movement restocks physical stock and leaves reserved at 0',
     JSON.stringify(rel));
 
   /* 2 — inside the window: hands off. */
@@ -318,17 +334,17 @@ async function main() {
   }
 
   /* 5 — the job runs every 5 minutes forever; a second pass must be a no-op. */
-  console.log('\n[5] re-run → idempotent (no double cancel, no double release)');
+  console.log('\n[5] re-run → idempotent (no double cancel, no double restock)');
   const rvBefore = (await getOrder(A.id)).row_version;
-  const reservedPre = await reservedQty(variantId);
-  const relPre = (await movements(A.id, 'release_expiry')).length;
+  const stockPre = await stockQty(variantId);
+  const relPre = (await movements(A.id, 'online_expiry_restock')).length;
   const n2 = await expire();
   const a2 = await getOrder(A.id);
-  const reservedPost = await reservedQty(variantId);
-  const relPost = (await movements(A.id, 'release_expiry')).length;
+  const stockPost = await stockQty(variantId);
+  const relPost = (await movements(A.id, 'online_expiry_restock')).length;
   check(5, a2.row_version === rvBefore, `the cancelled order was not written again (row_version ${rvBefore})`);
-  check(5, reservedPost === reservedPre, `stock not released twice (${reservedPre} → ${reservedPost})`);
-  check(5, relPost === relPre, `no duplicate release_expiry rows (${relPre})`);
+  check(5, stockPost === stockPre, `stock not restocked twice (${stockPre} → ${stockPost})`);
+  check(5, relPost === relPre, `no duplicate online_expiry_restock rows (${relPre})`);
   console.log(`      second pass cancelled ${n2} order(s) — expected 0 for already-expired ones`);
 
   /* 6 — attach and expire racing for the same order. */

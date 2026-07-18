@@ -1,8 +1,8 @@
--- 0065_stock_ledger_reasons.sql
+-- 0066_stock_ledger_reasons.sql
 -- อู้ฟู่ (Oofoo) — new stock_movements ledger reasons for the "sell by physical
--- stock" model (0066). Kept in its OWN migration because a value added to an
+-- stock" model (0067). Kept in its OWN migration because a value added to an
 -- enum by ALTER TYPE ... ADD VALUE cannot be USED in the same transaction that
--- adds it; 0066 (a separate transaction) uses these.
+-- adds it; 0067 (a separate transaction) uses these.
 --
 -- Model: stock_qty becomes the single source of truth and reserved_qty is
 -- forced to 0. Online/COD placement decrements stock immediately; a

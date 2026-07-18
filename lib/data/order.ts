@@ -406,14 +406,18 @@ function outOfStockMessage(detail: string | undefined | null): string | null {
   } catch {
     return null; // old format (comma-separated variant ids) → generic fallback
   }
-  const items = (parsed as { code?: string; items?: ShortageItem[] } | null)?.items;
-  if (!Array.isArray(items) || items.length === 0) return null;
-  const lines = items.map((it) => {
-    const label = [it.name, it.size].filter(Boolean).join(' ') || 'สินค้า';
-    const have = typeof it.available_qty === 'number' ? it.available_qty : 0;
-    const want = typeof it.requested_qty === 'number' ? it.requested_qty : 0;
-    return `${label} เหลือ ${have} ชิ้น (ต้องการ ${want})`;
-  });
+  const d = parsed as { code?: unknown; version?: unknown; items?: unknown } | null;
+  // Only trust the exact versioned contract; anything else → generic fallback.
+  if (!d || d.code !== 'OUT_OF_STOCK' || d.version !== 1 || !Array.isArray(d.items) || d.items.length === 0) {
+    return null;
+  }
+  const lines: string[] = [];
+  for (const raw of d.items as ShortageItem[]) {
+    // Each item must carry real numbers; a malformed line drops the whole parse.
+    if (typeof raw?.available_qty !== 'number' || typeof raw?.requested_qty !== 'number') return null;
+    const label = [raw.name, raw.size].filter(Boolean).join(' ') || 'สินค้า';
+    lines.push(`${label} เหลือ ${raw.available_qty} ชิ้น (ต้องการ ${raw.requested_qty})`);
+  }
   return lines.join('\n');
 }
 
