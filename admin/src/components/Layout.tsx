@@ -1,9 +1,11 @@
+import { AudioMutedOutlined, SoundOutlined } from '@ant-design/icons';
 import { RiMenuLine, RiNotification3Line } from '@remixicon/react';
-import { Avatar, Badge, Button, Drawer, Grid, Layout as AntLayout } from 'antd';
+import { Avatar, Badge, Button, Drawer, Grid, Layout as AntLayout, Tooltip } from 'antd';
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../auth';
+import { VOICE_STORAGE_KEY } from '../lib/voiceAnnounce';
 import { OrderAlerts } from './OrderAlerts';
 import { Sidebar, currentNavLabel } from './Sidebar';
 
@@ -17,6 +19,34 @@ export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const isDesktop = screens.lg;
   const initials = (profile?.displayName || 'แอ').trim().slice(0, 2).toUpperCase();
+
+  // Spoken new-order announcements. Default OFF; persisted in localStorage and
+  // read at speak time by OrderAlerts, so this toggle is the whole UI for it.
+  const [voiceOn, setVoiceOn] = useState(() => {
+    try {
+      return localStorage.getItem(VOICE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleVoice = () => {
+    const next = !voiceOn;
+    setVoiceOn(next);
+    try {
+      localStorage.setItem(VOICE_STORAGE_KEY, next ? '1' : '0');
+    } catch {
+      /* private mode / storage blocked — the in-memory toggle still holds for this session */
+    }
+    // Turning it on is a user gesture; prime speechSynthesis with a silent
+    // utterance so the first real order isn't swallowed by autoplay policy.
+    if (next) {
+      try {
+        window.speechSynthesis?.speak(new SpeechSynthesisUtterance(''));
+      } catch {
+        /* no speech engine — the toggle still persists, announcements degrade to chime */
+      }
+    }
+  };
 
   return (
     <AntLayout style={{ height: '100vh' }}>
@@ -47,6 +77,17 @@ export function Layout() {
           )}
           <span className="text-[15px] font-medium text-[#2B2320]">{currentNavLabel(pathname)}</span>
           <div className="ml-auto flex items-center gap-3">
+            <Tooltip title={voiceOn ? 'เสียงประกาศออเดอร์: เปิด' : 'เสียงประกาศออเดอร์: ปิด'}>
+              <Button
+                type={voiceOn ? 'primary' : 'text'}
+                size="small"
+                icon={voiceOn ? <SoundOutlined /> : <AudioMutedOutlined />}
+                onClick={toggleVoice}
+                aria-pressed={voiceOn}
+                aria-label="สลับเสียงประกาศออเดอร์">
+                เสียงประกาศ
+              </Button>
+            </Tooltip>
             <Badge dot color="#5B8C6E" offset={[-2, 2]}>
               <Button type="text" shape="circle" icon={<RiNotification3Line className="w-5 h-5" />} />
             </Badge>

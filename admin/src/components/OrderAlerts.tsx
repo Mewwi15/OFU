@@ -13,6 +13,12 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { supabase } from '../lib/supabase';
+import {
+  buildAnnouncement,
+  createAnnounceQueue,
+  createSpeaker,
+  VOICE_STORAGE_KEY,
+} from '../lib/voiceAnnounce';
 
 /** Pages listen for this to reload their order lists. */
 export const ORDERS_CHANGED_EVT = 'ofu-orders-changed';
@@ -48,12 +54,35 @@ function chime() {
 }
 
 type OrderRow = {
+  // The INSERT payload carries the row's id (needed to count its order_items —
+  // the items are not in the payload). Realtime always sends it.
+  id?: string;
   order_number?: string;
   payment_status?: string;
   payment_method?: string;
   shop_mode?: string;
   total?: number;
 };
+
+/* Voice announce (new orders only) — a single FIFO queue so a burst of orders
+ * chimes and speaks one at a time without overlapping. speechSynthesis is
+ * browser-only; a missing engine (or no Thai voice) degrades silently. The
+ * header toggle (default OFF) is read fresh at speak time via localStorage, so
+ * flipping it never needs a re-subscribe. See ../lib/voiceAnnounce. */
+const speak = createSpeaker(typeof window !== 'undefined' ? window.speechSynthesis : undefined);
+const announce = createAnnounceQueue({
+  chime,
+  speak,
+  delay: (ms) => new Promise((r) => setTimeout(r, ms)),
+  isEnabled: () => {
+    try {
+      return localStorage.getItem(VOICE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  },
+  log: (m) => console.info(m),
+});
 
 export function OrderAlerts() {
   const { notification } = App.useApp();
@@ -67,7 +96,7 @@ export function OrderAlerts() {
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
           const o = payload.new as OrderRow;
-          chime();
+          // Notification + list refresh fire immediately (visual, unordered).
           notification.info({
             key: `order-${o.order_number}`,
             message: 'ออเดอร์ออนไลน์ใหม่',
@@ -78,6 +107,23 @@ export function OrderAlerts() {
             onClick: () => nav('/orders'),
           });
           window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));
+          // The chime lives inside the queue now so it stays FIFO-ordered with
+          // the speech; the count query runs lazily, only if this order is
+          // actually going to be spoken. On any query failure we speak the base
+          // line without the "N รายการ" tail rather than nothing.
+          void announce(async () => {
+            const num = o.order_number ?? '';
+            if (!o.id) return buildAnnouncement(num, null);
+            try {
+              const { count, error } = await supabase
+                .from('order_items')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', o.id);
+              return buildAnnouncement(num, error ? null : count);
+            } catch {
+              return buildAnnouncement(num, null);
+            }
+          });
         },
       )
       .on(
