@@ -100,27 +100,43 @@ export function createAnnounceQueue(deps: AnnounceDeps): AnnounceQueue {
 }
 
 export type SpeakerOpts = {
-  /** Watchdog ceiling before the utterance is abandoned so the queue can move
-   *  on. Number, or a function of the text. Default: clamp(3s..10s) by length. */
-  watchdogMs?: number | ((text: string) => number);
+  /** How often to poll `synth.speaking` for natural completion (default 250ms). */
+  pollMs?: number;
+  /** Absolute last-resort ceiling for an engine that never starts or gets stuck
+   *  — the ONLY case where the utterance is cancelled. Normal speech never
+   *  reaches it. Default 30000ms. */
+  ceilingMs?: number;
   /** Injectable for tests — defaults to `new SpeechSynthesisUtterance(text)`. */
   makeUtterance?: (text: string) => SpeechSynthesisUtterance;
   /** Injectable for tests — defaults to the first `th*` voice from getVoices(). */
   findThaiVoice?: (synth: SpeechSynthesis) => SpeechSynthesisVoice | null;
 };
 
-const defaultWatchdog = (text: string) => Math.min(10_000, Math.max(3_000, text.length * 120));
-
 /**
- * Wrap speechSynthesis into a speak() that:
- *  - degrades silently when TTS is absent OR the device has no Thai voice — it
- *    resolves WITHOUT speaking rather than reading Thai in a wrong-language
- *    voice or staying accidentally silent (Blocking 3),
- *  - never leaves the FIFO queue stuck: a watchdog resolves the promise (and
- *    cancels the utterance) if the engine never fires onend/onerror, and a
- *    `done` guard makes a late onend after the watchdog a harmless no-op
- *    (Blocking 2),
- *  - resolves exactly once, when the utterance ends, errors, or times out.
+ * Wrap speechSynthesis into a speak() that resolves when the utterance actually
+ * FINISHES — it never cuts off speech that is still playing. The earlier
+ * length-based watchdog did: Thai reads an order number digit-by-digit, so a
+ * "…รหัส OF00042 3 รายการ" line runs past the estimated time and got cancelled
+ * mid-sentence, dropping the "N รายการ" tail on a real POS.
+ *
+ * Completion is detected two ways:
+ *  - onend/onerror → finish immediately (the normal path),
+ *  - polling `synth.speaking`: once it has been speaking and then stops, finish
+ *    — this covers the real Chrome bug where onend never fires on long text.
+ *    `sawSpeaking` is load-bearing here: it distinguishes "hasn't started yet"
+ *    (async engine start) from "finished", so the poll can't resolve early.
+ *
+ * The ONLY place the utterance is cancelled is the absolute ceiling (default
+ * 30s). It is the single guard for both "never started" and "stuck": because
+ * the ceiling CANCELS before resolving, a slow engine that would otherwise
+ * begin speaking after we've moved on is silenced rather than speaking late
+ * over the next order. (There is deliberately no earlier "start-grace" resolve
+ * — that path resolved WITHOUT cancelling, so a late-starting utterance could
+ * play out of order.) A `done` guard resolves exactly once; every
+ * timer/interval is cleared on all paths.
+ *
+ * Still degrades silently: no TTS, or no Thai voice → resolves without speaking
+ * (chime + notification carry the alert).
  */
 export function createSpeaker(
   synth: SpeechSynthesis | undefined | null,
@@ -131,16 +147,20 @@ export function createSpeaker(
     opts.findThaiVoice ??
     ((s: SpeechSynthesis) =>
       (s.getVoices?.() ?? []).find((v) => v.lang?.toLowerCase().startsWith('th')) ?? null);
-  const watchdog = opts.watchdogMs ?? defaultWatchdog;
+  const pollMs = opts.pollMs ?? 250;
+  const ceilingMs = opts.ceilingMs ?? 30_000;
 
   return (text: string) =>
     new Promise<void>((resolve) => {
       let done = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      let sawSpeaking = false;
+      let poll: ReturnType<typeof setInterval> | undefined;
+      let ceilTimer: ReturnType<typeof setTimeout> | undefined;
       const finish = () => {
-        if (done) return; // Blocking 2: a late onend/onerror after the watchdog is a no-op
+        if (done) return; // resolves exactly once; a late onend after finish is a no-op
         done = true;
-        if (timer) clearTimeout(timer);
+        if (poll) clearInterval(poll);
+        if (ceilTimer) clearTimeout(ceilTimer);
         resolve();
       };
       try {
@@ -150,23 +170,45 @@ export function createSpeaker(
         }
         const voice = findThaiVoice(synth);
         if (!voice) {
-          finish(); // Blocking 3: no Thai voice → skip speech, do not read in a random voice
+          finish(); // no Thai voice → skip speech, do not read in a random voice
           return;
         }
         const u = makeUtterance(text);
         u.lang = 'th-TH';
         u.voice = voice;
-        u.onend = finish;
+        u.onend = finish; // normal, fast path
         u.onerror = finish;
-        const ms = typeof watchdog === 'function' ? watchdog(text) : watchdog;
-        timer = setTimeout(() => {
-          try {
-            synth.cancel?.();
-          } catch {
-            /* ignore */
-          }
-          finish();
-        }, ms);
+
+        // Arm the timers BEFORE speak() so a synchronous onend inside speak()
+        // (some engines fire it inline) still finds them to clear — otherwise a
+        // timer created afterwards would leak. `!done` skips arming if onend has
+        // already fired synchronously by now.
+        if (!done) {
+          // Poll for a natural finish, purely from synth.speaking (no reliance on
+          // onstart/onend), so it catches Chrome dropping onend on long text
+          // WITHOUT ever cancelling active speech.
+          poll = setInterval(() => {
+            if (synth.speaking) {
+              sawSpeaking = true;
+              return;
+            }
+            if (sawSpeaking) finish(); // it spoke and has now stopped
+          }, pollMs);
+
+          // The single guard for "never started" AND "stuck": cancel then
+          // finish. Cancelling means a slow engine that would start speaking
+          // after this can't play late over the next order. Normal speech
+          // finishes via the poll long before this.
+          ceilTimer = setTimeout(() => {
+            try {
+              synth.cancel?.();
+            } catch {
+              /* ignore */
+            }
+            finish();
+          }, ceilingMs);
+        }
+
         synth.speak(u);
       } catch {
         finish();
