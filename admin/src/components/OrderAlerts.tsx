@@ -13,6 +13,12 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { supabase } from '../lib/supabase';
+import {
+  buildAnnouncement,
+  createAnnounceQueue,
+  createSpeaker,
+  VOICE_STORAGE_KEY,
+} from '../lib/voiceAnnounce';
 
 /** Pages listen for this to reload their order lists. */
 export const ORDERS_CHANGED_EVT = 'ofu-orders-changed';
@@ -48,6 +54,9 @@ function chime() {
 }
 
 type OrderRow = {
+  // The INSERT payload carries the row's id (needed to count its order_items —
+  // the items are not in the payload). Realtime always sends it.
+  id?: string;
   order_number?: string;
   payment_status?: string;
   payment_method?: string;
@@ -55,11 +64,40 @@ type OrderRow = {
   total?: number;
 };
 
+/* Voice announce (new orders only). The chime is rung IMMEDIATELY per order in
+ * the handler below — it must never wait on this queue. The queue only carries
+ * the delayed SPEECH (gap → count → speak), one order at a time so voices don't
+ * overlap. speechSynthesis is browser-only; a missing engine or no Thai voice
+ * degrades silently. The header toggle (default OFF) is read fresh at speak time
+ * via localStorage, so flipping it never needs a re-subscribe. See
+ * ../lib/voiceAnnounce. */
+const speak = createSpeaker(typeof window !== 'undefined' ? window.speechSynthesis : undefined);
+const announceQueue = createAnnounceQueue({
+  speak,
+  delay: (ms) => new Promise((r) => setTimeout(r, ms)),
+  isEnabled: () => {
+    try {
+      return localStorage.getItem(VOICE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  },
+  log: (m) => console.info(m),
+});
+
 export function OrderAlerts() {
   const { notification } = App.useApp();
   const nav = useNavigate();
 
   useEffect(() => {
+    // Warm the voice list so the first order can find a Thai voice — getVoices()
+    // is often empty until the engine loads and fires `voiceschanged`.
+    try {
+      window.speechSynthesis?.getVoices();
+    } catch {
+      /* no speech engine — announcements degrade to chime + notification */
+    }
+
     const channel = supabase
       .channel('admin-order-alerts')
       .on(
@@ -67,7 +105,7 @@ export function OrderAlerts() {
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
           const o = payload.new as OrderRow;
-          chime();
+          // Notification + list refresh fire immediately (visual, unordered).
           notification.info({
             key: `order-${o.order_number}`,
             message: 'ออเดอร์ออนไลน์ใหม่',
@@ -78,6 +116,25 @@ export function OrderAlerts() {
             onClick: () => nav('/orders'),
           });
           window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));
+          // Chime NOW, unconditionally, for every order — the audible alert must
+          // never be delayed or swallowed by a slow/stuck utterance ahead of it.
+          chime();
+          // The queue only carries the delayed speech. The count query runs
+          // lazily inside it, only if this order will actually be spoken; on any
+          // query failure we speak the base line without the "N รายการ" tail.
+          void announceQueue.enqueue(async () => {
+            const num = o.order_number ?? '';
+            if (!o.id) return buildAnnouncement(num, null);
+            try {
+              const { count, error } = await supabase
+                .from('order_items')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', o.id);
+              return buildAnnouncement(num, error ? null : count);
+            } catch {
+              return buildAnnouncement(num, null);
+            }
+          });
         },
       )
       .on(
@@ -108,6 +165,8 @@ export function OrderAlerts() {
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
+      // Drop any speech still queued so nothing is announced after logout.
+      announceQueue.dispose();
     };
     // notification/nav are stable from antd App + react-router
     // eslint-disable-next-line react-hooks/exhaustive-deps
