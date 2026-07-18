@@ -382,8 +382,48 @@ export async function cancelOrder(orderNumber: string, note?: string): Promise<v
 }
 
 /** Map a place_order / cancel error (RAISE message = the code) to friendly Thai. */
+/** One shortage line from place_order's OUT_OF_STOCK detail (M10, version 1). */
+type ShortageItem = {
+  variant_id?: string;
+  name?: string;
+  size?: string | null;
+  requested_qty?: number;
+  available_qty?: number;
+};
+
+/**
+ * Turn place_order's versioned OUT_OF_STOCK `detail` JSON into a per-item Thai
+ * message, e.g. "โอโมพลัส เหลือ 1 ชิ้น (ต้องการ 2)". Returns null on anything it
+ * can't confidently parse (an older comma-separated detail, or a shape it
+ * doesn't recognise) so the caller falls back to the generic message rather
+ * than showing a broken line.
+ */
+function outOfStockMessage(detail: string | undefined | null): string | null {
+  if (!detail) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(detail);
+  } catch {
+    return null; // old format (comma-separated variant ids) → generic fallback
+  }
+  const items = (parsed as { code?: string; items?: ShortageItem[] } | null)?.items;
+  if (!Array.isArray(items) || items.length === 0) return null;
+  const lines = items.map((it) => {
+    const label = [it.name, it.size].filter(Boolean).join(' ') || 'สินค้า';
+    const have = typeof it.available_qty === 'number' ? it.available_qty : 0;
+    const want = typeof it.requested_qty === 'number' ? it.requested_qty : 0;
+    return `${label} เหลือ ${have} ชิ้น (ต้องการ ${want})`;
+  });
+  return lines.join('\n');
+}
+
 export function orderErrorMessage(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? '';
+  if (msg === 'OUT_OF_STOCK') {
+    // Supabase surfaces a RAISE `detail` as `error.details` (older shapes: `detail`).
+    const err = e as { details?: string; detail?: string };
+    return outOfStockMessage(err.details ?? err.detail) ?? 'สินค้าบางรายการมีไม่พอ กรุณาปรับจำนวนแล้วลองใหม่';
+  }
   const table: Record<string, string> = {
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ กรุณาปรับจำนวนแล้วลองใหม่',
     EMPTY_CART: 'ไม่มีสินค้าที่เลือก',
