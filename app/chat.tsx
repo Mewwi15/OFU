@@ -87,8 +87,7 @@ export default function ShopChatScreen() {
   };
 
   const onAttach = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    // OS photo picker — no media-library permission needed.
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] });
     if (result.canceled) return;
     try {

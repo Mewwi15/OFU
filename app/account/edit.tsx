@@ -75,11 +75,7 @@ export default function EditProfileScreen() {
   const emailIsLogin = provider === 'email';
 
   const pickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t('editProfile.photoPermTitle'), t('editProfile.photoPermBody'));
-      return;
-    }
+    // OS photo picker — no media-library permission needed.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,

@@ -93,7 +93,7 @@
         "expo-media-library",
         {
           "savePhotosPermission": "ให้ อู้ฟู่ บันทึกรูป QR ชำระเงินลงในอัลบั้มรูปของคุณ",
-          "granularPermissions": ["photo"]
+          "granularPermissions": []
         }
       ],
       [
@@ -108,7 +108,8 @@
           "configureAndroidBackup": true,
           "faceIDPermission": "ให้ อู้ฟู่ ใช้ Face ID เพื่อปลดล็อกแอป"
         }
-      ]
+      ],
+      "./plugins/withCleanMediaPermissions.js"
     ],
     "experiments": {
       "typedRoutes": false,

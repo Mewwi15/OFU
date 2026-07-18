@@ -262,11 +262,8 @@ export default function CheckoutScreen() {
   };
 
   const pickSlip = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t('checkout.permTitle'), t('checkout.permBody'));
-      return;
-    }
+    // Android 13+/iOS: launchImageLibraryAsync uses the OS photo picker, which
+    // needs no media-library permission (see plugins/withCleanMediaPermissions).
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
     });
