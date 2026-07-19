@@ -661,8 +661,21 @@ export function Pos() {
                   key={p.id}
                   hoverable={!oos}
                   onClick={() => !oos && pick(p)}
-                  styles={{ body: { padding: '12px 14px 14px' } }}
+                  // h-full + flex column so every card fills its grid cell to
+                  // the same height and the name/price/+ block can pin to the
+                  // bottom — a consistent, complete card no matter the content.
+                  styles={{
+                    body: {
+                      padding: '12px 14px 14px',
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                    },
+                  }}
                   style={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                     overflow: 'hidden',
                     cursor: oos ? 'not-allowed' : 'pointer',
                     opacity: oos ? 0.55 : 1,
@@ -717,7 +730,7 @@ export function Pos() {
                   <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
                     {p.subtitle ?? p.category_name ?? ''}
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
+                  <div className="mt-auto pt-2 flex items-center justify-between">
                     <span className="text-[16px] font-bold text-tremor-content-strong">
                       {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
                     </span>
