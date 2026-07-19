@@ -647,20 +647,32 @@ export function Pos() {
                     borderColor: inCart > 0 ? '#5B8C6E' : '#E8E8E8',
                   }}
                   cover={
-                    <div className="relative aspect-square bg-[#FAFAFA] grid place-items-center overflow-hidden">
+                    // Native aspect-ratio (not Tailwind's aspect-square, which
+                    // wasn't producing height in prod — the box collapsed and
+                    // object-cover cropped the photo to a thin strip).
+                    <div className="relative bg-[#FAFAFA] overflow-hidden">
                       {p.image ? (
-                        // absolute-fill so a portrait image can't stretch the
-                        // square box (Safari/prod otherwise grow the card tall).
-                        <img src={p.image} alt={p.name} className="absolute inset-0 w-full h-full object-cover" />
+                        // The <img> is a square in normal flow: object-cover crops
+                        // the photo and aspect-ratio keeps the box square without
+                        // relying on the parent (Tailwind's aspect-square collapsed
+                        // in prod, leaving only a thin strip of the product).
+                        <img
+                          src={p.image}
+                          alt={p.name}
+                          className="block w-full object-cover"
+                          style={{ aspectRatio: '1 / 1' }}
+                        />
                       ) : (
                         // No photo yet: a per-product initial in a soft brand
-                        // circle reads as "designed" and gives each card its
-                        // own identity — a repeated generic icon on every
-                        // card made the whole grid look identical/unfinished.
-                        <div className="w-16 h-16 rounded-full grid place-items-center" style={{ background: '#EDF3EF' }}>
-                          <span className="text-2xl font-bold" style={{ color: '#3F6B52' }}>
-                            {p.name.trim().charAt(0)}
-                          </span>
+                        // circle reads as "designed" and gives each card its own
+                        // identity — a repeated generic icon on every card made
+                        // the whole grid look identical/unfinished.
+                        <div className="grid place-items-center" style={{ aspectRatio: '1 / 1' }}>
+                          <div className="w-16 h-16 rounded-full grid place-items-center" style={{ background: '#EDF3EF' }}>
+                            <span className="text-2xl font-bold" style={{ color: '#3F6B52' }}>
+                              {p.name.trim().charAt(0)}
+                            </span>
+                          </div>
                         </div>
                       )}
                       {inCart > 0 && (
