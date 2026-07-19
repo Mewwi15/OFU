@@ -267,13 +267,17 @@ export function Pos() {
   // Paginate so a big catalog stays readable (bigger cards, fewer per screen)
   // instead of cramming every product into one long, tiny-thumbnail grid.
   const PER_PAGE = 12;
+  const totalPages = Math.max(1, Math.ceil(shown.length / PER_PAGE));
   const paged = useMemo(
     () => shown.slice((page - 1) * PER_PAGE, page * PER_PAGE),
     [shown, page],
   );
-  // Snap back to page 1 whenever the filter narrows, so the user never lands on
-  // a now-empty page.
+  // Snap back to page 1 when the filter changes...
   useEffect(() => setPage(1), [cat, query]);
+  // ...and never strand the user past the last page after the set shrinks.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const qtyByVariant = useMemo(() => {
     const m = new Map<string, number>();
@@ -638,7 +642,12 @@ export function Pos() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
+          {/* Flexible grid: every card keeps a min width and columns auto-fill
+              to the container — cards never squish as the catalog grows; the
+              page size (not the column count) caps how many show at once. */}
+          <div
+            className="grid gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
             {paged.map((p) => {
               const price = p.variants[0]?.price ?? 0;
               const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
