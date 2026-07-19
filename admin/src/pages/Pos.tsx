@@ -53,6 +53,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Pagination,
   Segmented,
   Statistic,
   Tag,
@@ -128,6 +129,7 @@ export function Pos() {
 
   const [cat, setCat] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [picker, setPicker] = useState<PosProduct | null>(null);
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -261,6 +263,17 @@ export function Pos() {
       return true;
     });
   }, [catalog, cat, query]);
+
+  // Paginate so a big catalog stays readable (bigger cards, fewer per screen)
+  // instead of cramming every product into one long, tiny-thumbnail grid.
+  const PER_PAGE = 12;
+  const paged = useMemo(
+    () => shown.slice((page - 1) * PER_PAGE, page * PER_PAGE),
+    [shown, page],
+  );
+  // Snap back to page 1 whenever the filter narrows, so the user never lands on
+  // a now-empty page.
+  useEffect(() => setPage(1), [cat, query]);
 
   const qtyByVariant = useMemo(() => {
     const m = new Map<string, number>();
@@ -625,8 +638,8 @@ export function Pos() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
-            {shown.map((p) => {
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-4 gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start">
+            {paged.map((p) => {
               const price = p.variants[0]?.price ?? 0;
               const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
               const single = p.variants.length === 1 ? p.variants[0] : null;
@@ -720,6 +733,19 @@ export function Pos() {
               </div>
             )}
           </div>
+
+          {shown.length > PER_PAGE && (
+            <div className="flex justify-center py-2 shrink-0">
+              <Pagination
+                current={page}
+                total={shown.length}
+                pageSize={PER_PAGE}
+                onChange={setPage}
+                showSizeChanger={false}
+                size="small"
+              />
+            </div>
+          )}
 
           {/* scan feedback — floats above the grid, never covers search/categories */}
           {scanMsg && (
