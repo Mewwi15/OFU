@@ -14,14 +14,24 @@ import { Platform } from 'react-native';
 
 import { registerPushToken } from '@/lib/data/notifications';
 
-// Foreground notifications: show a banner + bump the badge. (Not on web —
-// the site relies on the in-app feed, no browser push.)
+/** The custom notification sound bundled via the expo-notifications plugin
+ *  (app.json `sounds`). On Android it's referenced on the channel by its base
+ *  filename; on iOS the sender sets it on the notification `sound`. */
+export const NOTIFICATION_SOUND = 'notification.wav';
+/** Android channel id. Bumped from the old soundless 'default' so devices that
+ *  already created that channel pick up the sounded one — Android freezes a
+ *  channel's settings after first creation, so a fresh id is the only way an
+ *  existing install starts making sound without a reinstall. */
+export const ANDROID_CHANNEL_ID = 'default-v2';
+
+// Foreground notifications: show a banner, PLAY THE SOUND, bump the badge. (Not
+// on web — the site relies on the in-app feed, no browser push.)
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
       shouldShowList: true,
-      shouldPlaySound: false,
+      shouldPlaySound: true,
       shouldSetBadge: true,
     }),
   });
@@ -44,9 +54,12 @@ export async function registerForPush(): Promise<void> {
   if (!Device.isDevice && Platform.OS === 'ios') return;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
+    // HIGH so a new order actually alerts (heads-up + sound); the sound is the
+    // bundled file, referenced by base filename per the expo-notifications docs.
+    await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: 'การแจ้งเตือน',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: NOTIFICATION_SOUND,
     });
   }
 
