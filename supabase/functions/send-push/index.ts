@@ -62,11 +62,18 @@ Deno.serve(async () => {
         title: d.notification?.title ?? 'อู้ฟู่',
         body: d.notification?.body ?? '',
         data: { targetId: d.notification?.target_id ?? null },
-        sound: 'default',
+        // Custom bundled sound (app.json expo-notifications `sounds`). On iOS the
+        // filename plays that sound; on Android it must match a channel whose
+        // sound is set — see channelId below.
+        sound: 'notification.wav',
         // Transactional order updates must wake the device: normal-priority FCM
         // gets deferred (or dropped) while the app is frozen in the background.
         priority: 'high',
-        channelId: 'default',
+        // Must equal ANDROID_CHANNEL_ID in lib/push.ts. Bumped from 'default':
+        // Android freezes a channel's sound after first creation, so the old
+        // soundless 'default' channel on existing installs can never gain sound
+        // — a fresh id is the only way an updated app starts alerting audibly.
+        channelId: 'default-v2',
       });
     }
   }
