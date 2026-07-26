@@ -10,7 +10,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { registerPushToken } from '@/lib/data/notifications';
 
@@ -44,18 +44,55 @@ function easProjectId(): string | undefined {
   );
 }
 
-/** Register this device for push. Safe to call on every authed launch. */
-export async function registerForPush(): Promise<void> {
+/**
+ * The outcome of a push registration attempt, so callers/diagnostics can tell
+ * WHY there's no push instead of a silent nothing:
+ *  - 'granted'        token minted and registered with the backend
+ *  - 'denied'         the OS permission was denied (offer a route to Settings)
+ *  - 'unsupported'    web, an iOS simulator, or no EAS projectId — nothing to do
+ *  - 'token_failed'   permission ok, but minting the Expo token threw (offline,
+ *                     or missing APNs/FCM credentials) — retryable
+ *  - 'backend_failed' token minted, but registering it with the backend threw
+ *                     (offline / RPC error) — retryable
+ */
+export type PushRegisterStatus =
+  | 'granted'
+  | 'denied'
+  | 'unsupported'
+  | 'token_failed'
+  | 'backend_failed';
+
+/** True for statuses worth retrying when the network/app state changes. */
+export function isRetryablePushStatus(s: PushRegisterStatus): boolean {
+  return s === 'token_failed' || s === 'backend_failed';
+}
+
+/** Open the OS notification settings for this app (for the denied case). */
+export async function openNotificationSettings(): Promise<void> {
+  try {
+    await Linking.openSettings();
+  } catch {
+    /* some OEMs restrict this — nothing better to do */
+  }
+}
+
+/**
+ * Register this device for push. Safe to call on every authed launch. Returns a
+ * status instead of swallowing failures, so the UI can react (retry, or point a
+ * denied user at Settings) and telemetry can see production breakage.
+ */
+export async function registerForPush(): Promise<PushRegisterStatus> {
   // No browser push on web (would need VAPID + a service worker; the in-app
   // notification feed covers it). Don't prompt for permission there.
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web') return 'unsupported';
   // iOS simulators can't receive remote push. Android emulators with Google
   // Play services CAN (FCM works there), so only gate iOS.
-  if (!Device.isDevice && Platform.OS === 'ios') return;
+  if (!Device.isDevice && Platform.OS === 'ios') return 'unsupported';
 
   if (Platform.OS === 'android') {
     // HIGH so a new order actually alerts (heads-up + sound); the sound is the
     // bundled file, referenced by base filename per the expo-notifications docs.
+    // Android 13 requires the channel to exist before the token is minted.
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
       name: 'การแจ้งเตือน',
       importance: Notifications.AndroidImportance.HIGH,
@@ -68,15 +105,21 @@ export async function registerForPush(): Promise<void> {
   if (status !== 'granted') {
     status = (await Notifications.requestPermissionsAsync()).status;
   }
-  if (status !== 'granted') return;
+  if (status !== 'granted') return 'denied';
 
   const projectId = easProjectId();
-  if (!projectId) return; // needs an EAS project to mint a token
+  if (!projectId) return 'unsupported'; // needs an EAS project to mint a token
 
+  let token: string;
   try {
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  } catch {
+    return 'token_failed'; // offline, or APNs/FCM credentials not wired
+  }
+  try {
     await registerPushToken(token, Platform.OS);
   } catch {
-    /* token mint / registration failed (offline, no EAS) — feed still works */
+    return 'backend_failed'; // token is fine; the backend register call failed
   }
+  return 'granted';
 }

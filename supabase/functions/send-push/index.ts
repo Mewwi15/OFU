@@ -85,10 +85,33 @@ Deno.serve(async () => {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(messages),
     });
-    const body = (await res.json().catch(() => ({}))) as { data?: { status?: string }[] };
+    // Log the HTTP status so a whole-batch failure (auth, 5xx, rate limit) is
+    // visible in function logs instead of silently counting as "failed".
+    if (!res.ok) {
+      console.error(`[send-push] Expo HTTP ${res.status} ${res.statusText}`);
+    }
+    const body = (await res.json().catch(() => ({}))) as {
+      data?: { status?: string; id?: string; message?: string; details?: { error?: string } }[];
+      errors?: unknown;
+    };
+    if (body.errors) {
+      console.error('[send-push] Expo request-level errors:', JSON.stringify(body.errors));
+    }
     (body.data ?? []).forEach((ticket, i) => {
       const id = owner[i];
-      acceptedByDelivery.set(id, (acceptedByDelivery.get(id) ?? false) || ticket?.status === 'ok');
+      const ok = ticket?.status === 'ok';
+      acceptedByDelivery.set(id, (acceptedByDelivery.get(id) ?? false) || ok);
+      if (!ok) {
+        // Ticket-level rejection — the error code (DeviceNotRegistered,
+        // MessageTooBig, InvalidCredentials, …) is the actionable bit. Log the
+        // delivery id + code, never the push token.
+        // FOLLOW-UP (separate task): poll receipts by ticket id and revoke the
+        // token on DeviceNotRegistered so dead devices stop being retried.
+        console.error(
+          `[send-push] ticket error delivery=${id} status=${ticket?.status ?? '?'} ` +
+            `error=${ticket?.details?.error ?? '?'} msg=${ticket?.message ?? ''}`,
+        );
+      }
     });
   }
 

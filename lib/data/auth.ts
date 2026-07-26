@@ -6,6 +6,7 @@
 
 import type { Session } from '@supabase/supabase-js';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -150,24 +151,73 @@ export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<
  * Requires the bundle id (com.oofoo.shop) in the Apple provider's Client IDs
  * in Supabase. Returns false if the user dismissed the sheet.
  */
-export async function signInWithAppleNative(): Promise<boolean> {
+/** Outcome of a native Apple sign-in, so the UI can tell a user-cancel apart
+ *  from a real failure (and surface a safe code for the latter). */
+export type AppleSignInResult =
+  | { ok: true }
+  | { ok: false; reason: 'cancelled' }
+  | { ok: false; reason: 'failed'; code: string };
+
+/**
+ * A short, token-free code for diagnostics/telemetry. NEVER include the
+ * identity token or any credential — only the provider's own error code or a
+ * clipped message word, so a failure is reportable without leaking secrets.
+ */
+function appleDiagnosticCode(e: unknown): string {
+  const err = e as { code?: string; status?: number; message?: string } | null;
+  if (err?.code) return String(err.code).slice(0, 40);
+  if (typeof err?.status === 'number') return `HTTP_${err.status}`;
+  const msg = err?.message ?? '';
+  // First token of the message, alphanumerics only, capped — no free text/PII.
+  return (msg.match(/[A-Za-z0-9_]+/)?.[0] ?? 'UNKNOWN').slice(0, 40);
+}
+
+export async function signInWithAppleNative(): Promise<AppleSignInResult> {
   try {
+    // Cryptographic nonce (replay protection; GoTrue may also require it):
+    // Apple receives SHA-256(rawNonce) baked into the identity token, and
+    // Supabase receives the raw value and re-hashes it to verify.
+    const bytes = await Crypto.getRandomBytesAsync(16);
+    const rawNonce = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const hashedNonce = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      rawNonce,
+    );
+
     const credential = await AppleAuthentication.signInAsync({
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
+      nonce: hashedNonce,
     });
-    if (!credential.identityToken) throw new Error('NO_IDENTITY_TOKEN');
-    const { error } = await supabase.auth.signInWithIdToken({
+    if (!credential.identityToken) return { ok: false, reason: 'failed', code: 'NO_IDENTITY_TOKEN' };
+
+    const { data, error } = await supabase.auth.signInWithIdToken({
       provider: 'apple',
       token: credential.identityToken,
+      nonce: rawNonce,
     });
-    if (error) throw error;
-    return true;
+    if (error) return { ok: false, reason: 'failed', code: appleDiagnosticCode(error) };
+    if (!data.session) return { ok: false, reason: 'failed', code: 'NO_SESSION' };
+
+    // Apple returns the name ONLY on the first sign-in; a returning user gets
+    // null here, which is normal — not a failure. Persist the name once and
+    // never overwrite a stored name with a later null.
+    const name = [credential.fullName?.givenName, credential.fullName?.familyName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const hasStoredName = !!(data.user?.user_metadata as { full_name?: string } | undefined)?.full_name;
+    if (name && !hasStoredName) {
+      await supabase.auth.updateUser({ data: { full_name: name } }).catch(() => {
+        /* name is a nicety; a failed metadata write must not fail the sign-in */
+      });
+    }
+    return { ok: true };
   } catch (e) {
-    if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return false; // user dismissed
-    throw e;
+    if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return { ok: false, reason: 'cancelled' };
+    return { ok: false, reason: 'failed', code: appleDiagnosticCode(e) };
   }
 }
 
