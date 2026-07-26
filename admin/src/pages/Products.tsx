@@ -209,7 +209,14 @@ export function Products() {
           if (!(s === 0 || isLow(p))) return false;
         }
         const q = query.trim().toLowerCase();
-        if (q && !p.name.toLowerCase().includes(q) && !(p.subtitle ?? '').toLowerCase().includes(q))
+        if (
+          q &&
+          !p.name.toLowerCase().includes(q) &&
+          !(p.subtitle ?? '').toLowerCase().includes(q) &&
+          !p.product_variants.some(
+            (v) => (v.barcode ?? '').toLowerCase().includes(q) || (v.sku ?? '').toLowerCase().includes(q),
+          )
+        )
           return false;
         return true;
       }),
@@ -331,7 +338,7 @@ export function Products() {
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Input.Search allowClear placeholder="ค้นหาสินค้า…" autoComplete="off" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
+        <Input.Search allowClear placeholder="ค้นหาชื่อ / บาร์โค้ด…" autoComplete="off" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         <Select
           allowClear
           placeholder="ทุกหมวดหมู่"
