@@ -176,7 +176,13 @@ export default function LoginScreen() {
     setSocialCallbackError(null);
     setSocialBusy(true);
     try {
-      await signInWithAppleNative();
+      const res = await signInWithAppleNative();
+      // A user cancel (reason 'cancelled') is silent — no error dialog. Only a
+      // real failure alerts, with a short token-free diagnostic code appended so
+      // the user can report it (never the identity token or any credential).
+      if (!res.ok && res.reason === 'failed') {
+        Alert.alert(t('login.socialFailed'), `${t('login.socialFailedBody')}\n\n(${res.code})`);
+      }
     } catch {
       Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
     } finally {
