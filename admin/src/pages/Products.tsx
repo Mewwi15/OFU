@@ -56,6 +56,8 @@ const primaryImage = (p: Product) =>
   p.product_images.find((i) => i.is_primary)?.storage_path ?? p.product_images[0]?.storage_path ?? null;
 const totalStock = (p: Product) => p.product_variants.reduce((s, v) => s + v.stock_qty, 0);
 const isLow = (p: Product) => p.product_variants.some((v) => v.stock_qty <= v.low_stock_threshold);
+// สินค้านำเข้าจากรายงานสต็อกมาแบบไม่มีรูป — ต้องหาเจอง่าย ๆ เพื่อไล่ถ่ายรูปให้ครบ
+const hasNoImage = (p: Product) => p.product_images.length === 0;
 function priceText(p: Product): string {
   const prices = p.product_variants.map((v) => v.price);
   if (!prices.length) return '—';
@@ -188,14 +190,16 @@ export function Products() {
   const summary = useMemo(() => {
     let published = 0,
       low = 0,
-      out = 0;
+      out = 0,
+      noImage = 0;
     for (const p of products) {
       if (p.publish_state === 'published') published++;
       const s = totalStock(p);
       if (s === 0) out++;
       else if (isLow(p)) low++;
+      if (hasNoImage(p)) noImage++;
     }
-    return { total: products.length, published, low, out };
+    return { total: products.length, published, low, out, noImage };
   }, [products]);
 
   const shown = useMemo(
@@ -208,6 +212,7 @@ export function Products() {
           const s = totalStock(p);
           if (!(s === 0 || isLow(p))) return false;
         }
+        if (statusFilter === 'noimage' && !hasNoImage(p)) return false;
         const q = query.trim().toLowerCase();
         if (
           q &&
@@ -321,7 +326,7 @@ export function Products() {
       </div>
 
       {/* summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
           <Statistic title="สินค้าทั้งหมด" value={summary.total} suffix="รายการ" />
         </Card>
@@ -333,6 +338,9 @@ export function Products() {
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
           <Statistic title="หมดสต็อก" value={summary.out} suffix="รายการ" styles={{ content: { color: summary.out ? '#E5484D' : undefined, fontWeight: 700 } }} />
+        </Card>
+        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
+          <Statistic title="ยังไม่มีรูป" value={summary.noImage} suffix="รายการ" styles={{ content: { color: summary.noImage ? '#6E56CF' : undefined, fontWeight: 700 } }} />
         </Card>
       </div>
 
@@ -355,6 +363,7 @@ export function Products() {
             { value: 'published', label: 'เผยแพร่' },
             { value: 'draft', label: 'ร่าง' },
             { value: 'low', label: 'ใกล้หมด/หมด' },
+            { value: 'noimage', label: `ไม่มีรูป${summary.noImage ? ` (${summary.noImage})` : ''}` },
           ]}
         />
       </div>
