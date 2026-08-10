@@ -32,6 +32,7 @@ import {
   getShopName,
   getSlipUrl,
   listOrders,
+  markOrderPrinted,
   nextStatus,
   rejectSlip,
   setOrderTrackingNo,
@@ -153,6 +154,7 @@ export function Orders() {
   const [query, setQuery] = useState('');
   const [bucket, setBucket] = useState<string>('all');
   const [mode, setMode] = useState<string>('all');
+  const [printFilter, setPrintFilter] = useState<string>('all');
 
   async function load() {
     setLoading(true);
@@ -179,26 +181,39 @@ export function Orders() {
     let slip = 0,
       action = 0,
       shipping = 0,
+      cancelled = 0,
       todayRevenue = 0;
     for (const o of orders) {
       if (isSlipPending(o)) slip++;
       const b = BUCKET[o.order_status];
       if (b === 'action') action++;
       else if (b === 'shipping') shipping++;
+      else if (b === 'cancelled') cancelled++;
       if (b !== 'cancelled' && isToday(o.placed_at)) todayRevenue += o.total;
     }
-    return { slip, action, shipping, todayRevenue };
+    return { slip, action, shipping, cancelled, todayRevenue };
   }, [orders]);
+  const cancelledCount = summary.cancelled;
+  // นับเฉพาะใบที่ยังต้องจัดจริง — ใบที่ยกเลิกหรือส่งจบแล้วไม่ต้องพิมพ์
+  const unprintedCount = useMemo(
+    () => orders.filter((o) => !o.printed_at && BUCKET[o.order_status] === 'action').length,
+    [orders],
+  );
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return orders.filter((o) => {
+      // "ทั้งหมด" = ทุกออเดอร์ที่ยังมีชีวิต — ที่ยกเลิก/ถูกปฏิเสธไปแล้วไม่มีอะไรให้
+      // ทำต่อ แต่เดิมมันค้างอยู่ในลิสต์จนกลบออเดอร์จริงที่ต้องรีบจัด
+      // ยังดูได้ที่แท็บ "ยกเลิก" — ไม่ได้ลบทิ้ง เพราะเป็นหลักฐานทางบัญชี
+      if (bucket === 'all' && BUCKET[o.order_status] === 'cancelled') return false;
       if (bucket !== 'all' && BUCKET[o.order_status] !== bucket) return false;
       if (mode !== 'all' && o.shop_mode !== mode) return false;
+      if (printFilter === 'unprinted' && o.printed_at) return false;
       if (q && !o.order_number.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [orders, query, bucket, mode]);
+  }, [orders, query, bucket, mode, printFilter]);
 
   const columns: ColumnsType<Order> = [
     {
@@ -236,6 +251,23 @@ export function Orders() {
       key: 'payment_status',
       width: 130,
       render: (_, o) => paymentStatusTag(o.payment_status),
+    },
+    {
+      // ช่องนี้ตอบคำถามเดียวของคนจัดของ: "ใบนี้พิมพ์ไปหรือยัง" — เดิมต้องจำเอง
+      // พอช่วยกันจัดสองคนเลยพิมพ์ซ้ำใบเดิมหรือข้ามใบที่ยังไม่ได้พิมพ์
+      title: 'ใบจัดสินค้า',
+      key: 'printed_at',
+      width: 118,
+      render: (_, o) =>
+        o.printed_at ? (
+          <Tag color="success" variant="filled">
+            พิมพ์แล้ว
+          </Tag>
+        ) : (
+          <Text type="secondary" className="text-xs">
+            ยังไม่พิมพ์
+          </Text>
+        ),
     },
     {
       title: 'เวลา',
@@ -340,7 +372,15 @@ export function Orders() {
             { value: 'action', label: 'รอจัดการ' },
             { value: 'shipping', label: 'กำลังส่ง' },
             { value: 'done', label: 'สำเร็จ' },
-            { value: 'cancelled', label: 'ยกเลิก' },
+            { value: 'cancelled', label: `ยกเลิก/ปฏิเสธ${cancelledCount ? ` (${cancelledCount})` : ''}` },
+          ]}
+        />
+        <Segmented
+          value={printFilter}
+          onChange={(v) => setPrintFilter(v as string)}
+          options={[
+            { value: 'all', label: 'ทุกใบ' },
+            { value: 'unprinted', label: `ยังไม่พิมพ์${unprintedCount ? ` (${unprintedCount})` : ''}` },
           ]}
         />
       </div>
@@ -404,12 +444,12 @@ function OrderDrawer({
           const track = await getParcelTracking(order.id).catch(() => null);
           if (alive) setTrackingNo(track);
         }
-        if (isSlipPending(order)) {
-          const url = await getSlipUrl(order.id).catch(() => null);
-          if (alive) setSlipUrl(url);
-        } else if (alive) {
-          setSlipUrl(null);
-        }
+        // Fetch the slip for every order that has one, not just the ones still
+        // waiting on a decision — approving used to make the shop's only proof
+        // of payment vanish from the screen. getSlipUrl returns null when there
+        // is no slip (e.g. cash on delivery), so the section just won't render.
+        const url = await getSlipUrl(order.id).catch(() => null);
+        if (alive) setSlipUrl(url);
       } catch (e) {
         message.error(apiError(e));
       } finally {
@@ -462,7 +502,17 @@ function OrderDrawer({
       <Space style={{ marginTop: 12 }} wrap>
         <Button
           icon={<RiPrinterLine className="w-4 h-4" />}
-          onClick={async () => printPickList(order, items, await getShopName())}>
+          onClick={async () => {
+            printPickList(order, items, await getShopName());
+            // ทำเครื่องหมายหลังเปิดหน้าต่างพิมพ์แล้ว และไม่ให้พังงานพิมพ์ถ้าเน็ตล่ม —
+            // การพิมพ์สำคัญกว่าการจดว่าพิมพ์
+            try {
+              await markOrderPrinted(order.id);
+              await onChanged();
+            } catch {
+              message.warning('พิมพ์แล้ว แต่บันทึกสถานะไม่สำเร็จ');
+            }
+          }}>
           พิมพ์ใบจัดสินค้า
         </Button>
         <Button
@@ -532,7 +582,7 @@ function OrderDrawer({
         <Row label="ยอดรวมทั้งสิ้น" value={baht(order.total)} strong />
       </div>
 
-      {isSlipPending(order) ? (
+      {slipUrl || isSlipPending(order) ? (
         <>
           <Divider titlePlacement="left" style={{ margin: '20px 0 12px' }}>
             สลิปการชำระเงิน
@@ -542,19 +592,33 @@ function OrderDrawer({
           ) : (
             <Text type="secondary">ไม่พบรูปสลิป (อาจยังไม่แนบ หรือเปิดดูไม่ได้)</Text>
           )}
-          <Space className="mt-3" style={{ width: '100%' }}>
-            <Button
-              type="primary"
-              loading={busy}
-              onClick={() =>
-                void runAction(() => approveSlip(order.id, order.row_version), 'อนุมัติสลิปแล้ว')
-              }>
-              อนุมัติสลิป
-            </Button>
-            <Button danger loading={busy} onClick={() => setRejectOpen(true)}>
-              ปฏิเสธสลิป
-            </Button>
-          </Space>
+          {isSlipPending(order) ? (
+            <Space className="mt-3" style={{ width: '100%' }}>
+              <Button
+                type="primary"
+                loading={busy}
+                onClick={() =>
+                  void runAction(() => approveSlip(order.id, order.row_version), 'อนุมัติสลิปแล้ว')
+                }>
+                อนุมัติสลิป
+              </Button>
+              <Button danger loading={busy} onClick={() => setRejectOpen(true)}>
+                ปฏิเสธสลิป
+              </Button>
+            </Space>
+          ) : (
+            // Decided already — keep the slip on screen as the record of what was
+            // approved, and say so, so the empty space isn't read as "buttons gone,
+            // did my click work?"
+            <div className="mt-3">
+              <Tag color={PAYMENT_STATUS[order.payment_status]?.color ?? 'default'}>
+                {PAYMENT_STATUS[order.payment_status]?.label ?? order.payment_status}
+              </Tag>
+              <Text type="secondary" className="ml-1">
+                ตรวจสอบแล้ว — เก็บสลิปไว้เป็นหลักฐาน
+              </Text>
+            </div>
+          )}
         </>
       ) : null}
 

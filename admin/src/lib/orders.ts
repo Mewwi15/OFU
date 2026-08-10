@@ -54,6 +54,8 @@ export type Order = {
   ship_address_text: string | null;
   placed_at: string;
   row_version: number;
+  /** เวลาที่พิมพ์ใบจัดสินค้าครั้งแรก · null = ยังไม่พิมพ์ (0068) */
+  printed_at: string | null;
 };
 
 export type OrderItem = {
@@ -68,7 +70,7 @@ export type OrderItem = {
 };
 
 const ORDER_COLS =
-  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, placed_at, row_version';
+  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, placed_at, row_version, printed_at';
 
 /* ── Reads (RLS: admin can read own shop) ────────────────────────────────────── */
 export async function listOrders(): Promise<Order[]> {
@@ -114,6 +116,12 @@ export async function getParcelTracking(orderId: string): Promise<string | null>
 }
 
 /** Resolve a signed URL for the active payment slip image (bucket is private). */
+/** ทำเครื่องหมายว่าพิมพ์ใบจัดสินค้าแล้ว — พิมพ์ซ้ำไม่เปลี่ยนเวลาเดิม (0068) */
+export async function markOrderPrinted(orderId: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_order_printed', { p_order_id: orderId });
+  if (error) throw error;
+}
+
 export async function getSlipUrl(orderId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('payment_slips')
