@@ -17,6 +17,8 @@ import { productThumb } from './image';
 import type { Order, OrderItem } from './orders';
 import { getReceiptConfig } from './receiptConfig';
 
+const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -73,6 +75,7 @@ const BASE_CSS = `
  * ships (owner 2026-07-16, replacing the earlier thermal-roll version). */
 export function printPickList(order: Order, items: OrderItem[], shopName: string) {
   const pieces = items.reduce((s, i) => s + i.qty, 0);
+  const itemsTotal = items.reduce((s, i) => s + i.line_total, 0);
   const when = new Date(order.placed_at).toLocaleString('th-TH', {
     day: 'numeric',
     month: 'short',
@@ -92,6 +95,8 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
         <td class="imgcell">${img}</td>
         <td class="nm">${esc(i.name_snapshot)}${i.size_snapshot ? `<div class="sz">${esc(i.size_snapshot)}</div>` : ''}</td>
         <td class="qty">${i.qty}</td>
+        <td class="price">${baht(i.unit_price)}</td>
+        <td class="sum">${baht(i.line_total)}</td>
         <td class="tick"><span class="cbox"></span></td>
       </tr>`;
     })
@@ -123,8 +128,13 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
     td.imgcell .noimg { font-size: 12px; color: #999; }
     td.nm { font-size: 19px; font-weight: 700; line-height: 1.35; }
     td.nm .sz { font-size: 15px; font-weight: 400; color: #333; margin-top: 2px; }
-    td.qty { text-align: center; font-size: 30px; font-weight: 800; width: 90px; }
-    td.tick { text-align: center; width: 80px; }
+    td.qty { text-align: center; font-size: 30px; font-weight: 800; width: 78px; }
+    /* ราคาต่อหน่วยแยกสินค้าชื่อคล้ายกันออกจากกัน (เช่น ยูโร่ช็อคโกพาย 5 บาท กับ
+       60 บาท) ซึ่งรูปกับชื่ออย่างเดียวแยกไม่ออก — เป็นด่านกันหยิบผิดตัว */
+    td.price, td.sum { text-align: right; white-space: nowrap; }
+    td.price { font-size: 17px; width: 88px; color: #333; }
+    td.sum { font-size: 19px; font-weight: 700; width: 96px; }
+    td.tick { text-align: center; width: 72px; }
     td.tick .cbox { display: inline-block; width: 30px; height: 30px; border: 2.5px solid #000; }
     .foot { display: flex; justify-content: space-between; align-items: center;
             margin-top: 14px; font-size: 17px; font-weight: 700; }
@@ -157,6 +167,8 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
           <th>รูป</th>
           <th class="nm">รายการสินค้า</th>
           <th>จำนวน</th>
+          <th>ราคา/ชิ้น</th>
+          <th>รวม</th>
           <th>จัดแล้ว</th>
         </tr>
       </thead>
@@ -165,6 +177,7 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
 
     <div class="foot">
       <span>รวม ${items.length} รายการ · ${pieces} ชิ้น</span>
+      <span>ยอดสินค้า ${baht(itemsTotal)}</span>
     </div>
     <div class="note">หมายเหตุ: <span class="line">&nbsp;</span></div>
   </body></html>`);
