@@ -123,21 +123,40 @@ export async function listProducts(force = false): Promise<Product[]> {
   if (!force && productsCache && Date.now() - productsCache.at < PRODUCTS_STALE_MS) {
     return productsCache.data;
   }
-  const { data, error } = await supabase
-    .from('products')
-    .select(
-      'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, cost_price, unit, archived_at), product_images(id, storage_path, is_primary)',
-    )
-    .is('archived_at', null)
-    .order('created_at', { ascending: false });
+  // cost_price is NOT selected here. RLS gates rows, not columns, and the
+  // catalogue rows are readable by everyone — so a cost_price in this select
+  // was readable by anyone holding the anon key, which ships inside the web
+  // shop and the app. It now comes from admin_variant_costs(), which checks
+  // admin_shop() first (0069a/0069b).
+  const [{ data, error }, costs] = await Promise.all([
+    supabase
+      .from('products')
+      .select(
+        'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, unit, archived_at), product_images(id, storage_path, is_primary)',
+      )
+      .is('archived_at', null)
+      .order('created_at', { ascending: false }),
+    variantCosts(),
+  ]);
   if (error) throw error;
   // Hide archived (retired size) variants — 1 product = 1 live stock row.
   const products = (data as unknown as Product[]).map((p) => ({
     ...p,
-    product_variants: p.product_variants.filter((v) => !v.archived_at),
+    product_variants: p.product_variants
+      .filter((v) => !v.archived_at)
+      .map((v) => ({ ...v, cost_price: costs.get(v.id) ?? null })),
   }));
   productsCache = { data: products, at: Date.now() };
   return products;
+}
+
+/** ต้นทุนต่อ variant สำหรับแอดมิน — คนละคำขอกับแคตตาล็อก เพราะคอลัมน์นี้ถูกซ่อน
+ *  จาก anon/authenticated แล้ว (0069b) อ่านได้ผ่าน RPC ที่เช็คสิทธิ์แอดมินเท่านั้น */
+async function variantCosts(): Promise<Map<string, number | null>> {
+  const { data, error } = await supabase.rpc('admin_variant_costs');
+  if (error) throw error;
+  const rows = (data ?? []) as { variant_id: string; cost_price: number | null }[];
+  return new Map(rows.map((r) => [r.variant_id, r.cost_price]));
 }
 
 /** Just enough to count products per category — Categories.tsx only needs a

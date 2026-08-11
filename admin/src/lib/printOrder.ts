@@ -136,8 +136,16 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
     td.sum { font-size: 19px; font-weight: 700; width: 96px; }
     td.tick { text-align: center; width: 72px; }
     td.tick .cbox { display: inline-block; width: 30px; height: 30px; border: 2.5px solid #000; }
-    .foot { display: flex; justify-content: space-between; align-items: center;
+    .foot { display: flex; justify-content: space-between; align-items: flex-start;
             margin-top: 14px; font-size: 17px; font-weight: 700; }
+    /* สรุปยอดชิดขวาแบบใบเสร็จ — คนแพ็คใช้เทียบกับเงินที่เก็บปลายทางได้เลย */
+    table.sums { width: auto; margin-top: 0; border-collapse: collapse; }
+    table.sums td { border: 0; padding: 3px 0 3px 26px; font-size: 17px; font-weight: 400; }
+    table.sums td.v { text-align: right; font-weight: 700; white-space: nowrap; min-width: 110px; }
+    table.sums tr.grand td { border-top: 2px solid #000; padding-top: 7px;
+                             font-size: 22px; font-weight: 800; }
+    .warn { margin-top: 10px; border: 2px solid #000; padding: 8px 12px;
+            font-size: 15px; font-weight: 700; }
     .note { margin-top: 20px; font-size: 15px; }
     .line { display: inline-block; width: 70%; border-bottom: 1px solid #000; }
   </style></head><body>
@@ -177,8 +185,21 @@ export function printPickList(order: Order, items: OrderItem[], shopName: string
 
     <div class="foot">
       <span>รวม ${items.length} รายการ · ${pieces} ชิ้น</span>
-      <span>ยอดสินค้า ${baht(itemsTotal)}</span>
+      <table class="sums">
+        <tr><td>ยอดสินค้า</td><td class="v">${baht(order.subtotal)}</td></tr>
+        ${order.delivery_fee ? `<tr><td>ค่าจัดส่ง</td><td class="v">${baht(order.delivery_fee)}</td></tr>` : ''}
+        ${order.discount_amount ? `<tr><td>ส่วนลด</td><td class="v">-${baht(order.discount_amount)}</td></tr>` : ''}
+        <tr class="grand"><td>ยอดรวมทั้งสิ้น</td><td class="v">${baht(order.total)}</td></tr>
+      </table>
     </div>
+    ${
+      // ยอดสินค้าที่บวกจากบรรทัดควรเท่ากับ subtotal ของออเดอร์เสมอ ถ้าไม่เท่า
+      // แปลว่ามีอะไรผิด (ราคาเปลี่ยนหลังสั่ง / รายการหาย) — บอกคนแพ็คไว้ก่อน
+      // ดีกว่าปล่อยให้ของออกจากร้านไปแล้วค่อยมารู้
+      itemsTotal !== order.subtotal
+        ? `<div class="warn">ยอดรวมรายการ (${baht(itemsTotal)}) ไม่ตรงกับยอดสินค้าของออเดอร์ (${baht(order.subtotal)}) — ตรวจก่อนส่ง</div>`
+        : ''
+    }
     <div class="note">หมายเหตุ: <span class="line">&nbsp;</span></div>
   </body></html>`);
 }
