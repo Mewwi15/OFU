@@ -9,6 +9,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image, useImage } from 'expo-image';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,25 +20,43 @@ import { RiderIllustration } from '@/components/shop/RiderIllustration';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import {
-  DELIVERY_DESTINATION,
-  DELIVERY_ROUTE,
-  DELIVERY_STAGES,
-  stageIndexFor,
-  type TrackedOrder,
-} from '@/data/fulfillment';
+import { DELIVERY_STAGES, stageIndexFor, type LatLng, type TrackedOrder } from '@/data/fulfillment';
+import { subscribeRiderLocation, type RiderFix } from '@/lib/data/riderLocation';
 import { useT } from '@/lib/i18n';
-import { useRiderRoute } from '@/lib/useRiderRoute';
 
-// Fixed camera, biased south of the route midpoint so the path sits in the map
-// strip above the (tall) status sheet instead of behind it.
-const CAMERA = {
-  coordinates: {
-    latitude: (DELIVERY_ROUTE[0].latitude + DELIVERY_DESTINATION.latitude) / 2 - 0.0034,
-    longitude: (DELIVERY_ROUTE[0].longitude + DELIVERY_DESTINATION.longitude) / 2,
-  },
-  zoom: 14.4,
-};
+/** Fallback view when the order carries no pin and the rider hasn't reported —
+ *  centred on Bangkok so the map is never a grey void. */
+const FALLBACK_CENTER: LatLng = { latitude: 13.7563, longitude: 100.5018 };
+
+/** Frame the customer and the rider together, biased north so the pair sits in
+ *  the map strip above the (tall) status sheet instead of behind it. */
+function cameraFor(dest: LatLng | undefined, rider: LatLng | null) {
+  const pts = [dest, rider].filter(Boolean) as LatLng[];
+  if (pts.length === 0) return { coordinates: FALLBACK_CENTER, zoom: 12 };
+  const lat = pts.reduce((a, p) => a + p.latitude, 0) / pts.length;
+  const lng = pts.reduce((a, p) => a + p.longitude, 0) / pts.length;
+  // Zoom out as the gap grows so both markers stay on screen.
+  const spread = pts.length < 2 ? 0 : Math.max(
+    Math.abs(pts[0].latitude - pts[1].latitude),
+    Math.abs(pts[0].longitude - pts[1].longitude),
+  );
+  const zoom = spread > 0.08 ? 11.5 : spread > 0.03 ? 12.8 : spread > 0.01 ? 13.8 : 14.6;
+  return { coordinates: { latitude: lat - 0.0034, longitude: lng }, zoom };
+}
+
+/** Straight-line metres between two fixes. Good enough for "how far away is my
+ *  order" — a routed distance would need a paid Directions call to say something
+ *  the customer reads as a rough sense of closeness anyway. */
+function metresBetween(a: LatLng, b: LatLng): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
 type Props = {
   order: TrackedOrder;
@@ -53,9 +72,35 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
   const t = useT();
   const activeIndex = stageIndexFor(order.status);
 
-  // Live rider movement along the route + branded marker artwork.
-  const { position, progress, minutesLeft, arrived } = useRiderRoute();
+  // Live rider position, straight off the private Realtime channel the shop
+  // broadcasts to while the order is out for delivery. No fix yet is the normal
+  // opening state (and also what a rider who hasn't started sharing looks like)
+  // — the sheet says "on the way" and the map simply shows no rider marker,
+  // rather than inventing a position.
+  const [fix, setFix] = useState<RiderFix | null>(null);
+  useEffect(() => {
+    if (!order.orderId || order.status !== 'out_for_delivery') return;
+    setFix(null);
+    return subscribeRiderLocation(order.orderId, setFix);
+  }, [order.orderId, order.status]);
+
+  const riderPos = useMemo<LatLng | null>(
+    () => (fix ? { latitude: fix.lat, longitude: fix.lng } : null),
+    [fix],
+  );
+  const dest = order.destination;
+  const camera = useMemo(() => cameraFor(dest, riderPos), [dest, riderPos]);
+  const arrived = order.status === 'delivered';
   const riderIcon = useImage(require('@/assets/images/rider-marker.png'));
+
+  const subtitle = useMemo(() => {
+    if (arrived) return t('track.comePickUp');
+    if (!riderPos || !dest) return t('track.waitingSignal');
+    const m = metresBetween(riderPos, dest);
+    return m < 1000
+      ? t('track.distanceAwayM').replace('{d}', String(Math.max(10, Math.round(m / 10) * 10)))
+      : t('track.distanceAway').replace('{d}', (m / 1000).toFixed(1));
+  }, [arrived, riderPos, dest, t]);
 
   return (
     <View style={styles.screen}>
@@ -63,26 +108,30 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
       {Platform.OS === 'ios' ? (
         <AppleMaps.View
           style={StyleSheet.absoluteFill}
-          cameraPosition={CAMERA}
-          markers={[{ coordinates: DELIVERY_DESTINATION, title: t('track.destination') }]}
+          cameraPosition={camera}
+          markers={dest ? [{ coordinates: dest, title: t('track.destination') }] : []}
           annotations={
-            riderIcon
-              ? [{ coordinates: position, icon: riderIcon, title: order.rider.name }]
-              : [{ coordinates: position, text: order.rider.name }]
+            riderPos
+              ? riderIcon
+                ? [{ coordinates: riderPos, icon: riderIcon, title: order.rider.name }]
+                : [{ coordinates: riderPos, text: order.rider.name }]
+              : []
           }
-          polylines={[{ coordinates: DELIVERY_ROUTE, color: Colors.primary, width: 5 }]}
         />
       ) : (
         <GoogleMaps.View
           style={StyleSheet.absoluteFill}
-          cameraPosition={CAMERA}
+          cameraPosition={camera}
           markers={[
-            riderIcon
-              ? { coordinates: position, icon: riderIcon, title: order.rider.name }
-              : { coordinates: position, title: order.rider.name },
-            { coordinates: DELIVERY_DESTINATION, title: t('track.destination') },
+            ...(riderPos
+              ? [
+                  riderIcon
+                    ? { coordinates: riderPos, icon: riderIcon, title: order.rider.name }
+                    : { coordinates: riderPos, title: order.rider.name },
+                ]
+              : []),
+            ...(dest ? [{ coordinates: dest, title: t('track.destination') }] : []),
           ]}
-          polylines={[{ coordinates: DELIVERY_ROUTE, color: Colors.primary, width: 5 }]}
         />
       )}
 
@@ -116,18 +165,9 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
             <Text variant="title" style={styles.sheetTitle}>
               {arrived ? t('track.riderArrived') : t('track.riderOnTheWay')}
             </Text>
-            <Text style={styles.arriving}>
-              {arrived
-                ? t('track.comePickUp')
-                : `${t('track.arrivingPrefix')}~${minutesLeft} ${t('track.minutesUnit')}`}
-            </Text>
+            <Text style={styles.arriving}>{subtitle}</Text>
           </View>
           <RiderIllustration size={104} />
-        </View>
-
-        {/* Live progress toward the customer */}
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
         </View>
 
         {/* Stepper */}
@@ -244,20 +284,6 @@ const styles = StyleSheet.create({
     ...Typography.bodyStrong,
     color: Colors.primaryStrong,
   },
-  progressTrack: {
-    height: 6,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.surfaceMuted,
-    overflow: 'hidden',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
-  },
-
   stepHint: {
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,

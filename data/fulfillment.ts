@@ -167,25 +167,17 @@ export function parcelStageIndexFor(status: OrderStatus): number {
 
 export type LatLng = { latitude: number; longitude: number };
 
-/**
- * A demo route the rider follows toward the customer (สุขุมวิท, กรุงเทพฯ). The
- * last point is the delivery address; `RIDER_POSITION` sits partway along.
- */
-export const DELIVERY_DESTINATION: LatLng = { latitude: 13.7236, longitude: 100.5686 };
-
-export const DELIVERY_ROUTE: LatLng[] = [
-  { latitude: 13.7301, longitude: 100.5601 },
-  { latitude: 13.7288, longitude: 100.5625 },
-  { latitude: 13.7269, longitude: 100.5638 },
-  { latitude: 13.7258, longitude: 100.5662 },
-  { latitude: 13.7246, longitude: 100.5675 },
-  DELIVERY_DESTINATION,
-];
-
-export const RIDER_POSITION: LatLng = { latitude: 13.7269, longitude: 100.5638 };
 
 export type TrackedOrder = {
+  /** `orders.order_number` — the human code shown everywhere in the UI. */
   id: string;
+  /** `orders.id` (uuid) — keys the private rider-location channel. Absent on a
+      locally-created optimistic order, which has no server row yet; the
+      tracking map falls back to the status-only view. */
+  orderId?: string;
+  /** Where the customer pinned the delivery. Absent when they typed the
+      address without dropping a pin, which the tracking map has to survive. */
+  destination?: LatLng;
   shopName: string;
   status: OrderStatus;
   /** Human ETA window, e.g. "30-45 นาที". */
@@ -219,6 +211,10 @@ export type TrackedOrder = {
   paymentStatus?: string;
   /** DB payment_method (cod | promptpay_slip). */
   paymentMethod?: string;
+  /** ทำไมออเดอร์ถึงถูกยกเลิก — ลูกค้าที่นั่งรออยู่ต้องได้รู้ ไม่ใช่เห็นแค่ "ยกเลิก" */
+  cancelReason?: string;
+  /** ข้อความเพิ่มจากร้าน (ถ้ามี) */
+  cancelNote?: string;
   /** First item's display name — makes the order list scannable. */
   firstItemName?: string;
   /** Product thumbnails of the order's items (primary image each, ≤4). */

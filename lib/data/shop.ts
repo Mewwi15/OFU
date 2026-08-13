@@ -33,3 +33,36 @@ export async function loadShopInfo(): Promise<ShopInfo> {
       : DEFAULT_SHOP.hours,
   };
 }
+
+/**
+ * Fulfilment fees straight from `shop_settings`.
+ *
+ * The app used to hardcode ฿40/฿200/฿150 while `place_order` charged from the
+ * table — so the moment the owner edited a fee, the number the customer read
+ * while deciding stopped matching the number they were charged (bug M1). This
+ * RPC (0071) exposes only the figures checkout shows anyway.
+ */
+export type FulfilmentFees = {
+  deliveryFee: number;
+  freeDeliveryMin: number;
+  onlineFee: number;
+  /** null = no free-shipping tier for parcels. */
+  onlineFreeMin: number | null;
+  codEnabled: boolean;
+  codCap: number | null;
+};
+
+export async function loadFulfilmentFees(): Promise<FulfilmentFees> {
+  const { data, error } = await supabase.rpc('get_fulfilment_fees');
+  if (error) throw error;
+  const r = (data ?? {}) as Record<string, unknown>;
+  const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);
+  return {
+    deliveryFee: num(r.delivery_fee, 40),
+    freeDeliveryMin: num(r.free_delivery_min, 200),
+    onlineFee: num(r.online_fee, 150),
+    onlineFreeMin: typeof r.online_free_min === 'number' ? r.online_free_min : null,
+    codEnabled: r.cod_enabled !== false,
+    codCap: typeof r.cod_cap === 'number' ? r.cod_cap : null,
+  };
+}

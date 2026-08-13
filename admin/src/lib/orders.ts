@@ -34,6 +34,7 @@ export type CancelReason =
   | 'out_of_stock'
   | 'payment_timeout'
   | 'undeliverable'
+  | 'out_of_area'
   | 'shop_cancel'
   | 'other';
 
@@ -52,6 +53,12 @@ export type Order = {
   ship_recipient: string | null;
   ship_phone: string | null;
   ship_address_text: string | null;
+  /** พิกัดที่ลูกค้าปักหมุดไว้ — ใช้เปิดนำทาง (0002 มีคอลัมน์นี้มาตั้งแต่ต้น) */
+  ship_lat: number | null;
+  ship_lng: number | null;
+  /** เวลาที่รับเงินสดปลายทาง · null = ยังไม่เก็บ (0071) */
+  cod_collected_at: string | null;
+  cod_amount: number | null;
   placed_at: string;
   row_version: number;
   /** เวลาที่พิมพ์ใบจัดสินค้าครั้งแรก · null = ยังไม่พิมพ์ (0068) */
@@ -70,7 +77,7 @@ export type OrderItem = {
 };
 
 const ORDER_COLS =
-  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, placed_at, row_version, printed_at';
+  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, ship_lat, ship_lng, cod_collected_at, cod_amount, placed_at, row_version, printed_at';
 
 /* ── Reads (RLS: admin can read own shop) ────────────────────────────────────── */
 export async function listOrders(): Promise<Order[]> {
@@ -227,3 +234,13 @@ export async function getShopName(): Promise<string> {
   })();
   return shopNameCache;
 }
+
+/**
+ * บันทึกว่ารับเงินสดปลายทางแล้ว (0071).
+ *
+ * ไม่สร้างบิล POS ปลอม — ออเดอร์ตัดสต็อกไปแล้วตอนลูกค้าสั่ง และบิล POS กินเลข
+ * ใบเสร็จของจริง · เก็บบนตัวออเดอร์แล้วให้ `pos_dashboard` รวมเข้ายอดเงินสด
+ * ให้ตอนอ่าน กดซ้ำไม่เปลี่ยนอะไร
+ */
+export const markCodCollected = (orderId: string, amount?: number) =>
+  rpc('mark_cod_collected', { p_order_id: orderId, p_amount: amount });

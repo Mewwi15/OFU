@@ -223,6 +223,7 @@ type OrderItemRow = {
 };
 
 type OrderRow = {
+  id: string;
   order_number: string;
   order_status: string;
   payment_status: string;
@@ -233,14 +234,19 @@ type OrderRow = {
   delivered_at: string | null;
   ship_recipient: string | null;
   ship_address_text: string | null;
+  ship_lat: number | null;
+  ship_lng: number | null;
+  cancel_reason: string | null;
+  cancel_note: string | null;
   order_items: OrderItemRow[] | null;
   // PostgREST returns a reverse-embedded (FK→orders) relation as an array.
   parcel_shipments: { tracking_no: string | null; courier: string | null }[] | null;
 };
 
 const ORDER_SELECT =
-  'order_number, order_status, payment_status, payment_method, shop_mode, total, placed_at, ' +
-  'delivered_at, ship_recipient, ship_address_text, ' +
+  'id, order_number, order_status, payment_status, payment_method, shop_mode, total, placed_at, ' +
+  'delivered_at, ship_recipient, ship_address_text, ship_lat, ship_lng, ' +
+  'cancel_reason, cancel_note, ' +
   'order_items(qty, name_snapshot, products(product_images(storage_path, is_primary))), ' +
   'parcel_shipments(tracking_no, courier)';
 
@@ -259,6 +265,13 @@ function toTracked(r: OrderRow): TrackedOrder {
     .slice(0, 4);
   return {
     id: r.order_number,
+    orderId: r.id,
+    cancelReason: r.cancel_reason ?? undefined,
+    cancelNote: r.cancel_note ?? undefined,
+    destination:
+      typeof r.ship_lat === 'number' && typeof r.ship_lng === 'number'
+        ? { latitude: r.ship_lat, longitude: r.ship_lng }
+        : undefined,
     shopName: 'ร้าน อู้ฟู่',
     status,
     etaText: fulfilment === 'parcel' ? 'ถึงภายใน 2-3 วัน' : '30-45 นาที',

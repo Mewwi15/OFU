@@ -53,9 +53,8 @@ import {
 } from '@/store/cart';
 import {
   deliveryFeeFor,
-  FREE_DELIVERY_MIN,
   meetsMinOrder,
-  MIN_ORDER,
+  useFees,
   useMode,
 } from '@/store/mode';
 
@@ -81,10 +80,11 @@ const CHECKOUT_BAR_HEIGHT = 80;
 /* Free-shipping progress (a block inside the delivery surface)            */
 /* ----------------------------------------------------------------------- */
 
-function FreeShipBlock({ subtotal }: { subtotal: number }) {
+function FreeShipBlock({ subtotal, freeMin }: { subtotal: number; freeMin: number }) {
   const t = useT();
-  const progress = Math.min(1, subtotal / FREE_DELIVERY_MIN);
-  const remaining = Math.max(0, FREE_DELIVERY_MIN - subtotal);
+  // freeMin 0 = ส่งฟรีทุกยอด — เต็มหลอดทันที ไม่ใช่หารด้วยศูนย์
+  const progress = freeMin > 0 ? Math.min(1, subtotal / freeMin) : 1;
+  const remaining = Math.max(0, freeMin - subtotal);
   const reached = remaining === 0;
 
   const fill = useSharedValue(0);
@@ -204,7 +204,8 @@ export default function CartScreen() {
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
   const selectedCount = cartCount(chosen);
-  const deliveryFee = deliveryFeeFor(mode, subtotal);
+  const fees = useFees((f) => f.fees);
+  const deliveryFee = deliveryFeeFor(mode, subtotal, fees);
   const discount = appliedPromo?.discount ?? 0;
   const total = subtotal + deliveryFee - discount;
 
@@ -215,7 +216,6 @@ export default function CartScreen() {
   const nothingSelected = selectedCount === 0;
   // Minimum-order floor (delivery only) — only relevant once something is ticked.
   const belowMin = !nothingSelected && !meetsMinOrder(mode, subtotal);
-  const minShortfall = Math.max(0, MIN_ORDER - subtotal);
   // Online (parcel) needs a parcel-ready address before checkout.
   const needsParcel = mode === 'online' && !hasParcelInfo(address);
   const canCheckout =
@@ -416,7 +416,7 @@ export default function CartScreen() {
                   <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
                 </PressableScale>
                 <View style={styles.insetHairline} />
-                <FreeShipBlock subtotal={subtotal} />
+                <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} />
               </View>
             ) : (
               /* Online surface — nationwide parcel address */
@@ -619,9 +619,7 @@ export default function CartScreen() {
                 numberOfLines={1}>
                 {!shopOpen
                   ? `${t('cart.closedShort')} · ${shopHoursLabel(shopHours)}`
-                  : belowMin
-                    ? `${t('cart.minOrderPrefix')}${MIN_ORDER} · ${t('cart.shortBy')} ${money(minShortfall)}`
-                    : nothingSelected
+                  : nothingSelected
                       ? t('cart.nothingSelected')
                       : needsParcel
                         ? t('cart.needParcelAddress')

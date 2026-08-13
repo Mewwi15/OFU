@@ -46,6 +46,7 @@ import {
 } from '../lib/orders';
 import { printAddressLabel, printPickList } from '../lib/printOrder';
 import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
+import { RiderPanel } from '../components/RiderPanel';
 
 const { Text } = Typography;
 
@@ -135,6 +136,7 @@ const CANCEL_OPTIONS: { value: CancelReason; label: string }[] = [
   { value: 'out_of_stock', label: 'สินค้าหมด' },
   { value: 'payment_timeout', label: 'ไม่ชำระเงินตามเวลา' },
   { value: 'undeliverable', label: 'จัดส่งไม่ได้' },
+  { value: 'out_of_area', label: 'อยู่นอกพื้นที่จัดส่ง' },
   { value: 'shop_cancel', label: 'ร้านยกเลิก' },
   { value: 'other', label: 'อื่น ๆ' },
 ];
@@ -496,6 +498,10 @@ function OrderDrawer({
         ) : null}
         <Descriptions.Item label="เวลา">{fmtTime(order.placed_at)}</Descriptions.Item>
       </Descriptions>
+
+      {/* โหมดไรเดอร์ — เจ้าของร้านส่งเอง POS บนมือถือจึงทำหน้าที่แอปไรเดอร์
+          (เฉพาะออเดอร์เดลิเวอรี่ · พัสดุทั่วไทยมีเลขติดตามแทน) */}
+      {order.shop_mode === 'delivery' ? <RiderPanel order={order} onChanged={onChanged} /> : null}
 
       {/* Print sheets: packing checklist + shop address label (the official
           Flash waybill still prints from Flash's own system/printer app). */}
