@@ -17,16 +17,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { loadFulfilmentFees, type FulfilmentFees } from '@/lib/data/shop';
 import { zustandStorage } from '@/lib/storage';
 
 export type ShopMode = 'delivery' | 'online';
 
 /**
- * Rider delivery hasn't launched yet (owner decision 2026-07-11) — the mode
- * shows as "เร็วๆ นี้" and can't be selected. Flip to false on launch day; the
- * switch UI, fees and checkout branches below are all still wired up.
+ * Rider delivery is live (owner decision 2026-08-13). The shop owner delivers
+ * in person and works the orders from the POS on their phone — navigate, call,
+ * share live position, collect cash — so there is no separate rider app.
+ *
+ * Free delivery, no minimum order and no service radius, all deliberate: an
+ * order that turns out to be too far is cancelled with the `out_of_area` reason,
+ * which the customer now actually sees.
  */
-export const DELIVERY_COMING_SOON = true;
+export const DELIVERY_COMING_SOON = false;
 
 export type ModeMeta = {
   key: ShopMode;
@@ -44,7 +49,7 @@ export const MODE_META: Record<ShopMode, ModeMeta> = {
   delivery: {
     key: 'delivery',
     label: 'เดลิเวอรี่',
-    tagline: DELIVERY_COMING_SOON ? 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้' : 'สั่งเลย ส่งถึงบ้าน',
+    tagline: DELIVERY_COMING_SOON ? 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้' : 'สั่งเลย ส่งถึงบ้าน · ส่งฟรี',
     image: require('@/assets/images/parcel/parcel-4.png') as number,
     comingSoon: DELIVERY_COMING_SOON,
   },
@@ -56,45 +61,69 @@ export const MODE_META: Record<ShopMode, ModeMeta> = {
   },
 };
 
-/** Delivery (rider) fee in Baht; waived above the free-shipping threshold. */
-export const DELIVERY_FEE = 40;
-/** Order subtotal at/above which rider delivery is free. */
-export const FREE_DELIVERY_MIN = 200;
-/** Minimum subtotal required to place a delivery order. */
-export const MIN_ORDER = 100;
+/**
+ * Fee store — the live figures from `shop_settings` (RPC `get_fulfilment_fees`,
+ * migration 0071).
+ *
+ * These used to be constants here. `place_order` has always charged from the
+ * table, so a hardcoded copy could only ever be right until the owner edited a
+ * fee — after that the app quoted one number and collected another (bug M1).
+ * The defaults below are just the pre-load placeholder, not the source of truth.
+ */
+export type Fees = FulfilmentFees;
 
-/** Flat parcel-shipping fee (online), waived above the threshold.
-    ESTIMATE ONLY — the owner edits the real one in shop_settings.online_fee
-    (0048) and place_order charges from there, so this copy goes stale the day
-    they change it and no rebuild can be assumed. See `deliveryFeeFor`. */
-export const FLASH_FEE = 150;
-/** No free-shipping tier for parcels (owner decision) — every online order
-    pays the fee. Mirrors shop_settings.online_free_threshold = NULL (0049).
-    ESTIMATE ONLY, same caveat as FLASH_FEE. */
-export const FLASH_FREE_MIN = Number.POSITIVE_INFINITY;
+const DEFAULT_FEES: Fees = {
+  deliveryFee: 40,
+  freeDeliveryMin: 200,
+  onlineFee: 150,
+  onlineFreeMin: null,
+  codEnabled: true,
+  codCap: null,
+};
+
+export type FeesState = {
+  fees: Fees;
+  loaded: boolean;
+  load: (force?: boolean) => Promise<void>;
+};
+
+export const useFees = create<FeesState>((set, get) => ({
+  fees: DEFAULT_FEES,
+  loaded: false,
+  load: async (force = false) => {
+    if (get().loaded && !force) return;
+    try {
+      set({ fees: await loadFulfilmentFees(), loaded: true });
+    } catch {
+      // Keep the placeholder and stay silent — a fee we cannot read is not a
+      // reason to block the cart. The charged total still comes from the server.
+    }
+  },
+}));
 
 /**
- * Fulfilment fee for a subtotal + mode — rider delivery fee (`delivery`) or
- * parcel-shipping fee (`online`), each waived above its free threshold.
+ * Fulfilment fee for a subtotal + mode.
  *
- * AN ESTIMATE, NOT A PRICE. The owner can change the online fee/threshold in
- * shop_settings whenever they like, and `place_order` charges from there — this
- * is a client-side copy that cannot know it has gone stale (M1). Use it for
- * pre-order "ประมาณการ" UI only. Anything the customer actually pays — above
- * all a PromptPay QR — must come from `PlacedOrder.total`.
+ * STILL AN ESTIMATE, NOT A PRICE. It now tracks the shop's real settings, but
+ * anything the customer actually pays — above all a PromptPay QR — must come
+ * from `PlacedOrder.total`, which is computed server-side inside `place_order`.
  */
-export function deliveryFeeFor(mode: ShopMode, subtotal: number): number {
+export function deliveryFeeFor(mode: ShopMode, subtotal: number, fees: Fees): number {
   if (mode === 'delivery') {
-    return subtotal >= FREE_DELIVERY_MIN ? 0 : DELIVERY_FEE;
+    return subtotal >= fees.freeDeliveryMin ? 0 : fees.deliveryFee;
   }
-  // online → nationwide parcel shipping
-  return subtotal >= FLASH_FREE_MIN ? 0 : FLASH_FEE;
+  return fees.onlineFreeMin != null && subtotal >= fees.onlineFreeMin ? 0 : fees.onlineFee;
 }
 
-/** Whether a subtotal clears the minimum-order floor (online has no floor). */
-export function meetsMinOrder(mode: ShopMode, subtotal: number): boolean {
-  if (mode !== 'delivery') return true;
-  return subtotal >= MIN_ORDER;
+/**
+ * Minimum-order floor.
+ *
+ * Owner decision 2026-08-13: delivery is free with no minimum — a customer may
+ * order a single ฿10 bottle. Kept as a function so reinstating a floor is one
+ * edit rather than a hunt through the cart.
+ */
+export function meetsMinOrder(_mode: ShopMode, _subtotal: number): boolean {
+  return true;
 }
 
 export type ModeState = {

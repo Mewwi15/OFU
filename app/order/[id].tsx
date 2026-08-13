@@ -176,6 +176,15 @@ export default function OrderTrackingScreen() {
   // rejected slip gets its own honest copy instead of a generic "cancelled".
   if (active.status === 'cancelled') {
     const rejected = active.paymentStatus === 'rejected';
+    // A customer who has been waiting deserves the actual reason. The shop
+    // always picks one when cancelling, and the free-text note (e.g. which
+    // item ran out) is worth more than the generic line when it exists.
+    const reasonKey = active.cancelReason ? `cancel.reason.${active.cancelReason}` : null;
+    const reasonText = reasonKey ? t(reasonKey) : null;
+    const explained =
+      reasonText && reasonText !== reasonKey
+        ? [reasonText, active.cancelNote?.trim()].filter(Boolean).join(' · ')
+        : null;
     return (
       <TerminalState
         icon={rejected ? 'alert' : 'close'}
@@ -185,7 +194,11 @@ export default function OrderTrackingScreen() {
             ? t('track.paymentRejectedTitle')
             : `${t('track.orderPrefix')}${active.id}${t('track.orderCancelledSuffix')}`
         }
-        body={rejected ? t('track.paymentRejectedBody') : t('track.orderCancelledBody')}
+        body={
+          rejected
+            ? t('track.paymentRejectedBody')
+            : (explained ?? t('track.orderCancelledBody'))
+        }
         buttonLabel={t('track.backHome')}
         onPress={goHome}
       />

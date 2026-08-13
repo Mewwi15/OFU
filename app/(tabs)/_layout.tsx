@@ -12,6 +12,7 @@ import {
 import { useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
 import { useNotifications } from '@/store/notifications';
+import { useFees } from '@/store/mode';
 import { useShop } from '@/store/shop';
 
 export default function TabLayout() {
@@ -19,6 +20,7 @@ export default function TabLayout() {
   const loadCatalog = useCatalog((s) => s.load);
   const loadAddresses = useAddress((s) => s.load);
   const loadShop = useShop((s) => s.load);
+  const loadFees = useFees((s) => s.load);
   const loadNotifications = useNotifications((s) => s.load);
 
   // Push registration: prompt a denied user toward Settings once, and retry a
@@ -30,6 +32,7 @@ export default function TabLayout() {
     loadCatalog();
     loadAddresses();
     loadShop();
+    loadFees();
     loadNotifications();
 
     let cancelled = false;
@@ -62,7 +65,7 @@ export default function TabLayout() {
       cancelled = true;
       sub.remove();
     };
-  }, [loadCatalog, loadAddresses, loadShop, loadNotifications]);
+  }, [loadCatalog, loadAddresses, loadShop, loadFees, loadNotifications]);
 
   return (
     <Tabs

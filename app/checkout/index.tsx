@@ -63,7 +63,7 @@ import { uuidv4 } from '@/lib/uuid';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useAuth } from '@/store/auth';
 import { cartCount, cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
-import { deliveryFeeFor, useMode } from '@/store/mode';
+import { deliveryFeeFor, useFees, useMode } from '@/store/mode';
 
 type Status = 'idle' | 'placing' | 'awaiting_payment' | 'verifying' | 'success';
 
@@ -136,7 +136,8 @@ export default function CheckoutScreen() {
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
   const count = cartCount(chosen);
-  const deliveryFee = deliveryFeeFor(mode, subtotal);
+  const fees = useFees((f) => f.fees);
+  const deliveryFee = deliveryFeeFor(mode, subtotal, fees);
 
   // Online flow pays up-front (PromptPay only); delivery defaults to COD but may
   // also pay by PromptPay.
