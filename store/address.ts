@@ -46,6 +46,8 @@ export type AddressState = {
   upsert: (draft: AddressDraft) => Promise<string>;
   remove: (id: string) => Promise<void>;
   select: (id: string) => void;
+  /** Wipe the signed-out customer's address book (see store/session.ts). */
+  reset: () => void;
 };
 
 export const useAddress = create<AddressState>()(
@@ -99,6 +101,8 @@ export const useAddress = create<AddressState>()(
           };
         });
       },
+
+      reset: () => set({ addresses: [], selectedId: null, loading: false, loaded: false }),
 
       select: (id) => set({ selectedId: id }),
     }),

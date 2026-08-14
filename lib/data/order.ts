@@ -10,7 +10,8 @@
  * That's why `placeOrder` takes the key rather than minting one per call.
  */
 
-import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
+import { riderFromShop, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
+import { useShop } from '@/store/shop';
 import type { CartItem } from '@/store/cart';
 import { supabase } from '@/lib/supabase/client';
 
@@ -283,7 +284,7 @@ function toTracked(r: OrderRow): TrackedOrder {
     addressLine: r.ship_address_text ?? '',
     placedAtLabel: thaiStamp(r.placed_at),
     deliveredAt: thaiStamp(r.delivered_at),
-    rider: MOCK_RIDER,
+    rider: riderFromShop(useShop.getState().info),
     fulfilment,
     paymentStatus: r.payment_status,
     paymentMethod: r.payment_method,

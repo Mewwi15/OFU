@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 export async function loadShopInfo(): Promise<ShopInfo> {
   const { data: shop } = await supabase
     .from('shops')
-    .select('name, promptpay_id, promptpay_name')
+    .select('name, promptpay_id, promptpay_name, contact_phone')
     .order('created_at')
     .limit(1)
     .maybeSingle();
@@ -23,6 +23,7 @@ export async function loadShopInfo(): Promise<ShopInfo> {
 
   return {
     name: shop?.name ?? DEFAULT_SHOP.name,
+    phone: shop?.contact_phone ?? DEFAULT_SHOP.phone,
     promptPay: {
       target: shop?.promptpay_id ?? DEFAULT_SHOP.promptPay.target,
       displayName: shop?.promptpay_name ?? DEFAULT_SHOP.promptPay.displayName,

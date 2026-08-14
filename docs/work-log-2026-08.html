@@ -1,0 +1,209 @@
+<title>สรุปงาน 9–14 ส.ค. 2026 · อู้ฟู่</title>
+<style>
+:root{
+  --ground:#FAF9F4; --surface:#FFFFFF; --raise:#F1F0E8; --line:#E4E3D9;
+  --ink:#1B1F19; --muted:#6A7167; --faint:#9AA096;
+  --accent:#1F7A4D; --accent-soft:#E6F1EA;
+  --warn:#9C5C08; --warn-soft:#FAF1E1; --danger:#A32A2C; --danger-soft:#F9EAE9;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --thai:"Noto Sans Thai","IBM Plex Sans Thai",Sarabun,Thonburi,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#131512; --surface:#1B1E19; --raise:#232720; --line:#2E332B;
+  --ink:#E8EAE3; --muted:#98A093; --faint:#6E756B;
+  --accent:#5FB98A; --accent-soft:#1A2E23;
+  --warn:#D69A45; --warn-soft:#2C2417; --danger:#E2807C; --danger-soft:#2E1D1C;
+}}
+:root[data-theme="dark"]{
+  --ground:#131512; --surface:#1B1E19; --raise:#232720; --line:#2E332B;
+  --ink:#E8EAE3; --muted:#98A093; --faint:#6E756B;
+  --accent:#5FB98A; --accent-soft:#1A2E23;
+  --warn:#D69A45; --warn-soft:#2C2417; --danger:#E2807C; --danger-soft:#2E1D1C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--thai);
+  font-size:15.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px 100px}
+header{padding:56px 0 26px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);font-weight:700}
+h1{font-size:clamp(26px,4.5vw,38px);line-height:1.25;margin:10px 0 8px;font-weight:700;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:64ch}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);margin-top:26px}
+.stat{background:var(--surface);padding:15px 17px}
+.stat .k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-family:var(--mono)}
+.stat .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25;margin-top:3px}
+.stat .n{font-size:13px;color:var(--muted)}
+section{margin-top:46px}
+h2{font-size:20px;font-weight:700;margin:0 0 4px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .count{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+h3{font-size:16px;font-weight:700;margin:26px 0 6px}
+.lead{color:var(--muted);margin:0 0 16px;max-width:74ch;font-size:14.5px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{position:sticky;top:0;background:var(--raise);text-align:left;font-size:11px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);font-family:var(--mono);font-weight:600;
+  padding:9px 12px;white-space:nowrap;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim{color:var(--muted)}
+.pill{display:inline-block;font-size:11px;font-family:var(--mono);letter-spacing:.05em;
+  padding:2px 8px;border-radius:3px;white-space:nowrap}
+.ok{background:var(--accent-soft);color:var(--accent)}
+.wait{background:var(--warn-soft);color:var(--warn)}
+.bad{background:var(--danger-soft);color:var(--danger)}
+ol.ship{padding-left:0;list-style:none;counter-reset:s;margin:0;display:grid;gap:1px;
+  background:var(--line);border:1px solid var(--line)}
+ol.ship li{background:var(--surface);padding:14px 18px;display:flex;gap:14px;align-items:flex-start}
+ol.ship .pr{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;flex:none;
+  width:34px;padding-top:3px}
+ol.ship b{display:block}
+ol.ship p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.note{border-left:3px solid var(--warn);background:var(--warn-soft);padding:14px 16px;margin:14px 0}
+.note.stop{border-color:var(--danger);background:var(--danger-soft)}
+.note.good{border-color:var(--accent);background:var(--accent-soft)}
+.note b{display:block;margin-bottom:3px}
+.note p{margin:0;font-size:14.5px;opacity:.9}
+.todo{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);margin-top:10px}
+.todo .row{background:var(--surface);padding:13px 16px;display:flex;gap:12px;align-items:flex-start}
+.todo .who{font-family:var(--mono);font-size:10px;letter-spacing:.07em;padding:3px 7px;border-radius:3px;
+  flex:none;margin-top:3px}
+.who.me{background:var(--accent-soft);color:var(--accent)}
+.who.you{background:var(--raise);color:var(--muted)}
+.todo b{display:block}
+.todo p{margin:2px 0 0;color:var(--muted);font-size:14px}
+code{font-family:var(--mono);font-size:12.5px;background:var(--raise);padding:1px 5px;border-radius:3px}
+footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--faint);
+  font-size:12.5px;font-family:var(--mono)}
+@media (max-width:640px){header{padding-top:36px}.wrap{padding:0 14px 60px}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">บันทึกงาน 9–14 สิงหาคม 2026</div>
+  <h1>สรุปงานทั้งหมด</h1>
+  <p class="sub">นำเข้าสต๊อก 3,527 ชิ้น · แก้บั๊ก POS · ส่งแอปขึ้นสองสโตร์ · เปิดโหมดเดลิเวอรี่ · ปิดช่องโหว่ข้อมูล 2 จุด</p>
+  <div class="stats">
+    <div class="stat"><div class="k">สินค้าในแอป</div><div class="v">688</div><div class="n">จาก 435 · รูปครบทุกตัว</div></div>
+    <div class="stat"><div class="k">สต็อก</div><div class="v">6,897</div><div class="n">ชิ้น</div></div>
+    <div class="stat"><div class="k">ขึ้น production</div><div class="v">6</div><div class="n">PR · #32–#37</div></div>
+    <div class="stat"><div class="k">migration</div><div class="v">6</div><div class="n">0068 → 0071</div></div>
+  </div>
+</header>
+
+<section>
+  <h2>สิ่งที่ขึ้น production แล้ว</h2>
+  <ol class="ship">
+    <li><span class="pr">#32</span><div><b>ตัวกรอง "ไม่มีรูป" ในหน้าสินค้า</b>
+      <p>ตอนนั้นมี 250 รายการไม่มีรูป ไม่มีทางไล่ดูได้ · ตอนนี้คุณถ่ายครบหมดแล้ว เหลือ 0</p></div></li>
+    <li><span class="pr">#33</span><div><b>4 เรื่องที่โต๊ะจัดออเดอร์</b>
+      <p>สลิปไม่หายหลังอนุมัติ · ใบจัดสินค้ามีราคา (กันหยิบผิดระหว่างสินค้าชื่อซ้ำ) · ซ่อนออเดอร์ยกเลิกจากลิสต์ · สถานะ "พิมพ์แล้ว"</p></div></li>
+    <li><span class="pr">#34</span><div><b>ปิดช่องโหว่ต้นทุนสินค้า</b>
+      <p>ใครมี anon key ก็อ่านต้นทุนได้ทั้ง 688 รายการ — anon key ฝังอยู่ในเว็บร้านและในแอป</p></div></li>
+    <li><span class="pr">#35</span><div><b>iOS ขยับเป็น 1.0.2</b>
+      <p>Apple ไม่รับไฟล์ทับเวอร์ชันที่เคยอนุมัติแล้ว</p></div></li>
+    <li><span class="pr">#36</span><div><b>ปิดต้นทุนอีกรอบ — รอบแรกไม่ได้ผล</b>
+      <p>คำสั่งถอนสิทธิ์รายคอลัมน์ผ่านแบบเงียบ ๆ โดยไม่เปลี่ยนอะไร เพราะมีสิทธิ์ระดับตารางครอบอยู่</p></div></li>
+    <li><span class="pr">#37</span><div><b>เปิดโหมดเดลิเวอรี่</b>
+      <p>ตำแหน่งไรเดอร์จริงแทนของปลอม · ค่าส่งอ่านจากเซิร์ฟเวอร์ · เก็บเงินปลายทาง · เหตุผลยกเลิก</p></div></li>
+  </ol>
+</section>
+
+<section>
+  <h2>งานสต๊อก <span class="count">9–10 ส.ค.</span></h2>
+  <p class="lead">เริ่มจากใบรับเข้า 260 รายการ แต่ระหว่างตรวจพบว่า POS ร้านมินนี่กับระบบอู้ฟู่เดินคนละทาง จึงเปลี่ยนไปยึดรายงานสต๊อกเป็นแหล่งความจริงแทน</p>
+  <div class="tablewrap"><table>
+    <tr><th>ขั้น</th><th>ผล</th></tr>
+    <tr><td>แกะใบรับเข้า 11 ใบ</td><td>260 รายการ · ยอดรวมตรงทุกใบ · ตรวจซ้ำกับ PDF 260/260</td></tr>
+    <tr><td>เทียบกับระบบ</td><td>พบว่าสต็อกตรงกันแค่ 40% — สองระบบ drift กันมานาน</td></tr>
+    <tr><td>เปลี่ยนแผน</td><td>ยึดรายงานสต๊อก ณ 8 ส.ค. แทนการบวกใบรับเข้า (ไม่งั้นนับซ้ำ)</td></tr>
+    <tr><td>sync</td><td>อัปเดต 627 รายการ · สร้างใหม่ 162 · ตรวจผ่านทุกด่าน</td></tr>
+  </table></div>
+  <div class="note good">
+    <b>จุดที่เกือบพลาด</b>
+    <p>รายงานสต๊อกรวมของที่เพิ่งรับเข้าไปแล้ว — ถ้าทำตามแผนเดิม (ตั้งสต็อกตามรายงาน แล้วบวกใบรับเข้าอีก) สินค้า 161 รายการจะเด้งเป็นสองเท่า</p>
+  </div>
+</section>
+
+<section>
+  <h2>ช่องโหว่ข้อมูลที่พบ <span class="count">2 จุด</span></h2>
+
+  <h3>1 · ต้นทุนสินค้าเปิดให้ทุกคนอ่าน <span class="pill ok">ปิดแล้ว</span></h3>
+  <p class="lead">RLS คุมได้แค่ระดับแถว ไม่ใช่ระดับคอลัมน์ — แถวสินค้าที่เผยแพร่เปิดให้ทุกคนอ่าน <code>cost_price</code> จึงติดไปด้วย ใครก็ตามที่เปิดเว็บร้านมี anon key อยู่ในมือ ยิง REST ตรง ๆ ก็ได้ต้นทุนทั้งร้าน</p>
+  <div class="note">
+    <b>บทเรียนที่แพงที่สุดของรอบนี้</b>
+    <p>คำสั่งถอนสิทธิ์รอบแรก (0069b) <b>รันผ่านโดยไม่มี error แต่ไม่ได้ทำอะไรเลย</b> — Postgres ไม่ยอมถอนทีละคอลัมน์ออกจากสิทธิ์ที่ให้ไว้ทั้งตาราง สิ่งเดียวที่จับได้คือบล็อกตรวจสอบท้ายไฟล์ที่ raise แทนที่จะรายงานว่าสำเร็จ · <b>ต่อจากนี้ migration ที่แตะสิทธิ์ทุกไฟล์จะมีบล็อกตรวจผลเสมอ</b></p>
+  </div>
+
+  <h3>2 · ใครก็ยึดตำแหน่ง "เจ้าของร้าน" ทางไลน์ได้ <span class="pill bad">ยังไม่ปิด</span></h3>
+  <p class="lead">แอดไลน์ร้านแล้วพิมพ์คำว่า <b>"เจ้าของร้าน"</b> คนแรก = ได้รับแจ้งเตือนของเจ้าของทั้งหมด · ไม่มีการตรวจสอบใด ๆ · "first come wins" และแย่งคืนไม่ได้</p>
+  <div class="tablewrap"><table>
+    <tr><th>คนนั้นทำได้</th><th>คนนั้นทำไม่ได้</th></tr>
+    <tr>
+      <td>อ่านออเดอร์ใหม่ทุกใบ (ชื่อ เบอร์ ที่อยู่ลูกค้า)<br>อ่านแจ้งเตือนสลิป<br>อ่านแจ้งเตือนสต๊อกใกล้หมด</td>
+      <td>ล็อกอินแอดมิน · แก้สินค้า/ราคา/สต๊อก · ดูรายงาน · ยกเลิกออเดอร์ · อนุมัติสลิป · สั่งอะไรผ่านไลน์</td>
+    </tr>
+  </table></div>
+  <div class="note stop">
+    <b>ตัดการรั่วทันทีด้วยคำสั่งเดียว</b>
+    <p><code>update shops set line_owner_user_id = null;</code> — แจ้งเตือนหยุดส่งทันที (รวมถึงของคุณด้วย) แล้วค่อยผูกใหม่แบบปลอดภัย</p>
+  </div>
+
+  <h3>3 · ข้อมูลลูกค้าคนก่อนค้างในเครื่อง <span class="pill wait">แก้แล้ว รอ deploy</span></h3>
+  <p class="lead">ปุ่ม logout ล้างแค่สถานะล็อกอิน — ประวัติออเดอร์ ตะกร้า และที่อยู่ยังค้างอยู่ คนต่อไปที่ล็อกอินบนเครื่องเดียวกันจึงเห็นของคนก่อน · ไม่ใช่ปัญหาฝั่งเซิร์ฟเวอร์ เซิร์ฟเวอร์ให้ข้อมูลถูกคนเสมอ</p>
+  <p class="lead">LINE ทำให้เจอง่ายที่สุดเพราะล็อกอินเสร็จได้ session ใหม่มาเลย ไม่ผ่านหน้า logout — โค้ดเดิมจึงไม่มีจังหวะได้ล้างเลยสักครั้ง · แก้แล้วโดยดักไว้ 3 จุด รวมถึง "user id เปลี่ยนไปจากเดิม"</p>
+</section>
+
+<section>
+  <h2>สโตร์</h2>
+  <div class="tablewrap"><table>
+    <tr><th>แพลตฟอร์ม</th><th>เวอร์ชัน</th><th>สถานะ</th><th>หมายเหตุ</th></tr>
+    <tr><td>Android</td><td class="mono">1.0.1 (5)</td><td><span class="pill wait">รอ Google</span></td><td>ส่ง 9 ส.ค. · เกิน 7 วันแล้ว ควรกด "ขอความช่วยเหลือ" ในคอนโซล</td></tr>
+    <tr><td>iOS</td><td class="mono">1.0.2 (3)</td><td><span class="pill wait">รอ Apple</span></td><td>ส่ง 13 ส.ค. · ครั้งแรกโดนตีกลับเพราะเวอร์ชันซ้ำ แก้แล้ว</td></tr>
+  </table></div>
+  <div class="note">
+    <b>OTA ใช้ได้แล้ว แต่แยกกัน</b>
+    <p>build ทั้งสองมี expo-updates · แก้อะไรฝั่ง JS ส่งตรงถึงเครื่องลูกค้าได้โดยไม่ต้องรอสโตร์ · แต่ Android เป็น runtime 1.0.1 และ iOS เป็น 1.0.2 — คนละ runtime จึงต้องส่งแยก จนกว่า Android จะ build รอบหน้า</p>
+  </div>
+</section>
+
+<section>
+  <h2>ค้างอยู่</h2>
+
+  <h3>ด่วน</h3>
+  <div class="todo">
+    <div class="row"><span class="who you">คุณ</span><div><b>ตัดการรั่วทางไลน์</b>
+      <p><code>update shops set line_owner_user_id = null;</code> แล้วบอกผมเพื่อทำระบบผูกใหม่แบบปลอดภัย</p></div></div>
+    <div class="row"><span class="who me">ผม</span><div><b>push การแก้ข้อมูลค้างในเครื่อง</b>
+      <p>โค้ดเสร็จแล้ว ยังไม่ได้ commit — เป็นข้อมูลส่วนตัวลูกค้า ควรขึ้นก่อนเรื่องอื่น</p></div></div>
+    <div class="row"><span class="who me">ผม</span><div><b>push แผนที่ในหน้า POS</b>
+      <p>เสร็จแล้ว ยังไม่ได้ commit</p></div></div>
+  </div>
+
+  <h3>ไม่ด่วน</h3>
+  <div class="todo">
+    <div class="row"><span class="who you">คุณ</span><div><b>แก้ราคา 3 รายการที่ขายต่ำกว่าทุน</b>
+      <p>แจ็คมันฝรั่งแท่ง (6/8.5) · กรีนนัทปลาหมึก + กุ้ง (5/5.75)</p></div></div>
+    <div class="row"><span class="who you">คุณ</span><div><b>ลบตารางสำรอง</b>
+      <p><code>drop table sync_backup_20260808;</code> เมื่อมั่นใจว่า sync ถูกต้อง</p></div></div>
+    <div class="row"><span class="who me">ผม</span><div><b>อัปเดตเอกสารให้ตรงความจริง</b>
+      <p>Launch Checklist ยังบอก 38% · backlog ยังบอกว่า B2–B5 ค้าง (merge ไปแล้ว) · pos-requirements ยังเขียนว่าร้านจด VAT ซึ่งไม่ตรง</p></div></div>
+    <div class="row"><span class="who me">ผม</span><div><b>แก้บทบาททีมที่เขียนไว้ผิด 3 ที่</b>
+      <p>การสลับบทบาท (Claude เขียนโค้ด · Codex รีวิว) เมื่อ 16 ก.ค. ไม่ได้ส่งต่อไปที่ GITHUB.md, TMUX.md และ banner ใน tmux</p></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>ของปลอมที่ลบทิ้ง</h2>
+  <p class="lead">หน้าติดตามพัสดุเคยแสดงไรเดอร์วิ่งอยู่บนถนนในกรุงเทพ — พิกัด 6 จุดฝังตายในโค้ด เดินด้วย timer นับถอยหลังจากเลข 12 นาทีที่ฮาร์ดโค้ด · เปิดหน้านี้เมื่อไหร่ก็เห็นไรเดอร์เคลื่อนที่ ไม่ว่าจะมีใครออกจากร้านหรือยัง</p>
+  <p class="lead">ตอนนี้แสดงตำแหน่งจริงที่ POS broadcast มา ระยะทางจริง และบอกตรง ๆ ว่า "กำลังรอสัญญาณ" เมื่อยังไม่มี · ETA ปลอมถูกลบแทนที่จะเดาใหม่ — ระยะทางจริงมีค่ากว่าเวลาที่แต่งขึ้น</p>
+</section>
+
+<footer>
+  ข้อมูล ณ 14 ส.ค. 2026 · repo Mewwi15/OFU · main = <span>67eaecc</span><br>
+  ตัวเลขสินค้า/สต็อกอ่านสดจากฐานข้อมูล production ตอนสร้างหน้านี้
+</footer>
+</div>

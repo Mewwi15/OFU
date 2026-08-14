@@ -158,7 +158,11 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
           <View style={styles.detailHairline} />
 
           <View style={styles.deliveredByRow}>
-            <Image source={{ uri: order.rider.avatar }} style={styles.riderAvatar} contentFit="cover" />
+            <Image
+              source={require('@/assets/images/logo-oofoo.png')}
+              style={styles.riderAvatar}
+              contentFit="contain"
+            />
             <View style={styles.riderInfo}>
               <Text variant="caption">{t('track.deliveredByRider')}</Text>
               <View style={styles.riderNameRow}>
@@ -175,13 +179,15 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
               style={styles.riderAction}>
               <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primaryStrong} />
             </PressableScale>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel={t('track.callRiderA11y')}
-              onPress={onCall}
-              style={styles.riderAction}>
-              <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
-            </PressableScale>
+            {!!order.rider.phone && (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={t('track.callRiderA11y')}
+                onPress={onCall}
+                style={styles.riderAction}>
+                <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
+              </PressableScale>
+            )}
           </View>
         </Animated.View>
 

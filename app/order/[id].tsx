@@ -105,8 +105,11 @@ export default function OrderTrackingScreen() {
 
   const goHome = () => router.replace('/');
   const openChat = () => router.push('/chat');
+  // No number configured (shops.contact_phone empty) means there is nothing to
+  // dial — the button is hidden rather than opening a dialer on a dead number.
+  const riderPhone = active?.rider.phone ?? '';
   const callRider = () => {
-    if (active) Linking.openURL(`tel:${active.rider.phone}`).catch(() => {});
+    if (riderPhone) Linking.openURL(`tel:${riderPhone}`).catch(() => {});
   };
   const openHelp = () => Alert.alert(t('track.helpTitle'), t('track.helpBody'));
 

@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 
 import { authRepo, type Profile } from '@/lib/data/auth';
+import { clearUserScopedState } from '@/store/session';
 
 export type AuthUser = {
   name: string;
@@ -86,7 +87,7 @@ async function loadUser(): Promise<AuthUser> {
   return toUser(profile);
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   status: 'loading',
   hydrated: false,
   userId: null,
@@ -114,6 +115,11 @@ export const useAuth = create<AuthState>((set) => ({
     // defer the profile fetch to a later tick.
     unsubscribe = authRepo.onAuthChange((session, event) => {
       if (session) {
+        // A different person than the one whose data is still in memory:
+        // an expired-then-renewed session, or an account switch with no
+        // sign-out in between (the LINE magiclink redeem lands here directly).
+        const previous = get().userId;
+        if (previous && previous !== session.user.id) clearUserScopedState();
         set({ status: 'authenticated', userId: session.user.id });
         setTimeout(() => {
           void loadUser().then((user) => set({ user }));
@@ -130,7 +136,10 @@ export const useAuth = create<AuthState>((set) => ({
           }
         }, 0);
       } else {
+        // Session gone for any reason — expiry, revocation, sign-out on
+        // another tab. Same disclosure risk as an explicit logout.
         set({ status: 'unauthenticated', userId: null, user: GUEST });
+        clearUserScopedState();
       }
     });
   },
@@ -179,5 +188,9 @@ export const useAuth = create<AuthState>((set) => ({
   logout: async () => {
     await authRepo.signOut();
     set({ status: 'unauthenticated', userId: null, user: GUEST });
+    // Addresses, orders and the cart persist to device storage — without this
+    // the next customer to sign in on the same device opens the app holding the
+    // previous one's saved address and order history.
+    clearUserScopedState();
   },
 }));

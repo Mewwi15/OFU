@@ -13,24 +13,35 @@ export type IconName = keyof typeof Ionicons.glyphMap;
 /* Rider                                                                   */
 /* ----------------------------------------------------------------------- */
 
+/**
+ * Who is bringing the order.
+ *
+ * The shop owner rides the deliveries themselves, so this is the shop — not a
+ * courier with their own identity. It used to be a fabricated person ("พีรพล
+ * จันทร์ดี", a stock portrait, and 089-555-0123) left over from the
+ * frontend-first phase. Customers were being shown the name of someone who
+ * does not exist, and the call button dialled a number that does not connect.
+ *
+ * `rating` and `vehicle` are gone rather than reworded: nothing rendered them,
+ * and a 4.9 nobody earned is worse than no rating at all.
+ */
 export type Rider = {
-  id: string;
   name: string;
-  avatar: string;
+  /** Dialled by the call button — the shop's real line. */
   phone: string;
-  /** Vehicle / plate shown under the name. */
-  vehicle: string;
-  rating: number;
 };
 
-export const MOCK_RIDER: Rider = {
-  id: 'rider-1',
-  name: 'พีรพล จันทร์ดี',
-  avatar: 'https://i.pravatar.cc/200?img=12',
-  phone: '089-555-0123',
-  vehicle: 'มอเตอร์ไซค์ · กข 1234',
-  rating: 4.9,
+/** The shop as courier, before `shops` loads. Phone stays empty on purpose so
+ *  the call button can hide rather than dial something invented. */
+export const DEFAULT_RIDER: Rider = {
+  name: 'ร้าน อู้ฟู่',
+  phone: '',
 };
+
+/** Build the courier identity from the loaded shop profile. */
+export function riderFromShop(shop: { name: string; phone: string }): Rider {
+  return { name: shop.name, phone: shop.phone };
+}
 
 /* ----------------------------------------------------------------------- */
 /* Order status + delivery timeline                                        */

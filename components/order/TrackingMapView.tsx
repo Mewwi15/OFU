@@ -8,14 +8,14 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { Image, useImage } from 'expo-image';
+import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppleMaps, GoogleMaps } from '@/components/maps/native-maps';
 import { DeliveryStepper } from '@/components/order/DeliveryStepper';
+import { TrackingMap } from '@/components/order/TrackingMap';
 import { RiderIllustration } from '@/components/shop/RiderIllustration';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
@@ -91,7 +91,6 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
   const dest = order.destination;
   const camera = useMemo(() => cameraFor(dest, riderPos), [dest, riderPos]);
   const arrived = order.status === 'delivered';
-  const riderIcon = useImage(require('@/assets/images/rider-marker.png'));
 
   const subtitle = useMemo(() => {
     if (arrived) return t('track.comePickUp');
@@ -104,36 +103,14 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
 
   return (
     <View style={styles.screen}>
-      {/* Native map */}
-      {Platform.OS === 'ios' ? (
-        <AppleMaps.View
-          style={StyleSheet.absoluteFill}
-          cameraPosition={camera}
-          markers={dest ? [{ coordinates: dest, title: t('track.destination') }] : []}
-          annotations={
-            riderPos
-              ? riderIcon
-                ? [{ coordinates: riderPos, icon: riderIcon, title: order.rider.name }]
-                : [{ coordinates: riderPos, text: order.rider.name }]
-              : []
-          }
-        />
-      ) : (
-        <GoogleMaps.View
-          style={StyleSheet.absoluteFill}
-          cameraPosition={camera}
-          markers={[
-            ...(riderPos
-              ? [
-                  riderIcon
-                    ? { coordinates: riderPos, icon: riderIcon, title: order.rider.name }
-                    : { coordinates: riderPos, title: order.rider.name },
-                ]
-              : []),
-            ...(dest ? [{ coordinates: dest, title: t('track.destination') }] : []),
-          ]}
-        />
-      )}
+      {/* expo-maps on native, Leaflet on web — see TrackingMap.web.tsx */}
+      <TrackingMap
+        dest={dest}
+        riderPos={riderPos}
+        camera={camera}
+        destLabel={t('track.destination')}
+        riderLabel={order.rider.name}
+      />
 
       {/* Top controls */}
       <Animated.View
@@ -175,13 +152,17 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
 
         <Text variant="caption" style={styles.stepHint}>
           {t('track.giveRiderTimePrefix')}
-          {order.rider.name.split(' ')[0]}
+          {order.rider.name}
           {t('track.giveRiderTimeSuffix')}
         </Text>
 
         {/* Rider row */}
         <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.riderRow}>
-          <Image source={{ uri: order.rider.avatar }} style={styles.riderAvatar} contentFit="cover" />
+          <Image
+            source={require('@/assets/images/logo-oofoo.png')}
+            style={styles.riderAvatar}
+            contentFit="contain"
+          />
           <View style={styles.riderInfo}>
             <Text variant="caption">{t('track.oofooRider')}</Text>
             <View style={styles.riderNameRow}>
@@ -198,13 +179,16 @@ export function TrackingMapView({ order, onClose, onHelp, onChat, onCall, onArri
             style={styles.riderAction}>
             <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primaryStrong} />
           </PressableScale>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={t('track.callRiderA11y')}
-            onPress={onCall}
-            style={styles.riderAction}>
-            <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
-          </PressableScale>
+          {/* No shops.contact_phone configured means nothing to dial. */}
+          {!!order.rider.phone && (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={t('track.callRiderA11y')}
+              onPress={onCall}
+              style={styles.riderAction}>
+              <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
+            </PressableScale>
+          )}
         </Animated.View>
 
         <PressableScale

@@ -15,6 +15,7 @@ import { App, Alert, Button, Space, Switch, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 
 import { markCodCollected, type Order } from '../lib/orders';
+import { OrderMiniMap } from './OrderMiniMap';
 import { navUrl, startRiderBroadcast, type BroadcastStatus, type RiderBroadcast } from '../lib/riderLocation';
 
 const { Text } = Typography;
@@ -84,6 +85,13 @@ export function RiderPanel({ order, onChanged }: { order: Order; onChanged: () =
 
   return (
     <>
+      {/* หมุดที่ลูกค้าปักไว้ — ตอบคำถามแรกของคนส่ง "ที่นี่อยู่ไหน" ก่อนกดออกไปนำทาง */}
+      {hasPin ? (
+        <div className="mt-3">
+          <OrderMiniMap lat={order.ship_lat!} lng={order.ship_lng!} />
+        </div>
+      ) : null}
+
       <Space wrap style={{ marginTop: 12 }}>
         <Button
           type="primary"

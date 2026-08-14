@@ -36,6 +36,8 @@ type ChatState = {
   send: (text: string) => Promise<void>;
   sendImage: (base64: string) => Promise<void>;
   refreshUnread: () => Promise<void>;
+  /** Wipe the signed-out customer's thread + messages (see store/session.ts). */
+  reset: () => void;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -50,6 +52,8 @@ export const useChat = create<ChatState>((set, get) => ({
   loading: false,
   sending: false,
   unread: 0,
+
+  reset: () => set({ threadId: null, messages: [], loading: false, sending: false, unread: 0 }),
 
   open: async () => {
     set({ loading: true });

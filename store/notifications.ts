@@ -19,6 +19,8 @@ export type NotificationState = {
   load: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: () => Promise<void>;
+  /** Wipe the signed-out customer's notifications (see store/session.ts). */
+  reset: () => void;
 };
 
 let unsubscribe: (() => void) | null = null;
@@ -26,6 +28,8 @@ let unsubscribe: (() => void) | null = null;
 export const useNotifications = create<NotificationState>((set, get) => ({
   items: [],
   loading: false,
+
+  reset: () => set({ items: [], loading: false }),
 
   load: async () => {
     set({ loading: true });

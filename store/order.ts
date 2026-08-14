@@ -13,7 +13,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { MOCK_RIDER, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
+import { riderFromShop, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
+import { useShop } from '@/store/shop';
 import { getOrderByNumber, listOrders } from '@/lib/data/order';
 import { zustandStorage } from '@/lib/storage';
 
@@ -56,6 +57,8 @@ export type OrderState = {
   archive: () => void;
   /** Drop the active order without archiving (rarely needed). */
   clear: () => void;
+  /** Wipe the signed-out customer's orders (see store/session.ts). */
+  reset: () => void;
 };
 
 const THAI_MONTHS = [
@@ -101,6 +104,9 @@ export const useOrder = create<OrderState>()(
         }
       },
 
+      reset: () =>
+        set({ active: null, history: [], rating: null, list: [], listLoading: false, activeLoading: false }),
+
       loadActive: async (orderNumber) => {
         set({ activeLoading: true });
         try {
@@ -126,7 +132,7 @@ export const useOrder = create<OrderState>()(
           addressLabel: input.addressLabel,
           addressLine: input.addressLine,
           placedAtLabel: stampNow(),
-          rider: MOCK_RIDER,
+          rider: riderFromShop(useShop.getState().info),
           fulfilment: input.fulfilment ?? 'delivery',
           // Parcel courier/trackingNo stay unset — the real tracking number
           // comes from parcel_shipments once the shop ships (loadActive).

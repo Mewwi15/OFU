@@ -51,6 +51,8 @@ export type CartState = {
   removeSelected: () => void;
   /** Empty the cart. */
   clear: () => void;
+  /** Wipe the signed-out customer's cart (see store/session.ts). */
+  reset: () => void;
 };
 
 /** Build the stable line id for a product + chosen size. */
@@ -169,6 +171,8 @@ export const useCart = create<CartState>()(
     }),
 
       clear: () => set({ items: [], selectedIds: [] }),
+
+      reset: () => set({ items: [], selectedIds: [] }),
     }),
     {
       name: 'oofoo-cart',

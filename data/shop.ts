@@ -10,6 +10,9 @@ export type ShopHours = { open: string; close: string };
 
 export type ShopInfo = {
   name: string;
+  /** Public contact line, dialled from order tracking. Empty until set in
+   *  `shops.contact_phone` — callers must hide the call affordance, not dial. */
+  phone: string;
   promptPay: {
     /** PromptPay target the QR encodes — phone (10) / citizen-id (13) / e-wallet (15). */
     target: string;
@@ -24,6 +27,7 @@ export type ShopInfo = {
 
 export const DEFAULT_SHOP: ShopInfo = {
   name: 'ร้าน อู้ฟู่',
+  phone: '',
   promptPay: {
     target: '0812345678',
     displayName: 'ร้าน อู้ฟู่ (พร้อมเพย์)',
