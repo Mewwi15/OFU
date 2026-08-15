@@ -10,6 +10,8 @@ name: deploy
 on:
   push:
     branches: [main]
+  # กดรันเองได้จากแท็บ Actions — ไว้ deploy ซ้ำโดยไม่ต้องมี commit ใหม่
+  workflow_dispatch:
 
 # deploy ทีละรอบ — push ซ้อนกันให้ต่อคิว ไม่ยกเลิกกันเอง (ยกเลิกกลางคัน
 # อาจได้เว็บครึ่งเดียว)
