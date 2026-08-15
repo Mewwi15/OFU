@@ -47,7 +47,10 @@ if [ "$before" -eq 0 ]; then
   echo "        deploying with an unbusted cache." >&2
   exit 1
 fi
-sed -i '' "s|\(/_expo/static/js/web/[^\"]*\.js\)\"|\1?v=$(date +%s)\"|g" dist/index.html
+# -i.bak (not -i '') so the same script runs on macOS *and* GitHub Actions'
+# GNU sed — BSD's `-i ''` makes GNU sed treat '' as the file to edit.
+sed -i.bak "s|\(/_expo/static/js/web/[^\"]*\.js\)\"|\1?v=$(date +%s)\"|g" dist/index.html
+rm -f dist/index.html.bak
 after=$(grep -o '/_expo/static/js/web/[^"]*\.js?v=[0-9]*"' dist/index.html | wc -l | tr -d ' ')
 if [ "$after" -ne "$before" ]; then
   echo "ERROR: cache-bust only updated $after of $before script tags — aborting." >&2
@@ -60,11 +63,14 @@ cat > dist/.vercelignore <<'TXT'
 TXT
 
 cd dist
-npx vercel link --yes --project ofu-shop
+# CI has no logged-in Vercel session — pass VERCEL_TOKEN through when set.
+# Locally (interactive login) the array is just `npx vercel --scope ...`.
+vc=(npx vercel --scope mewwis-projects ${VERCEL_TOKEN:+--token "$VERCEL_TOKEN"})
+"${vc[@]}" link --yes --project ofu-shop
 # CLI v55 prints JSON to stdout — fish the deployment URL out by pattern.
-out=$(npx vercel deploy 2>&1)
+out=$("${vc[@]}" deploy 2>&1)
 url=$(echo "$out" | grep -o 'https://ofu-shop-[a-z0-9]*-mewwis-projects\.vercel\.app' | head -1)
 [ -z "$url" ] && { echo "deploy URL not found in output:"; echo "$out" | tail -5; exit 1; }
 echo "deployed: $url"
-npx vercel promote "$url" --yes
+"${vc[@]}" promote "$url" --yes
 echo "live: https://ofu-shop.vercel.app"

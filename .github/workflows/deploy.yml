@@ -1,0 +1,80 @@
+# push ขึ้น main = deploy ทุกช่องทางอัตโนมัติ
+#
+#   1. OTA → แอป iOS + Android (expo-updates ดึงเข้าเครื่องลูกค้าเอง)
+#   2. เว็บร้าน → ofu-shop.vercel.app (ผ่าน scripts/deploy-web.sh ตัวเดิม)
+#
+# ใช้ได้เมื่อตั้ง secrets ครบ (ดู "ตั้งครั้งเดียว" ท้ายไฟล์) — ก่อนหน้านั้น
+# ทุก step จะข้ามตัวเองเงียบ ๆ ไม่ขึ้นเป็น fail แดงให้ตกใจ
+
+name: deploy
+on:
+  push:
+    branches: [main]
+
+# deploy ทีละรอบ — push ซ้อนกันให้ต่อคิว ไม่ยกเลิกกันเอง (ยกเลิกกลางคัน
+# อาจได้เว็บครึ่งเดียว)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  ota:
+    name: OTA ขึ้นแอปมือถือ
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GOOGLE_MAPS_WEB_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_WEB_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: env.EXPO_TOKEN != ''
+        run: npm ci
+
+      - name: OTA runtime 1.0.2 (iOS ตอนนี้ + Android build หน้า)
+        if: env.EXPO_TOKEN != ''
+        run: >
+          npx eas update --branch production --platform all
+          --message "${{ github.event.head_commit.message }}" --non-interactive
+
+      # ── ชั่วคราว: Android บนสโตร์ยังเป็น 1.0.1 ─────────────────────────────
+      # runtime ผูกกับเลขเวอร์ชัน (policy: appVersion) จึงต้องยิงซ้ำอีกรอบ
+      # ในนาม 1.0.1 ไม่งั้นเครื่องลูกค้า Android มองไม่เห็นอัปเดต
+      # ★ ลบ step นี้ทิ้งเมื่อ Android build 1.0.2 ขึ้นสโตร์แล้ว ★
+      - name: OTA runtime 1.0.1 (Android ที่ live อยู่ — ชั่วคราว)
+        if: env.EXPO_TOKEN != ''
+        run: |
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('app.json'));j.expo.version='1.0.1';fs.writeFileSync('app.json',JSON.stringify(j,null,2)+'\n')"
+          npx eas update --branch production --platform android \
+            --message "${{ github.event.head_commit.message }}" --non-interactive
+          git checkout app.json
+
+  web:
+    name: เว็บร้าน ofu-shop.vercel.app
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GOOGLE_MAPS_WEB_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_WEB_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: env.VERCEL_TOKEN != ''
+        run: npm ci
+      - if: env.VERCEL_TOKEN != ''
+        run: ./scripts/deploy-web.sh
+
+# ── ตั้งครั้งเดียว (รันในเครื่อง ใส่ค่าจริงของตัวเอง) ─────────────────────────
+#   gh secret set EXPO_TOKEN                        # expo.dev → Account settings → Access tokens
+#   gh secret set VERCEL_TOKEN                      # vercel.com/account/tokens
+#   gh secret set EXPO_PUBLIC_SUPABASE_URL          # ค่าเดียวกับใน .env.local
+#   gh secret set EXPO_PUBLIC_SUPABASE_ANON_KEY     # ค่าเดียวกับใน .env.local
+#   gh secret set EXPO_PUBLIC_GOOGLE_MAPS_WEB_KEY   # ค่าเดียวกับใน .env.local
