@@ -92,5 +92,5 @@ begin
   end if;
 
   raise notice '0072 ผ่าน — line_owner_user_id ปิดแล้ว · contact_phone พร้อมใช้';
-  raise notice 'อย่าลืมใส่เบอร์ร้าน: update shops set contact_phone = ''0xxxxxxxxx'';';
+  raise notice 'อย่าลืมใส่เบอร์ร้าน: update shops set contact_phone = ''0846503474'';';
 end $$;
