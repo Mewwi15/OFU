@@ -3,7 +3,7 @@
 เอกสารวิศวกรรมของโปรเจกต์ อู้ฟู่ จัดทำตามกระบวนการ **SDLC เต็มรูปแบบ** (Requirements → Design → Implementation → Testing → Release)
 
 ## สถานะปัจจุบัน
-- **Phase:** 2 — Design ✅ เสร็จ · 1 — Requirements ✅ (193 stories) → ถัดไป 3 — Implementation
+- **Phase:** 5 — **Release** · ขายจริงแล้วทุกช่องทาง: POS หน้าร้าน + เว็บ ofu-shop.vercel.app + Android บน Play (15 ส.ค.) · iOS รอรีวิว · delivery เปิดแล้ว (เจ้าของส่งเอง)
 - **Target:** Real product, **ร้านเดียว (อู้ฟู่)**, 3 surfaces = แอปลูกค้า (Expo iOS/Android) + เว็บแอดมิน + แอปไรเดอร์
 - **Auth:** เบอร์+OTP และ LINE/Apple/Google · **Payment v1:** PromptPay+สลิป (pickup + delivery) **และ COD (delivery)** — ADR-0002 ✅
 - **Backend:** ✅ Supabase (launch) → NestJS-on-Postgres (scale-to) — ADR-0001 · **Testing:** Jest + RNTL + Maestro

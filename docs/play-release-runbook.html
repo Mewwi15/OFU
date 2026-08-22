@@ -1,0 +1,329 @@
+<title>คู่มือขึ้น Google Play — อู้ฟู่</title>
+<style>
+:root{
+  --ground:#FAF9F4; --surface:#FFFFFF; --raise:#F1F0E8; --line:#E4E3D9;
+  --ink:#1B1F19; --muted:#6A7167; --faint:#9AA096;
+  --accent:#1F7A4D; --accent-soft:#E6F1EA;
+  --warn:#9C5C08; --warn-soft:#FAF1E1; --danger:#A32A2C; --danger-soft:#F9EAE9;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --thai:"Noto Sans Thai","IBM Plex Sans Thai",Sarabun,Thonburi,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131512; --surface:#1B1E19; --raise:#232720; --line:#2E332B;
+    --ink:#E8EAE3; --muted:#98A093; --faint:#6E756B;
+    --accent:#5FB98A; --accent-soft:#1A2E23;
+    --warn:#D69A45; --warn-soft:#2C2417; --danger:#E2807C; --danger-soft:#2E1D1C;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131512; --surface:#1B1E19; --raise:#232720; --line:#2E332B;
+  --ink:#E8EAE3; --muted:#98A093; --faint:#6E756B;
+  --accent:#5FB98A; --accent-soft:#1A2E23;
+  --warn:#D69A45; --warn-soft:#2C2417; --danger:#E2807C; --danger-soft:#2E1D1C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--thai);
+  font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:0 20px 110px}
+header{padding:60px 0 30px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent);font-weight:700}
+h1{font-size:clamp(28px,5vw,40px);line-height:1.22;margin:12px 0 10px;font-weight:700;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:60ch}
+.status{display:flex;gap:14px;margin-top:26px;padding:16px 18px;background:var(--accent-soft);
+  border-left:3px solid var(--accent);border-radius:0 4px 4px 0}
+.status b{display:block;margin-bottom:2px}
+.status p{margin:0;color:var(--muted);font-size:15px}
+.tick{flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.08em;font-weight:700;
+  color:var(--accent);background:var(--surface);padding:4px 8px;border-radius:3px;height:fit-content}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.who{font-size:13px;font-family:var(--mono);padding:3px 10px;border-radius:99px;border:1px solid var(--line)}
+.who.me{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.who.you{background:var(--raise);color:var(--muted)}
+.step{margin-top:44px;display:grid;grid-template-columns:46px 1fr;gap:18px}
+.num{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--surface);
+  background:var(--accent);width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;margin-top:3px}
+.step.opt .num{background:var(--warn)}
+.body h2{font-size:21px;margin:0 0 4px;font-weight:700;text-wrap:balance}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.why{color:var(--muted);margin:0 0 16px;font-size:15px}
+.card{background:var(--surface);border:1px solid var(--line);padding:18px 20px;border-radius:4px}
+.card + .card{margin-top:10px}
+.card h3{font-size:13px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 10px;font-weight:600}
+ol,ul{margin:0;padding-left:22px}
+li{margin:6px 0}
+li::marker{color:var(--accent);font-weight:700}
+pre{background:var(--raise);border:1px solid var(--line);border-radius:4px;padding:12px 14px;
+  overflow-x:auto;margin:10px 0 0;font-family:var(--mono);font-size:13.5px;line-height:1.6}
+code{font-family:var(--mono);font-size:0.88em;background:var(--raise);padding:1px 6px;border-radius:3px}
+pre code{background:none;padding:0;font-size:1em}
+.expect{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;margin-top:12px;border-radius:0 4px 4px 0}
+.expect b{font-size:14px}
+.expect p{margin:2px 0 0;font-size:14.5px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);background:var(--warn-soft);padding:14px 16px;margin-top:12px;border-radius:0 4px 4px 0}
+.note.stop{border-color:var(--danger);background:var(--danger-soft)}
+.note b{display:block;margin-bottom:3px}
+.note p{margin:0;font-size:14.5px;opacity:.9}
+.time{font-family:var(--mono);font-size:12px;color:var(--faint)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin-top:10px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}
+footer{margin-top:70px;padding-top:22px;border-top:1px solid var(--line);
+  color:var(--faint);font-size:13px;font-family:var(--mono)}
+@media (max-width:620px){
+  .step{grid-template-columns:34px 1fr;gap:12px}
+  .num{width:30px;height:30px;font-size:13px}
+  .wrap{padding:0 15px 70px}
+}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">คู่มือทีละขั้น</div>
+  <h1>เอาแอปอู้ฟู่ขึ้น Google Play</h1>
+  <p class="sub">ทำตามลำดับ 1 ถึง 8 · ข้ามขั้นไม่ได้ เพราะแต่ละขั้นต้องใช้ผลจากขั้นก่อนหน้า</p>
+  <div class="status">
+    <span class="tick">ผ่านแล้ว</span>
+    <div>
+      <b>ด่านที่ยากที่สุดผ่านไปแล้ว</b>
+      <p>Google อนุมัติให้แอปเข้าถึงเวอร์ชันใช้งานจริงแล้ว (ผ่านเงื่อนไข 12 ผู้ทดสอบ 14 วัน) เหลือแค่ส่งไฟล์ที่ถูกต้องเข้าไป</p>
+    </div>
+  </div>
+  <div class="legend">
+    <span class="who me">ผมทำให้ได้</span>
+    <span class="who you">คุณต้องทำเอง</span>
+  </div>
+</header>
+
+<div class="step">
+  <div class="num">1</div>
+  <div class="body">
+    <h2>ตัดสินใจก่อน: จะเปลี่ยน Google Maps key ไหม</h2>
+    <div class="meta"><span class="who you">คุณตัดสินใจ</span><span class="time">คิด 2 นาที</span></div>
+    <p class="why">Maps key ตัวปัจจุบันเคยหลุดเข้าไปอยู่ในประวัติ git ตอนพัฒนาช่วงแรก ตอนนี้ล็อกไว้แล้วว่าใช้ได้เฉพาะแอปของเรา คนอื่นเอาไปใช้ไม่ได้ ความเสี่ยงจริงจึงเกือบเป็นศูนย์</p>
+    <div class="card">
+      <h3>ทำไมต้องคิดตอนนี้</h3>
+      <ul>
+        <li><b>ถ้าเปลี่ยนตอนนี้</b> — เสียเวลาเพิ่ม 10 นาที แล้วจบเลย เพราะยังไม่มีลูกค้าใช้</li>
+        <li><b>ถ้าเปลี่ยนทีหลัง</b> — ต้อง build ใหม่ ส่ง Google ตรวจใหม่ รออนุมัติใหม่อีกรอบ และแอปที่ลูกค้าลงไปแล้วจะแผนที่พังจนกว่าจะอัปเดต</li>
+      </ul>
+      <div class="expect">
+        <b>ผมแนะนำ: ยังไม่ต้องเปลี่ยน</b>
+        <p>คีย์ถูกล็อกด้วย package name + SHA-1 อยู่แล้ว เอาแอปขึ้นให้ได้ก่อนสำคัญกว่า ค่อยเปลี่ยนตอนอัปเดตรอบหน้าพร้อมของอื่น</p>
+      </div>
+      <div class="note">
+        <b>ถ้าอยากเปลี่ยนเลย</b>
+        <p>บอกผม เดี๋ยวผมแทรกขั้นตอนให้ก่อนขั้นที่ 2 — สร้างคีย์ใหม่ ล็อกแบบเดิม ใส่เข้า EAS แล้วลบคีย์เก่าทิ้ง</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">2</div>
+  <div class="body">
+    <h2>สร้างไฟล์แอปตัวใหม่</h2>
+    <div class="meta"><span class="who me">ผมสั่งให้ได้</span><span class="time">รอ 15–25 นาที</span></div>
+    <p class="why">ไฟล์ที่อยู่ใน Play ตอนนี้สร้างไว้ตั้งแต่ 18 ก.ค. ซึ่งเก่ากว่างานที่ทำเสร็จวันที่ 26 ก.ค. ถึง 4 เรื่อง ถ้าส่งไฟล์เก่าเข้าไป ลูกค้าจะเจอบั๊กที่เราแก้ไปแล้ว</p>
+    <div class="card">
+      <h3>สิ่งที่ไฟล์เก่ายังไม่มี</h3>
+      <div class="tablewrap"><table>
+        <tr><th>เรื่อง</th><th>ถ้าไม่มีจะเป็นยังไง</th></tr>
+        <tr><td>แก้ Android map key</td><td>หน้าเลือกที่อยู่ส่งของขึ้นเป็นจอเทาว่าง กดเลือกจุดไม่ได้</td></tr>
+        <tr><td>ระบบอัปเดตแบบ OTA</td><td>แก้บั๊กเล็ก ๆ ทีหลังต้องส่ง Google ตรวจใหม่ทุกครั้ง รอเป็นวัน</td></tr>
+        <tr><td>Apple sign-in nonce</td><td>เข้าสู่ระบบด้วย Apple ไม่ผ่าน (เกี่ยวกับ iOS แต่รวมอยู่ในโค้ดชุดเดียวกัน)</td></tr>
+        <tr><td>แจ้งเตือน retry + เสียงแบรนด์</td><td>แจ้งเตือนหายเงียบเวลาเน็ตสะดุด</td></tr>
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>คำสั่ง</h3>
+      <pre><code>npx eas build --platform android --profile production</code></pre>
+      <ul>
+        <li>ตัวเลขเวอร์ชันจะขยับจาก 4 เป็น <b>5</b> ให้เอง — Google ไม่รับไฟล์ที่เลขซ้ำของเดิม</li>
+        <li>ระหว่างรอ ไปทำขั้นที่ 3 กับ 4 ได้เลย ไม่ต้องนั่งเฝ้า</li>
+      </ul>
+      <div class="expect">
+        <b>เสร็จแล้วจะเห็น</b>
+        <p>ลิงก์ไปหน้า build บนเว็บ EAS พร้อมสถานะ <code>finished</code> และปุ่มดาวน์โหลดไฟล์ <code>.aab</code></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">3</div>
+  <div class="body">
+    <h2>เก็บรหัส SHA-1 ตัวที่ 1 — ของ EAS</h2>
+    <div class="meta"><span class="who you">คุณต้องทำเอง</span><span class="time">3 นาที</span></div>
+    <p class="why">SHA-1 คือลายนิ้วมือของกุญแจที่ใช้เซ็นแอป Google Maps จะยอมทำงานให้เฉพาะแอปที่มีลายนิ้วมือตรงกับที่เราลงทะเบียนไว้เท่านั้น</p>
+    <div class="card">
+      <h3>วิธีที่ง่ายที่สุด — ดูจากเว็บ ไม่ต้องพิมพ์คำสั่ง</h3>
+      <ol>
+        <li>เปิดลิงก์นี้ แล้วล็อกอินด้วยบัญชี Expo เดิม
+          <pre><code>https://expo.dev/accounts/mewwi/projects/my-rn-app/credentials</code></pre>
+        </li>
+        <li>เลื่อนลงไปหัวข้อ <b>Android</b></li>
+        <li>ดูที่กล่อง <b>Keystore</b> → บรรทัด <b>SHA-1 Fingerprint</b></li>
+        <li>คัดลอกเก็บไว้ หน้าตาประมาณนี้
+          <pre><code>AB:CD:12:34:…:EF</code></pre>
+        </li>
+      </ol>
+      <div class="note">
+        <b>ถ้าอยากใช้คำสั่งแทน</b>
+        <p>ต้องเปิดแอป <b>Terminal</b> ของ Mac เอง รันผ่านช่องคุยกับผมไม่ได้ เพราะเป็นเมนูที่ต้องกดลูกศรเลือก<br>
+        <code>cd ~/dev/my-rn-app</code> แล้ว <code>npx eas credentials --platform android</code> → เลือก production → Keystore</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">4</div>
+  <div class="body">
+    <h2>เก็บรหัส SHA-1 ตัวที่ 2 — ของ Google Play</h2>
+    <div class="meta"><span class="who you">คุณต้องทำเอง</span><span class="time">2 นาที</span></div>
+    <p class="why">ตอนแจกแอป Google จะเซ็นแอปใหม่ด้วยกุญแจของตัวเอง ไม่ใช่กุญแจของเรา แปลว่าแอปที่ลูกค้าโหลดมีลายนิ้วมือคนละอันกับที่เราเซ็นส่งไป</p>
+    <div class="card">
+      <h3>วิธีทำ</h3>
+      <ol>
+        <li>เปิด <b>Google Play Console</b> เลือกแอป OFU</li>
+        <li>เมนูซ้าย → <b>ทดสอบและเผยแพร่</b> (Test and release)</li>
+        <li>→ <b>การตรวจสอบความสมบูรณ์ของแอป</b> (App integrity)</li>
+        <li>หาหัวข้อ <b>ใบรับรองคีย์การลงนามแอป</b> (App signing key certificate)</li>
+        <li>คัดลอกค่า <b>ลายนิ้วมือใบรับรอง SHA-1</b></li>
+      </ol>
+      <div class="note stop">
+        <b>ขั้นนี้สำคัญที่สุดของทั้งคู่มือ</b>
+        <p>ถ้าใส่แค่ SHA-1 ตัวที่ 1 แผนที่จะใช้ได้ตอนคุณลงไฟล์เองทดสอบ แต่ <b>จอเทาว่างเปล่าสำหรับลูกค้าที่โหลดจาก Play</b> ซึ่งเป็นตอนที่สำคัญที่สุด — และคุณจะไม่เจอบั๊กนี้ตอนทดสอบเลย</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">5</div>
+  <div class="body">
+    <h2>เอา SHA-1 ทั้งสองตัวไปใส่ใน Google Cloud</h2>
+    <div class="meta"><span class="who you">คุณต้องทำเอง</span><span class="time">5 นาที</span></div>
+    <p class="why">นี่คือที่ที่บอก Google ว่า "อนุญาตให้แอปพวกนี้เรียกแผนที่ได้" ถ้าไม่ใส่ แผนที่จะไม่ทำงานและคีย์ที่เคยหลุดก็ยังปลอดภัยอยู่เพราะไม่มีใครมีลายนิ้วมือของเรา</p>
+    <div class="card">
+      <h3>วิธีทำ</h3>
+      <ol>
+        <li>เปิด <b>Google Cloud Console</b> → เลือกโปรเจกต์ที่เก็บ Maps key ไว้ (คนละโปรเจกต์กับ Supabase)</li>
+        <li>เมนู → <b>APIs &amp; Services</b> → <b>Credentials</b></li>
+        <li>คลิกที่คีย์ที่ใช้กับ Android</li>
+        <li>หัวข้อ <b>Application restrictions</b> → ต้องเลือกไว้ที่ <b>Android apps</b></li>
+        <li>กด <b>ADD</b> แล้วใส่ทีละรายการ รวม <b>2 รายการ</b>
+          <div class="tablewrap"><table>
+            <tr><th>ช่อง</th><th>ใส่อะไร</th></tr>
+            <tr><td>Package name</td><td><code>com.oofoo.shop</code> (ทั้งสองรายการใช้ค่าเดียวกัน)</td></tr>
+            <tr><td>SHA-1 รายการที่ 1</td><td>ค่าที่ได้จากขั้นที่ 3 (EAS)</td></tr>
+            <tr><td>SHA-1 รายการที่ 2</td><td>ค่าที่ได้จากขั้นที่ 4 (Play)</td></tr>
+          </table></div>
+        </li>
+        <li>หัวข้อ <b>API restrictions</b> → เลือก <b>Restrict key</b> → ติ๊กเฉพาะ <b>Maps SDK for Android</b></li>
+        <li>กด <b>SAVE</b></li>
+      </ol>
+      <div class="expect">
+        <b>หมายเหตุ</b>
+        <p>Google ใช้เวลาประมาณ 5 นาทีกว่าการตั้งค่าจะมีผลจริง ถ้าทดสอบทันทีแล้วแผนที่ยังไม่ขึ้น ให้รอสักครู่แล้วลองใหม่</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">6</div>
+  <div class="body">
+    <h2>ลองไฟล์ที่ build เสร็จด้วยตัวเองก่อน</h2>
+    <div class="meta"><span class="who you">คุณต้องทำเอง</span><span class="time">10 นาที</span></div>
+    <p class="why">พอส่งเข้า Google แล้วต้องรอตรวจเป็นวัน ถ้าเจอปัญหาตอนนั้นคือเสียเวลารอบใหม่ทั้งรอบ ลองเองก่อนถูกกว่ามาก</p>
+    <div class="card">
+      <h3>ต้องเช็คอะไรบ้าง</h3>
+      <ol>
+        <li><b>เปิดแอปแล้วไม่เด้งปิด</b> — ถ้าเด้งปิดทันทีแปลว่าค่าเชื่อมต่อฐานข้อมูลไม่เข้า</li>
+        <li><b>หน้าแรกโหลดสินค้าขึ้น</b> — ควรเห็น 441 รายการ ราคาและรูปครบ</li>
+        <li><b>หน้าเลือกที่อยู่ส่งของขึ้นแผนที่จริง</b> ← สำคัญที่สุด ถ้าเป็นจอเทาแปลว่า SHA-1 ยังไม่ถูก กลับไปขั้นที่ 5</li>
+        <li><b>ค้นหาสินค้าได้</b></li>
+        <li><b>เข้าสู่ระบบได้</b></li>
+      </ol>
+      <div class="note stop">
+        <b>ระวัง — ฐานข้อมูลมีชุดเดียว ไม่มีชุดทดลอง</b>
+        <p>ถ้ากดสั่งซื้อจนจบในแอปทดสอบ <b>มันคือออเดอร์จริงของร้าน</b> ตัดสต็อกจริงและโผล่ใน POS จริง<br>
+        แนะนำให้ดูหน้าจอเฉย ๆ อย่ากดจนจบ · ถ้าเผลอสั่งแบบพร้อมเพย์แล้วไม่จ่าย ระบบจะยกเลิกเองใน 30 นาทีและคืนสต็อกให้ · <b>แต่แบบเก็บเงินปลายทางไม่ยกเลิกเอง ต้องเข้าไปยกเลิกในแอดมิน</b></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">7</div>
+  <div class="body">
+    <h2>ส่งไฟล์เข้า Google Play</h2>
+    <div class="meta"><span class="who me">ผมสั่งให้ได้</span><span class="time">5 นาที</span></div>
+    <p class="why">คำสั่งนี้อัปโหลดไฟล์ที่ build ไว้เข้า Play Console ให้อัตโนมัติ ไม่ต้องลากไฟล์เอง</p>
+    <div class="card">
+      <h3>คำสั่ง</h3>
+      <pre><code>npx eas submit --platform android --latest</code></pre>
+      <div class="expect">
+        <b>เสร็จแล้ว</b>
+        <p>ไฟล์จะไปโผล่ใน Play Console เป็นรุ่นที่รอการยืนยัน ยังไม่ถึงมือลูกค้า</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">8</div>
+  <div class="body">
+    <h2>กดเผยแพร่ใน Play Console</h2>
+    <div class="meta"><span class="who you">คุณต้องทำเอง</span><span class="time">10 นาที + รอ Google ตรวจ</span></div>
+    <p class="why">3 รายการที่ยังไม่ติ๊กในหน้า "เปิดตัวแอป" ของคุณ คือขั้นนี้ทั้งหมด</p>
+    <div class="card">
+      <h3>ในหน้า สร้างและเผยแพร่รุ่น</h3>
+      <ol>
+        <li><b>ดูตัวอย่างและยืนยันรุ่น</b> — ตรวจว่าเลขเวอร์ชันเป็น 5 และไฟล์คือตัวที่เพิ่งส่ง</li>
+        <li><b>ส่งรุ่นไปให้ Google ตรวจสอบ</b></li>
+        <li><b>เผยแพร่แอปของคุณใน Google Play</b></li>
+      </ol>
+      <div class="expect">
+        <b>รอนานแค่ไหน</b>
+        <p>ปกติ 1–3 วัน แต่แอปที่เพิ่งได้สิทธิ์ production ครั้งแรกอาจนานถึง 7 วัน · ระหว่างรอเข้าไปดูสถานะได้เรื่อย ๆ ไม่ต้องทำอะไรเพิ่ม</p>
+      </div>
+      <div class="note">
+        <b>ถ้าโดนปฏิเสธ</b>
+        <p>Google จะบอกเหตุผลเป็นข้อ ๆ ในอีเมลและใน Console · ส่งข้อความนั้นมาให้ผม เดี๋ยวแก้แล้วส่งใหม่ ไม่ต้องเริ่มนับ 14 วันใหม่</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">9</div>
+  <div class="body">
+    <h2>ระหว่างรอ Google ตรวจ — ทำอันนี้ต่อ</h2>
+    <div class="meta"><span class="who you">คุณทำ</span><span class="time">ทำเรื่อย ๆ</span></div>
+    <p class="why">แคตตาล็อกโหลดสดจากเซิร์ฟเวอร์ ไม่ได้ฝังอยู่ในไฟล์แอป แปลว่าแก้สินค้าตอนนี้ได้เลย ไม่ต้องรอ ไม่ต้อง build ใหม่</p>
+    <div class="card">
+      <ul>
+        <li><b>ถ่ายรูปสินค้า 250 รายการที่ยังเป็นร่าง</b> — มีของอยู่จริง 199 ตัว มูลค่าขาย 74,087 บาทที่ยังลงแอปไม่ได้ ใช้ไฟล์ <code>docs/สินค้าที่ยังไม่มีรูป-2026-08-09.pdf</code> หรือกดตัวกรอง <b>ไม่มีรูป</b> ในหน้าสินค้า</li>
+        <li><b>แก้ราคา 3 ตัวที่ยังขายต่ำกว่าทุน</b></li>
+        <li><b>จัดหมวดหมู่</b>ให้สินค้าร่างที่ยังไม่มีหมวด</li>
+      </ul>
+      <div class="expect">
+        <b>ผลคือ</b>
+        <p>วันที่แอปผ่านการตรวจและขึ้นสโตร์ ลูกค้าจะเจอร้านที่ของครบพร้อมรูป ไม่ใช่ร้านที่มีของครึ่งเดียว</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  อู้ฟู่ · com.oofoo.shop · เวอร์ชัน 1.0.1 · ไฟล์ปัจจุบันใน Play คือ versionCode 4 (18 ก.ค.) · ไฟล์ใหม่จะเป็น 5<br>
+  ปรับปรุง 9 ส.ค. 2026
+</footer>
+</div>

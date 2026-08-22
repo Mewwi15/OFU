@@ -462,7 +462,10 @@ export function Stock() {
         const cells: Record<string, string> = {};
         head.forEach((h, c) => (cells[h] = r[c] ?? ''));
         const item = matchItem(items, cells);
-        const qty = Number(cells[head[qtyCol]]);
+        // ช่องว่างต้องเป็น "ข้ามแถวนี้" ไม่ใช่ศูนย์ — Number('') คืน 0 ซึ่งใน
+        // โหมดนับสต๊อก (set) จะล้างสต็อกของแถวนั้นทิ้งทั้งยวง (M4)
+        const rawQty = (cells[head[qtyCol]] ?? '').trim();
+        const qty = rawQty === '' ? NaN : Number(rawQty);
         return {
           key: idx,
           label:

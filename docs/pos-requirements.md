@@ -11,7 +11,7 @@ inventory** (an on-site sale decrements the same stock as online).
 | 1 | **Offline-first POS** — the sell screen must keep working if the internet drops (record locally, sync when back online) | Local-first architecture; biggest technical driver |
 | 2 | On-site payments: **cash + change**, **PromptPay QR**, **coupon / store credit** (no card/EDC in v1) | Checkout flow + store-credit ledger |
 | 3 | Hardware: **barcode scanner** + **thermal receipt printer** (no cash drawer) | Barcode field on products; ESC/POS printing |
-| 4 | **VAT-registered — issue tax invoices** (ใบกำกับภาษี) | VAT 7% pricing + tax-invoice numbering + receipt format |
+| 4 | ~~VAT-registered~~ → **ร้านไม่ได้จด VAT** (ยืนยันเจ้าของ ก.ค. 2026) — ใบเสร็จธรรมดา ไม่มีใบกำกับภาษี | ระบบมี VAT flag ไว้แล้วแต่ปิดใช้ · เปิดได้ภายหลังถ้าจดทะเบียน |
 
 ---
 
@@ -25,8 +25,8 @@ inventory** (an on-site sale decrements the same stock as online).
 - Checkout with **cash** (enter tendered → compute change), **PromptPay QR**
   (render QR for the exact amount → mark paid), **store credit / coupon**.
 - Split payment (cash + QR) — *to confirm*.
-- Print **abbreviated tax invoice** (ใบกำกับภาษีอย่างย่อ) by default; option for a
-  **full tax invoice** (ใบกำกับภาษีเต็มรูป) capturing the customer's name + tax id.
+- Print a plain receipt (ร้านไม่ได้จด VAT — ไม่มีใบกำกับภาษี · โค้ดรองรับไว้แล้ว
+  เผื่อจดทะเบียนภายหลัง).
 - **Returns / refunds** of a prior sale (restock + refund/credit).
 - Works fully **offline**: catalog, prices, stock cached locally; sales queued and
   synced on reconnect.

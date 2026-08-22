@@ -1,17 +1,25 @@
 // line-webhook — receives LINE platform events for the OA (deployed with
 // --no-verify-jwt; authenticity comes from the x-line-signature HMAC check).
 //
-//  • follow            : welcome message.
-//  • message "เจ้าของร้าน": binds the sender as the shop owner
-//    (shops.line_owner_user_id) — first come wins, re-binding only by the
-//    same user. The owner types this once after adding the OA.
+//  • follow                    : welcome message.
+//  • message = OWNER_BIND_SECRET: binds the sender as the shop owner
+//    (shops.line_owner_user_id) — the account every order/slip/stock alert
+//    is delivered to.
+//
+// This used to be the guessable phrase "เจ้าของร้าน", first-come-wins, no
+// takeover — so whoever typed a perfectly ordinary Thai word first owned the
+// notification stream (customer names, phones, addresses) and could never be
+// evicted. Now:
+//   - the trigger is a random secret from env; env unset = binding disabled
+//   - a correct secret ALWAYS rebinds, even over an existing holder — knowing
+//    the secret is the proof of ownership, so recovery from a squatter is
+//    just typing it once; no SQL surgery needed
+//   - anything else gets silence, exactly like before
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LINE_CHANNEL_ID,
-// LINE_CHANNEL_SECRET.
+// LINE_CHANNEL_SECRET, OWNER_BIND_SECRET.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const OWNER_PHRASE = 'เจ้าของร้าน';
 const LINE_TOKEN_URL = 'https://api.line.me/oauth2/v3/token';
 const LINE_REPLY_URL = 'https://api.line.me/v2/bot/message/reply';
 
@@ -87,21 +95,27 @@ Deno.serve(async (req) => {
 
     if (ev.type === 'message' && ev.message?.type === 'text' && ev.replyToken) {
       const text = (ev.message.text ?? '').trim();
-      if (text === OWNER_PHRASE) {
+      const secret = Deno.env.get('OWNER_BIND_SECRET');
+      // No secret configured = binding switched off entirely. Never treat an
+      // empty env as "match everything".
+      if (secret && text === secret) {
         const { data: shop } = await supabase
           .from('shops')
           .select('id, line_owner_user_id')
           .limit(1)
           .maybeSingle();
         if (!shop) continue;
-        if (!shop.line_owner_user_id) {
+        if (shop.line_owner_user_id === userId) {
+          await reply(ev.replyToken, 'บัญชีนี้ผูกเป็นเจ้าของร้านอยู่แล้ว');
+        } else {
+          // Correct secret always rebinds — including over an existing holder.
+          // Knowing the secret IS the ownership proof, so recovering from a
+          // squatted binding is just typing it once.
           await supabase.from('shops').update({ line_owner_user_id: userId }).eq('id', shop.id);
           await reply(ev.replyToken, 'ผูกบัญชีเจ้าของร้านเรียบร้อย\nออเดอร์ใหม่และสลิปที่ลูกค้าแนบจะแจ้งเตือนที่แชทนี้');
-        } else if (shop.line_owner_user_id === userId) {
-          await reply(ev.replyToken, 'บัญชีนี้ผูกเป็นเจ้าของร้านอยู่แล้ว');
         }
-        // someone else's phrase attempt: stay silent
       }
+      // wrong guesses (including the old public phrase): stay silent
     }
   }
 

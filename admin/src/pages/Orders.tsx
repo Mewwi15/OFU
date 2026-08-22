@@ -191,7 +191,10 @@ export function Orders() {
       if (b === 'action') action++;
       else if (b === 'shipping') shipping++;
       else if (b === 'cancelled') cancelled++;
-      if (b !== 'cancelled' && isToday(o.placed_at)) todayRevenue += o.total;
+      // นับเฉพาะเงินที่เข้าแล้วจริง — ใบที่ยังรอสลิป/รอโอนไม่ใช่ยอดขาย (M3)
+      // ให้ตรงกับ pos_dashboard ฝั่งเซิร์ฟเวอร์ที่กรอง paid อยู่แล้ว
+      if (b !== 'cancelled' && o.payment_status === 'paid' && isToday(o.placed_at))
+        todayRevenue += o.total;
     }
     return { slip, action, shipping, cancelled, todayRevenue };
   }, [orders]);

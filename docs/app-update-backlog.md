@@ -1,18 +1,18 @@
 # OFU App Update Backlog (Master)
 
-อัปเดต 2026-07-26 · Legend: 🔴 Native (ต้องเข้า build) · 🟢 JS/OTA · 🟡 Backend/DB · ขนาด S/M/L
+อัปเดต 2026-08-22 · Legend: 🔴 Native (ต้องเข้า build) · 🟢 JS/OTA · 🟡 Backend/DB · ขนาด S/M/L
 
 ---
 
-## TIER 0 — บั๊ก Native (ต้องเข้า build "ประตู OTA" รอบนี้)
-> พลาดแล้วต้อง build ใหม่รออีก → ทำให้ครบก่อน build
+## TIER 0 — บั๊ก Native ✅ จบแล้ว — เข้า build ที่ขึ้นสโตร์แล้วทั้งหมด
+> B2-B5 merge ครบ (PR #29/#30/#31) · อยู่ใน Android 1.0.1 (Play live 15 ส.ค.) และ iOS 1.0.2
 
-| ID | รายการ | ชนิด | ขนาด |
-|---|---|---|---|
-| B2 | สมัคร Apple ไม่ได้ | 🔴 เช็ค entitlement + Supabase | M |
-| B3 | Map บน Android ไม่ขึ้น | 🔴 เพิ่ม SHA-1 release ใน Maps key | S |
-| B4 | แจ้งเตือน alert ไม่เด้ง | 🔴🟡 push channel + backend ส่ง | M |
-| B5 | เสียงแจ้งเตือน | 🔴 bundle เสียง + channel | S |
+| ID | รายการ | สถานะ |
+|---|---|---|
+| B2 | สมัคร Apple ไม่ได้ | ✅ nonce fix (#30) |
+| B3 | Map บน Android ไม่ขึ้น | ✅ key wiring + fallback (#29) |
+| B4 | แจ้งเตือน alert ไม่เด้ง | ✅ push status/retry (#30) |
+| B5 | เสียงแจ้งเตือน | ✅ branded ding (#29/#31) |
 
 ## TIER 1 — บั๊ก JS (ยิง OTA หลัง build)
 | ID | รายการ | ชนิด | ขนาด |
@@ -57,7 +57,8 @@
 
 ---
 
-## ลำดับที่แนะนำ
-1. **รอบ build (ตอนนี้):** TIER 0 (B2-B5) + สี F6 ถ้าจะเปลี่ยน → build → ส่ง store
-2. **หลัง build ผ่าน (OTA ทยอย):** B1 → TIER 2 (quick win) → F3/F1/F5 → F6 → TIER 4
+## ลำดับที่แนะนำ (อัปเดต 22 ส.ค.)
+1. **~~รอบ build~~ ✅ จบแล้ว** — TIER 0 ขึ้นสโตร์ครบ (Play live · iOS รอรีวิว)
+2. **OTA (ทันทีที่ Actions ปลดล็อก):** B1 → TIER 2 (quick win) → F3/F1/F5 → F6 → TIER 4
 3. **ขนาน (แอดมิน):** P1-P5 ทำได้เลย ไม่ต้องรอ build
+4. **build 1.0.2 Android รอบหน้า:** edge-to-edge + R8 + จอใหญ่ (คำแนะนำ Play console)

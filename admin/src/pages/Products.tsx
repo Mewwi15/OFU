@@ -738,11 +738,13 @@ function ProductModal({
                 <Form.Item name="stock_qty" noStyle>
                   <InputNumber min={0} disabled style={{ width: '100%' }} placeholder="0" />
                 </Form.Item>
+                {/* รับของเข้า = บวกยอด (receive) — เดิม deep-link ไป action=set
+                    ซึ่งทับยอดทั้งก้อน คนรับของ 10 ชิ้นเลยกลายเป็นตั้งสต็อก = 10 */}
                 <Button
                   onClick={() => {
-                    if (variantId) navigate(`/stock?variant=${variantId}&action=set`);
+                    if (variantId) navigate(`/stock?variant=${variantId}&action=receive`);
                   }}>
-                  ปรับสต็อก
+                  เติมสต็อก
                 </Button>
               </Space.Compact>
             </Form.Item>
