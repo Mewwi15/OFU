@@ -35,7 +35,10 @@ import {
   apiError,
   createGoodsReceipt,
   getGoodsReceiptLines,
+  invalidateProductsCache,
   listProducts,
+  upsertProduct,
+  upsertVariant,
   type GoodsReceipt,
   type GoodsReceiptLine,
 } from '../lib/api';
@@ -65,14 +68,94 @@ export function Receive() {
   // ผลการ import ไฟล์: แถวที่จับคู่ไม่ได้ต้องเห็นตรง ๆ ห้ามหายเงียบ (บทเรียน M4)
   const [importReport, setImportReport] = useState<{
     matched: number;
-    unmatchedRows: { row: number; text: string; why: string }[];
+    unmatchedRows: UnmatchedRow[];
   } | null>(null);
+  const [creatingDrafts, setCreatingDrafts] = useState(false);
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [receipts, setReceipts] = useState<GoodsReceipt[] | null>(null);
   const [lineCache, setLineCache] = useState<Record<string, GoodsReceiptLine[]>>({});
   const [query, setQuery] = useState('');
   const searchRef = useRef<InputRef>(null);
+
+  /* สร้างสินค้าใหม่ (ฉบับร่าง) จากแถวที่ไม่พบ — เจ้าของยืนยัน: "น่าจะเป็นสินค้าใหม่"
+   * ราคาขายตั้งต้น: ① เลขในชื่อ ("ขนม 10 บาท" → 10) ② ทุน×1.25 ปัดขึ้น (สูตรเดียว
+   * กับ sync ใหญ่) ③ 0 — เป็นร่างเสมอ ลูกค้าไม่เห็นจนกว่าจะตั้งราคา/เผยแพร่เอง */
+  const createDraftsFromUnmatched = async () => {
+    if (!importReport) return;
+    const rows = importReport.unmatchedRows.filter((u) => u.qty && u.qty > 0);
+    if (!rows.length) return;
+    setCreatingDrafts(true);
+    let ok = 0;
+    const failed: UnmatchedRow[] = [];
+    for (const u of rows) {
+      try {
+        const name = u.name?.trim() || `สินค้า ${u.text}`;
+        const mPrice = name.match(/(\d+(?:\.\d+)?)\s*บาท/);
+        const price = mPrice
+          ? Number(mPrice[1])
+          : u.cost != null
+            ? Math.ceil(u.cost * 1.25)
+            : 0;
+        const { id: productId } = await upsertProduct({ name });
+        const { id: variantId } = await upsertVariant({
+          product_id: productId,
+          price,
+          barcode: u.text,
+          cost_price: u.cost ?? undefined,
+        });
+        setLines((prev) => [
+          ...prev,
+          {
+            variantId,
+            label: name,
+            productName: name,
+            size: null,
+            barcode: u.text,
+            sku: null,
+            cost: u.cost ?? null,
+            image: null,
+            qty: u.qty as number,
+            unitCost: u.cost ?? null,
+          },
+        ]);
+        ok++;
+      } catch {
+        failed.push(u);
+      }
+    }
+    invalidateProductsCache();
+    void listProducts(true).then((ps) => {
+      setItems(
+        ps.flatMap((p) => {
+          const image =
+            productThumb(
+              p.product_images.find((i) => i.is_primary)?.storage_path ??
+                p.product_images[0]?.storage_path ??
+                null,
+              64,
+            ) ?? null;
+          return p.product_variants.map((v) => ({
+            variantId: v.id,
+            label: `${p.name}${v.size ? ` (${v.size})` : ''}`,
+            productName: p.name,
+            size: v.size ?? null,
+            barcode: v.barcode ?? null,
+            sku: v.sku ?? null,
+            cost: v.cost_price ?? null,
+            image,
+          }));
+        }),
+      );
+    });
+    setImportReport((prev) =>
+      prev ? { ...prev, matched: prev.matched + ok, unmatchedRows: failed } : prev,
+    );
+    setCreatingDrafts(false);
+    message.success(
+      `สร้างสินค้าร่าง ${ok} ตัว + เพิ่มเข้าใบแล้ว — อย่าลืมไปตั้งราคา/รูป/หมวด แล้วเผยแพร่ในหน้าสินค้า`,
+    );
+  };
 
   const loadReceipts = useCallback(() => {
     listGoodsReceiptsSafe().then(setReceipts);
@@ -352,12 +435,24 @@ export function Receive() {
             }
             description={
               importReport.unmatchedRows.length ? (
-                <div className="max-h-40 overflow-y-auto text-[13px]">
-                  {importReport.unmatchedRows.map((u) => (
-                    <div key={`${u.row}-${u.text}`}>
-                      แถว {u.row} · <span className="font-mono">{u.text}</span> — {u.why}
-                    </div>
-                  ))}
+                <div>
+                  <div className="max-h-40 overflow-y-auto text-[13px]">
+                    {importReport.unmatchedRows.map((u) => (
+                      <div key={`${u.row}-${u.text}`}>
+                        แถว {u.row} · <span className="font-mono">{u.text}</span>
+                        {u.name ? ` · ${u.name}` : ''} — {u.why}
+                      </div>
+                    ))}
+                  </div>
+                  {importReport.unmatchedRows.some((u) => u.qty && u.qty > 0) ? (
+                    <Button
+                      className="mt-2"
+                      type="primary"
+                      loading={creatingDrafts}
+                      onClick={() => void createDraftsFromUnmatched()}>
+                      สร้างสินค้าร่าง + เพิ่มเข้าใบ ({importReport.unmatchedRows.filter((u) => u.qty && u.qty > 0).length} ตัว)
+                    </Button>
+                  ) : null}
                 </div>
               ) : null
             }
@@ -489,10 +584,19 @@ async function listGoodsReceiptsSafe(): Promise<GoodsReceipt[]> {
  * "ตรวจทานตัวเอง": จำนวน×ราคา ต้องตรงยอดสุทธิในไฟล์ ไม่ตรง = เตือนรายแถว
  * กติกาเดิมคงอยู่: เข้าตารางร่างเท่านั้น · แถวมีปัญหาไม่หายเงียบ (บทเรียน M4)
  */
+export type UnmatchedRow = {
+  row: number;
+  text: string;
+  why: string;
+  name?: string;
+  qty?: number;
+  cost?: number;
+};
+
 export function parseReceiveFile(
   wb: XLSX.WorkBook,
   items: PickItem[],
-): { lines: DraftLine[]; matched: number; unmatchedRows: { row: number; text: string; why: string }[] } {
+): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[] } {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, raw: false, defval: '' });
   if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [] };
@@ -526,7 +630,7 @@ export function parseReceiveFile(
   };
 
   const acc = new Map<string, DraftLine>();
-  const unmatchedRows: { row: number; text: string; why: string }[] = [];
+  const unmatchedRows: UnmatchedRow[] = [];
   for (let r = headRow + 1; r < rows.length; r++) {
     const cells = rows[r];
     // หาช่องรหัส: ตำแหน่งหัวตารางก่อน · เยื้องได้ ±2 ช่อง (นิสัย Crystal)
@@ -542,7 +646,25 @@ export function parseReceiveFile(
     if (!item) {
       // แถวสรุปท้ายรายงาน (เช่น "รวม") ไม่ใช่รหัส — รายงานเฉพาะที่หน้าตาเป็นรหัสจริง
       if (/^[0-9A-Za-z-]{3,}$/.test(rawBar)) {
-        unmatchedRows.push({ row: r + 1, text: rawBar, why: 'ไม่พบสินค้าในระบบ (บาร์โค้ด/SKU ไม่ตรง)' });
+        // เก็บ ชื่อ+จำนวน+ทุน จากไฟล์ไว้ด้วย — ปุ่ม "สร้างสินค้าร่าง" ใช้ต่อได้เลย
+        let fname = '';
+        for (let j = barIdx + 1; j < cells.length; j++) {
+          const t = String(cells[j] ?? '').trim();
+          if (t !== '' && num(cells[j]) === null && t.length > fname.length) fname = t;
+        }
+        const fnums: number[] = [];
+        for (let j = barIdx + 1; j < cells.length; j++) {
+          const n = num(cells[j]);
+          if (n !== null) fnums.push(n);
+        }
+        unmatchedRows.push({
+          row: r + 1,
+          text: rawBar,
+          why: 'ไม่พบสินค้าในระบบ (บาร์โค้ด/SKU ไม่ตรง)',
+          name: fname || undefined,
+          qty: fnums.length && Math.floor(fnums[0]) > 0 ? Math.floor(fnums[0]) : undefined,
+          cost: fnums.length >= 2 ? fnums[1] : undefined,
+        });
       }
       continue;
     }
