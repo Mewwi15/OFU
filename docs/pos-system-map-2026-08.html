@@ -1,0 +1,411 @@
+<title>แผนที่ระบบ POS อู้ฟู่ — ส.ค. 2026</title>
+<style>
+:root{
+  --ground:#FAF7F3; --surface:#FFFFFF; --raise:#F4EEE8; --line:#EAE0D8; --line2:#D9CCC2;
+  --ink:#241F1B; --soft:#4A423C; --muted:#6E625C; --faint:#9C918A;
+  --coral:#F15929; --coral-strong:#B83C18; --coral-tint:#FCE7DE;
+  --ok:#017A3A; --ok-tint:#DFF1E6; --warn:#946508; --warn-tint:#F7EDD8;
+  --danger:#C9252B; --danger-tint:#FAE7E7;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --thai:"Noto Sans Thai","IBM Plex Sans Thai",Sarabun,Thonburi,-apple-system,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#18140F; --surface:#211C17; --raise:#2A241E; --line:#38302A; --line2:#4A403A;
+  --ink:#F0E9E2; --soft:#D8CEC5; --muted:#A79A8F; --faint:#7A6F66;
+  --coral:#F87A4E; --coral-strong:#FF9068; --coral-tint:#3A2317;
+  --ok:#66C08F; --ok-tint:#1C2E23; --warn:#D9A84E; --warn-tint:#2E2617;
+  --danger:#E88580; --danger-tint:#331D1C;
+}}
+:root[data-theme="dark"]{
+  --ground:#18140F; --surface:#211C17; --raise:#2A241E; --line:#38302A; --line2:#4A403A;
+  --ink:#F0E9E2; --soft:#D8CEC5; --muted:#A79A8F; --faint:#7A6F66;
+  --coral:#F87A4E; --coral-strong:#FF9068; --coral-tint:#3A2317;
+  --ok:#66C08F; --ok-tint:#1C2E23; --warn:#D9A84E; --warn-tint:#2E2617;
+  --danger:#E88580; --danger-tint:#331D1C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--soft);font-family:var(--thai);
+  font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px;margin:0 auto;padding:0 22px 110px}
+a{color:var(--coral-strong)}
+
+header{padding:58px 0 30px;border-bottom:3px solid var(--coral)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--coral-strong);font-weight:700}
+h1{font-size:clamp(27px,4.5vw,40px);line-height:1.22;margin:10px 0 8px;font-weight:800;
+  color:var(--ink);text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:68ch}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);margin-top:28px}
+.stat{background:var(--surface);padding:16px 18px}
+.stat .k{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-family:var(--mono)}
+.stat .v{font-size:27px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.3;margin-top:2px}
+.stat .n{font-size:12.5px;color:var(--muted)}
+
+section{margin-top:56px}
+h2{font-size:22px;font-weight:800;color:var(--ink);margin:0 0 4px;
+  display:flex;align-items:baseline;gap:10px}
+h2 .tag{font-family:var(--mono);font-size:11px;color:var(--faint);font-weight:400}
+h3{font-size:16.5px;font-weight:700;color:var(--ink);margin:30px 0 8px}
+.lead{color:var(--muted);margin:0 0 18px;max-width:76ch;font-size:14.5px}
+
+.diagram{border:1px solid var(--line);background:var(--surface);padding:18px 14px;
+  overflow-x:auto;margin:14px 0}
+.diagram figcaption{font-size:12.5px;color:var(--muted);font-family:var(--mono);
+  padding:8px 6px 0;border-top:1px dashed var(--line);margin-top:12px}
+pre.mermaid{margin:0;display:flex;justify-content:center;min-width:560px}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);background:var(--surface);margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{background:var(--raise);text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);font-family:var(--mono);font-weight:600;padding:9px 13px;white-space:nowrap;
+  border-bottom:1px solid var(--line)}
+td{padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.feat{font-weight:700;color:var(--ink);white-space:nowrap}
+.mono{font-family:var(--mono);font-size:12.5px}
+.dim{color:var(--muted)}
+
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+  padding:2px 10px 2px 8px;border-radius:99px;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.live{background:var(--ok-tint);color:var(--ok)}
+.chip.idle{background:var(--warn-tint);color:var(--warn)}
+.chip.none{background:var(--raise);color:var(--muted)}
+.chip.bug{background:var(--danger-tint);color:var(--danger)}
+
+.zone{border:1px solid var(--line);background:var(--surface);margin:14px 0}
+.zone>.zh{display:flex;align-items:baseline;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--line);background:var(--raise)}
+.zone>.zh b{color:var(--ink);font-size:15px}
+.zone>.zh span{font-size:12px;color:var(--muted);font-family:var(--mono)}
+
+.buglist{display:grid;gap:1px;background:var(--line);border:1px solid var(--line)}
+.bug{background:var(--surface);padding:15px 18px;display:grid;
+  grid-template-columns:74px 1fr;gap:14px}
+.bug .id{font-family:var(--mono);font-weight:700;font-size:14px;padding-top:2px}
+.bug .id.m{color:var(--warn)} .bug .id.l{color:var(--muted)}
+.bug b{display:block;color:var(--ink)}
+.bug p{margin:3px 0 0;font-size:14px;color:var(--muted)}
+.bug .where{font-family:var(--mono);font-size:12px;color:var(--faint);margin-top:5px;display:block}
+
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:720px){.cols{grid-template-columns:1fr}}
+.panel{border:1px solid var(--line);background:var(--surface);padding:16px 18px}
+.panel h3{margin:0 0 10px}
+.panel ul{margin:0;padding-left:20px}
+.panel li{margin:7px 0;font-size:14.5px}
+.panel li b{color:var(--ink)}
+.panel.good{border-top:3px solid var(--ok)}
+.panel.warn{border-top:3px solid var(--warn)}
+
+ol.queue{padding-left:0;list-style:none;margin:12px 0 0;counter-reset:q;display:grid;gap:1px;
+  background:var(--line);border:1px solid var(--line)}
+ol.queue li{background:var(--surface);padding:13px 18px;display:flex;gap:14px;counter-increment:q}
+ol.queue li::before{content:counter(q);font-family:var(--mono);font-weight:700;color:var(--coral-strong);
+  flex:none;width:20px;padding-top:1px}
+ol.queue b{color:var(--ink)}
+ol.queue p{margin:2px 0 0;font-size:14px;color:var(--muted)}
+
+.note{border-left:3px solid var(--coral);background:var(--coral-tint);padding:13px 16px;margin:16px 0;
+  color:var(--ink)}
+.note b{display:block}
+.note p{margin:2px 0 0;font-size:14px;opacity:.85}
+
+footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line);color:var(--faint);
+  font-size:12.5px;font-family:var(--mono)}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">System Map · POS เท่านั้น · 23 ส.ค. 2026</div>
+  <h1>ระบบ POS ร้านอู้ฟู่ — แผนที่ฉบับเต็ม</h1>
+  <p class="sub">เครื่องเดียวทำสองหน้าที่: เคาน์เตอร์ขายหน้าร้าน + โต๊ะจัดการออเดอร์ออนไลน์
+  บนสต๊อกก้อนเดียวกัน · อ่านจากโค้ดจริงทุกบรรทัด ณ วันที่จัดทำ</p>
+  <div class="stats">
+    <div class="stat"><div class="k">หน้าจอ</div><div class="v">18</div><div class="n">7,350 บรรทัด UI</div></div>
+    <div class="stat"><div class="k">คำสั่งเซิร์ฟเวอร์</div><div class="v">60+</div><div class="n">RPC ผ่านชั้นเดียว (api.ts)</div></div>
+    <div class="stat"><div class="k">บั๊กเงินที่เปิดอยู่</div><div class="v">3</div><div class="n">จาก audit 31 — ปิดแล้ว 28</div></div>
+    <div class="stat"><div class="k">ใช้งานจริง</div><div class="v">36 วัน</div><div class="n">ตั้งแต่ 18 ก.ค. · ไม่มีเหตุขายไม่ได้</div></div>
+  </div>
+</header>
+
+<!-- ═══════════ 1 · CONTEXT DIAGRAM ═══════════ -->
+<section>
+  <h2>Context Diagram <span class="tag">ระดับ 0 — POS คุยกับใครบ้าง</span></h2>
+  <p class="lead">POS เป็นเว็บแอป (Vite + React + Ant Design v6) รันในเบราว์เซอร์เครื่องเดียวหรือหลายเครื่องพร้อมกัน
+  ทุกเส้นข้อมูลวิ่งผ่าน Supabase เป็นศูนย์กลางเดียว — ไม่มีเซิร์ฟเวอร์อื่นของตัวเอง</p>
+  <figure class="diagram">
+<pre class="mermaid">
+flowchart LR
+  classDef actor fill:#FCE7DE,stroke:#B83C18,color:#241F1B
+  classDef sys fill:#F15929,stroke:#B83C18,color:#fff,font-weight:bold
+  classDef ext fill:#F4EEE8,stroke:#9C918A,color:#241F1B
+  CASH["แคชเชียร์ / เจ้าของ"]:::actor
+  CUST["ลูกค้าหน้าร้าน"]:::actor
+  APP["แอป + เว็บลูกค้า<br/>(ออเดอร์ออนไลน์)"]:::ext
+  POS(("ระบบ POS<br/>เบราว์เซอร์")):::sys
+  SB[("Supabase<br/>DB · RPC · Realtime · Storage")]:::ext
+  SCAN["เครื่องยิงบาร์โค้ด<br/>(โหมดคีย์บอร์ด)"]:::ext
+  PRINT["ปริ้นเตอร์ความร้อน<br/>58/80มม. + A4"]:::ext
+  LINE["LINE OA<br/>แจ้งเตือนเจ้าของ+ลูกค้า"]:::ext
+  PUSH["Expo Push<br/>แจ้งเตือนเข้าแอป"]:::ext
+  MAPS["Google Maps<br/>นำทางไปส่งของ"]:::ext
+  CUST -->|"ยื่นสินค้า / จ่ายเงิน"| CASH
+  CASH -->|"ยิงสแกน · กดขาย"| POS
+  SCAN -->|"เลขบาร์โค้ดเป็น keystroke"| POS
+  POS <-->|"ขาย · สต๊อก · ออเดอร์ · รายงาน"| SB
+  APP -->|"สั่งซื้อ / แนบสลิป"| SB
+  SB -->|"Realtime: ออเดอร์ใหม่ / สลิปใหม่"| POS
+  POS -->|"ใบเสร็จ · ใบจัดสินค้า · ใบจ่าหน้า"| PRINT
+  SB -->|"ผ่าน Edge Function"| LINE
+  SB -->|"สั่งซื้อสำเร็จ / สถานะเปลี่ยน"| PUSH
+  POS -->|"เปิดพิกัดลูกค้า"| MAPS
+  POS -->|"พิกัดไรเดอร์ (Broadcast)"| SB
+</pre>
+  <figcaption>ทุกกล่องสีเทาคือของนอกระบบ · POS ไม่เก็บความจริงไว้เอง — Supabase คือแหล่งความจริงเดียว
+  (ยกเว้นช่วงออฟไลน์ ดูหัวข้อการขาย)</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════ 2 · FEATURES ═══════════ -->
+<section>
+  <h2>ฟีเจอร์ทั้งหมด <span class="tag">เรียงตามเมนูจริง 5 โซน</span></h2>
+
+  <div class="zone"><div class="zh"><b>โซนหน้าร้าน</b><span>งานทุกวันของแคชเชียร์</span></div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:170px">ฟีเจอร์</th><th>รายละเอียด</th><th style="width:120px">สถานะ</th></tr>
+    <tr><td class="feat">ขายหน้าร้าน</td><td>ยิงบาร์โค้ด (สแกนเนอร์=คีย์บอร์ด เพิ่มลงบิลอัตโนมัติ) · ค้นหาชื่อ/บาร์โค้ด/SKU · แถบหมวดหมู่ · เลือกไซซ์สินค้าหลายแบบ · ปรับจำนวน/ลบรายการ</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">รับเงิน 3 ทาง</td><td>เงินสด (คิดเงินทอน) · PromptPay (สร้าง QR ยอดตรงบิลในเครื่อง ไม่พึ่งเน็ตนอก) · เครดิตร้าน (ค้นลูกค้าจากเบอร์)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ส่วนลดท้ายบิล</td><td>ลดเป็นบาททั้งบิล · กันเคสลบรายการแล้วส่วนลดใหญ่กว่ายอด</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ขายตอนเน็ตล่ม</td><td>แคตตาล็อกแคชไว้ในเครื่อง · บิลเข้าคิวรอ sync · ยิงซ้ำไม่เบิ้ล (client_op_id) · บิลที่ sync ไม่ผ่านจริงมีหน้ารีวิว/ลองใหม่/ทิ้ง</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ใบเสร็จ</td><td>โมดัลใบเสร็จ → พิมพ์ความร้อน 58/80มม. · บาร์โค้ดเลขบิล (เปิด/ปิดได้) · ช่องออกใบกำกับเต็มรูป (ชื่อ+เลขภาษี) เตรียมไว้เผื่อจด VAT</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">บิลขาย + คืนเงิน</td><td>ประวัติบิล · ดูรายการในบิล · refund ทั้งบิล (คืนสต๊อกอัตโนมัติ) · กันบิลผี H5 (จอขาว replay) ปิดไปแล้ว</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">สต๊อก</td><td>เติมของ (บวก) แยกจากนับสต๊อก (ทับ) คนละปุ่มชัดเจน · สมุดบันทึกทุกการขยับ (ใคร/เมื่อไหร่/เหตุผล) · import CSV 2 โหมด + export · แจ้งของใกล้หมดเข้า LINE เจ้าของ (เกณฑ์ตั้งได้รายตัว, เว้นระยะ 6 ชม.)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">พักบิล / เรียกคืน</td><td>อยู่ในสเปกตั้งต้น แต่ยังไม่ได้สร้าง — ลูกค้าสองคิวซ้อนต้องขายให้จบทีละคน</td><td><span class="chip none">ยังไม่มี</span></td></tr>
+    <tr><td class="feat">จ่ายผสม (สด+โอน)</td><td>ฝั่งเซิร์ฟเวอร์รองรับแล้ว (payments[]) แต่ยังไม่มีปุ่มในหน้าจอ</td><td><span class="chip idle">มีแต่หลังบ้าน</span></td></tr>
+    <tr><td class="feat">เปิด/ปิดกะ + นับลิ้นชัก</td><td>คำสั่ง openShift/closeShift สร้างไว้ครบแต่ไม่มีหน้าจอเรียกใช้ — ปิดยอดวันนี้ใช้หน้ารายงานแทน</td><td><span class="chip idle">มีแต่หลังบ้าน</span></td></tr>
+  </table></div></div>
+
+  <div class="zone"><div class="zh"><b>โซนออนไลน์</b><span>ออเดอร์จากแอป/เว็บ มาจบที่โต๊ะเดียวกัน</span></div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:170px">ฟีเจอร์</th><th>รายละเอียด</th><th style="width:120px">สถานะ</th></tr>
+    <tr><td class="feat">แจ้งออเดอร์เข้าเรียลไทม์</td><td>เสียงแบรนด์ร้าน (ตัวสำรองเป็นเสียงสังเคราะห์ — ไม่มีวันเงียบ) + ป๊อปอัปกดเด้งไปหน้าออเดอร์ · เสียงพูดประกาศภาษาไทย "ออเดอร์ใหม่ N รายการ" (สวิตช์เปิด/ปิดบน header, ต่อคิวไม่ทับกัน)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ตรวจสลิป</td><td>ดูสลิปแนบ · อนุมัติ/ปฏิเสธพร้อมเหตุผล · สลิปไม่หายหลังอนุมัติ · แจ้งผลถึงลูกค้า (push + LINE)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">จัดของ + พิมพ์</td><td>ใบจัดสินค้า A4 รูปใหญ่+ราคา+ยอดรวม · ใบจ่าหน้า 100×150 · พิมพ์ผ่าน iframe ซ่อน (ไม่มีหน้าต่างเด้ง) · สถานะ "พิมพ์แล้ว" · ซ่อนออเดอร์ที่ยกเลิก</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">โหมดไรเดอร์ (เจ้าของส่งเอง)</td><td>แผนที่หมุดลูกค้าในหน้าออเดอร์ · ปุ่มนำทาง Google Maps · ปุ่มโทร · สวิตช์แชร์พิกัดสด (ลูกค้าเห็นบนแอป, จอไม่ดับระหว่างส่ง) · ปุ่มรับเงินสด COD (เข้ารายงานเงินสดรวม)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">แชตลูกค้า</td><td>ตอบแชตจากแอปได้ในหน้าเดียว</td><td><span class="chip live">ใช้จริง</span></td></tr>
+  </table></div></div>
+
+  <div class="zone"><div class="zh"><b>โซนจัดการแอป</b><span>ควบคุมสิ่งที่ลูกค้าเห็น</span></div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:170px">ฟีเจอร์</th><th>รายละเอียด</th><th style="width:120px">สถานะ</th></tr>
+    <tr><td class="feat">สินค้า</td><td>688 รายการ · รูปหลายรูป/ตั้งรูปหลัก · ค้นด้วยบาร์โค้ด/SKU · ตัวกรอง "ไม่มีรูป" · ปุ่มเติมสต็อกลิงก์ข้ามหน้า · draft/published/archive กันแก้ชนกันด้วย row_version</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">หมวดหมู่ / แบนเนอร์ / Featured</td><td>ลากเรียงลำดับ · แบนเนอร์ 5 ตำแหน่งบนแอป · เซกชันสินค้าแนะนำ</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">โปรโมชั่น</td><td>โค้ดส่วนลด % หรือบาท · ขั้นต่ำ · เลือกลดค่าสินค้า/ค่าส่ง · จำกัดจำนวนครั้ง (ใช้กับออเดอร์แอป)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ประกาศ (Broadcast)</td><td>ยิงแจ้งเตือนเข้าแอปลูกค้าทุกเครื่อง</td><td><span class="chip live">ใช้จริง</span></td></tr>
+  </table></div></div>
+
+  <div class="zone"><div class="zh"><b>โซนภาพรวม</b><span>ตัวเลขและการควบคุม</span></div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:170px">ฟีเจอร์</th><th>รายละเอียด</th><th style="width:120px">สถานะ</th></tr>
+    <tr><td class="feat">รายงาน</td><td>ยอดขาย/VAT/สุทธิ/ส่วนลด · เงินแยกช่องทาง (สด+COD รวมเป็นก้อนเดียวตามกระเป๋าจริง) · คืนเงิน · Top 5 สินค้าขายดี · เลือกช่วงเวลา</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">เครดิตร้าน</td><td>เติมเงินให้ลูกค้า · ดูประวัติ · ใช้จ่ายที่หน้าขาย</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ประวัติแก้ไข (Audit)</td><td>ทุกการกระทำสำคัญมีบันทึก ใคร-ทำอะไร-เมื่อไหร่ ย้อนดูได้</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">อัปเดตระบบ</td><td>หน้า monitor สไตล์ Vercel — เห็นว่าอัปเดตกำลังวิ่ง/เขียว/แดง ย้อนหลัง 12 รอบ</td><td><span class="chip live">ใช้จริง</span></td></tr>
+    <tr><td class="feat">ตั้งค่า</td><td>ข้อมูลบนบิล · ขนาดกระดาษ + พิมพ์ทดสอบ · ค่าส่ง/COD · คิวคำขอลบบัญชี (PDPA)</td><td><span class="chip live">ใช้จริง</span></td></tr>
+  </table></div></div>
+
+  <div class="zone"><div class="zh"><b>เครื่องมือแฝง</b><span>ของที่มองไม่เห็นแต่ทำงานอยู่</span></div>
+  <div class="tablewrap"><table>
+    <tr><th style="width:170px">เครื่องมือ</th><th>รายละเอียด</th><th style="width:120px">สถานะ</th></tr>
+    <tr><td class="feat">กล่องดำสแกนเนอร์</td><td>flight recorder อัดทุก keystroke/การเปลี่ยนหน้า (ข้อมูลที่พนักงานพิมพ์ถูกปิดบัง) · หน้า /scan-lab ไว้ไล่อาการสแกนเนอร์หลอน · รอดข้ามการรีโหลดหน้า</td><td><span class="chip live">ติดตั้งอยู่</span></td></tr>
+    <tr><td class="feat">กันจอเสีย</td><td>ErrorBoundary ทั้งแอป + ครอบใบเสร็จแยกอีกชั้น — ใบเสร็จพังต้องไม่พาเครื่องขายล่ม</td><td><span class="chip live">ติดตั้งอยู่</span></td></tr>
+  </table></div></div>
+</section>
+
+<!-- ═══════════ 3 · WORKFLOWS ═══════════ -->
+<section>
+  <h2>Workflow หลัก <span class="tag">3 สายงานประจำวัน</span></h2>
+
+  <h3>สายที่ 1 — ขายหน้าร้าน (รวมตอนเน็ตล่ม)</h3>
+  <figure class="diagram">
+<pre class="mermaid">
+flowchart TB
+  classDef act fill:#FCE7DE,stroke:#B83C18,color:#241F1B
+  classDef sys fill:#F4EEE8,stroke:#9C918A,color:#241F1B
+  classDef money fill:#DFF1E6,stroke:#017A3A,color:#241F1B
+  classDef off fill:#F7EDD8,stroke:#946508,color:#241F1B
+  A["ยิงบาร์โค้ด / ค้นหา / จิ้มหมวด"]:::act --> B["รายการลงบิล<br/>ปรับจำนวน · ส่วนลดท้ายบิล"]:::act
+  B --> C{"วิธีจ่าย"}
+  C -->|เงินสด| D["กรอกรับเงิน → คิดทอน"]:::money
+  C -->|PromptPay| E["สร้าง QR ยอดตรงบิล<br/>ลูกค้าสแกน → กดยืนยันรับโอน"]:::money
+  C -->|เครดิตร้าน| F["ค้นเบอร์ลูกค้า → ตัดยอดเครดิต"]:::money
+  D & E & F --> G{"เน็ตปกติ?"}
+  G -->|ปกติ| H["create_pos_sale (RPC)<br/>ตัดสต๊อก + ลงสมุดสต๊อก + เลขบิล"]:::sys
+  G -->|ล่ม| I["บิลเข้าคิวในเครื่อง<br/>ขายต่อได้ไม่สะดุด"]:::off
+  I -->|เน็ตกลับ| H
+  H --> J["ใบเสร็จ → พิมพ์ความร้อน"]:::act
+  H -.->|ของใกล้หมด| K["LINE แจ้งเจ้าของ"]:::sys
+</pre>
+  <figcaption>จุดแข็ง: ทุกทางจ่ายมาบรรจบที่ RPC เดียว ยิงซ้ำได้ไม่เบิ้ลบิล · จุดเสี่ยงที่เหลือ = ราคา ณ ตอน sync (บั๊ก M2)</figcaption>
+  </figure>
+
+  <h3>สายที่ 2 — ออเดอร์ออนไลน์ → ส่งถึงมือ</h3>
+  <figure class="diagram">
+<pre class="mermaid">
+flowchart TB
+  classDef cust fill:#FCE7DE,stroke:#B83C18,color:#241F1B
+  classDef pos fill:#F4EEE8,stroke:#9C918A,color:#241F1B
+  classDef ship fill:#DFF1E6,stroke:#017A3A,color:#241F1B
+  A["ลูกค้าสั่งจากแอป/เว็บ<br/>(เดลิเวอรี่ ≤15กม. หรือพัสดุ)"]:::cust --> B["POS ร้องเสียงร้าน + ประกาศไทย<br/>+ LINE เข้าเครื่องเจ้าของ"]:::pos
+  B --> C{"จ่ายแบบไหน"}
+  C -->|โอน+สลิป| D["ตรวจสลิป → อนุมัติ / ปฏิเสธ"]:::pos
+  C -->|COD เดลิเวอรี่| E["รับออเดอร์ได้เลย"]:::pos
+  D & E --> F["พิมพ์ใบจัดสินค้า (รูป+ราคา)<br/>หยิบของ → ติ๊กพิมพ์แล้ว"]:::pos
+  F --> G{"โหมดส่ง"}
+  G -->|เดลิเวอรี่| H["โหมดไรเดอร์: นำทาง · แชร์พิกัดสด<br/>ลูกค้าเห็นบนแผนที่ · เก็บเงิน COD"]:::ship
+  G -->|พัสดุ| I["ใบจ่าหน้า 100×150<br/>ส่งเข้าระบบขนส่ง"]:::ship
+  H & I --> J["จบออเดอร์ · เงิน COD เข้ารายงานก้อนเงินสด"]:::ship
+</pre>
+  <figcaption>ทุกการเปลี่ยนสถานะ ลูกค้าได้รับแจ้งอัตโนมัติ (push + LINE) โดย POS ไม่ต้องทำอะไรเพิ่ม</figcaption>
+  </figure>
+
+  <h3>สายที่ 3 — สต๊อก</h3>
+  <figure class="diagram">
+<pre class="mermaid">
+flowchart LR
+  classDef act fill:#FCE7DE,stroke:#B83C18,color:#241F1B
+  classDef sys fill:#F4EEE8,stroke:#9C918A,color:#241F1B
+  A["ของเข้าร้าน"]:::act -->|"ปุ่มเติม (บวก)"| L[("สมุดสต๊อก<br/>ทุกแถวมีเหตุผล+คนทำ")]:::sys
+  B["นับสต๊อกจริง"]:::act -->|"ปุ่มนับ (ทับ)"| L
+  C["ไฟล์ CSV"]:::act -->|"import 2 โหมด<br/>ช่องว่าง = ข้ามแถว"| L
+  D["ขายหน้าร้าน/แอป"]:::act -->|ตัดอัตโนมัติ| L
+  E["คืนเงิน"]:::act -->|คืนของอัตโนมัติ| L
+  L -->|"เหลือ ≤ เกณฑ์"| F["LINE แจ้งเจ้าของ"]:::sys
+</pre>
+  <figcaption>ความจริงหนึ่งเดียว: ยอดคงเหลือแก้ตรง ๆ ไม่ได้ ต้องผ่านสมุดเสมอ — ย้อนหาต้นตอได้ทุกชิ้น</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════ 4 · DFD ═══════════ -->
+<section>
+  <h2>DFD ระดับ 1 <span class="tag">กระบวนการขาย — ข้อมูลไหลไปไหน</span></h2>
+  <figure class="diagram">
+<pre class="mermaid">
+flowchart LR
+  classDef proc fill:#F15929,stroke:#B83C18,color:#fff
+  classDef store fill:#F4EEE8,stroke:#9C918A,color:#241F1B
+  classDef ext fill:#FCE7DE,stroke:#B83C18,color:#241F1B
+  CASH["แคชเชียร์"]:::ext
+  P1(("1.0<br/>รับรายการ<br/>เข้าบิล")):::proc
+  P2(("2.0<br/>คิดเงิน<br/>สด/QR/เครดิต")):::proc
+  P3(("3.0<br/>บันทึกขาย<br/>create_pos_sale")):::proc
+  P4(("4.0<br/>ออกใบเสร็จ")):::proc
+  D1[("D1 แคตตาล็อก<br/>(แคชในเครื่อง)")]:::store
+  D2[("D2 คิวออฟไลน์<br/>(ในเครื่อง)")]:::store
+  D3[("D3 pos_sales +<br/>pos_sale_items")]:::store
+  D4[("D4 product_variants<br/>สต๊อกคงเหลือ")]:::store
+  D5[("D5 stock_movements<br/>สมุดสต๊อก")]:::store
+  D6[("D6 store_credit")]:::store
+  CASH -->|บาร์โค้ด/คำค้น| P1
+  D1 -->|ชื่อ·ราคา·คงเหลือ| P1
+  P1 -->|รายการบิล| P2
+  CASH -->|เงินรับ/ยืนยันโอน| P2
+  P2 -->|บิล+วิธีจ่าย+client_op_id| P3
+  P3 -->|แถวขาย| D3
+  P3 -->|ตัดคงเหลือ| D4
+  P3 -->|แถวบันทึก 'sale'| D5
+  P3 -->|ตัดเครดิต| D6
+  P3 -.->|เน็ตล่ม| D2
+  D2 -.->|flush เมื่อเน็ตกลับ| P3
+  P3 -->|เลขบิล+ยอด| P4
+  P4 -->|ใบเสร็จ 58/80มม.| CASH
+</pre>
+  <figcaption>D1–D2 อยู่ในเครื่อง (localStorage) · D3–D6 อยู่ Supabase มี RLS คุมทุกตาราง ·
+  กระบวนการ 3.0 เป็น transaction เดียว — สำเร็จทั้งก้อนหรือไม่เกิดเลย</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════ 5 · BUGS ═══════════ -->
+<section>
+  <h2>บั๊กที่เปิดอยู่ <span class="tag">3 ตัวสุดท้ายจาก audit 31 ตัว</span></h2>
+  <p class="lead">ทั้งสามตัวเป็นตระกูล "เงิน" เหมือนกัน และรอดมาถึงวันนี้เพราะเงื่อนไขเกิดยาก —
+  แต่ยิ่งร้านโตยิ่งมีโอกาสเจอ</p>
+  <div class="buglist">
+    <div class="bug"><span class="id m">M2</span><div>
+      <b>ขายตอนเน็ตล่ม แล้วราคาถูกแก้ก่อนคิว sync เข้า — บิลถูกคิดราคาใหม่</b>
+      <p>เก็บเงินลูกค้าตามราคาตอนขาย แต่ระบบบันทึกตามราคาตอน sync → เงินลิ้นชักไม่ตรงรายงานแบบไม่มีใครรู้ตัว
+      เกิดเมื่อ: เน็ตล่ม + มีการแก้ราคา ในช่วงเดียวกัน</p>
+      <span class="where">admin/src/lib/offline.ts · แนวแก้: ผูกราคา ณ ตอนขายไปกับบิลในคิว</span>
+    </div></div>
+    <div class="bug"><span class="id m">M10</span><div>
+      <b>ยิงสินค้าที่ของหมดปนอยู่ในบิล — ทั้งบิล fail โดยไม่บอกว่าตัวไหน</b>
+      <p>บิล 20 รายการมี 1 ตัวหมด ล้มทั้งบิลพร้อม error กลาง ๆ แคชเชียร์ต้องไล่เดาต่อหน้าลูกค้า
+      ฝั่งแอปลูกค้าแก้ไปแล้ว (บอกรายตัว) — ฝั่ง POS ยังไม่ได้ผ่าตัดตาม</p>
+      <span class="where">admin/src/pages/Pos.tsx · แนวแก้: ใช้ detail รายตัวแบบเดียวกับฝั่งแอป</span>
+    </div></div>
+    <div class="bug"><span class="id l">L1</span><div>
+      <b>จ่ายด้วยเครดิตร้านพร้อมกัน 2 เครื่อง — ยอดติดลบได้</b>
+      <p>อ่านยอดคงเหลือโดยไม่ล็อกแถว สองเครื่องอ่านค่าเดียวกันแล้วตัดพร้อมกัน
+      โอกาสเกิดต่ำมากตอนนี้ (เครื่องเดียว) แต่เป็นระเบิดเวลาเมื่อมีเครื่องที่สอง</p>
+      <span class="where">supabase migration 0060 · แนวแก้: SELECT ... FOR UPDATE หนึ่งบรรทัด</span>
+    </div></div>
+  </div>
+
+  <h3>แก้แล้วสัปดาห์นี้ — รอเวลาพิสูจน์ตัวเองหน้างาน</h3>
+  <p class="lead" style="margin-bottom:6px">M3 ยอดขายวันนี้นับเฉพาะเงินเข้าจริง · M4 ช่องว่างใน CSV ไม่ล้างสต๊อกอีกแล้ว ·
+  ปุ่มหน้าสินค้าเปลี่ยนเป็น "เติมสต็อก" (บวก ไม่ทับ) · เสียงออเดอร์เป็นไฟล์แบรนด์ร้าน</p>
+</section>
+
+<!-- ═══════════ 6 · UI/UX ═══════════ -->
+<section>
+  <h2>UI / UX <span class="tag">อ่านจากโครงจริง + การใช้งาน 36 วัน</span></h2>
+  <div class="cols">
+    <div class="panel good"><h3>ที่ทำได้ดีแล้ว</h3><ul>
+      <li><b>คีย์บอร์ดต้องมาก่อน</b> — ยิงสแกนจากหน้าไหนก็เข้าบิล ช่องค้นหา focus ค้างให้ตลอด</li>
+      <li><b>จอแคชเชียร์สองคอลัมน์</b> — ซ้ายเลือกของ ขวาคือบิล · จอเล็กบิลกลายเป็น drawer ไม่เบียดกัน</li>
+      <li><b>เสียงคือ UI</b> — ออเดอร์เข้าไม่ต้องเฝ้าจอ: เสียงร้าน + เสียงพูดไทยบอกจำนวนรายการ</li>
+      <li><b>พิมพ์ไม่เด้งหน้าต่าง</b> — ทุกใบพิมพ์ผ่าน iframe ซ่อน เหลือแค่ dialog เครื่องพิมพ์</li>
+      <li><b>ดีไซน์ระบบเดียวกัน</b> — Ant Design v6 + โทน coral ทั้ง 18 หน้า ปุ่มเดิมอยู่ที่เดิม</li>
+      <li><b>ผิดพลาดแล้วไปต่อได้</b> — เน็ตล่มมีป้ายบอกชัด + ขายต่อได้ · บิลค้างมีหน้าจัดการ ไม่หายเงียบ</li>
+    </ul></div>
+    <div class="panel warn"><h3>ที่ควรปรับ (เรียงตามผลกระทบ)</h3><ul>
+      <li><b>ปิดยอดสิ้นวันยังเป็นงานสายตา</b> — ไม่มี flow นับลิ้นชัก/ปิดกะ ทั้งที่หลังบ้านสร้างไว้แล้ว
+      เจ้าของต้องเทียบเงินจริงกับหน้ารายงานเอง (โยงกับ M2 โดยตรง)</li>
+      <li><b>error ตอนขายยังพูดไม่ชัด</b> — เคสของหมด (M10) คือตัวแทนของปัญหา: ระบบรู้สาเหตุแต่ไม่บอกหน้างาน</li>
+      <li><b>ลูกค้าซ้อนคิวต้องรอ</b> — ไม่มีพักบิล ลูกค้าลืมของต้องยกเลิกหรือให้คิวถัดไปรอ</li>
+      <li><b>หน้าขายไฟล์เดียว 1,263 บรรทัด</b> — ยังไม่กระทบผู้ใช้ แต่ทุกฟีเจอร์ใหม่จะแก้ยากขึ้นเรื่อย ๆ
+      (ความเสี่ยงเชิงวิศวกรรม ไม่เร่ง)</li>
+      <li><b>ยังไม่เคยทดสอบบนแท็บเล็ต</b> — โครง responsive รองรับอยู่แล้ว แต่ถ้าวันหนึ่งจะใช้ iPad
+      หน้าร้าน ควรลองจริงก่อน</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- ═══════════ 7 · NEXT ═══════════ -->
+<section>
+  <h2>คิวแนะนำ <span class="tag">ถ้าจะลุย POS ต่อ — เรียงตามความคุ้ม</span></h2>
+  <ol class="queue">
+    <li><div><b>ชุดปิดเงินให้สนิท: M2 + หน้าปิดกะ</b>
+      <p>แก้บั๊กราคาตอน sync พร้อมสร้าง flow นับลิ้นชัก-ปิดกะที่หลังบ้านมีอยู่แล้ว — จบทั้งบั๊กและงานปิดยอดในชุดเดียว</p></div></li>
+    <li><div><b>M10 — ของหมดต้องบอกชื่อ</b>
+      <p>งานเล็ก (ฝั่งแอปมีต้นแบบแล้ว) แต่ตัดจังหวะเสียหน้าต่อลูกค้าที่หน้าเคาน์เตอร์</p></div></li>
+    <li><div><b>L1 — ล็อกเครดิตร้าน</b>
+      <p>SQL หนึ่งบรรทัด ปิดระเบิดเวลาก่อนมีเครื่องที่สอง</p></div></li>
+    <li><div><b>พักบิล / เรียกคืน</b>
+      <p>ฟีเจอร์ที่สเปกตั้งต้นสัญญาไว้ — คิวหน้าร้านลื่นขึ้นทันทีที่มีลูกค้าซ้อน</p></div></li>
+    <li><div><b>จ่ายผสม เงินสด+โอน</b>
+      <p>หลังบ้านพร้อมแล้ว เหลือแค่หน้าจอ — ลูกค้าเงินสดไม่พอโอนส่วนต่างได้</p></div></li>
+  </ol>
+  <div class="note"><b>มุมมองรวม</b>
+    <p>โครงสร้าง POS แข็งแรงเกินขนาดร้านไปแล้วด้วยซ้ำ — offline-first, สมุดสต๊อกกันแก้, audit ครบ,
+    ตัวกันพลาดหลายชั้น สิ่งที่เหลือไม่ใช่การสร้างใหม่ แต่เป็นการเก็บ 3 บั๊กเงินสุดท้าย
+    และเติมฟีเจอร์หน้างานที่สเปกวางไว้แต่ยังไม่ถึงคิว</p></div>
+</section>
+
+<footer>
+  จัดทำ 23 ส.ค. 2026 · อ่านจากโค้ดจริง commit ล่าสุดบน main · ตัวเลขบั๊กอ้างอิง docs/bug-audit-2026-07.md
+  · แผนภาพทั้งหมดคือโครงสร้างจริงของระบบ ไม่ใช่แผนอนาคต
+</footer>
+</div>

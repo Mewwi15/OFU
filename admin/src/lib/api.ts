@@ -801,6 +801,47 @@ export async function listStockMovements(
 }
 
 /** Goods-in: adds qty to a variant with its own 'receive' ledger reason. */
+/* ── ใบรับเข้าสินค้า (0074 — ย้ายการรับของจาก ETS มาที่นี่) ────────────────── */
+export type GoodsReceipt = {
+  id: string;
+  receipt_number: string;
+  supplier: string | null;
+  doc_number: string | null;
+  note: string | null;
+  total_cost: number;
+  line_count: number;
+  created_at: string;
+};
+export type GoodsReceiptLine = {
+  product_name: string;
+  size: string | null;
+  barcode: string | null;
+  qty: number;
+  unit_cost: number | null;
+};
+export type GoodsReceiptInput = {
+  supplier?: string;
+  doc_number?: string;
+  note?: string;
+  items: { variant_id: string; qty: number; unit_cost?: number }[];
+};
+export const createGoodsReceipt = (p: GoodsReceiptInput) =>
+  rpc<{ id: string; receipt_number: string; total_cost: number; line_count: number }>(
+    'create_goods_receipt',
+    { p_supplier: p.supplier ?? null, p_doc_number: p.doc_number ?? null, p_note: p.note ?? null, p_items: p.items },
+  );
+export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
+  const { data, error } = await supabase
+    .from('goods_receipts')
+    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return (data ?? []) as GoodsReceipt[];
+}
+export const getGoodsReceiptLines = (receiptId: string) =>
+  rpc<GoodsReceiptLine[]>('get_goods_receipt_lines', { p_receipt_id: receiptId });
+
 export const receiveStock = (variantId: string, qty: number, note?: string) =>
   rpc<{ variant_id: string; stock_qty: number }>('receive_stock', {
     p_variant_id: variantId,
