@@ -2,7 +2,7 @@ import { RiRefund2Line, RiShoppingBag3Line, RiStore2Line } from '@remixicon/reac
 import { Alert, App, Card, Col, Progress, Row, Segmented, Statistic, Table, Tag, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiError, listLowStock, posDashboard, type Dashboard, type LowStockItem } from '../lib/api';
+import { apiError, listLowStock, posDashboard, profitReport, type Dashboard, type LowStockItem, type ProfitReport } from '../lib/api';
 
 const { Title, Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -28,11 +28,16 @@ export function Reports() {
   const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [lowStockLoading, setLowStockLoading] = useState(true);
   const [lowStockError, setLowStockError] = useState(false);
+  const [profit, setProfit] = useState<ProfitReport | null>(null);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     const { from, to } = rangeBounds(range);
+    setProfit(null);
+    void profitReport(from.toISOString(), to.toISOString())
+      .then((p) => setProfit(p))
+      .catch(() => setProfit(null)); // migration 0076 ยังไม่รัน — ซ่อนส่วนกำไรเฉย ๆ
     posDashboard(from.toISOString(), to.toISOString())
       .then((d) => alive && setData(d))
       .catch((e) => alive && message.error(apiError(e)))
@@ -142,6 +147,69 @@ export function Reports() {
           </Card>
         </Col>
       </Row>
+
+      {profit ? (
+        <Card title="กำไรขั้นต้น" className="mt-4">
+          {(() => {
+            const revenue = profit.pos.revenue + profit.online.revenue;
+            const cost = profit.pos.cost + profit.online.cost;
+            const billDisc = profit.pos.bill_discount ?? 0;
+            const gp = revenue - billDisc - cost;
+            const pctGp = revenue - billDisc > 0 ? (gp / (revenue - billDisc)) * 100 : 0;
+            return (
+              <>
+                <Row gutter={[16, 16]}>
+                  <Col xs={12} lg={6}><Statistic title="ยอดขาย (หลังส่วนลด)" value={revenue - billDisc} prefix="฿" /></Col>
+                  <Col xs={12} lg={6}><Statistic title="ต้นทุนของที่ขาย" value={cost} prefix="฿" /></Col>
+                  <Col xs={12} lg={6}>
+                    <Statistic title="กำไรขั้นต้น" value={gp} prefix="฿"
+                      valueStyle={{ color: gp >= 0 ? '#017A3A' : '#C9252B', fontWeight: 700 }} />
+                  </Col>
+                  <Col xs={12} lg={6}>
+                    <Statistic title="อัตรากำไร" value={pctGp} precision={1} suffix="%"
+                      valueStyle={{ color: gp >= 0 ? '#017A3A' : '#C9252B' }} />
+                  </Col>
+                </Row>
+                {profit.missing_cost_lines > 0 ? (
+                  <Text type="warning" style={{ fontSize: 13 }}>
+                    มี {profit.missing_cost_lines} บรรทัดขายที่สินค้ายังไม่เคยกรอกทุน — กำไรจริงต่ำกว่าตัวเลขนี้
+                    (กรอกทุนได้ตอนรับของเข้า หรือในหน้าสินค้า)
+                  </Text>
+                ) : null}
+                <Table
+                  className="mt-3"
+                  size="small"
+                  rowKey={(r) => `${r.name}-${r.size ?? ''}`}
+                  pagination={{ pageSize: 15, showSizeChanger: false }}
+                  dataSource={profit.products}
+                  locale={{ emptyText: 'ยังไม่มีข้อมูลในช่วงนี้' }}
+                  columns={[
+                    { title: 'สินค้า', render: (_, r) => `${r.name}${r.size ? ` (${r.size})` : ''}` },
+                    { title: 'ขาย (ชิ้น)', dataIndex: 'qty', width: 90, align: 'right',
+                      sorter: (a, b) => a.qty - b.qty },
+                    { title: 'ยอดขาย', dataIndex: 'revenue', width: 110, align: 'right',
+                      render: (v) => baht(v), sorter: (a, b) => a.revenue - b.revenue,
+                      defaultSortOrder: 'descend' as const },
+                    { title: 'ทุน', dataIndex: 'cost', width: 110, align: 'right', render: (v) => baht(v) },
+                    { title: 'กำไร', dataIndex: 'profit', width: 110, align: 'right',
+                      sorter: (a, b) => a.profit - b.profit,
+                      render: (v: number) => (
+                        <span style={{ color: v < 0 ? '#C9252B' : undefined, fontWeight: v < 0 ? 600 : undefined }}>
+                          {baht(v)}
+                        </span>
+                      ) },
+                    { title: '%', width: 80, align: 'right',
+                      render: (_, r) => (r.revenue > 0 ? `${((r.profit / r.revenue) * 100).toFixed(0)}%` : '-') },
+                  ]}
+                />
+                <Text type="secondary" style={{ fontSize: 12.5 }}>
+                  รายสินค้าคิดก่อนหักส่วนลดท้ายบิล · แถวสีแดง = ขายต่ำกว่าทุน ควรเช็คราคา
+                </Text>
+              </>
+            );
+          })()}
+        </Card>
+      ) : null}
 
       <Card title="สินค้าขายดี" className="mt-4" loading={loading}>
         <Table

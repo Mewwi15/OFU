@@ -696,6 +696,26 @@ export type Dashboard = {
 export const posDashboard = (fromIso: string, toIso: string) =>
   rpc<Dashboard>('pos_dashboard', { p_from: fromIso, p_to: toIso });
 
+/* ── รายงานกำไรขั้นต้น (0076) ────────────────────────────────────────────────── */
+export type ProfitChannel = { revenue: number; cost: number; bill_discount?: number };
+export type ProfitProduct = {
+  name: string;
+  size: string | null;
+  qty: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  no_cost_lines: number;
+};
+export type ProfitReport = {
+  pos: ProfitChannel;
+  online: ProfitChannel;
+  products: ProfitProduct[];
+  missing_cost_lines: number;
+};
+export const profitReport = (fromIso: string, toIso: string) =>
+  rpc<ProfitReport>('profit_report', { p_from: fromIso, p_to: toIso });
+
 export type LowStockItem = { product_name: string; size: string | null; stock_qty: number; threshold: number };
 export const listLowStock = () => rpc<LowStockItem[]>('low_stock_items', {});
 
