@@ -70,8 +70,15 @@ export function Receive() {
   useEffect(() => {
     void listProducts().then((ps) => {
       setItems(
-        ps.flatMap((p) =>
-          p.variants.map((v) => ({
+        ps.flatMap((p) => {
+          const image =
+            productThumb(
+              p.product_images.find((i) => i.is_primary)?.storage_path ??
+                p.product_images[0]?.storage_path ??
+                null,
+              64,
+            ) ?? null;
+          return p.product_variants.map((v) => ({
             variantId: v.id,
             label: `${p.name}${v.size ? ` (${v.size})` : ''}`,
             productName: p.name,
@@ -79,9 +86,9 @@ export function Receive() {
             barcode: v.barcode ?? null,
             sku: v.sku ?? null,
             cost: v.cost_price ?? null,
-            image: productThumb(p) ?? null,
-          })),
-        ),
+            image,
+          }));
+        }),
       );
     });
     loadReceipts();
