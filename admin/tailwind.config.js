@@ -20,11 +20,11 @@ export default {
         // locked coral brand) wired into Tremor's semantic tokens (light theme).
         tremor: {
           brand: {
-            faint: '#EDF3EF',
-            muted: '#C3DACB',
-            subtle: '#8CAE9B',
-            DEFAULT: '#5b8c6e',
-            emphasis: '#3F6B52',
+            faint: '#FCE7DE',
+            muted: '#F8C9B8',
+            subtle: '#F0906A',
+            DEFAULT: '#F15929',
+            emphasis: '#B83C18',
             inverted: '#ffffff',
           },
           background: {
@@ -36,8 +36,8 @@ export default {
           border: { DEFAULT: '#e8e8e8' },
           ring: { DEFAULT: '#e8e8e8' },
           content: {
-            subtle: '#a89c93',
-            DEFAULT: '#8a807a',
+            subtle: '#8A7F76',   // เดิม #a89c93 อ่อนจนอ่านไม่ผ่านเกณฑ์ — เจ้าของ: 'สีกลืนกันไปหมด'
+            DEFAULT: '#6E625C',  // เดิม #8a807a — จูนให้ตรง warmGray600 ของแอป (5.9:1)
             emphasis: '#4b443f',
             strong: '#2b2320',
             inverted: '#ffffff',

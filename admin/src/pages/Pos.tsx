@@ -711,14 +711,14 @@ export function Pos() {
                       )}
                     </div>
                   }>
-                  <div className="text-[14px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
+                  <div className="text-[15px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
                     {p.name}
                   </div>
                   <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
                     {p.subtitle ?? p.category_name ?? ''}
                   </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[16px] font-bold text-tremor-content-strong">
+                    <span className="text-[17px] font-bold text-tremor-content-strong tabular-nums">
                       {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
                     </span>
                     <Button
@@ -841,14 +841,14 @@ export function Pos() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-tremor-content-strong truncate">{l.name}</div>
-                      <div className="text-xs text-tremor-content-subtle">
+                      <div className="text-[15px] font-medium text-tremor-content-strong truncate">{l.name}</div>
+                      <div className="text-[13px] text-tremor-content">
                         {l.size ? `${l.size} · ` : ''}
                         {baht(l.unitPrice)}
                       </div>
                     </div>
                     <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
-                    <div className="w-16 text-right text-sm font-bold text-tremor-content-strong">
+                    <div className="w-[72px] text-right text-[15.5px] font-bold text-tremor-content-strong tabular-nums">
                       {baht(l.unitPrice * l.qty)}
                     </div>
                   </div>
@@ -859,7 +859,7 @@ export function Pos() {
 
           {/* totals + pay */}
           <div className="border-t border-tremor-border p-4 space-y-3">
-            <Card size="small" style={{ background: '#FAFAFA', borderColor: '#E8E8E8' }} styles={{ body: { padding: 14 } }}>
+            <Card size="small" style={{ background: '#FFF8F3', borderColor: '#F3D9CB' }} styles={{ body: { padding: 14 } }}>
               <Row label="ยอดรวม" value={baht(subtotal)} />
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
@@ -887,7 +887,7 @@ export function Pos() {
                 <Statistic
                   value={total}
                   prefix="฿"
-                  styles={{ content: { color: '#5B8C6E', fontWeight: 700, fontSize: 26, lineHeight: 1 } }}
+                  styles={{ content: { color: '#241F1B', fontWeight: 800, fontSize: 34, lineHeight: 1, fontVariantNumeric: 'tabular-nums' } }}
                 />
               </div>
             </Card>
@@ -1045,9 +1045,9 @@ export function Pos() {
 
 function Row({ label, value, subtle }: { label: string; value: string; subtle?: boolean }) {
   return (
-    <div className={`flex items-center justify-between text-sm ${subtle ? 'text-tremor-content-subtle' : 'text-tremor-content'}`}>
+    <div className={`flex items-center justify-between text-[14.5px] ${subtle ? 'text-tremor-content-subtle' : 'text-tremor-content'}`}>
       <span>{label}</span>
-      <span className={subtle ? '' : 'font-medium text-tremor-content-strong'}>{value}</span>
+      <span className={`tabular-nums ${subtle ? '' : 'font-semibold text-tremor-content-strong'}`}>{value}</span>
     </div>
   );
 }
@@ -1143,9 +1143,9 @@ function CashPay({
         ))}
       </div>
       {typeof tendered === 'number' && tendered >= total && (
-        <div className="flex items-center justify-between rounded-none bg-emerald-50 px-3 py-2 text-sm">
-          <span className="text-emerald-700">เงินทอน</span>
-          <span className="font-bold text-emerald-700">{baht(change)}</span>
+        <div className="flex items-center justify-between rounded-none bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+          <span className="text-[15px] font-semibold text-emerald-800">เงินทอน</span>
+          <span className="text-[24px] font-extrabold text-emerald-700 tabular-nums leading-none">{baht(change)}</span>
         </div>
       )}
     </div>
