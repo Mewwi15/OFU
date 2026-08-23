@@ -35,7 +35,7 @@ jobs:
           node-version: 24 # ตรงกับเครื่อง dev — npm คนละรุ่นอ่าน lockfile ไม่ตรงกัน (บทเรียนเดียวกับ eas.json)
           cache: npm
       - if: env.EXPO_TOKEN != ''
-        run: npm ci
+        run: npm install --no-audit --no-fund # ไม่ใช้ npm ci — lockfile ที่เขียนบน Mac ขาด edge ของแพ็กเกจฉบับ Linux (npm limitation) · EAS ก็ติดตั้งแบบนี้และผ่านตลอด
 
       # ข้อความ commit ส่งผ่าน env ไม่ฝังตรงใน script (กัน injection) และตัดเหลือ
       # บรรทัดแรก — ก้อนเต็มหลายบรรทัดเคยทำ eas ล้มทั้ง run (23 ส.ค.)
@@ -78,7 +78,7 @@ jobs:
           node-version: 24 # ตรงกับเครื่อง dev — npm คนละรุ่นอ่าน lockfile ไม่ตรงกัน (บทเรียนเดียวกับ eas.json)
           cache: npm
       - if: env.VERCEL_TOKEN != ''
-        run: npm ci
+        run: npm install --no-audit --no-fund # ไม่ใช้ npm ci — lockfile ที่เขียนบน Mac ขาด edge ของแพ็กเกจฉบับ Linux (npm limitation) · EAS ก็ติดตั้งแบบนี้และผ่านตลอด
       - if: env.VERCEL_TOKEN != ''
         run: ./scripts/deploy-web.sh
 
