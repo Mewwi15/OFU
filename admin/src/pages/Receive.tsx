@@ -676,7 +676,7 @@ export function parseReceiveFile(
 ): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[]; head: FileHead } {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, raw: false, defval: '' });
-  if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [] };
+  if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [], head: {} };
 
   const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
   const BARCODE_H = ['บาร์โค้ด', 'barcode', 'รหัส', 'รหัสสินค้า', 'sku', 'code'];
@@ -694,7 +694,7 @@ export function parseReceiveFile(
     }
   }
   if (headRow < 0) {
-    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }] };
+    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }], head: {} };
   }
 
   /* หัวใบเหนือหัวตาราง (เจ้าของทัก: "ผู้ขาย เลขเอกสาร ก็มีในไฟล์ ทำไมไม่ทำ"):
