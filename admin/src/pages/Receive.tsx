@@ -29,6 +29,9 @@ import {
 import * as XLSX from 'xlsx';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+dayjs.extend(customParseFormat);
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
 
@@ -73,6 +76,7 @@ export function Receive() {
     unmatchedRows: UnmatchedRow[];
   } | null>(null);
   const [creatingDrafts, setCreatingDrafts] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null); // 'เลขที่เอกสาร: ขนม' จากหัวไฟล์
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [receipts, setReceipts] = useState<GoodsReceipt[] | null>(null);
@@ -281,6 +285,7 @@ export function Receive() {
         supplier: supplier.trim() || undefined,
         doc_number: docNo.trim() || undefined,
         received_at: receivedAt.toISOString(),
+        note: importNote ?? undefined,
         items: lines.map((l) => ({
           variant_id: l.variantId,
           qty: l.qty,
@@ -294,6 +299,7 @@ export function Receive() {
       setDocNo('');
       setReceivedAt(dayjs());
       setImportReport(null);
+      setImportNote(null);
       loadReceipts();
     } catch (e) {
       message.error(apiError(e));
@@ -466,6 +472,12 @@ export function Receive() {
                     }
                     return [...map.values()];
                   });
+                  const filled: string[] = [];
+                  if (res.head.supplier && !supplier.trim()) { setSupplier(res.head.supplier); filled.push(`ผู้ขาย ${res.head.supplier}`); }
+                  if (res.head.docNumber && !docNo.trim()) { setDocNo(res.head.docNumber); filled.push(`เอกสาร ${res.head.docNumber}`); }
+                  if (res.head.docDate) { setReceivedAt(dayjs(res.head.docDate)); filled.push(`วันที่ ${dayjs(res.head.docDate).format('DD/MM/YYYY')}`); }
+                  if (res.head.refText) setImportNote(`อ้างอิง ETS: ${res.head.refText}`);
+                  if (filled.length) message.info(`ดึงหัวใบจากไฟล์: ${filled.join(' · ')}`);
                   setImportReport({ matched: res.matched, unmatchedRows: res.unmatchedRows });
                   if (res.unmatchedRows.length === 0)
                     message.success(`นำเข้า ${res.matched} รายการ ครบทุกแถว — ตรวจในตารางแล้วกดบันทึก`);
@@ -651,10 +663,17 @@ export type UnmatchedRow = {
   cost?: number;
 };
 
+export type FileHead = {
+  supplier?: string;
+  docNumber?: string;
+  refText?: string;
+  docDate?: string; // ISO
+};
+
 export function parseReceiveFile(
   wb: XLSX.WorkBook,
   items: PickItem[],
-): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[] } {
+): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[]; head: FileHead } {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, raw: false, defval: '' });
   if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [] };
@@ -676,6 +695,37 @@ export function parseReceiveFile(
   }
   if (headRow < 0) {
     return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }] };
+  }
+
+  /* หัวใบเหนือหัวตาราง (เจ้าของทัก: "ผู้ขาย เลขเอกสาร ก็มีในไฟล์ ทำไมไม่ทำ"):
+   *   ผู้ขาย : สามก.ออยล์ · เลขที่เอกสารระบบ : IN2608080001 ·
+   *   เลขที่เอกสาร : ขนม (ข้อความอ้างอิง) · วันที่เอกสาร : 2026-08-08
+   * label กับค่าอยู่คนละเซลล์ในแถวเดียวกัน — เจอ label แล้วเก็บเซลล์ถัดไปที่ไม่ว่าง */
+  const head: FileHead = {};
+  const valueAfter = (cells: (string | number)[], from: number): string => {
+    for (let j = from + 1; j < cells.length; j++) {
+      const t = String(cells[j] ?? '').trim();
+      if (t !== '') return t;
+    }
+    return '';
+  };
+  for (let r = 0; r < headRow; r++) {
+    const cells = rows[r];
+    for (let j = 0; j < cells.length; j++) {
+      const label = String(cells[j] ?? '').replace(/[:：]/g, '').trim();
+      if (label === 'ผู้ขาย' && !head.supplier) head.supplier = valueAfter(cells, j);
+      else if (label === 'เลขที่เอกสารระบบ' && !head.docNumber) head.docNumber = valueAfter(cells, j);
+      else if (label === 'เลขที่เอกสาร' && !head.refText) head.refText = valueAfter(cells, j);
+      else if ((label === 'วันที่เอกสาร' || label === 'วันที่') && !head.docDate) {
+        const raw = valueAfter(cells, j);
+        let d = dayjs(raw, ['YYYY-MM-DD', 'DD/MM/YYYY', 'D/M/YYYY'], true);
+        if (d.isValid()) {
+          // ปี พ.ศ. จากบางรายงาน → แปลงเป็น ค.ศ.
+          if (d.year() > 2400) d = d.subtract(543, 'year');
+          head.docDate = d.toISOString();
+        }
+      }
+    }
   }
 
   const byBarcode = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
@@ -762,7 +812,7 @@ export function parseReceiveFile(
       acc.set(item.variantId, { ...item, qty, unitCost: cost ?? item.cost });
     }
   }
-  return { lines: [...acc.values()], matched: acc.size, unmatchedRows };
+  return { lines: [...acc.values()], matched: acc.size, unmatchedRows, head };
 }
 
 /* ═══ พิมพ์ใบรับเข้า — iframe ซ่อน (ธรรมเนียมเดียวกับ printOrder: ไม่มีหน้าต่างเด้ง) ═══ */
