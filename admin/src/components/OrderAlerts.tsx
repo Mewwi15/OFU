@@ -23,10 +23,25 @@ import {
 /** Pages listen for this to reload their order lists. */
 export const ORDERS_CHANGED_EVT = 'ofu-orders-changed';
 
-/* Two-tone chime via WebAudio — no asset file, survives offline. Browsers gate
- * audio behind a user gesture; any click on the till unlocks it. */
-let audioCtx: AudioContext | null = null;
+/* Order alert = the owner's branded sound (public/order-alert.m4a, 23 ส.ค.),
+ * with the old synthesized two-tone kept as the fallback so an alert can never
+ * be silent — if the file fails (cold cache offline, codec quirk, autoplay
+ * gate rejecting the element) we ring the beep instead. Browsers gate audio
+ * behind a user gesture either way; any click on the till unlocks it. */
+let alertAudio: HTMLAudioElement | null = null;
 function chime() {
+  try {
+    alertAudio ??= new Audio('/order-alert.m4a');
+    alertAudio.currentTime = 0;
+    void alertAudio.play().catch(() => synthChime());
+  } catch {
+    synthChime();
+  }
+}
+
+/* Two-tone chime via WebAudio — no asset file, survives offline. */
+let audioCtx: AudioContext | null = null;
+function synthChime() {
   try {
     audioCtx ??= new AudioContext();
     if (audioCtx.state === 'suspended') void audioCtx.resume();
