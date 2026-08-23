@@ -734,28 +734,62 @@ export type PosSale = {
   cash_tendered: number | null;
   change: number | null;
   created_at: string;
+  shift_id: string | null;
+  refunded_amount: number;
+  refund_reason: string | null;
 };
-export async function listPosSales(): Promise<PosSale[]> {
-  const { data, error } = await supabase
+const POS_SALE_COLS =
+  'id, sale_number, tax_invoice_no, total, vat_amount, net_amount, discount, payment_method, status, customer_name, customer_tax_id, cash_tendered, change, created_at, shift_id, refunded_amount, refund_reason';
+/** ช่วงวันที่ (เลือกได้) + cursor โหลดย้อนหลัง — ข้อ ③ ของหน้าบิลขาย */
+export async function listPosSales(opts?: {
+  fromIso?: string;
+  toIso?: string;
+  beforeIso?: string;
+  limit?: number;
+}): Promise<PosSale[]> {
+  let q = supabase
     .from('pos_sales')
-    .select(
-      'id, sale_number, tax_invoice_no, total, vat_amount, net_amount, discount, payment_method, status, customer_name, customer_tax_id, cash_tendered, change, created_at',
-    )
+    .select(POS_SALE_COLS)
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(opts?.limit ?? 100);
+  if (opts?.fromIso) q = q.gte('created_at', opts.fromIso);
+  if (opts?.toIso) q = q.lte('created_at', opts.toIso);
+  if (opts?.beforeIso) q = q.lt('created_at', opts.beforeIso);
+  const { data, error } = await q;
   if (error) throw error;
   return data as PosSale[];
 }
-export type PosSaleItem = { id: string; product_name: string; size: string | null; unit_price: number; qty: number; line_total: number };
+export type PosSaleItem = { id: string; product_name: string; size: string | null; unit_price: number; qty: number; line_total: number; refunded_qty: number };
 export async function getPosSaleItems(saleId: string): Promise<PosSaleItem[]> {
   const { data, error } = await supabase
     .from('pos_sale_items')
-    .select('id, product_name, size, unit_price, qty, line_total')
+    .select('id, product_name, size, unit_price, qty, line_total, refunded_qty')
     .eq('sale_id', saleId);
   if (error) throw error;
   return data as PosSaleItem[];
 }
-export const refundPosSale = (saleId: string) => rpc<{ replay: boolean }>('refund_pos_sale', { p_sale_id: saleId });
+export const refundPosSale = (saleId: string, reason?: string) =>
+  rpc<{ replay: boolean }>('refund_pos_sale', { p_sale_id: saleId, p_reason: reason ?? null });
+export const refundPosSaleItems = (
+  saleId: string,
+  items: { item_id: string; qty: number }[],
+  reason: string,
+) =>
+  rpc<{ refund_amount: number; fully_refunded: boolean }>('refund_pos_sale_items', {
+    p_sale_id: saleId,
+    p_items: items,
+    p_reason: reason,
+  });
+/** รอบล่าสุด ~50 รอบ — ไว้ทำคอลัมน์ 'รอบ' และตัวกรองรอบปัจจุบัน */
+export async function listShifts(): Promise<Shift[]> {
+  const { data, error } = await supabase
+    .from('pos_shifts')
+    .select('id, opening_float, opened_at, closed_at, counted_cash, expected_cash, over_short')
+    .order('opened_at', { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []) as Shift[];
+}
 
 /* ── store credit ────────────────────────────────────────────────────────────── */
 export type Customer = { user_id: string; display_name: string | null; phone: string | null; balance: number };

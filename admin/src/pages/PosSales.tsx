@@ -1,5 +1,6 @@
 import { RiFileList3Line, RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
-import { App, Button, Card, Drawer, Input, Popconfirm, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
+import { App, Button, Card, Checkbox, DatePicker, Drawer, Input, InputNumber, Modal, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -13,6 +14,10 @@ import {
   type PosSale,
   type PosSaleItem,
   type ShopInfo,
+  getOpenShift,
+  listShifts,
+  refundPosSaleItems,
+  type Shift,
 } from '../lib/api';
 
 const { Text } = Typography;
@@ -46,20 +51,60 @@ export function PosSales() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<string>('all');
   const [pay, setPay] = useState<string>('all');
+  // ③ ช่วงวันที่ + โหลดย้อนหลังเกิน 100 บิล
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [noMore, setNoMore] = useState(false);
+  // ④ รอบ: map id → เวลาเปิดรอบ + ตัวกรองรอบปัจจุบัน
+  const [shifts, setShifts] = useState<Map<string, Shift>>(new Map());
+  const [currentShiftId, setCurrentShiftId] = useState<string | null>(null);
+  const [onlyCurrentShift, setOnlyCurrentShift] = useState(false);
+  // ①② โมดัลคืนเงิน: เลือกรายการ + จำนวน + เหตุผลบังคับ
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundPicks, setRefundPicks] = useState<Record<string, number>>({});
+  const [refundReason, setRefundReason] = useState<string | null>(null);
+  const [refundNote, setRefundNote] = useState('');
 
-  async function load() {
+  async function load(r: [Dayjs, Dayjs] | null = range) {
     setLoading(true);
+    setNoMore(false);
     try {
-      setSales(await listPosSales());
+      setSales(
+        await listPosSales(
+          r
+            ? { fromIso: r[0].startOf('day').toISOString(), toIso: r[1].endOf('day').toISOString(), limit: 500 }
+            : undefined,
+        ),
+      );
     } catch (e) {
       message.error(apiError(e));
     } finally {
       setLoading(false);
     }
   }
+
+  async function loadMore() {
+    if (!sales.length) return;
+    setLoadingMore(true);
+    try {
+      const oldest = sales[sales.length - 1].created_at;
+      const more = await listPosSales({
+        beforeIso: oldest,
+        ...(range ? { fromIso: range[0].startOf('day').toISOString() } : {}),
+      });
+      if (more.length === 0) setNoMore(true);
+      setSales((prev) => [...prev, ...more]);
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   useEffect(() => {
     void load();
     getShopInfo().then(setShop).catch(() => {});
+    listShifts().then((rows) => setShifts(new Map(rows.map((r) => [r.id, r])))).catch(() => {});
+    getOpenShift().then((sh) => setCurrentShiftId(sh?.id ?? null)).catch(() => {});
     // mount-only fetch; load isn't memoized so listing it would refetch every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -74,11 +119,38 @@ export function PosSales() {
     }
   }
 
-  async function refund(s: PosSale) {
+  const REASONS = ['สินค้าชำรุด/เสีย', 'ยิงบิลผิด', 'ลูกค้าเปลี่ยนใจ', 'อื่นๆ'];
+
+  function openRefund() {
+    // ค่าเริ่มต้น = คืนเต็มทุกรายการที่ยังเหลือ (เคสส่วนใหญ่คือคืนทั้งบิล)
+    setRefundPicks(Object.fromEntries(items.map((i) => [i.id, i.qty - i.refunded_qty])));
+    setRefundReason(null);
+    setRefundNote('');
+    setRefundOpen(true);
+  }
+
+  async function submitRefund() {
+    if (!detail || !refundReason) return;
+    const reason = refundReason === 'อื่นๆ' ? refundNote.trim() || 'อื่นๆ' : refundReason;
+    const picks = items
+      .map((i) => ({ item_id: i.id, qty: refundPicks[i.id] ?? 0, max: i.qty - i.refunded_qty }))
+      .filter((p) => p.qty > 0);
+    if (picks.length === 0) {
+      message.warning('เลือกรายการที่จะคืนอย่างน้อย 1 รายการ');
+      return;
+    }
+    const isFull = picks.length === items.filter((i) => i.qty - i.refunded_qty > 0).length
+      && picks.every((p) => p.qty === p.max);
     setRefunding(true);
     try {
-      await refundPosSale(s.id);
-      message.success(`คืนเงินบิล ${s.sale_number} แล้ว`);
+      if (isFull) {
+        await refundPosSale(detail.id, reason);
+        message.success(`คืนเงินเต็มบิล ${detail.sale_number} แล้ว`);
+      } else {
+        const r = await refundPosSaleItems(detail.id, picks.map(({ item_id, qty }) => ({ item_id, qty })), reason);
+        message.success(`คืน ${baht(r.refund_amount)} จากบิล ${detail.sale_number} แล้ว`);
+      }
+      setRefundOpen(false);
       setDetail(null);
       await load();
     } catch (e) {
@@ -106,9 +178,10 @@ export function PosSales() {
       if (pay !== 'all' && s.payment_method !== pay) return false;
       if (q && !s.sale_number.toLowerCase().includes(q) && !(s.customer_name ?? '').toLowerCase().includes(q))
         return false;
+      if (onlyCurrentShift && s.shift_id !== currentShiftId) return false;
       return true;
     });
-  }, [sales, query, status, pay]);
+  }, [sales, query, status, pay, onlyCurrentShift, currentShiftId]);
 
   const columns: ColumnsType<PosSale> = [
     {
@@ -151,21 +224,44 @@ export function PosSales() {
       align: 'right',
       sorter: (a, b) => a.total - b.total,
       render: (v: number, s) => (
-        <span className={`font-semibold ${s.status === 'refunded' ? 'text-gray-400 line-through' : 'text-[#2B2320]'}`}>
-          {baht(v)}
-        </span>
+        <div className="leading-tight">
+          <span className={`font-semibold tabular-nums ${s.status === 'refunded' ? 'text-gray-400 line-through' : 'text-[#2B2320]'}`}>
+            {baht(v)}
+          </span>
+          {s.refunded_amount > 0 && s.status !== 'refunded' ? (
+            <div className="text-xs text-red-600 tabular-nums">คืนแล้ว −{baht(s.refunded_amount)}</div>
+          ) : null}
+        </div>
       ),
+    },
+    {
+      title: 'รอบ',
+      key: 'shift',
+      width: 110,
+      render: (_, s) => {
+        if (!s.shift_id) return <span className="text-gray-300">—</span>;
+        const sh = shifts.get(s.shift_id);
+        return (
+          <span className={`text-xs ${s.shift_id === currentShiftId ? 'font-semibold text-[#B83C18]' : 'text-gray-500'}`}>
+            {sh ? dayjs(sh.opened_at).format('DD/MM HH:mm') : '…'}
+            {s.shift_id === currentShiftId ? ' (ปัจจุบัน)' : ''}
+          </span>
+        );
+      },
     },
     {
       title: 'สถานะ',
       key: 'status',
       align: 'center',
       width: 130,
-      render: (_, s) => (
-        <Tag color={STATUS[s.status]?.color} variant="filled">
-          {STATUS[s.status]?.label ?? s.status}
-        </Tag>
-      ),
+      render: (_, s) =>
+        s.refunded_amount > 0 && s.status === 'completed' ? (
+          <Tag color="warning" variant="filled">คืนบางส่วน</Tag>
+        ) : (
+          <Tag color={STATUS[s.status]?.color} variant="filled">
+            {STATUS[s.status]?.label ?? s.status}
+          </Tag>
+        ),
     },
     {
       title: 'จัดการ',
@@ -202,7 +298,7 @@ export function PosSales() {
             title="ยอดขายวันนี้"
             value={summary.todayTotal}
             prefix="฿"
-            styles={{ content: { color: '#5B8C6E', fontWeight: 700 } }}
+            styles={{ content: { color: '#241F1B', fontWeight: 700 } }}
           />
         </Card>
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
@@ -251,6 +347,21 @@ export function PosSales() {
             { value: 'refunded', label: 'คืนเงิน' },
           ]}
         />
+        <DatePicker.RangePicker
+          value={range}
+          format="DD/MM/YYYY"
+          placeholder={['จากวันที่', 'ถึงวันที่']}
+          onChange={(r) => {
+            const next = (r?.[0] && r?.[1] ? [r[0], r[1]] : null) as [Dayjs, Dayjs] | null;
+            setRange(next);
+            void load(next);
+          }}
+        />
+        {currentShiftId ? (
+          <Checkbox checked={onlyCurrentShift} onChange={(e) => setOnlyCurrentShift(e.target.checked)}>
+            เฉพาะรอบปัจจุบัน
+          </Checkbox>
+        ) : null}
       </div>
 
       <Table<PosSale>
@@ -266,6 +377,11 @@ export function PosSales() {
           emptyText: query || status !== 'all' || pay !== 'all' ? 'ไม่พบบิลที่ตรงกับตัวกรอง' : 'ยังไม่มีบิลขาย',
         }}
       />
+      <div className="flex justify-center mt-3">
+        <Button onClick={() => void loadMore()} loading={loadingMore} disabled={noMore || !sales.length}>
+          {noMore ? 'ครบทุกบิลแล้ว' : 'โหลดบิลเก่ากว่านี้'}
+        </Button>
+      </div>
 
       <Drawer
         open={!!detail}
@@ -275,17 +391,14 @@ export function PosSales() {
         styles={{ body: { background: '#FAFAFA' } }}
         extra={
           detail?.status === 'completed' ? (
-            <Popconfirm
-              title="คืนเงินบิลนี้?"
-              description="สินค้าจะถูกคืนเข้าสต็อก"
-              okText="คืนเงิน"
-              cancelText="ยกเลิก"
-              okButtonProps={{ danger: true, loading: refunding }}
-              onConfirm={() => void refund(detail)}>
-              <Button danger icon={<RiRefund2Line className="w-4 h-4" />}>
+            <div className="flex items-center gap-2">
+              {detail.refunded_amount > 0 ? (
+                <Tag color="warning" variant="filled">คืนแล้ว {baht(detail.refunded_amount)}</Tag>
+              ) : null}
+              <Button danger icon={<RiRefund2Line className="w-4 h-4" />} disabled={!items.length} onClick={openRefund}>
                 คืนเงิน
               </Button>
-            </Popconfirm>
+            </div>
           ) : detail?.status === 'refunded' ? (
             <Tag color="error" variant="filled">
               คืนเงินแล้ว
@@ -331,6 +444,72 @@ export function PosSales() {
           </div>
         )}
       </Drawer>
+
+      {/* โมดัลคืนเงิน — เลือกรายการ+จำนวน (ข้อ ①) + เหตุผลบังคับ (ข้อ ②) */}
+      <Modal
+        open={refundOpen}
+        onCancel={() => setRefundOpen(false)}
+        title={`คืนเงินบิล ${detail?.sale_number ?? ''}`}
+        okText="ยืนยันคืนเงิน"
+        cancelText="ยกเลิก"
+        okButtonProps={{ danger: true, loading: refunding, disabled: !refundReason }}
+        onOk={() => void submitRefund()}>
+        <div className="space-y-3">
+          <div>
+            <div className="text-[13px] text-gray-500 mb-1">เหตุผลการคืน (บังคับ)</div>
+            <Select
+              value={refundReason}
+              onChange={setRefundReason}
+              placeholder="เลือกเหตุผล"
+              style={{ width: '100%' }}
+              options={REASONS.map((r) => ({ value: r, label: r }))}
+            />
+            {refundReason === 'อื่นๆ' ? (
+              <Input
+                className="mt-2"
+                value={refundNote}
+                onChange={(e) => setRefundNote(e.target.value)}
+                placeholder="ระบุเหตุผล"
+                maxLength={120}
+              />
+            ) : null}
+          </div>
+          <div>
+            <div className="text-[13px] text-gray-500 mb-1">
+              รายการที่คืน (ปรับจำนวนได้ · ตั้งต้น = คืนทั้งหมดที่เหลือ)
+            </div>
+            <div className="border divide-y" style={{ borderColor: '#E8E8E8' }}>
+              {items.map((i) => {
+                const max = i.qty - i.refunded_qty;
+                if (max <= 0)
+                  return (
+                    <div key={i.id} className="flex justify-between px-3 py-2 text-gray-400 text-[13.5px]">
+                      <span className="line-through">{i.product_name}{i.size ? ` (${i.size})` : ''}</span>
+                      <span>คืนครบแล้ว</span>
+                    </div>
+                  );
+                return (
+                  <div key={i.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[14px] font-medium text-[#2B2320] truncate">
+                        {i.product_name}{i.size ? ` (${i.size})` : ''}
+                      </div>
+                      <div className="text-[12px] text-gray-500">ซื้อ {i.qty} · คืนได้อีก {max}</div>
+                    </div>
+                    <InputNumber
+                      min={0}
+                      max={max}
+                      value={refundPicks[i.id] ?? 0}
+                      onChange={(v) => setRefundPicks((prev) => ({ ...prev, [i.id]: Math.max(0, Math.min(max, Number(v) || 0)) }))}
+                      style={{ width: 80 }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }
