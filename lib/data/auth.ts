@@ -111,6 +111,55 @@ export async function completeOAuthRedirect(returnUrl: string): Promise<boolean>
  * Requires the provider to be enabled in Supabase with its keys, and the
  * redirect URL (myrnapp://auth-callback) to be allow-listed.
  */
+/**
+ * Native Google Sign-In (Android) — the OS account sheet, no browser tab, no
+ * deep link, no relaunch. This is the root fix for the login that used to
+ * crawl (and before the watchdog, hang forever): the Chrome round-trip let
+ * Android kill and cold-boot the app mid-login, and supabase-js's auth lock
+ * could wedge on the way back in. The native sheet never leaves the process.
+ *
+ * OTA-safety: this JS also ships to store builds that predate the native
+ * module (Android 1.0.1). The require is lazy and failure falls back to the
+ * browser flow, so old binaries keep their old behaviour instead of crashing.
+ *
+ * Server side: Supabase validates the idToken's audience, so the Web client id
+ * below must be listed in Supabase → Auth → Providers → Google → Client IDs.
+ * (Same trick as Apple's com.oofoo.shop.) The id itself is public by design.
+ */
+const GOOGLE_WEB_CLIENT_ID =
+  '129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com';
+
+export type GoogleNativeResult = 'success' | 'cancelled' | 'unavailable';
+
+export async function signInWithGoogleNative(): Promise<GoogleNativeResult> {
+  if (Platform.OS !== 'android') return 'unavailable';
+  let GoogleSignin: typeof import('@react-native-google-signin/google-signin').GoogleSignin;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy: module absent in pre-1.0.2 binaries
+    GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+  } catch {
+    return 'unavailable'; // old binary without the native module — caller falls back
+  }
+  try {
+    GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const res = await GoogleSignin.signIn();
+    if (res.type === 'cancelled') return 'cancelled';
+    const idToken = res.data?.idToken;
+    if (!idToken) throw new Error('NO_ID_TOKEN');
+    const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+    if (error) throw error;
+    return 'success'; // onAuthStateChange flips the gate like every other sign-in
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    // User backed out of the sheet — not an error, not a fallback trigger.
+    if (code === 'SIGN_IN_CANCELLED' || code === '12501') return 'cancelled';
+    // Genuine failure (Play Services missing, audience misconfig, network):
+    // let the caller decide; browser flow is the safety net.
+    throw e;
+  }
+}
+
 export async function signInWithOAuthProvider(provider: OAuthProvider): Promise<boolean> {
   if (Platform.OS === 'web') {
     // Full-page redirect; on return detectSessionInUrl completes the PKCE

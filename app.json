@@ -58,7 +58,9 @@
         {
           "icon": "./assets/images/notification-icon.png",
           "color": "#F15929",
-          "sounds": ["./assets/sounds/notification.wav"]
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
         }
       ],
       [
@@ -116,7 +118,17 @@
           "faceIDPermission": "ให้ อู้ฟู่ ใช้ Face ID เพื่อปลดล็อกแอป"
         }
       ],
-      "./plugins/withCleanMediaPermissions.js"
+      "./plugins/withCleanMediaPermissions.js",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

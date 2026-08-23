@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { signInWithAppleNative, signInWithOAuthProvider } from '@/lib/data/auth';
+import { signInWithAppleNative, signInWithGoogleNative, signInWithOAuthProvider } from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { PRIVACY_URL } from '@/lib/legal';
 import { startLineAuth } from '@/lib/line';
@@ -163,7 +163,11 @@ export default function LoginScreen() {
     setSocialCallbackError(null);
     setSocialBusy(true);
     try {
-      await signInWithOAuthProvider('google');
+      // Android: native sheet first (build 1.0.2+) — no browser, no deep link.
+      // 'unavailable' = old binary or non-Android → the browser flow as before.
+      const native = await signInWithGoogleNative().catch(() => 'unavailable' as const);
+      if (native === 'unavailable') await signInWithOAuthProvider('google');
+      // 'cancelled' and 'success' both just end here — the auth gate reacts.
     } catch {
       Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
     } finally {
