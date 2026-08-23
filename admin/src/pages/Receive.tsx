@@ -480,12 +480,14 @@ async function listGoodsReceiptsSafe(): Promise<GoodsReceipt[]> {
 }
 
 /* ═══ Import ไฟล์รับเข้า (จุดที่เจ้าของย้ำ: "ต้องถูกต้อง") ═══════════════════
- * รับ .csv / .xls / .xlsx — หา 3 คอลัมน์จากหัวตาราง (ไทย/อังกฤษ):
- *   บาร์โค้ด/รหัส · จำนวน · ราคา/ทุน (ไม่บังคับ)
- * กติกาความถูกต้อง (บทเรียน M4 + sync ใหญ่):
- *   1. import เข้า "ตารางร่าง" เท่านั้น — ตาต้องเห็นก่อน มือถึงกดบันทึก
- *   2. แถวที่จับคู่สินค้าไม่ได้ = รายงานเป็นรายแถวพร้อมเหตุผล ไม่หายเงียบ
- *   3. จำนวนว่าง/ศูนย์/ติดลบ = ข้ามพร้อมบอก · บาร์โค้ดซ้ำในไฟล์ = รวมจำนวนให้
+ * รับ .csv / .xls / .xlsx — รวมรายงานที่ export จาก Crystal Reports ของ ETS
+ * ซึ่งมี 2 กับดักที่เจอจากไฟล์จริง (1.xls, 23 ส.ค.):
+ *   - หัวตารางกับตัวข้อมูลอยู่คนละคอลัมน์ (เซลล์ผสานเยื้องกัน 1 ช่อง)
+ *   - หัวคอลัมน์สะกดผิดจากต้นทาง ("ราคาชื้อ")
+ * จึงไม่ยึดตำแหน่งคอลัมน์ของตัวเลขเลย: เจอรหัสสินค้าในแถวไหน → กวาดเก็บ
+ * ตัวเลขทั้งหมดหลังช่องรหัส ตามลำดับ [จำนวน, ราคา, ยอดสุทธิ] แล้ว
+ * "ตรวจทานตัวเอง": จำนวน×ราคา ต้องตรงยอดสุทธิในไฟล์ ไม่ตรง = เตือนรายแถว
+ * กติกาเดิมคงอยู่: เข้าตารางร่างเท่านั้น · แถวมีปัญหาไม่หายเงียบ (บทเรียน M4)
  */
 export function parseReceiveFile(
   wb: XLSX.WorkBook,
@@ -496,60 +498,88 @@ export function parseReceiveFile(
   if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [] };
 
   const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
-  // หาแถวหัวตาราง (ภายใน 5 แถวแรก) — ETS ชอบมีหัวกระดาษก่อนตาราง
   const BARCODE_H = ['บาร์โค้ด', 'barcode', 'รหัส', 'รหัสสินค้า', 'sku', 'code'];
   const QTY_H = ['จำนวน', 'qty', 'quantity', 'รับเข้า', 'ชิ้น'];
-  const COST_H = ['ราคา', 'ราคาซื้อ', 'ทุน', 'ต้นทุน', 'cost', 'price', 'ราคาทุน', 'ทุน/หน่วย'];
-  let headRow = -1, cBar = -1, cQty = -1, cCost = -1;
+  let headRow = -1;
+  let cBar = -1;
   for (let r = 0; r < Math.min(rows.length, 20); r++) {
     const cells = rows[r].map(norm);
     const bi = cells.findIndex((c) => BARCODE_H.includes(c));
     const qi = cells.findIndex((c) => QTY_H.includes(c));
     if (bi >= 0 && qi >= 0) {
-      headRow = r; cBar = bi; cQty = qi;
-      cCost = cells.findIndex((c) => COST_H.includes(c));
+      headRow = r;
+      cBar = bi;
       break;
     }
   }
   if (headRow < 0) {
-    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ บาร์โค้ด/รหัส และ จำนวน)' }] };
+    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }] };
   }
 
   const byBarcode = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
   const bySku = new Map(items.filter((i) => i.sku).map((i) => [(i.sku as string).toLowerCase(), i]));
+  const num = (v: unknown): number | null => {
+    const t = String(v ?? '').trim().replace(/,/g, '');
+    if (t === '') return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  };
 
   const acc = new Map<string, DraftLine>();
   const unmatchedRows: { row: number; text: string; why: string }[] = [];
   for (let r = headRow + 1; r < rows.length; r++) {
     const cells = rows[r];
-    const rawBar = String(cells[cBar] ?? '').trim();
-    if (!rawBar) continue; // แถวว่างจริง ๆ ข้ามเงียบได้
-    const rawQty = String(cells[cQty] ?? '').trim().replace(/,/g, '');
-    const qty = rawQty === '' ? NaN : Number(rawQty);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      unmatchedRows.push({ row: r + 1, text: rawBar, why: rawQty === '' ? 'จำนวนว่าง' : `จำนวนไม่ถูกต้อง (${rawQty})` });
-      continue;
+    // หาช่องรหัส: ตำแหน่งหัวตารางก่อน · เยื้องได้ ±2 ช่อง (นิสัย Crystal)
+    let barIdx = -1;
+    for (const j of [cBar, cBar - 1, cBar + 1, cBar - 2, cBar + 2]) {
+      if (j >= 0 && String(cells[j] ?? '').trim() !== '') { barIdx = j; break; }
     }
+    if (barIdx < 0) continue; // แถวคั่น/แถวว่างของรายงาน — ข้ามเงียบได้
+    const rawBar = String(cells[barIdx] ?? '').trim();
+    if (!rawBar || BARCODE_H.includes(rawBar.toLowerCase())) continue;
+
     const item = byBarcode.get(rawBar) ?? bySku.get(rawBar.toLowerCase());
     if (!item) {
-      unmatchedRows.push({ row: r + 1, text: rawBar, why: 'ไม่พบสินค้าในระบบ (บาร์โค้ด/SKU ไม่ตรง)' });
+      // แถวสรุปท้ายรายงาน (เช่น "รวม") ไม่ใช่รหัส — รายงานเฉพาะที่หน้าตาเป็นรหัสจริง
+      if (/^[0-9A-Za-z-]{3,}$/.test(rawBar)) {
+        unmatchedRows.push({ row: r + 1, text: rawBar, why: 'ไม่พบสินค้าในระบบ (บาร์โค้ด/SKU ไม่ตรง)' });
+      }
       continue;
     }
-    let cost: number | null = null;
-    if (cCost >= 0) {
-      const rawCost = String(cells[cCost] ?? '').trim().replace(/,/g, '');
-      if (rawCost !== '') {
-        const c = Number(rawCost);
-        if (Number.isFinite(c) && c >= 0) cost = c;
-        else unmatchedRows.push({ row: r + 1, text: rawBar, why: `ราคาไม่ถูกต้อง (${rawCost}) — นำเข้าเฉพาะจำนวน` });
+
+    // กวาดตัวเลขทุกช่องหลังช่องรหัส → [จำนวน, ราคา, ยอดสุทธิ]
+    const nums: number[] = [];
+    for (let j = barIdx + 1; j < cells.length; j++) {
+      const n = num(cells[j]);
+      if (n !== null) nums.push(n);
+    }
+    if (nums.length === 0) {
+      unmatchedRows.push({ row: r + 1, text: rawBar, why: 'ไม่พบตัวเลขจำนวนในแถว' });
+      continue;
+    }
+    const qty = Math.floor(nums[0]);
+    if (qty <= 0) {
+      unmatchedRows.push({ row: r + 1, text: rawBar, why: `จำนวนไม่ถูกต้อง (${nums[0]})` });
+      continue;
+    }
+    const cost = nums.length >= 2 ? nums[1] : null;
+    // ตรวจทานตัวเอง: จำนวน×ราคา ต้องตรงยอดสุทธิในไฟล์ (เผื่อเศษปัดทศนิยม)
+    if (cost != null && nums.length >= 3) {
+      const expect = qty * cost;
+      if (Math.abs(expect - nums[2]) > Math.max(0.5, expect * 0.01)) {
+        unmatchedRows.push({
+          row: r + 1,
+          text: rawBar,
+          why: `เช็คยอด: ${qty}×${cost} = ${expect.toFixed(2)} ไม่ตรงยอดในไฟล์ ${nums[2]} — นำเข้าแล้ว โปรดตรวจ`,
+        });
       }
     }
     const prev = acc.get(item.variantId);
     if (prev) {
-      prev.qty += Math.floor(qty);
+      prev.qty += qty;
       if (cost != null) prev.unitCost = cost;
     } else {
-      acc.set(item.variantId, { ...item, qty: Math.floor(qty), unitCost: cost ?? item.cost });
+      acc.set(item.variantId, { ...item, qty, unitCost: cost ?? item.cost });
     }
   }
   return { lines: [...acc.values()], matched: acc.size, unmatchedRows };
