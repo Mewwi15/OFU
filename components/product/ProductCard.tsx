@@ -13,7 +13,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { productThumb } from '@/lib/image';
@@ -70,13 +70,17 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
+    // Radius.lg + เงา: บนพื้นพีชเดิมการ์ดขาวตัดกับพื้นเองเลยไม่ต้องมีเงา —
+    // พอพื้นเป็นขาว การ์ดจมหายทั้งกริด (มุมมองเจ้าของ 23 ส.ค.: "โล้น ไม่นุ่ม")
+    // ให้เข้าชุดกับ ProductListItem ที่ใช้ Radius.lg + เงาอยู่แล้ว
+    borderRadius: Radius.lg,
+    ...Shadow.card,
   },
   image: {
     width: '100%',
     aspectRatio: 1,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
     backgroundColor: Colors.primaryTint,
   },
   imageDimmed: {
