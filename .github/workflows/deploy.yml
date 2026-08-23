@@ -40,7 +40,7 @@ jobs:
       - name: OTA runtime 1.0.2 (iOS ตอนนี้ + Android build หน้า)
         if: env.EXPO_TOKEN != ''
         run: >
-          npx eas update --branch production --platform all
+          npx eas-cli@latest update --branch production --platform all
           --message "${{ github.event.head_commit.message }}" --non-interactive
 
       # ── ชั่วคราว: Android บนสโตร์ยังเป็น 1.0.1 ─────────────────────────────
@@ -51,7 +51,7 @@ jobs:
         if: env.EXPO_TOKEN != ''
         run: |
           node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('app.json'));j.expo.version='1.0.1';fs.writeFileSync('app.json',JSON.stringify(j,null,2)+'\n')"
-          npx eas update --branch production --platform android \
+          npx eas-cli@latest update --branch production --platform android \
             --message "${{ github.event.head_commit.message }}" --non-interactive
           git checkout app.json
 
