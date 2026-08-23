@@ -499,9 +499,9 @@ export function parseReceiveFile(
   // หาแถวหัวตาราง (ภายใน 5 แถวแรก) — ETS ชอบมีหัวกระดาษก่อนตาราง
   const BARCODE_H = ['บาร์โค้ด', 'barcode', 'รหัส', 'รหัสสินค้า', 'sku', 'code'];
   const QTY_H = ['จำนวน', 'qty', 'quantity', 'รับเข้า', 'ชิ้น'];
-  const COST_H = ['ราคา', 'ทุน', 'ต้นทุน', 'cost', 'price', 'ราคาทุน', 'ทุน/หน่วย'];
+  const COST_H = ['ราคา', 'ราคาซื้อ', 'ทุน', 'ต้นทุน', 'cost', 'price', 'ราคาทุน', 'ทุน/หน่วย'];
   let headRow = -1, cBar = -1, cQty = -1, cCost = -1;
-  for (let r = 0; r < Math.min(rows.length, 6); r++) {
+  for (let r = 0; r < Math.min(rows.length, 20); r++) {
     const cells = rows[r].map(norm);
     const bi = cells.findIndex((c) => BARCODE_H.includes(c));
     const qi = cells.findIndex((c) => QTY_H.includes(c));
