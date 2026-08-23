@@ -9,21 +9,25 @@
  * ครึ่งล่าง: ประวัติใบรับเข้า กดขยายดูรายบรรทัด
  */
 
-import { RiAddLine, RiDeleteBin6Line } from '@remixicon/react';
+import { RiAddLine, RiDeleteBin6Line, RiFileExcel2Line, RiPrinterLine } from '@remixicon/react';
 import {
+  Alert,
   AutoComplete,
   Button,
   Card,
+  DatePicker,
   Empty,
   Input,
   InputNumber,
   Table,
   Tag,
   Typography,
+  Upload,
   message,
 } from 'antd';
+import * as XLSX from 'xlsx';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
 
@@ -56,6 +60,13 @@ export function Receive() {
   const [items, setItems] = useState<PickItem[]>([]);
   const [supplier, setSupplier] = useState('');
   const [docNo, setDocNo] = useState('');
+  // วันที่รับจริง — ย้อนหลังได้ (เคสคีย์ตามหลัง เช่นใบค้างจาก ETS)
+  const [receivedAt, setReceivedAt] = useState<Dayjs>(dayjs());
+  // ผลการ import ไฟล์: แถวที่จับคู่ไม่ได้ต้องเห็นตรง ๆ ห้ามหายเงียบ (บทเรียน M4)
+  const [importReport, setImportReport] = useState<{
+    matched: number;
+    unmatchedRows: { row: number; text: string; why: string }[];
+  } | null>(null);
   const [lines, setLines] = useState<DraftLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [receipts, setReceipts] = useState<GoodsReceipt[] | null>(null);
@@ -146,6 +157,7 @@ export function Receive() {
       const res = await createGoodsReceipt({
         supplier: supplier.trim() || undefined,
         doc_number: docNo.trim() || undefined,
+        received_at: receivedAt.toISOString(),
         items: lines.map((l) => ({
           variant_id: l.variantId,
           qty: l.qty,
@@ -153,9 +165,16 @@ export function Receive() {
         })),
       });
       message.success(`บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
+      printReceiptSheet(
+        { receipt_number: res.receipt_number, supplier: supplier.trim(), doc_number: docNo.trim(), received_at: receivedAt.toISOString() },
+        lines,
+        true, // ถามก่อนพิมพ์ผ่าน dialog ของเบราว์เซอร์เอง — กดยกเลิกได้
+      );
       setLines([]);
       setSupplier('');
       setDocNo('');
+      setReceivedAt(dayjs());
+      setImportReport(null);
       loadReceipts();
     } catch (e) {
       message.error(apiError(e));
@@ -227,17 +246,44 @@ export function Receive() {
 
   const historyCols: ColumnsType<GoodsReceipt> = [
     { title: 'เลขที่ใบ', dataIndex: 'receipt_number', width: 140, render: (v) => <span className="font-mono">{v}</span> },
-    { title: 'วันที่', dataIndex: 'created_at', width: 150, render: (v) => dayjs(v).format('DD/MM/YYYY HH:mm') },
+    { title: 'วันที่รับ', dataIndex: 'received_at', width: 130, render: (v, r) => dayjs(v ?? r.created_at).format('DD/MM/YYYY') },
     { title: 'ผู้ขาย', dataIndex: 'supplier', render: (v) => v ?? <Typography.Text type="secondary">—</Typography.Text> },
     { title: 'เลขเอกสาร', dataIndex: 'doc_number', width: 140, render: (v) => v ?? '—' },
     { title: 'รายการ', dataIndex: 'line_count', width: 90, align: 'right' },
     { title: 'ทุนรวม', dataIndex: 'total_cost', width: 120, align: 'right', render: (v) => (v > 0 ? baht(v) : '—') },
+    {
+      title: '',
+      width: 56,
+      render: (_, r) => (
+        <Button
+          size="small"
+          icon={<RiPrinterLine className="w-4 h-4" />}
+          title="พิมพ์ใบนี้"
+          onClick={async (e) => {
+            e.stopPropagation();
+            const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
+            if (!lineCache[r.id]) setLineCache((prev) => ({ ...prev, [r.id]: ls }));
+            printReceiptSheet(
+              { receipt_number: r.receipt_number, supplier: r.supplier, doc_number: r.doc_number, received_at: r.received_at ?? r.created_at },
+              ls.map((l) => ({ productName: l.product_name, size: l.size, barcode: l.barcode, qty: l.qty, unitCost: l.unit_cost })),
+            );
+          }}
+        />
+      ),
+    },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <Card title="สร้างใบรับเข้าสินค้า" size="small">
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3 items-center">
+          <DatePicker
+            value={receivedAt}
+            onChange={(d) => d && setReceivedAt(d)}
+            format="DD/MM/YYYY"
+            allowClear={false}
+            disabledDate={(d) => d.isAfter(dayjs().endOf('day')) || d.isBefore(dayjs().subtract(1, 'year'))}
+          />
           <AutoComplete
             options={supplierOptions}
             value={supplier}
@@ -254,7 +300,69 @@ export function Receive() {
             placeholder="เลขที่เอกสาร (ถ้ามี)"
             style={{ width: 200 }}
           />
+          <Upload
+            accept=".csv,.xls,.xlsx"
+            showUploadList={false}
+            beforeUpload={(file) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                try {
+                  const wb = XLSX.read(reader.result, { type: 'array' });
+                  const res = parseReceiveFile(wb, items);
+                  if (res.lines.length === 0 && res.unmatchedRows.length === 0) {
+                    message.warning('ไฟล์ว่าง หรืออ่านไม่ได้');
+                    return;
+                  }
+                  // เข้า "ตารางร่าง" ให้ตาเห็นก่อนเสมอ — ไม่บันทึกอัตโนมัติ
+                  setLines((prev) => {
+                    const map = new Map(prev.map((l) => [l.variantId, { ...l }]));
+                    for (const nl of res.lines) {
+                      const ex = map.get(nl.variantId);
+                      if (ex) {
+                        ex.qty += nl.qty;
+                        if (nl.unitCost != null) ex.unitCost = nl.unitCost;
+                      } else map.set(nl.variantId, nl);
+                    }
+                    return [...map.values()];
+                  });
+                  setImportReport({ matched: res.matched, unmatchedRows: res.unmatchedRows });
+                  if (res.unmatchedRows.length === 0)
+                    message.success(`นำเข้า ${res.matched} รายการ ครบทุกแถว — ตรวจในตารางแล้วกดบันทึก`);
+                } catch {
+                  message.error('อ่านไฟล์ไม่สำเร็จ — เช็คว่าเป็น .csv/.xls/.xlsx');
+                }
+              };
+              reader.readAsArrayBuffer(file);
+              return false; // ไม่อัปโหลดไปไหน อ่านในเครื่องเท่านั้น
+            }}>
+            <Button icon={<RiFileExcel2Line className="w-4 h-4" />}>นำเข้าไฟล์</Button>
+          </Upload>
         </div>
+        {importReport ? (
+          <Alert
+            className="mb-3"
+            type={importReport.unmatchedRows.length ? 'warning' : 'success'}
+            showIcon
+            closable
+            onClose={() => setImportReport(null)}
+            message={
+              importReport.unmatchedRows.length
+                ? `นำเข้าได้ ${importReport.matched} รายการ · ไม่ได้ ${importReport.unmatchedRows.length} แถว (ไม่ถูกนำเข้า — ดูรายการด้านล่าง)`
+                : `นำเข้าครบ ${importReport.matched} รายการ`
+            }
+            description={
+              importReport.unmatchedRows.length ? (
+                <div className="max-h-40 overflow-y-auto text-[13px]">
+                  {importReport.unmatchedRows.map((u) => (
+                    <div key={`${u.row}-${u.text}`}>
+                      แถว {u.row} · <span className="font-mono">{u.text}</span> — {u.why}
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            }
+          />
+        ) : null}
 
         <Input
           ref={searchRef}
@@ -295,10 +403,17 @@ export function Receive() {
               size="small"
             />
             <div className="flex items-center justify-between mt-3">
-              <Typography.Text type="secondary">
-                {lines.length} รายการ · {lines.reduce((s, l) => s + l.qty, 0)} ชิ้น
-                {total > 0 ? ` · ทุนรวม ${baht(total)}` : ''}
-              </Typography.Text>
+              <div className="flex items-baseline gap-4">
+                <span className="text-[15px]">
+                  จำนวนรวม <b className="tabular-nums text-[19px]">{lines.reduce((s, l) => s + l.qty, 0)}</b> ชิ้น
+                  <span className="text-gray-400"> · {lines.length} รายการ</span>
+                </span>
+                {total > 0 ? (
+                  <span className="text-[15px]">
+                    เงินรวม <b className="tabular-nums text-[19px]">{baht(total)}</b>
+                  </span>
+                ) : null}
+              </div>
               <Button type="primary" size="large" loading={saving} onClick={() => void save()}>
                 บันทึกรับเข้า
               </Button>
@@ -362,4 +477,125 @@ async function listGoodsReceiptsSafe(): Promise<GoodsReceipt[]> {
   } catch {
     return [];
   }
+}
+
+/* ═══ Import ไฟล์รับเข้า (จุดที่เจ้าของย้ำ: "ต้องถูกต้อง") ═══════════════════
+ * รับ .csv / .xls / .xlsx — หา 3 คอลัมน์จากหัวตาราง (ไทย/อังกฤษ):
+ *   บาร์โค้ด/รหัส · จำนวน · ราคา/ทุน (ไม่บังคับ)
+ * กติกาความถูกต้อง (บทเรียน M4 + sync ใหญ่):
+ *   1. import เข้า "ตารางร่าง" เท่านั้น — ตาต้องเห็นก่อน มือถึงกดบันทึก
+ *   2. แถวที่จับคู่สินค้าไม่ได้ = รายงานเป็นรายแถวพร้อมเหตุผล ไม่หายเงียบ
+ *   3. จำนวนว่าง/ศูนย์/ติดลบ = ข้ามพร้อมบอก · บาร์โค้ดซ้ำในไฟล์ = รวมจำนวนให้
+ */
+export function parseReceiveFile(
+  wb: XLSX.WorkBook,
+  items: PickItem[],
+): { lines: DraftLine[]; matched: number; unmatchedRows: { row: number; text: string; why: string }[] } {
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, raw: false, defval: '' });
+  if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [] };
+
+  const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
+  // หาแถวหัวตาราง (ภายใน 5 แถวแรก) — ETS ชอบมีหัวกระดาษก่อนตาราง
+  const BARCODE_H = ['บาร์โค้ด', 'barcode', 'รหัส', 'รหัสสินค้า', 'sku', 'code'];
+  const QTY_H = ['จำนวน', 'qty', 'quantity', 'รับเข้า', 'ชิ้น'];
+  const COST_H = ['ราคา', 'ทุน', 'ต้นทุน', 'cost', 'price', 'ราคาทุน', 'ทุน/หน่วย'];
+  let headRow = -1, cBar = -1, cQty = -1, cCost = -1;
+  for (let r = 0; r < Math.min(rows.length, 6); r++) {
+    const cells = rows[r].map(norm);
+    const bi = cells.findIndex((c) => BARCODE_H.includes(c));
+    const qi = cells.findIndex((c) => QTY_H.includes(c));
+    if (bi >= 0 && qi >= 0) {
+      headRow = r; cBar = bi; cQty = qi;
+      cCost = cells.findIndex((c) => COST_H.includes(c));
+      break;
+    }
+  }
+  if (headRow < 0) {
+    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ บาร์โค้ด/รหัส และ จำนวน)' }] };
+  }
+
+  const byBarcode = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
+  const bySku = new Map(items.filter((i) => i.sku).map((i) => [(i.sku as string).toLowerCase(), i]));
+
+  const acc = new Map<string, DraftLine>();
+  const unmatchedRows: { row: number; text: string; why: string }[] = [];
+  for (let r = headRow + 1; r < rows.length; r++) {
+    const cells = rows[r];
+    const rawBar = String(cells[cBar] ?? '').trim();
+    if (!rawBar) continue; // แถวว่างจริง ๆ ข้ามเงียบได้
+    const rawQty = String(cells[cQty] ?? '').trim().replace(/,/g, '');
+    const qty = rawQty === '' ? NaN : Number(rawQty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      unmatchedRows.push({ row: r + 1, text: rawBar, why: rawQty === '' ? 'จำนวนว่าง' : `จำนวนไม่ถูกต้อง (${rawQty})` });
+      continue;
+    }
+    const item = byBarcode.get(rawBar) ?? bySku.get(rawBar.toLowerCase());
+    if (!item) {
+      unmatchedRows.push({ row: r + 1, text: rawBar, why: 'ไม่พบสินค้าในระบบ (บาร์โค้ด/SKU ไม่ตรง)' });
+      continue;
+    }
+    let cost: number | null = null;
+    if (cCost >= 0) {
+      const rawCost = String(cells[cCost] ?? '').trim().replace(/,/g, '');
+      if (rawCost !== '') {
+        const c = Number(rawCost);
+        if (Number.isFinite(c) && c >= 0) cost = c;
+        else unmatchedRows.push({ row: r + 1, text: rawBar, why: `ราคาไม่ถูกต้อง (${rawCost}) — นำเข้าเฉพาะจำนวน` });
+      }
+    }
+    const prev = acc.get(item.variantId);
+    if (prev) {
+      prev.qty += Math.floor(qty);
+      if (cost != null) prev.unitCost = cost;
+    } else {
+      acc.set(item.variantId, { ...item, qty: Math.floor(qty), unitCost: cost ?? item.cost });
+    }
+  }
+  return { lines: [...acc.values()], matched: acc.size, unmatchedRows };
+}
+
+/* ═══ พิมพ์ใบรับเข้า — iframe ซ่อน (ธรรมเนียมเดียวกับ printOrder: ไม่มีหน้าต่างเด้ง) ═══ */
+const esc = (v: string | null | undefined) =>
+  (v ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+export function printReceiptSheet(
+  head: { receipt_number: string; supplier?: string | null; doc_number?: string | null; received_at: string },
+  lines: { productName: string; size: string | null; barcode: string | null; qty: number; unitCost: number | null }[],
+  _viaDialog = false,
+) {
+  const money = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
+  const total = lines.reduce((s, l) => s + (l.unitCost ?? 0) * l.qty, 0);
+  const pieces = lines.reduce((s, l) => s + l.qty, 0);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>
+    body{font-family:'Noto Sans Thai',Sarabun,sans-serif;font-size:13px;color:#111;margin:24px}
+    h1{font-size:18px;margin:0 0 2px} .m{color:#555;margin:0 0 14px}
+    table{width:100%;border-collapse:collapse}
+    th{font-size:11px;text-align:left;border-bottom:2px solid #111;padding:4px 6px}
+    td{border-bottom:1px solid #ddd;padding:4px 6px}
+    .r{text-align:right;font-variant-numeric:tabular-nums}
+    tfoot td{border:0;font-weight:700;padding-top:10px}
+  </style></head><body>
+    <h1>ใบรับเข้าสินค้า ${esc(head.receipt_number)}</h1>
+    <p class="m">วันที่รับ ${dayjs(head.received_at).format('DD/MM/YYYY')}${head.supplier ? ` · ผู้ขาย ${esc(head.supplier)}` : ''}${head.doc_number ? ` · เอกสาร ${esc(head.doc_number)}` : ''}</p>
+    <table>
+      <thead><tr><th>บาร์โค้ด</th><th>สินค้า</th><th class="r">จำนวน</th><th class="r">ทุน/หน่วย</th><th class="r">รวม</th></tr></thead>
+      <tbody>${lines.map((l) => `<tr>
+        <td>${esc(l.barcode ?? '-')}</td>
+        <td>${esc(l.productName)}${l.size ? ` (${esc(l.size)})` : ''}</td>
+        <td class="r">${l.qty}</td>
+        <td class="r">${l.unitCost != null ? money(l.unitCost) : '-'}</td>
+        <td class="r">${l.unitCost != null ? money(l.unitCost * l.qty) : '-'}</td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="2">รวม ${lines.length} รายการ</td><td class="r">${pieces} ชิ้น</td><td></td><td class="r">${money(total)}</td></tr></tfoot>
+    </table>
+  </body></html>`;
+  const frame = document.createElement('iframe');
+  frame.style.display = 'none';
+  document.body.appendChild(frame);
+  frame.srcdoc = html;
+  frame.onload = () => {
+    frame.contentWindow?.print();
+    setTimeout(() => frame.remove(), 60_000);
+  };
 }

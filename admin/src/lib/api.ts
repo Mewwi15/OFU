@@ -859,6 +859,7 @@ export async function listStockMovements(
 export type GoodsReceipt = {
   id: string;
   receipt_number: string;
+  received_at: string;
   supplier: string | null;
   doc_number: string | null;
   note: string | null;
@@ -877,17 +878,25 @@ export type GoodsReceiptInput = {
   supplier?: string;
   doc_number?: string;
   note?: string;
+  /** วันที่รับของจริง (ย้อนหลังได้ ≤ 1 ปี) — ไม่ส่ง = ตอนนี้ */
+  received_at?: string;
   items: { variant_id: string; qty: number; unit_cost?: number }[];
 };
 export const createGoodsReceipt = (p: GoodsReceiptInput) =>
   rpc<{ id: string; receipt_number: string; total_cost: number; line_count: number }>(
     'create_goods_receipt',
-    { p_supplier: p.supplier ?? null, p_doc_number: p.doc_number ?? null, p_note: p.note ?? null, p_items: p.items },
+    {
+      p_supplier: p.supplier ?? null,
+      p_doc_number: p.doc_number ?? null,
+      p_note: p.note ?? null,
+      p_items: p.items,
+      p_received_at: p.received_at ?? null,
+    },
   );
 export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   const { data, error } = await supabase
     .from('goods_receipts')
-    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at')
+    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at, received_at')
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;
