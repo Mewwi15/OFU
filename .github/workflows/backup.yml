@@ -26,7 +26,13 @@ jobs:
       - name: pg_dump + เข้ารหัส
         if: env.DB_URL != '' && env.PASS != ''
         run: |
-          sudo apt-get -qq update && sudo apt-get -qq install -y postgresql-client >/dev/null
+          # ต้องใช้ pg_dump รุ่น >= ของเซิร์ฟเวอร์ (Supabase = PG17, เครื่อง GitHub มากับ 16)
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get -qq update && sudo apt-get -qq install -y postgresql-client-17 >/dev/null
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          pg_dump --version
           STAMP=$(TZ=Asia/Bangkok date +%Y%m%d-%H%M)
           # custom format (-Fc): บีบอัดในตัว + pg_restore เลือกกู้บางตารางได้
           pg_dump "$DB_URL" -Fc --no-owner --no-privileges -f "ofu-$STAMP.dump"
