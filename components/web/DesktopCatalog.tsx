@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Text } from '@/components/ui/text';
@@ -32,6 +32,9 @@ type Props = {
 };
 
 export function DesktopCatalog({ initialCategory, initialQuery }: Props) {
+  // จอแคบ (900–1119): sidebar หดเหลือ 224 + สินค้า 2 คอลัมน์ · กว้างกว่านั้น 3 คอลัมน์
+  const { width } = useWindowDimensions();
+  const narrow = width < 1120;
   const t = useT();
   const router = useRouter();
 
@@ -92,7 +95,7 @@ export function DesktopCatalog({ initialCategory, initialQuery }: Props) {
 
         <View style={styles.body}>
           {/* Sidebar */}
-          <View style={styles.sidebar}>
+          <View style={[styles.sidebar, narrow && styles.sidebarNarrow]}>
             <View style={styles.filterCard}>
               <Text style={styles.filterTitle}>{t('site.categories')}</Text>
               {cats.map((c) => {
@@ -168,7 +171,7 @@ export function DesktopCatalog({ initialCategory, initialQuery }: Props) {
             ) : (
               <View style={styles.grid}>
                 {shown.map((p) => (
-                  <DesktopProductCard key={p.id} product={p} style={styles.gridCard3} />
+                  <DesktopProductCard key={p.id} product={p} style={narrow ? styles.gridCard2 : styles.gridCard3} />
                 ))}
               </View>
             )}
@@ -187,7 +190,7 @@ const styles = StyleSheet.create({
   },
   inner: {
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: 1320,
     alignSelf: 'center',
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
@@ -222,6 +225,9 @@ const styles = StyleSheet.create({
   },
 
   /* Sidebar */
+  sidebarNarrow: {
+    width: 224,
+  },
   sidebar: {
     width: 260,
     gap: Spacing.lg,
@@ -337,6 +343,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.lg,
+  },
+  gridCard2: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    maxWidth: '49%',
   },
   gridCard3: {
     flexGrow: 1,

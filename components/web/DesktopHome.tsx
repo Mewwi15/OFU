@@ -7,7 +7,7 @@
 
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -23,6 +23,9 @@ import { useCatalog } from '@/store/catalog';
 const FALLBACK_HERO = require('@/assets/images/braner.jpg');
 
 export function DesktopHome() {
+  // 900–1149 = 3 คอลัมน์ (การ์ดไม่เบียด) · ≥1150 = 4 คอลัมน์เดิม
+  const { width } = useWindowDimensions();
+  const cardStyle = width < 1150 ? styles.gridCard3 : styles.gridCard4;
   const t = useT();
   const router = useRouter();
 
@@ -82,7 +85,7 @@ export function DesktopHome() {
         </View>
         <View style={styles.grid}>
           {best.map((p) => (
-            <DesktopProductCard key={p.id} product={p} style={styles.gridCard4} />
+            <DesktopProductCard key={p.id} product={p} style={cardStyle} />
           ))}
         </View>
 
@@ -95,7 +98,7 @@ export function DesktopHome() {
         </View>
         <View style={styles.grid}>
           {products.slice(0, 8).map((p) => (
-            <DesktopProductCard key={p.id} product={p} style={styles.gridCard4} />
+            <DesktopProductCard key={p.id} product={p} style={cardStyle} />
           ))}
         </View>
       </View>
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
   },
   inner: {
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: 1320,
     alignSelf: 'center',
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
@@ -166,6 +169,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.lg,
+  },
+  gridCard3: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    maxWidth: '32%',
   },
   gridCard4: {
     flexGrow: 1,

@@ -12,8 +12,15 @@ import { Platform, useWindowDimensions } from 'react-native';
 /** Max width of the app column on web (phone-sized, matches SiteShell). */
 export const WEB_FRAME_MAX = 480;
 
-/** Viewport width where the web switches to the full desktop storefront. */
-export const DESKTOP_BREAK = 1024;
+/**
+ * Viewport width where the web switches to the full desktop storefront.
+ *
+ * 900, not 1024: macOS windows are rarely maximized (Chrome opens ~1050px,
+ * Safari with its sidebar or Split View drops well under 1024), so the old
+ * 1024 cliff put most Mac visitors in the 480px phone-strip band — the
+ * owner's long-standing "responsive on Mac is broken" report (23 ส.ค.).
+ */
+export const DESKTOP_BREAK = 900;
 
 export function useAppWidth(): number {
   const { width } = useWindowDimensions();

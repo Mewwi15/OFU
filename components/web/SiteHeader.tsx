@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   inner: {
     width: '100%',
-    maxWidth: 1200,
+    maxWidth: 1320,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
