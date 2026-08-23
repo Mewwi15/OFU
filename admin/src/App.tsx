@@ -20,6 +20,7 @@ import { Pos } from './pages/Pos';
 import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Receive } from './pages/Receive';
+import { Shift } from './pages/Shift';
 import { Promotions } from './pages/Promotions';
 import { Reports } from './pages/Reports';
 import { Stock } from './pages/Stock';
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/pos-sales" element={<PosSales />} />
           <Route path="/stock" element={<Stock />} />
           <Route path="/receive" element={<Receive />} />
+          <Route path="/shift" element={<Shift />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
