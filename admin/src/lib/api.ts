@@ -860,6 +860,7 @@ export type GoodsReceipt = {
   id: string;
   receipt_number: string;
   received_at: string;
+  voided_at: string | null;
   supplier: string | null;
   doc_number: string | null;
   note: string | null;
@@ -896,12 +897,17 @@ export const createGoodsReceipt = (p: GoodsReceiptInput) =>
 export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   const { data, error } = await supabase
     .from('goods_receipts')
-    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at, received_at')
+    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at, received_at, voided_at')
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;
   return (data ?? []) as GoodsReceipt[];
 }
+export const voidGoodsReceipt = (receiptId: string, reason?: string) =>
+  rpc<{ receipt_number: string; replay: boolean }>('void_goods_receipt', {
+    p_receipt_id: receiptId,
+    p_reason: reason ?? null,
+  });
 export const getGoodsReceiptLines = (receiptId: string) =>
   rpc<GoodsReceiptLine[]>('get_goods_receipt_lines', { p_receipt_id: receiptId });
 

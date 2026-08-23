@@ -9,10 +9,11 @@
  * ครึ่งล่าง: ประวัติใบรับเข้า กดขยายดูรายบรรทัด
  */
 
-import { RiAddLine, RiDeleteBin6Line, RiFileExcel2Line, RiPrinterLine } from '@remixicon/react';
+import { RiAddLine, RiDeleteBin6Line, RiEditLine, RiFileExcel2Line, RiPrinterLine } from '@remixicon/react';
 import {
   Alert,
   AutoComplete,
+  Modal,
   Button,
   Card,
   DatePicker,
@@ -36,6 +37,7 @@ import {
   createGoodsReceipt,
   getGoodsReceiptLines,
   invalidateProductsCache,
+  voidGoodsReceipt,
   listProducts,
   upsertProduct,
   upsertVariant,
@@ -157,6 +159,44 @@ export function Receive() {
     );
   };
 
+  /* "ลบ" = ยกเลิกใบ (void): ถอนสต๊อกคืน + ใบติดป้ายยกเลิก ดูย้อนหลังได้
+   * "แก้ไข" = ยกเลิกใบเดิม แล้วดึงทุกบรรทัดกลับเข้าฟอร์ม แก้เสร็จบันทึกเป็นใบใหม่ */
+  const doVoid = (r: GoodsReceipt, thenEdit: boolean) => {
+    Modal.confirm({
+      title: thenEdit ? `แก้ไขใบ ${r.receipt_number}?` : `ยกเลิกใบ ${r.receipt_number}?`,
+      content: thenEdit
+        ? 'ใบเดิมจะถูกยกเลิก (สต๊อกถอนคืน) แล้วดึงรายการกลับมาแก้ในฟอร์ม — บันทึกใหม่ได้เลขใบใหม่'
+        : 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
+      okText: thenEdit ? 'ยกเลิกใบเดิมและแก้ไข' : 'ยกเลิกใบ',
+      okButtonProps: { danger: true },
+      cancelText: 'ไม่ทำ',
+      onOk: async () => {
+        try {
+          const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
+          await voidGoodsReceipt(r.id, thenEdit ? 'แก้ไขใบ' : undefined);
+          message.success(`ยกเลิกใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
+          if (thenEdit) {
+            // จับคู่บรรทัดเดิมกลับเป็นรายการในฟอร์มผ่านบาร์โค้ด
+            const byBc = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
+            setLines(
+              ls.flatMap((l) => {
+                const it = l.barcode ? byBc.get(l.barcode) : undefined;
+                return it ? [{ ...it, qty: l.qty, unitCost: l.unit_cost }] : [];
+              }),
+            );
+            setSupplier(r.supplier ?? '');
+            setDocNo(r.doc_number ?? '');
+            setReceivedAt(dayjs(r.received_at ?? r.created_at));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          loadReceipts();
+        } catch (e) {
+          message.error(apiError(e));
+        }
+      },
+    });
+  };
+
   const loadReceipts = useCallback(() => {
     listGoodsReceiptsSafe().then(setReceipts);
   }, []);
@@ -248,11 +288,7 @@ export function Receive() {
         })),
       });
       message.success(`บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
-      printReceiptSheet(
-        { receipt_number: res.receipt_number, supplier: supplier.trim(), doc_number: docNo.trim(), received_at: receivedAt.toISOString() },
-        lines,
-        true, // ถามก่อนพิมพ์ผ่าน dialog ของเบราว์เซอร์เอง — กดยกเลิกได้
-      );
+      // ไม่พิมพ์อัตโนมัติ (เจ้าของสั่ง 23 ส.ค.) — ปุ่มพิมพ์อยู่ในประวัติเมื่อต้องการ
       setLines([]);
       setSupplier('');
       setDocNo('');
@@ -328,7 +364,11 @@ export function Receive() {
   ];
 
   const historyCols: ColumnsType<GoodsReceipt> = [
-    { title: 'เลขที่ใบ', dataIndex: 'receipt_number', width: 140, render: (v) => <span className="font-mono">{v}</span> },
+    { title: 'เลขที่ใบ', dataIndex: 'receipt_number', width: 150, render: (v, r) => (
+        <span className={`font-mono ${r.voided_at ? 'line-through text-gray-400' : ''}`}>
+          {v}{r.voided_at ? <Tag className="ml-1" color="default">ยกเลิก</Tag> : null}
+        </span>
+      ) },
     { title: 'วันที่รับ', dataIndex: 'received_at', width: 130, render: (v, r) => dayjs(v ?? r.created_at).format('DD/MM/YYYY') },
     { title: 'ผู้ขาย', dataIndex: 'supplier', render: (v) => v ?? <Typography.Text type="secondary">—</Typography.Text> },
     { title: 'เลขเอกสาร', dataIndex: 'doc_number', width: 140, render: (v) => v ?? '—' },
@@ -336,22 +376,40 @@ export function Receive() {
     { title: 'ทุนรวม', dataIndex: 'total_cost', width: 120, align: 'right', render: (v) => (v > 0 ? baht(v) : '—') },
     {
       title: '',
-      width: 56,
+      width: 132,
       render: (_, r) => (
-        <Button
-          size="small"
-          icon={<RiPrinterLine className="w-4 h-4" />}
-          title="พิมพ์ใบนี้"
-          onClick={async (e) => {
-            e.stopPropagation();
-            const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
-            if (!lineCache[r.id]) setLineCache((prev) => ({ ...prev, [r.id]: ls }));
-            printReceiptSheet(
-              { receipt_number: r.receipt_number, supplier: r.supplier, doc_number: r.doc_number, received_at: r.received_at ?? r.created_at },
-              ls.map((l) => ({ productName: l.product_name, size: l.size, barcode: l.barcode, qty: l.qty, unitCost: l.unit_cost })),
-            );
-          }}
-        />
+        <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="small"
+            icon={<RiPrinterLine className="w-4 h-4" />}
+            title="พิมพ์ใบนี้"
+            onClick={async () => {
+              const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
+              if (!lineCache[r.id]) setLineCache((prev) => ({ ...prev, [r.id]: ls }));
+              printReceiptSheet(
+                { receipt_number: r.receipt_number, supplier: r.supplier, doc_number: r.doc_number, received_at: r.received_at ?? r.created_at },
+                ls.map((l) => ({ productName: l.product_name, size: l.size, barcode: l.barcode, qty: l.qty, unitCost: l.unit_cost })),
+              );
+            }}
+          />
+          {!r.voided_at ? (
+            <>
+              <Button
+                size="small"
+                icon={<RiEditLine className="w-4 h-4" />}
+                title="แก้ไข (ยกเลิกใบเดิม ดึงกลับมาแก้)"
+                onClick={() => doVoid(r, true)}
+              />
+              <Button
+                size="small"
+                danger
+                icon={<RiDeleteBin6Line className="w-4 h-4" />}
+                title="ยกเลิกใบ (ถอนสต๊อกคืน)"
+                onClick={() => doVoid(r, false)}
+              />
+            </>
+          ) : null}
+        </div>
       ),
     },
   ];
