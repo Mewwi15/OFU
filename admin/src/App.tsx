@@ -7,6 +7,7 @@ import { Layout } from './components/Layout';
 import { installFlightRecorder, recordNav } from './lib/flightRecorder';
 import { installScannerGuard } from './lib/scannerGuard';
 import { AuditLog } from './pages/AuditLog';
+import { Deploys } from './pages/Deploys';
 import { Banners } from './pages/Banners';
 import { Broadcast } from './pages/Broadcast';
 import { Categories } from './pages/Categories';
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/deploys" element={<Deploys />} />
           <Route path="/scan-lab" element={<ScanLab />} />
         </Route>
         <Route path="*" element={<Navigate to="/pos" replace />} />
