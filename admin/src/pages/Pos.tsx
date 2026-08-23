@@ -12,13 +12,15 @@ import {
   RiShoppingBasket2Line,
   RiSubtractLine,
 } from '@remixicon/react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 
 import {
   apiError,
   createPosSale,
+  getOpenShift,
   getShopInfo,
+  openShift,
   listCategories,
   listPosCatalog,
   type Category,
@@ -70,6 +72,8 @@ type Line = {
   size: string | null;
   unitPrice: number;
   qty: number;
+  /** ส่วนลดของรายการนี้ (บาท ทั้งบรรทัด) — หลังบ้านรองรับมาแต่แรก (line_discount) */
+  lineDiscount: number;
   image: string | undefined;
 };
 type PayMethod = 'cash' | 'promptpay';
@@ -134,6 +138,13 @@ export function Pos() {
 
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState(0);
+  const [discountEditing, setDiscountEditing] = useState<string | null>(null);
+  const setLineDiscount = (variantId: string, amount: number) =>
+    setLines((prev) =>
+      prev.map((l) =>
+        l.variantId === variantId ? { ...l, lineDiscount: Math.min(amount, l.unitPrice * l.qty) } : l,
+      ),
+    );
   const [method, setMethod] = useState<PayMethod>('cash');
   const [tendered, setTendered] = useState<number | ''>('');
   const [taxInvoice, setTaxInvoice] = useState(false);
@@ -148,6 +159,23 @@ export function Pos() {
   const [failedSales, setFailedSales] = useState<FailedSale[]>([]); // synced failed for a real reason — needs manual review
   const [failedOpen, setFailedOpen] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null); // client_op_id currently retrying
+  // ── ด่านเปิดรอบ (เจ้าของสั่ง 23 ส.ค.): ไม่มีรอบเปิดอยู่ = ห้ามขาย ──────────
+  // null = กำลังเช็ค · true = มีรอบ · false = ต้องเปิดก่อน
+  // เช็คไม่ได้ (ออฟไลน์) = ปล่อยขาย — offline-first สำคัญกว่าวินัยรอบ
+  const [shiftOpen, setShiftOpen] = useState<boolean | null>(null);
+  const [floatInput, setFloatInput] = useState<number | ''>('');
+  const [openingShift, setOpeningShift] = useState(false);
+  const recheckShift = useCallback(() => {
+    getOpenShift()
+      .then((sh) => setShiftOpen(!!sh))
+      .catch(() => setShiftOpen(true));
+  }, []);
+  useEffect(() => {
+    recheckShift();
+    const onVis = () => { if (document.visibilityState === 'visible') recheckShift(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [recheckShift]);
   const searchRef = useRef<InputRef>(null);
   // Remembers the client_op_id used for the CURRENT checkout attempt, keyed
   // to a snapshot of exactly what was sent — see checkout()'s use of it.
@@ -296,7 +324,8 @@ export function Pos() {
       }
       return [
         ...cur,
-        { variantId: v.id, name: p.name, size: v.size, unitPrice: v.price, qty: 1, image: p.image },
+        { variantId: v.id, name: p.name, size: v.size, unitPrice: v.price, qty: 1,
+        lineDiscount: 0, image: p.image },
       ];
     });
   }
@@ -433,13 +462,17 @@ export function Pos() {
   }, []);
 
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
+  const lineDiscountTotal = useMemo(
+    () => lines.reduce((s, l) => s + Math.min(l.lineDiscount, l.unitPrice * l.qty), 0),
+    [lines],
+  );
   // Removing a line after setting a discount can leave a stale discount above
   // the new (smaller) subtotal — clamp it down so the total shown is always
   // what actually gets charged, not a display that then fails at checkout.
   useEffect(() => {
     setDiscount((d) => Math.min(d, subtotal));
   }, [subtotal]);
-  const total = Math.max(0, subtotal - discount);
+  const total = Math.max(0, subtotal - lineDiscountTotal - discount);
   const vat =
     shop?.vat_registered && total > 0 ? Math.round((total * shop.vat_rate) / (100 + shop.vat_rate)) : 0;
   const net = total - vat;
@@ -460,6 +493,16 @@ export function Pos() {
 
   async function checkout() {
     if (!lines.length || busy) return;
+    // รอบอาจถูกปิดจากแท็บ/เครื่องอื่นระหว่างเปิดหน้าค้างไว้ — เช็คซ้ำก่อนเงินเข้า
+    // (เช็คไม่ได้เพราะเน็ต = ปล่อยผ่าน ให้คิวออฟไลน์ทำงานตามปกติ)
+    if (typeof navigator === 'undefined' || navigator.onLine) {
+      const sh = await getOpenShift().catch(() => undefined);
+      if (sh === null) {
+        setShiftOpen(false);
+        setError('รอบขายถูกปิดแล้ว — เปิดรอบใหม่ก่อนขาย');
+        return;
+      }
+    }
     // A ฿0 total (e.g. a full-discount giveaway) needs no cash tendered at
     // all — only enforce "enough cash" once there's actually something to pay.
     if (method === 'cash' && total > 0 && (typeof tendered !== 'number' || tendered < total)) {
@@ -467,7 +510,11 @@ export function Pos() {
       return;
     }
     const baseInput = {
-      items: lines.map((l) => ({ variant_id: l.variantId, qty: l.qty })),
+      items: lines.map((l) => ({
+        variant_id: l.variantId,
+        qty: l.qty,
+        ...(l.lineDiscount > 0 ? { line_discount: Math.min(l.lineDiscount, l.unitPrice * l.qty) } : {}),
+      })),
       payment_method: method,
       cash_tendered: method === 'cash' ? (typeof tendered === 'number' ? tendered : total) : undefined,
       discount,
@@ -561,6 +608,50 @@ export function Pos() {
 
   if (loading)
     return <div className="text-tremor-content py-16 text-center">กำลังโหลด…</div>;
+
+  /* ── ด่านเปิดรอบ: ไม่มีรอบ = ขายไม่ได้ (เจ้าของสั่ง: "ต้องเปิดรอบก่อนเท่านั้น") ── */
+  if (shiftOpen === false) {
+    return (
+      <div className="grid place-items-center min-h-[60vh]">
+        <Card style={{ width: 420, maxWidth: '92vw' }}>
+          <div className="text-center space-y-1 mb-4">
+            <div className="text-[22px] font-extrabold text-tremor-content-strong">ยังไม่ได้เปิดรอบขาย</div>
+            <div className="text-tremor-content">
+              นับเงินทอนตั้งต้นในลิ้นชัก แล้วเปิดรอบก่อนเริ่มขาย — บิลทุกใบจะถูกนับเข้ารอบ
+            </div>
+          </div>
+          <div className="flex gap-2 justify-center">
+            <InputNumber
+              min={0}
+              size="large"
+              placeholder="เงินตั้งต้น เช่น 1000"
+              style={{ width: 200 }}
+              value={floatInput === '' ? undefined : floatInput}
+              onChange={(v) => setFloatInput(v ?? '')}
+              autoFocus
+            />
+            <Button
+              type="primary"
+              size="large"
+              loading={openingShift}
+              onClick={() => {
+                setOpeningShift(true);
+                openShift(Number(floatInput) || 0)
+                  .then(() => setShiftOpen(true))
+                  .catch((e) => setError(apiError(e)))
+                  .finally(() => setOpeningShift(false));
+              }}>
+              เปิดรอบ
+            </Button>
+          </div>
+          <div className="text-center mt-3">
+            <a href="/shift" className="text-[13px]">นับเงินแบบละเอียด (แบงก์/เหรียญ) ที่หน้า เปิด-ปิดรอบ</a>
+          </div>
+          {error ? <div className="mt-3 text-center text-red-600 text-sm">{error}</div> : null}
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-white min-h-[calc(100vh-4rem)]">
@@ -832,7 +923,8 @@ export function Pos() {
             ) : (
               <div className="divide-y divide-[#F0F0F0]">
                 {lines.map((l) => (
-                  <div key={l.variantId} className="flex items-center gap-3 px-2 py-3 hover:bg-[#FAFAFA]">
+                  <React.Fragment key={l.variantId}>
+                  <div className="flex items-center gap-3 px-2 py-3 hover:bg-[#FAFAFA]">
                     <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
                       {l.image ? (
                         <img src={l.image} alt="" className="w-full h-full object-cover" />
@@ -848,10 +940,41 @@ export function Pos() {
                       </div>
                     </div>
                     <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
-                    <div className="w-[72px] text-right text-[15.5px] font-bold text-tremor-content-strong tabular-nums">
-                      {baht(l.unitPrice * l.qty)}
-                    </div>
+                    <button
+                      type="button"
+                      title="กดเพื่อใส่ส่วนลดรายการนี้"
+                      onClick={() => setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))}
+                      className="w-[72px] text-right hover:bg-[#FFF3EC] px-1 -mx-1 transition">
+                      <span className="block text-[15.5px] font-bold text-tremor-content-strong tabular-nums">
+                        {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
+                      </span>
+                      {l.lineDiscount > 0 ? (
+                        <span className="block text-[12px] font-semibold text-red-600 tabular-nums leading-tight">
+                          ลด −{baht(l.lineDiscount)}
+                        </span>
+                      ) : null}
+                    </button>
                   </div>
+                  {discountEditing === l.variantId ? (
+                    <div className="flex items-center justify-end gap-2 px-2 pb-2 -mt-1">
+                      <span className="text-[13px] text-tremor-content">ส่วนลดรายการนี้</span>
+                      <InputNumber
+                        size="small"
+                        min={0}
+                        max={l.unitPrice * l.qty}
+                        precision={0}
+                        controls={false}
+                        inputMode="numeric"
+                        autoFocus
+                        placeholder="฿ 0"
+                        value={l.lineDiscount || null}
+                        onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
+                        onPressEnter={() => setDiscountEditing(null)}
+                        style={{ width: 100 }}
+                      />
+                    </div>
+                  ) : null}
+                  </React.Fragment>
                 ))}
               </div>
             )}
@@ -861,6 +984,12 @@ export function Pos() {
           <div className="border-t border-tremor-border p-4 space-y-3">
             <Card size="small" style={{ background: '#FFF8F3', borderColor: '#F3D9CB' }} styles={{ body: { padding: 14 } }}>
               <Row label="ยอดรวม" value={baht(subtotal)} />
+              {lineDiscountTotal > 0 ? (
+                <div className="flex items-center justify-between text-[14.5px] mt-1.5">
+                  <span className="font-medium text-red-600">ส่วนลดรายสินค้า</span>
+                  <span className="font-bold text-red-600 tabular-nums">−{baht(lineDiscountTotal)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
                 <InputNumber
@@ -1258,7 +1387,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           taxInvoiceNo={sale.tax_invoice_no}
           customerName={customerName}
           customerTaxId={customerTaxId}
-          items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: l.unitPrice * l.qty }))}
+          items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
           subtotal={sale.subtotal}
           discount={sale.discount}
           vatAmount={sale.vat_amount}
