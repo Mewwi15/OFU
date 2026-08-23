@@ -60,6 +60,7 @@ const ref = {
   greenTint: '#DCF3E5',   // decorative tint
 
   // red
+  red100: '#FBE9EA',      // danger surface tint (fill only — e.g. out-of-zone notice)
   red500: '#E5484D',      // danger graphic / trash icon — 3.91:1 white (NOT for label text)
   red700: '#C9252B',      // accessible danger text + fill behind white — 5.55:1 white; white-on 5.55
 
@@ -145,6 +146,7 @@ const color = {
     success: ref.greenStrong, successFg: ref.white, // 5.46:1 — codemod target for button/badge
     warning: ref.amber700, warningFg: ref.white,     // 5.09:1 white — separated from primary coral
     danger: ref.red500,                              // 3.91:1 icon/graphic only
+    dangerTint: ref.red100,                          // fill only
     dangerStrong: ref.red700, dangerFg: ref.white,   // 5.55:1 text-bearing
     info: ref.blueInfo, infoFg: ref.white,           // RESERVED — not verifier-tested
   },
@@ -306,6 +308,7 @@ export const flatColors = {
   border: c.border.default,
   borderStrong: c.border.strong,        // 3.40:1 white / 3.02:1 peach (corrected #948984)
   danger: c.status.danger,              // icon/graphic only — 3.91:1
+  dangerTint: c.status.dangerTint,      // light fill — pair with dangerStrong text
   dangerStrong: c.status.dangerStrong,  // text + behind-white-text — 5.55:1
   swatchBorder: c.border.swatch,
   scrim: c.overlay.scrim,

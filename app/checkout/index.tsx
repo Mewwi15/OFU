@@ -27,7 +27,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -64,6 +64,7 @@ import { selectedAddress, useAddress } from '@/store/address';
 import { useAuth } from '@/store/auth';
 import { cartCount, cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
 import { deliveryFeeFor, useFees, useMode } from '@/store/mode';
+import { kmBetween } from '@/lib/geo';
 
 type Status = 'idle' | 'placing' | 'awaiting_payment' | 'verifying' | 'success';
 
@@ -138,6 +139,16 @@ export default function CheckoutScreen() {
   const count = cartCount(chosen);
   const fees = useFees((f) => f.fees);
   const deliveryFee = deliveryFeeFor(mode, subtotal, fees);
+
+  // Delivery zone (0073): flag the address as out-of-range BEFORE the customer
+  // taps pay — the server trigger rejects it anyway, but a disabled button with
+  // a reason beats a surprise error. Zone unset (shopLat null) = no limit.
+  const outOfZoneKm = useMemo(() => {
+    if (mode !== 'delivery' || !address) return null;
+    if (fees.shopLat == null || fees.shopLng == null) return null;
+    const km = kmBetween(fees.shopLat, fees.shopLng, address.lat, address.lng);
+    return km > fees.deliveryRadiusKm ? km : null;
+  }, [mode, address, fees]);
 
   // Online flow pays up-front (PromptPay only); delivery defaults to COD but may
   // also pay by PromptPay.
@@ -222,7 +233,7 @@ export default function CheckoutScreen() {
     : method === 'cod'
       ? t('checkout.confirmOrder')
       : t('checkout.continueToPay');
-  const canConfirm = awaiting ? !!slipUri : status === 'idle';
+  const canConfirm = (awaiting ? !!slipUri : status === 'idle') && !outOfZoneKm;
 
   /* ----- Guard: nothing to pay for (e.g. opened with an empty selection) ----
    * `placed` exempts the awaiting-payment screen: that order is real and owed,
@@ -460,6 +471,16 @@ export default function CheckoutScreen() {
             ) : null}
           </View>
 
+          {outOfZoneKm ? (
+            <View style={styles.zoneWarnRow}>
+              <Ionicons name="alert-circle" size={16} color={Colors.dangerStrong} />
+              <Text variant="caption" style={styles.zoneWarnText}>
+                {t('checkout.outOfZone')
+                  .replace('{km}', outOfZoneKm.toFixed(1))
+                  .replace('{radius}', String(fees.deliveryRadiusKm))}
+              </Text>
+            </View>
+          ) : null}
           {address ? (
             <View style={styles.addrRow}>
               <Ionicons
@@ -746,6 +767,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
     marginTop: Spacing.md,
+  },
+  zoneWarnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.dangerTint,
+  },
+  zoneWarnText: {
+    flex: 1,
+    color: Colors.dangerStrong,
   },
   addrText: {
     flex: 1,

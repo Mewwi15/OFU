@@ -51,6 +51,10 @@ export type FulfilmentFees = {
   onlineFreeMin: number | null;
   codEnabled: boolean;
   codCap: number | null;
+  /** Delivery zone (0073). Origin null = zone not configured, no limit. */
+  shopLat: number | null;
+  shopLng: number | null;
+  deliveryRadiusKm: number;
 };
 
 export async function loadFulfilmentFees(): Promise<FulfilmentFees> {
@@ -65,5 +69,8 @@ export async function loadFulfilmentFees(): Promise<FulfilmentFees> {
     onlineFreeMin: typeof r.online_free_min === 'number' ? r.online_free_min : null,
     codEnabled: r.cod_enabled !== false,
     codCap: typeof r.cod_cap === 'number' ? r.cod_cap : null,
+    shopLat: typeof r.shop_lat === 'number' ? r.shop_lat : null,
+    shopLng: typeof r.shop_lng === 'number' ? r.shop_lng : null,
+    deliveryRadiusKm: num(r.delivery_radius_km, 15),
   };
 }

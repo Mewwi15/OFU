@@ -79,6 +79,10 @@ const DEFAULT_FEES: Fees = {
   onlineFreeMin: null,
   codEnabled: true,
   codCap: null,
+  // เขตจัดส่ง: ก่อนโหลดค่าจริง ถือว่ายังไม่ตั้ง = ไม่บล็อกใคร
+  shopLat: null,
+  shopLng: null,
+  deliveryRadiusKm: 15,
 };
 
 export type FeesState = {

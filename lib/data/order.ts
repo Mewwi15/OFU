@@ -450,6 +450,7 @@ export function orderErrorMessage(e: unknown): string {
     COD_NOT_ALLOWED: 'ออเดอร์นี้ใช้เก็บเงินปลายทางไม่ได้',
     ONLINE_REQUIRES_PREPAY: 'การส่งพัสดุต้องชำระเงินก่อน',
     ADDRESS_REQUIRED: 'กรุณาเลือกที่อยู่จัดส่ง',
+    OUT_OF_AREA: 'ที่อยู่นี้อยู่นอกพื้นที่จัดส่งของร้าน',
     PROMO_INVALID: 'โค้ดส่วนลดใช้ไม่ได้',
     PROMO_MIN_SPEND: 'ยอดสั่งซื้อยังไม่ถึงขั้นต่ำของโค้ดส่วนลด',
     ALREADY_TERMINAL: 'ออเดอร์นี้จบแล้ว ยกเลิกไม่ได้',
