@@ -139,14 +139,13 @@ export function Pos() {
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState(0);
   const [discountEditing, setDiscountEditing] = useState<string | null>(null);
-  // แตะรายการในบิลเพื่อเลือก แล้วสั่งจากแถบเครื่องมือ (ส่วนลด/รายละเอียด/ลบ)
-  const [selectedLine, setSelectedLine] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // Nav ของบิลเป็น "หัวข้อ" สลับมุมมอง (เจ้าของ: ไม่ใช่ปุ่มสั่งการ):
+  // รายการ = แถวสินค้า (มีปุ่มลด/ลบท้ายแถว) · ส่วนลด = แก้ส่วนลดรวมที่เดียว ·
+  // รายละเอียด = สรุปบิลอ่านอย่างเดียว
+  const [billTab, setBillTab] = useState<'items' | 'discount' | 'detail'>('items');
   const removeLine = (variantId: string) => {
     setLines((prev) => prev.filter((l) => l.variantId !== variantId));
-    setSelectedLine(null);
     setDiscountEditing(null);
-    setDetailOpen(false);
   };
   const setLineDiscount = (variantId: string, amount: number) =>
     setLines((prev) =>
@@ -916,58 +915,18 @@ export function Pos() {
             </div>
           </div>
 
-          {/* แถบเครื่องมือของบิล — เจ้าของขอปุ่มชัด ๆ: ส่วนลด · รายละเอียด · ลบ */}
+          {/* Nav หัวข้อของบิล — รายการ / ส่วนลด / รายละเอียด */}
           <div className="px-3 pt-2.5 pb-2 border-b border-tremor-border bg-[#FAFAFA]">
-            <div className="grid grid-cols-3 gap-1.5">
-              <Button
-                disabled={!selectedLine}
-                onClick={() => {
-                  if (selectedLine) { setDiscountEditing(selectedLine); setDetailOpen(false); }
-                }}
-                style={{ fontWeight: 600 }}>
-                ส่วนลด
-              </Button>
-              <Button
-                disabled={!selectedLine}
-                onClick={() => { setDetailOpen((v) => !v); setDiscountEditing(null); }}
-                style={{ fontWeight: 600 }}>
-                รายละเอียด
-              </Button>
-              <Button
-                danger
-                disabled={!selectedLine}
-                icon={<RiDeleteBin6Line className="w-4 h-4" />}
-                onClick={() => selectedLine && removeLine(selectedLine)}
-                style={{ fontWeight: 600 }}>
-                ลบ
-              </Button>
-            </div>
-            {!selectedLine && lines.length > 0 ? (
-              <div className="text-[12px] text-tremor-content mt-1.5 text-center">
-                แตะรายการในบิลเพื่อเลือกก่อน แล้วใช้ปุ่มด้านบน
-              </div>
-            ) : null}
-            {detailOpen && selectedLine ? (() => {
-              const l = lines.find((x) => x.variantId === selectedLine);
-              if (!l) return null;
-              const lineNet = Math.max(0, l.unitPrice * l.qty - l.lineDiscount);
-              return (
-                <div className="mt-2 bg-white border border-tremor-border px-3 py-2 text-[13.5px] space-y-1">
-                  <div className="font-semibold text-tremor-content-strong text-[14.5px]">
-                    {l.name}{l.size ? ` (${l.size})` : ''}
-                  </div>
-                  <div className="flex justify-between"><span className="text-tremor-content">ราคาต่อหน่วย</span><span className="tabular-nums font-medium">{baht(l.unitPrice)}</span></div>
-                  <div className="flex justify-between"><span className="text-tremor-content">จำนวน</span><span className="tabular-nums font-medium">{l.qty}</span></div>
-                  {l.lineDiscount > 0 ? (
-                    <div className="flex justify-between text-red-600"><span>ส่วนลดรายการ</span><span className="tabular-nums font-semibold">−{baht(l.lineDiscount)}</span></div>
-                  ) : null}
-                  <div className="flex justify-between border-t border-tremor-border pt-1">
-                    <span className="font-semibold text-tremor-content-strong">ยอดรายการนี้</span>
-                    <span className="tabular-nums font-bold text-tremor-content-strong">{baht(lineNet)}</span>
-                  </div>
-                </div>
-              );
-            })() : null}
+            <Segmented
+              block
+              value={billTab}
+              onChange={(v) => setBillTab(v as 'items' | 'discount' | 'detail')}
+              options={[
+                { value: 'items', label: 'รายการ' },
+                { value: 'discount', label: 'ส่วนลด' },
+                { value: 'detail', label: 'รายละเอียด' },
+              ]}
+            />
           </div>
 
           {error && (
@@ -984,16 +943,12 @@ export function Pos() {
                 />
               </div>
             ) : (
+              <>
+              {billTab === 'items' ? (
               <div className="divide-y divide-[#F0F0F0]">
                 {lines.map((l) => (
                   <React.Fragment key={l.variantId}>
-                  <div
-                    onClick={() => setSelectedLine((cur) => (cur === l.variantId ? null : l.variantId))}
-                    className={`flex items-center gap-3 px-2 py-3 cursor-pointer transition ${
-                      selectedLine === l.variantId
-                        ? 'bg-[#FFF3EC] border-l-4 border-tremor-brand'
-                        : 'hover:bg-[#FAFAFA] border-l-4 border-transparent'
-                    }`}>
+                  <div className="flex items-center gap-2.5 px-2 py-3 hover:bg-[#FAFAFA]">
                     <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
                       {l.image ? (
                         <img src={l.image} alt="" className="w-full h-full object-cover" />
@@ -1008,14 +963,8 @@ export function Pos() {
                         {baht(l.unitPrice)}
                       </div>
                     </div>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
-                    </div>
-                    <button
-                      type="button"
-                      title="กดเพื่อใส่ส่วนลดรายการนี้"
-                      onClick={(e) => { e.stopPropagation(); setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId)); }}
-                      className="w-[72px] text-right hover:bg-[#FFF3EC] px-1 -mx-1 transition">
+                    <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
+                    <div className="w-[64px] text-right">
                       <span className="block text-[15.5px] font-bold text-tremor-content-strong tabular-nums">
                         {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
                       </span>
@@ -1024,7 +973,28 @@ export function Pos() {
                           ลด −{baht(l.lineDiscount)}
                         </span>
                       ) : null}
-                    </button>
+                    </div>
+                    {/* ปุ่มท้ายแถว: ลดรายการนี้ · ลบ (กดผิดตัวเอาออกได้ทันที) */}
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        title="ส่วนลดรายการนี้"
+                        onClick={() => setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))}
+                        className={`w-7 h-7 grid place-items-center border text-[12px] font-bold transition ${
+                          l.lineDiscount > 0 || discountEditing === l.variantId
+                            ? 'border-red-300 bg-red-50 text-red-600'
+                            : 'border-[#E8E8E8] text-[#6E625C] hover:bg-[#FFF3EC] hover:text-tremor-brand-emphasis'
+                        }`}>
+                        ลด
+                      </button>
+                      <button
+                        type="button"
+                        title="ลบรายการนี้"
+                        onClick={() => removeLine(l.variantId)}
+                        className="w-7 h-7 grid place-items-center border border-[#E8E8E8] text-[#6E625C] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition">
+                        <RiDeleteBin6Line className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {discountEditing === l.variantId ? (
                     <div className="flex items-center justify-end gap-2 px-2 pb-2 -mt-1">
@@ -1048,6 +1018,93 @@ export function Pos() {
                   </React.Fragment>
                 ))}
               </div>
+              ) : null}
+
+              {billTab === 'discount' ? (
+                <div className="px-3 py-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[14.5px] font-semibold text-tremor-content-strong">ส่วนลดทั้งบิล</span>
+                    <InputNumber
+                      min={0}
+                      max={subtotal}
+                      precision={0}
+                      controls={false}
+                      inputMode="numeric"
+                      formatter={moneyFormatter}
+                      parser={moneyParser}
+                      onKeyDown={digitsOnlyKeyDown}
+                      placeholder="฿ 0"
+                      value={discount || null}
+                      onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
+                      style={{ width: 120 }}
+                    />
+                  </div>
+                  <div className="border-t border-tremor-border pt-2">
+                    <div className="text-[13px] text-tremor-content mb-1.5">ส่วนลดรายสินค้า</div>
+                    <div className="space-y-2">
+                      {lines.map((l) => (
+                        <div key={l.variantId} className="flex items-center justify-between gap-2">
+                          <span className="text-[14px] text-tremor-content-strong truncate flex-1">
+                            {l.name}{l.size ? ` (${l.size})` : ''}
+                          </span>
+                          <InputNumber
+                            size="small"
+                            min={0}
+                            max={l.unitPrice * l.qty}
+                            precision={0}
+                            controls={false}
+                            inputMode="numeric"
+                            placeholder="฿ 0"
+                            value={l.lineDiscount || null}
+                            onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
+                            style={{ width: 90 }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {lineDiscountTotal + discount > 0 ? (
+                    <div className="flex items-center justify-between border-t border-tremor-border pt-2 text-red-600">
+                      <span className="font-semibold">รวมส่วนลดทั้งหมด</span>
+                      <span className="font-bold tabular-nums">−{baht(lineDiscountTotal + discount)}</span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {billTab === 'detail' ? (
+                <div className="px-3 py-3 space-y-2 text-[13.5px]">
+                  {lines.map((l) => {
+                    const net = Math.max(0, l.unitPrice * l.qty - l.lineDiscount);
+                    return (
+                      <div key={l.variantId} className="border-b border-[#F0F0F0] pb-2">
+                        <div className="font-semibold text-tremor-content-strong text-[14.5px]">
+                          {l.name}{l.size ? ` (${l.size})` : ''}
+                        </div>
+                        <div className="flex justify-between text-tremor-content">
+                          <span>{baht(l.unitPrice)} × {l.qty}</span>
+                          <span className="tabular-nums font-semibold text-tremor-content-strong">{baht(net)}</span>
+                        </div>
+                        {l.lineDiscount > 0 ? (
+                          <div className="flex justify-between text-red-600 text-[12.5px]">
+                            <span>ส่วนลดรายการ</span><span className="tabular-nums">−{baht(l.lineDiscount)}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between"><span className="text-tremor-content">ยอดรวม</span><span className="tabular-nums font-semibold">{baht(subtotal)}</span></div>
+                    {lineDiscountTotal > 0 ? <div className="flex justify-between text-red-600"><span>ส่วนลดรายสินค้า</span><span className="tabular-nums font-semibold">−{baht(lineDiscountTotal)}</span></div> : null}
+                    {discount > 0 ? <div className="flex justify-between text-red-600"><span>ส่วนลดทั้งบิล</span><span className="tabular-nums font-semibold">−{baht(discount)}</span></div> : null}
+                    <div className="flex justify-between border-t border-tremor-border pt-1.5">
+                      <span className="font-bold text-tremor-content-strong text-[15px]">ยอดสุทธิ</span>
+                      <span className="tabular-nums font-extrabold text-tremor-content-strong text-[17px]">{baht(total)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              </>
             )}
           </div>
 
