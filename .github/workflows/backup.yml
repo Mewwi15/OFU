@@ -1,0 +1,51 @@
+# สำรองฐานข้อมูลทั้งร้านทุกคืน — ข้อค้างเก่าสุดใน checklist (หมวด F)
+#
+# ทั้งร้าน (สินค้า สต๊อก บิล ออเดอร์ ลูกค้า เครดิต) อยู่บน Postgres ก้อนเดียว
+# ไฟล์สำรองถูก "เข้ารหัสก่อนอัปโหลด" เสมอ — repo นี้เป็น public, artifact
+# เปล่า ๆ ใครก็โหลดได้ ห้ามมีข้อมูลลูกค้าแบบอ่านออกเด็ดขาด
+#
+# ตั้งครั้งเดียว (เจ้าของ):
+#   gh secret set SUPABASE_DB_URL     # Supabase → Settings → Database → Connection string (URI)
+#   gh secret set BACKUP_PASSPHRASE   # รหัสยาว ๆ เก็บไว้ในที่ปลอดภัย — ไม่มีรหัสนี้ = กู้ไฟล์ไม่ได้
+#
+# กู้คืน/ตรวจไฟล์: scripts/restore-backup.sh (ดูวิธีใช้หัวไฟล์)
+
+name: backup-db
+on:
+  schedule:
+    - cron: '0 20 * * *' # 03:00 เวลาไทย ทุกคืน
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: pg_dump + เข้ารหัส
+        if: env.DB_URL != '' && env.PASS != ''
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y postgresql-client >/dev/null
+          STAMP=$(TZ=Asia/Bangkok date +%Y%m%d-%H%M)
+          # custom format (-Fc): บีบอัดในตัว + pg_restore เลือกกู้บางตารางได้
+          pg_dump "$DB_URL" -Fc --no-owner --no-privileges -f "ofu-$STAMP.dump"
+          ls -lh "ofu-$STAMP.dump"
+          # ตรวจว่า dump อ่านกลับได้จริงก่อนเก็บ — ไฟล์เสียต้องรู้คืนนี้ ไม่ใช่วันที่ต้องใช้
+          pg_restore --list "ofu-$STAMP.dump" | head -5
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:PASS \
+            -in "ofu-$STAMP.dump" -out "ofu-$STAMP.dump.enc"
+          rm "ofu-$STAMP.dump"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+
+      - name: เก็บไฟล์ (ย้อนหลัง 30 วัน)
+        if: env.DB_URL != '' && env.PASS != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ env.STAMP }}
+          path: ofu-*.dump.enc
+          retention-days: 30
+
+      - name: ยังไม่ได้ตั้ง secrets
+        if: env.DB_URL == '' || env.PASS == ''
+        run: echo "ข้าม — ยังไม่ได้ตั้ง SUPABASE_DB_URL / BACKUP_PASSPHRASE"
