@@ -120,7 +120,10 @@ export const useAuth = create<AuthState>((set, get) => ({
         // sign-out in between (the LINE magiclink redeem lands here directly).
         const previous = get().userId;
         if (previous && previous !== session.user.id) clearUserScopedState();
-        set({ status: 'authenticated', userId: session.user.id });
+        // hydrated ด้วย: ถ้า getSession() ตอนบูตค้าง (lock ชนกันตอนถูกปลุกจาก
+        // deep link — เคสเดียวกับหน้า auth-callback) event นี้คือหลักฐานว่า
+        // session พร้อมแล้ว อย่าปล่อยให้ gate รอสิ่งที่ค้างอยู่
+        set({ status: 'authenticated', userId: session.user.id, hydrated: true });
         setTimeout(() => {
           void loadUser().then((user) => set({ user }));
           // PDPA consent on a real sign-in — only the email forms used to
@@ -138,7 +141,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       } else {
         // Session gone for any reason — expiry, revocation, sign-out on
         // another tab. Same disclosure risk as an explicit logout.
-        set({ status: 'unauthenticated', userId: null, user: GUEST });
+        set({ status: 'unauthenticated', userId: null, user: GUEST, hydrated: true });
         clearUserScopedState();
       }
     });

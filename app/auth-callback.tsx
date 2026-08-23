@@ -40,6 +40,29 @@ export default function AuthCallbackScreen() {
   const [phase, setPhase] = useState<Phase>('working');
   const ran = useRef(false);
 
+  // ── ชั้นกันค้าง (23 ส.ค.) ─────────────────────────────────────────────────
+  // อาการจริงบน Android standalone: exchange สำเร็จ session ถูกเซฟแล้ว แต่
+  // promise ของ exchange ไม่ settle (auth lock ของ supabase-js ชนกันเองตอนแอป
+  // ถูกปลุกจาก deep link) → หน้านี้หมุนตลอดกาล ผู้ใช้ต้องฆ่าแอปเปิดใหม่ถึงเข้า
+  // ได้ ทางออก: ไม่ฝากชีวิตไว้กับ promise ทางเดียว —
+  //   1. ฟัง status จาก listener ตรง ๆ (listener ยิงตอน session ถูกเซฟ ซึ่ง
+  //      เกิดก่อนจุดที่ promise ค้าง) → เข้าแอปทันทีที่ session มา
+  //   2. เพดานรอ 12 วิ → ขึ้นปุ่มลองใหม่ แทนหมุนไม่มีที่สิ้นสุด
+  const status = useAuth((s) => s.status);
+  useEffect(() => {
+    if (status === 'authenticated') router.replace('/');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  useEffect(() => {
+    const watchdog = setTimeout(() => {
+      // ถ้า session โผล่หลังจากนี้ effect ข้างบนยังพาเข้าแอปให้เหมือนเดิม —
+      // จอ error นี้เป็นแค่ทางออกไม่ให้ค้าง ไม่ใช่คำตัดสินสุดท้าย
+      setPhase((p) => (p === 'working' ? 'error' : p));
+    }, 12_000);
+    return () => clearTimeout(watchdog);
+  }, []);
+
   useEffect(() => {
     // Params can settle across renders; the exchange must fire once. (The code
     // is single-use — exchangeAuthCodeOnce would dedupe anyway, but there is no
