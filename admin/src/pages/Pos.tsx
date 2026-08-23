@@ -663,7 +663,7 @@ export function Pos() {
 
   return (
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-white min-h-[calc(100vh-4rem)]">
-      <div className="lg:grid lg:grid-cols-[1fr_23rem] lg:h-[calc(100vh-6.5rem)]">
+      <div className="lg:grid lg:grid-cols-[1fr_26rem] lg:h-[calc(100vh-6.5rem)]">
         {/* ── left: search + categories + grid ────────────────────────────── */}
         <div className="relative flex flex-col min-h-0 lg:pr-5">
           {/* Sales that already happened (cash/goods changed hands, a
@@ -882,7 +882,7 @@ export function Pos() {
 
         {/* ── right: order panel (drawer < lg, column ≥ lg) ────────────────── */}
         <div
-          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none lg:shadow-none lg:border-l-2 lg:border-[#D9D9D9] lg:pl-5 fixed inset-y-0 right-0 z-40 w-full max-w-sm transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
+          className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none lg:shadow-none lg:border-l-2 lg:border-[#D9D9D9] lg:pl-5 fixed inset-y-0 right-0 z-40 w-full max-w-md transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
             cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}>
           <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
@@ -948,73 +948,78 @@ export function Pos() {
               <div className="divide-y divide-[#F0F0F0]">
                 {lines.map((l) => (
                   <React.Fragment key={l.variantId}>
-                  <div className="flex items-center gap-2.5 px-2 py-3 hover:bg-[#FAFAFA]">
-                    <div className="w-11 h-11 rounded-none overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
-                      {l.image ? (
-                        <img src={l.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[15px] font-medium text-tremor-content-strong truncate">{l.name}</div>
-                      <div className="text-[13px] text-tremor-content">
-                        {l.size ? `${l.size} · ` : ''}
-                        {baht(l.unitPrice)}
+                  <div className="px-3 py-3 hover:bg-[#FAFAFA]">
+                    {/* ชั้นบน: รูป · ชื่อ+ราคาต่อหน่วย · ยอดบรรทัด */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-10 h-10 overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
+                        {l.image ? (
+                          <img src={l.image} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[15px] font-medium text-tremor-content-strong leading-snug line-clamp-2">
+                          {l.name}{l.size ? ` (${l.size})` : ''}
+                        </div>
+                        <div className="text-[13px] text-tremor-content mt-0.5">
+                          {baht(l.unitPrice)} / หน่วย
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="block text-[16px] font-bold text-tremor-content-strong tabular-nums">
+                          {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
+                        </span>
+                        {l.lineDiscount > 0 ? (
+                          <span className="block text-[12px] font-semibold text-red-600 tabular-nums">
+                            ลด −{baht(l.lineDiscount)}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
-                    <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
-                    <div className="w-[64px] text-right">
-                      <span className="block text-[15.5px] font-bold text-tremor-content-strong tabular-nums">
-                        {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
-                      </span>
-                      {l.lineDiscount > 0 ? (
-                        <span className="block text-[12px] font-semibold text-red-600 tabular-nums leading-tight">
-                          ลด −{baht(l.lineDiscount)}
-                        </span>
-                      ) : null}
+                    {/* ชั้นล่าง: จำนวน · ลด/ลบ */}
+                    <div className="flex items-center justify-between mt-2 pl-[50px]">
+                      <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))}
+                          className={`h-8 px-3 text-[13px] font-semibold border transition ${
+                            l.lineDiscount > 0 || discountEditing === l.variantId
+                              ? 'border-red-300 bg-red-50 text-red-600'
+                              : 'border-[#E8E8E8] text-[#6E625C] hover:bg-[#FFF3EC] hover:text-tremor-brand-emphasis'
+                          }`}>
+                          ลด
+                        </button>
+                        <button
+                          type="button"
+                          title="ลบรายการนี้"
+                          onClick={() => removeLine(l.variantId)}
+                          className="h-8 w-9 grid place-items-center border border-[#E8E8E8] text-[#6E625C] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition">
+                          <RiDeleteBin6Line className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    {/* ปุ่มท้ายแถว: ลดรายการนี้ · ลบ (กดผิดตัวเอาออกได้ทันที) */}
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <button
-                        type="button"
-                        title="ส่วนลดรายการนี้"
-                        onClick={() => setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))}
-                        className={`w-7 h-7 grid place-items-center border text-[12px] font-bold transition ${
-                          l.lineDiscount > 0 || discountEditing === l.variantId
-                            ? 'border-red-300 bg-red-50 text-red-600'
-                            : 'border-[#E8E8E8] text-[#6E625C] hover:bg-[#FFF3EC] hover:text-tremor-brand-emphasis'
-                        }`}>
-                        ลด
-                      </button>
-                      <button
-                        type="button"
-                        title="ลบรายการนี้"
-                        onClick={() => removeLine(l.variantId)}
-                        className="w-7 h-7 grid place-items-center border border-[#E8E8E8] text-[#6E625C] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition">
-                        <RiDeleteBin6Line className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {discountEditing === l.variantId ? (
+                      <div className="flex items-center justify-end gap-2 mt-2 pl-[50px]">
+                        <span className="text-[13px] text-tremor-content">ส่วนลดรายการนี้</span>
+                        <InputNumber
+                          size="small"
+                          min={0}
+                          max={l.unitPrice * l.qty}
+                          precision={0}
+                          controls={false}
+                          inputMode="numeric"
+                          autoFocus
+                          placeholder="฿ 0"
+                          value={l.lineDiscount || null}
+                          onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
+                          onPressEnter={() => setDiscountEditing(null)}
+                          style={{ width: 100 }}
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                  {discountEditing === l.variantId ? (
-                    <div className="flex items-center justify-end gap-2 px-2 pb-2 -mt-1">
-                      <span className="text-[13px] text-tremor-content">ส่วนลดรายการนี้</span>
-                      <InputNumber
-                        size="small"
-                        min={0}
-                        max={l.unitPrice * l.qty}
-                        precision={0}
-                        controls={false}
-                        inputMode="numeric"
-                        autoFocus
-                        placeholder="฿ 0"
-                        value={l.lineDiscount || null}
-                        onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
-                        onPressEnter={() => setDiscountEditing(null)}
-                        style={{ width: 100 }}
-                      />
-                    </div>
-                  ) : null}
                   </React.Fragment>
                 ))}
               </div>
