@@ -10,7 +10,7 @@
  *        (ตัวเลขตัดสินมาจาก close_shift ฝั่งเซิร์ฟเวอร์ — หน้าจอเป็นแค่พรีวิว)
  */
 
-import { Alert, Button, Card, Descriptions, InputNumber, Modal, Statistic, Typography, message } from 'antd';
+import { Alert, Button, Card, Collapse, Descriptions, InputNumber, Modal, Statistic, Typography, message } from 'antd';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -115,6 +115,15 @@ export function Shift() {
               เปิดรอบ
             </Button>
           </div>
+          <Collapse
+            ghost
+            className="mt-2"
+            items={[{
+              key: 'count',
+              label: 'นับตามชนิดแบงก์/เหรียญ',
+              children: <CashCounter onTotal={setFloat} />,
+            }]}
+          />
         </Card>
       </div>
     );
@@ -161,6 +170,15 @@ export function Shift() {
             </Typography.Text>
           ) : null}
         </div>
+        <Collapse
+          ghost
+          className="mt-2"
+          items={[{
+            key: 'count',
+            label: 'นับตามชนิดแบงก์/เหรียญ',
+            children: <CashCounter onTotal={setCounted} />,
+          }]}
+        />
       </Card>
     </div>
   );
@@ -189,5 +207,62 @@ function ClosedSummary({ row }: { row: ShiftRow }) {
         />
       }
     />
+  );
+}
+
+/* ── ตารางนับแบงก์/เหรียญ (เจ้าของขอ 23 ส.ค.) ────────────────────────────────
+ * ครบทุกชนิดเงินไทย: 1000/500/100/50/20 แบงก์ · 10/5/2/1 เหรียญ · 50/25 สตางค์
+ * กรอกจำนวนใบ/เหรียญ ระบบคูณ-รวมให้ แล้วดันยอดขึ้นช่องหลักอัตโนมัติ
+ * (ราคาขายของร้านเป็นบาทเต็ม สตางค์แทบไม่โผล่ — แต่มีช่องให้ครบตามขอ
+ *  ถ้ายอดรวมมีเศษสตางค์ ระบบบันทึกแบบปัดเป็นบาทเต็ม)
+ */
+const DENOMS: { value: number; label: string; kind: 'แบงก์' | 'เหรียญ' | 'สตางค์' }[] = [
+  { value: 1000, label: '1,000', kind: 'แบงก์' },
+  { value: 500, label: '500', kind: 'แบงก์' },
+  { value: 100, label: '100', kind: 'แบงก์' },
+  { value: 50, label: '50', kind: 'แบงก์' },
+  { value: 20, label: '20', kind: 'แบงก์' },
+  { value: 10, label: '10', kind: 'เหรียญ' },
+  { value: 5, label: '5', kind: 'เหรียญ' },
+  { value: 2, label: '2', kind: 'เหรียญ' },
+  { value: 1, label: '1', kind: 'เหรียญ' },
+  { value: 0.5, label: '50 สต.', kind: 'สตางค์' },
+  { value: 0.25, label: '25 สต.', kind: 'สตางค์' },
+];
+
+function CashCounter({ onTotal }: { onTotal: (total: number) => void }) {
+  const [counts, setCounts] = useState<Record<number, number>>({});
+  const total = DENOMS.reduce((s, d) => s + d.value * (counts[d.value] ?? 0), 0);
+
+  const setCount = (denom: number, qty: number | null) => {
+    const next = { ...counts, [denom]: qty ?? 0 };
+    setCounts(next);
+    onTotal(Math.round(DENOMS.reduce((s, d) => s + d.value * (next[d.value] ?? 0), 0)));
+  };
+
+  return (
+    <div>
+      <div className="grid gap-1" style={{ gridTemplateColumns: 'auto 110px 1fr' }}>
+        {DENOMS.map((d) => (
+          <div key={d.value} className="contents">
+            <Typography.Text style={{ alignSelf: 'center', minWidth: 86 }}>
+              {d.kind} {d.label}
+            </Typography.Text>
+            <InputNumber
+              min={0}
+              placeholder="0"
+              value={counts[d.value] || undefined}
+              onChange={(v) => setCount(d.value, v)}
+            />
+            <Typography.Text type="secondary" style={{ alignSelf: 'center' }}>
+              {counts[d.value] ? `= ฿${(d.value * counts[d.value]).toLocaleString('th-TH')}` : ''}
+            </Typography.Text>
+          </div>
+        ))}
+      </div>
+      <Typography.Title level={5} style={{ marginTop: 12 }}>
+        รวม {`฿${total.toLocaleString('th-TH')}`}
+      </Typography.Title>
+    </div>
   );
 }
