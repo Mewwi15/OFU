@@ -879,6 +879,12 @@ export function Pos() {
                   style={{ width: 120 }}
                 />
               </div>
+              {discount > 0 ? (
+                <div className="flex items-center justify-between text-[14.5px] mt-1.5">
+                  <span className="font-medium text-red-600">ส่วนลด</span>
+                  <span className="font-bold text-red-600 tabular-nums">−{baht(discount)}</span>
+                </div>
+              ) : null}
               {shop?.vat_registered && <div className="mt-2"><Row label="ราคาก่อน VAT" value={baht(net)} subtle /></div>}
               {shop?.vat_registered && <div className="mt-1"><Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle /></div>}
               <Divider style={{ margin: '12px 0' }} />
@@ -951,11 +957,17 @@ export function Pos() {
               onClick={checkout}
               disabled={!lines.length}
               style={{
-                height: 52,
-                fontWeight: 600,
+                height: 60,
+                fontWeight: 800,
+                fontSize: 22,
                 borderRadius: 0,
               }}>
-              {busy ? 'กำลังบันทึก…' : `ชำระเงิน ${baht(total)}`}
+              {busy ? 'กำลังบันทึก…' : (
+                <span className="inline-flex items-baseline gap-2">
+                  ชำระเงิน
+                  <span className="tabular-nums font-extrabold">{baht(total)}</span>
+                </span>
+              )}
             </Button>
           </div>
         </div>
