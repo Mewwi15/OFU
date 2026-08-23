@@ -89,7 +89,9 @@ const ref = {
 /* -------------------------------------------------------------------------- */
 
 const color = {
-  bg: { canvas: ref.peach50 },
+  // OTA smoke test 23 ส.ค.: canvas ขาวชั่วคราวตามคำขอเจ้าของ — สลับกลับพีช
+  // (ref.peach50) ได้ด้วย push เดียว
+  bg: { canvas: ref.white },
   surface: { base: ref.white, muted: ref.warmMuted100 },
 
   text: {
