@@ -474,11 +474,7 @@ export default function CheckoutScreen() {
           {outOfZoneKm ? (
             <View style={styles.zoneWarnRow}>
               <Ionicons name="alert-circle" size={16} color={Colors.dangerStrong} />
-              <Text variant="caption" style={styles.zoneWarnText}>
-                {t('checkout.outOfZone')
-                  .replace('{km}', outOfZoneKm.toFixed(1))
-                  .replace('{radius}', String(fees.deliveryRadiusKm))}
-              </Text>
+              <Text style={styles.zoneWarnText}>{t('checkout.outOfZone')}</Text>
             </View>
           ) : null}
           {address ? (
@@ -779,6 +775,7 @@ const styles = StyleSheet.create({
   },
   zoneWarnText: {
     flex: 1,
+    ...Typography.bodyStrong,
     color: Colors.dangerStrong,
   },
   addrText: {
