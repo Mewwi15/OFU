@@ -40,7 +40,12 @@ create policy goods_receipts_admin_read on public.goods_receipts
   for select to authenticated
   using (shop_id = public.admin_shop_safe());
 grant select on public.goods_receipts to authenticated;
--- ตั้งใจไม่ grant ให้ anon เลย — ผู้ขาย/ทุนเป็นข้อมูลภายในล้วน
+-- Supabase แจกสิทธิ์ตารางใหม่ให้ anon/authenticated อัตโนมัติ (default privileges)
+-- — ถอนทิ้งชัด ๆ: anon ห้ามเห็น (ผู้ขาย/ทุนเป็นข้อมูลภายใน) และ authenticated
+-- เขียนตรงไม่ได้ ต้องผ่าน RPC เท่านั้น · เช็คท้ายไฟล์คือตัวจับตอนลืมบรรทัดพวกนี้
+revoke all on public.goods_receipts from anon;
+revoke insert, update, delete on public.goods_receipts from authenticated;
+revoke all on sequence public.goods_receipt_seq from anon, authenticated;
 
 -- ── 2. บรรทัด = stock_movements เดิม + ที่ผูกใบ + ทุนต่อหน่วย ────────────────
 alter table public.stock_movements
