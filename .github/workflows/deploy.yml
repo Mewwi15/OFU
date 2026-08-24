@@ -39,7 +39,7 @@ jobs:
 
       # ข้อความ commit ส่งผ่าน env ไม่ฝังตรงใน script (กัน injection) และตัดเหลือ
       # บรรทัดแรก — ก้อนเต็มหลายบรรทัดเคยทำ eas ล้มทั้ง run (23 ส.ค.)
-      - name: OTA runtime 1.0.2 (iOS ตอนนี้ + Android build หน้า)
+      - name: OTA runtime 1.0.2 (iOS + Android บนสโตร์ปัจจุบัน)
         if: env.EXPO_TOKEN != ''
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
@@ -47,21 +47,6 @@ jobs:
           MSG="${COMMIT_MSG%%$'\n'*}"
           npx eas-cli@latest update --branch production --platform all \
             --message "${MSG:-deploy}" --non-interactive
-
-      # ── ชั่วคราว: Android บนสโตร์ยังเป็น 1.0.1 ─────────────────────────────
-      # runtime ผูกกับเลขเวอร์ชัน (policy: appVersion) จึงต้องยิงซ้ำอีกรอบ
-      # ในนาม 1.0.1 ไม่งั้นเครื่องลูกค้า Android มองไม่เห็นอัปเดต
-      # ★ ลบ step นี้ทิ้งเมื่อ Android build 1.0.2 ขึ้นสโตร์แล้ว ★
-      - name: OTA runtime 1.0.1 (Android ที่ live อยู่ — ชั่วคราว)
-        if: env.EXPO_TOKEN != ''
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-        run: |
-          MSG="${COMMIT_MSG%%$'\n'*}"
-          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('app.json'));j.expo.version='1.0.1';fs.writeFileSync('app.json',JSON.stringify(j,null,2)+'\n')"
-          npx eas-cli@latest update --branch production --platform android \
-            --message "${MSG:-deploy}" --non-interactive
-          git checkout app.json
 
   web:
     name: เว็บร้าน ofu-shop.vercel.app
