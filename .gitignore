@@ -41,3 +41,15 @@ app-example
 # generated native folders
 /ios
 /android
+
+# ไฟล์งานที่หล่นมาไว้ที่ root: รายงานสต๊อก/ใบเสนอราคา, ใบรับรองที่โหลดจาก
+# Play Console, ไฟล์เสียง ฯลฯ — ของจริงที่ยังต้องใช้ ย้ายไปกองใน _local/
+# แทนการลบทิ้ง กฎ root-only (/) ข้างล่างกันไม่ให้หล่นมาซ้ำ แต่ไม่ไปบัง
+# ไฟล์แบบเดียวกันใน docs/ หรือ scripts/import/ ที่ตั้งใจ commit
+/_local/
+/*.xls
+/*.xlsx
+/*.pdf
+/*.der
+/*.WAV
+/*.wav
