@@ -164,10 +164,21 @@ export default function LoginScreen() {
     setSocialBusy(true);
     try {
       // Android: native sheet first (build 1.0.2+) — no browser, no deep link.
-      // 'unavailable' = old binary or non-Android → the browser flow as before.
-      const native = await signInWithGoogleNative().catch(() => 'unavailable' as const);
-      if (native === 'unavailable') await signInWithOAuthProvider('google');
-      // 'cancelled' and 'success' both just end here — the auth gate reacts.
+      const res = await signInWithGoogleNative();
+      // 'unavailable' = no native sheet in this binary (old Android build, or
+      // iOS) → the browser flow is the only way in. Every other failure reports
+      // its code: this used to `.catch(() => 'unavailable')`, which swallowed
+      // real errors and quietly pushed the user into the browser round-trip —
+      // the flow that leaves them staring at a frozen login screen with a
+      // session already saved, needing a force-quit to get in. A visible code
+      // is both the honest outcome and the only way to learn WHY the sheet
+      // failed on a customer's device.
+      if (!res.ok && res.reason === 'unavailable') {
+        await signInWithOAuthProvider('google');
+      } else if (!res.ok && res.reason === 'failed') {
+        Alert.alert(t('login.socialFailed'), `${t('login.socialFailedBody')}\n\n(${res.code})`);
+      }
+      // 'cancelled' and success both just end here — the auth gate reacts.
     } catch {
       Alert.alert(t('login.socialFailed'), t('login.socialFailedBody'));
     } finally {

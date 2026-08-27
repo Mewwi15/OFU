@@ -119,8 +119,10 @@ export async function completeOAuthRedirect(returnUrl: string): Promise<boolean>
  * could wedge on the way back in. The native sheet never leaves the process.
  *
  * OTA-safety: this JS also ships to store builds that predate the native
- * module (Android 1.0.1). The require is lazy and failure falls back to the
- * browser flow, so old binaries keep their old behaviour instead of crashing.
+ * module (Android 1.0.1). The require is lazy and a MISSING module falls back
+ * to the browser flow, so old binaries keep their old behaviour instead of
+ * crashing. A module that is present but fails does not fall back — see
+ * {@link GoogleNativeResult}.
  *
  * Server side: Supabase validates the idToken's audience, so the Web client id
  * below must be listed in Supabase → Auth → Providers → Google → Client IDs.
@@ -129,34 +131,51 @@ export async function completeOAuthRedirect(returnUrl: string): Promise<boolean>
 const GOOGLE_WEB_CLIENT_ID =
   '129235146060-0riu39sbql9ocuoffg2dmo3ap96h7c7n.apps.googleusercontent.com';
 
-export type GoogleNativeResult = 'success' | 'cancelled' | 'unavailable';
+/**
+ * Outcome of a native Google sign-in — same shape as {@link AppleSignInResult}
+ * so the login screen can treat both providers identically.
+ *
+ * `unavailable` means the native sheet does not exist in this binary at all
+ * (pre-1.0.2 Android, or iOS/web) and the browser flow is the only way in.
+ * That is the ONLY case allowed to fall back. A sheet that exists and *failed*
+ * must surface its code instead: the browser round-trip is the flow that
+ * strands the user with a saved session behind a frozen screen (the reason
+ * app/auth-callback.tsx needs a watchdog at all), so quietly retrying through
+ * it converts a legible error into an unrecoverable hang.
+ */
+export type GoogleNativeResult =
+  | { ok: true }
+  | { ok: false; reason: 'cancelled' }
+  | { ok: false; reason: 'unavailable' }
+  | { ok: false; reason: 'failed'; code: string };
 
 export async function signInWithGoogleNative(): Promise<GoogleNativeResult> {
-  if (Platform.OS !== 'android') return 'unavailable';
+  if (Platform.OS !== 'android') return { ok: false, reason: 'unavailable' };
   let GoogleSignin: typeof import('@react-native-google-signin/google-signin').GoogleSignin;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy: module absent in pre-1.0.2 binaries
     GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
   } catch {
-    return 'unavailable'; // old binary without the native module — caller falls back
+    return { ok: false, reason: 'unavailable' }; // old binary — caller falls back
   }
   try {
     GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
     const res = await GoogleSignin.signIn();
-    if (res.type === 'cancelled') return 'cancelled';
+    if (res.type === 'cancelled') return { ok: false, reason: 'cancelled' };
     const idToken = res.data?.idToken;
-    if (!idToken) throw new Error('NO_ID_TOKEN');
+    if (!idToken) return { ok: false, reason: 'failed', code: 'NO_ID_TOKEN' };
     const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
-    if (error) throw error;
-    return 'success'; // onAuthStateChange flips the gate like every other sign-in
+    if (error) return { ok: false, reason: 'failed', code: diagnosticCode(error) };
+    return { ok: true }; // onAuthStateChange flips the gate like every other sign-in
   } catch (e) {
     const code = (e as { code?: string }).code;
     // User backed out of the sheet — not an error, not a fallback trigger.
-    if (code === 'SIGN_IN_CANCELLED' || code === '12501') return 'cancelled';
-    // Genuine failure (Play Services missing, audience misconfig, network):
-    // let the caller decide; browser flow is the safety net.
-    throw e;
+    if (code === 'SIGN_IN_CANCELLED' || code === '12501') return { ok: false, reason: 'cancelled' };
+    // DEVELOPER_ERROR (code 10) lands here when the Play App Signing SHA-1 for
+    // com.oofoo.shop is not registered as an Android OAuth client in project
+    // oofoo-be2e0 — the code is what tells us that from a user's report.
+    return { ok: false, reason: 'failed', code: diagnosticCode(e) };
   }
 }
 
@@ -208,11 +227,12 @@ export type AppleSignInResult =
   | { ok: false; reason: 'failed'; code: string };
 
 /**
- * A short, token-free code for diagnostics/telemetry. NEVER include the
- * identity token or any credential — only the provider's own error code or a
- * clipped message word, so a failure is reportable without leaking secrets.
+ * A short, token-free code for diagnostics/telemetry — shared by the Apple and
+ * Google native flows. NEVER include the identity token or any credential —
+ * only the provider's own error code or a clipped message word, so a failure is
+ * reportable without leaking secrets.
  */
-function appleDiagnosticCode(e: unknown): string {
+function diagnosticCode(e: unknown): string {
   const err = e as { code?: string; status?: number; message?: string } | null;
   if (err?.code) return String(err.code).slice(0, 40);
   if (typeof err?.status === 'number') return `HTTP_${err.status}`;
@@ -247,7 +267,7 @@ export async function signInWithAppleNative(): Promise<AppleSignInResult> {
       token: credential.identityToken,
       nonce: rawNonce,
     });
-    if (error) return { ok: false, reason: 'failed', code: appleDiagnosticCode(error) };
+    if (error) return { ok: false, reason: 'failed', code: diagnosticCode(error) };
     if (!data.session) return { ok: false, reason: 'failed', code: 'NO_SESSION' };
 
     // Apple returns the name ONLY on the first sign-in; a returning user gets
@@ -266,7 +286,7 @@ export async function signInWithAppleNative(): Promise<AppleSignInResult> {
     return { ok: true };
   } catch (e) {
     if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return { ok: false, reason: 'cancelled' };
-    return { ok: false, reason: 'failed', code: appleDiagnosticCode(e) };
+    return { ok: false, reason: 'failed', code: diagnosticCode(e) };
   }
 }
 
