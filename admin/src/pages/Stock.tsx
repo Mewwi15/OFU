@@ -172,6 +172,32 @@ const URGENCY_LABEL: Record<Urgency, string> = {
   idle: 'ไม่ขยับ',
 };
 
+/** One boxed figure in the overview. Every tile has the same frame, label size
+ *  and value size, so the block scans as a set instead of loose text; `hint`
+ *  carries what the number means, which is the part that was missing. */
+function StatTile({
+  label, value, hint, accent, span2,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  accent?: string;
+  span2?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg px-3 py-2.5 ${span2 ? 'col-span-2' : ''}`}
+      style={{ background: '#FAFAF9', border: '1px solid #EDEAE7' }}
+    >
+      <div style={{ fontSize: 12, color: '#6B625C', lineHeight: 1.4 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: accent ?? '#2B2320' }}>
+        {value}
+      </div>
+      {hint && <div style={{ fontSize: 11, color: '#8C837D', lineHeight: 1.4 }}>{hint}</div>}
+    </div>
+  );
+}
+
 /** Days the shelf lasts at the current rate; null = no sales, never runs out. */
 const daysCoverOf = (i: Item): number | null =>
   i.perDay > 0 ? i.stock / i.perDay : null;
@@ -815,33 +841,40 @@ export function Stock() {
               </div>
             </div>
 
-            <div className="mb-3">
-              <Text style={{ fontSize: 13, color: '#6B625C' }}>เงินจมในสต๊อก</Text>
-              <div>
-                <Text strong style={{ fontSize: 30, lineHeight: 1.15 }}>
-                  {baht(Math.round(totals.costValue))}
-                </Text>
-              </div>
+            {/* Bordered tiles, not bare numbers floating on white — three
+                values with no edges between them read as one blur, and the
+                rows never lined up because only one had a sub-line. Each tile
+                also says what its number MEANS: ฿176,668 next to ฿222,862 is
+                inert until you show that the gap is the margin. */}
+            <div className="grid grid-cols-2 gap-2">
+              <StatTile
+                label="เงินจมในสต๊อก"
+                value={baht(Math.round(totals.costValue))}
+                hint="ต้นทุนของที่วางอยู่บนชั้น"
+                span2
+              />
+              <StatTile
+                label="ขายหมดได้"
+                value={baht(Math.round(totals.saleValue))}
+                hint="ถ้าขายได้ทุกชิ้น"
+              />
+              <StatTile
+                label="กำไรถ้าขายหมด"
+                value={baht(Math.round(totals.saleValue - totals.costValue))}
+                hint={
+                  totals.costValue > 0
+                    ? `+${Math.round(((totals.saleValue - totals.costValue) / totals.costValue) * 100)}% จากทุน`
+                    : undefined
+                }
+                accent="#15803D"
+              />
+              <StatTile
+                label="ของในร้าน"
+                value={`${totals.pieces.toLocaleString('th-TH')} ชิ้น`}
+                hint={`${items.length} รายการ · ${buckets.idle} รายการไม่ขยับ`}
+                span2
+              />
             </div>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Text style={{ fontSize: 13, color: '#6B625C' }}>ขายหมดได้</Text>
-                <div>
-                  <Text strong style={{ fontSize: 19 }}>{baht(Math.round(totals.saleValue))}</Text>
-                </div>
-              </Col>
-              <Col span={12}>
-                <Text style={{ fontSize: 13, color: '#6B625C' }}>ของในร้าน</Text>
-                <div>
-                  <Text strong style={{ fontSize: 19 }}>
-                    {totals.pieces.toLocaleString('th-TH')}
-                    <Text style={{ fontSize: 13, color: '#6B625C' }}> ชิ้น</Text>
-                  </Text>
-                </div>
-                <Text style={{ fontSize: 12, color: '#8C837D' }}>{items.length} รายการ</Text>
-              </Col>
-            </Row>
           </Col>
 
           <Col xs={24} lg={16}>
