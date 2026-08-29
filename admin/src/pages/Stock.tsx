@@ -141,33 +141,27 @@ function flatten(products: Product[], perDay: Record<string, number>): Item[] {
 const itemLabel = (i: { productName: string; size: string | null }) =>
   i.productName + (i.size ? ` (${i.size})` : '');
 
-/* ── "จะหมดเมื่อไหร่" แทน "เหลือกี่ชิ้น" ─────────────────────────────────────
- * A flat low-stock threshold (5 for most of this shop's catalogue) flagged
- * HALF of it at once: something selling one piece a quarter with 4 left looked
- * exactly as urgent as a bestseller with 4 left. The number that actually
- * decides "buy it today?" is how many DAYS the shelf lasts at the rate it
- * really sells — so that is what the page ranks and colours by now.
+/* ── กฎเดียว: เหลือน้อยกว่า 3 ชิ้น = ต้องซื้อ ─────────────────────────────────
+ * Started out ranking by days-of-cover (stock ÷ sales rate). The maths was
+ * sound but the owner had to hold two ideas at once to read the screen, and the
+ * counts it produced disagreed with the plain "shelf is empty" count sitting
+ * next to them. Owner's call: one threshold in pieces, nothing to interpret.
  *
- * The owner has no fixed restock run (the ledger shows gaps of 1, 2, 4, 8, and
- * once 20 days), so the cover target is a control at the top of the page rather
- * than stored config: set it to however long this trip has to last.
- *
- * Anything with no sales in the window has no rate, so it can't run out — it
- * falls to `idle` and sinks to the bottom on its own. That is what silences the
- * hundreds of dead catalogue rows, with no special case anywhere.
+ * The sales rate stays on the page, but only to answer HOW MANY to buy — it no
+ * longer decides WHETHER an item is on the list.
  */
-type Urgency = 'buy' | 'soon' | 'ok' | 'idle';
+const LOW_STOCK_PIECES = 3;
+
+type Urgency = 'buy' | 'ok' | 'idle';
 
 const URGENCY_COLOR: Record<Urgency, string> = {
   buy: '#dc2626',
-  soon: '#c2410c',
   ok: '#15803d',
   idle: '#9CA3AF',
 };
 
 const URGENCY_LABEL: Record<Urgency, string> = {
   buy: 'ต้องซื้อ',
-  soon: 'ใกล้',
   ok: 'พอ',
   idle: 'ไม่ขยับ',
 };
@@ -198,30 +192,20 @@ function StatTile({
   );
 }
 
-/** Days the shelf lasts at the current rate; null = no sales, never runs out. */
-const daysCoverOf = (i: Item): number | null =>
-  i.perDay > 0 ? i.stock / i.perDay : null;
-
-const urgencyOf = (i: Item, coverDays: number): Urgency => {
-  // An empty shelf is a buy, full stop — owner: "ไงก็ต้องซื้ออยู่แล้ว". It used
-  // to fall to `idle` when the item had no recent sales, which split the answer
-  // across two tiles that then disagreed (ต้องซื้อ 56 vs หมดแล้ว 95) for no
-  // reason the person restocking cares about.
-  if (i.stock === 0) return 'buy';
-  const d = daysCoverOf(i);
-  if (d === null) return 'idle';
-  if (d < coverDays) return 'buy';
-  if (d < coverDays * 1.5) return 'soon';
+const urgencyOf = (i: Item): Urgency => {
+  if (i.stock < LOW_STOCK_PIECES) return 'buy';
+  // Not low, but nothing has sold in a month — stock sitting still, which is a
+  // "should we keep carrying this?" question rather than a buying one.
+  if (i.perDay === 0) return 'idle';
   return 'ok';
 };
 
-/** Pieces to buy so the shelf reaches the cover target. An empty shelf with no
- *  sales rate has no computable target, so it asks for one piece rather than
- *  landing on the sheet as "ควรซื้อ 0". */
+/** Pieces to buy. The sales rate sizes the order where we know it; where we
+ *  don't, ask for enough to clear the threshold rather than print a zero on a
+ *  sheet that only lists things needing a buy. */
 const suggestQty = (i: Item, coverDays: number): number => {
-  const target = Math.ceil(i.perDay * coverDays - i.stock);
-  if (i.stock === 0) return Math.max(1, target);
-  return Math.max(0, target);
+  const byRate = Math.ceil(i.perDay * coverDays - i.stock);
+  return Math.max(LOW_STOCK_PIECES - i.stock, byRate, 1);
 };
 
 /* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
@@ -355,10 +339,10 @@ export function Stock() {
   const items = useMemo(() => flatten(products, perDay), [products, perDay]);
 
   const buckets = useMemo(() => {
-    const b: Record<Urgency, number> = { buy: 0, soon: 0, ok: 0, idle: 0 };
-    for (const i of items) b[urgencyOf(i, coverDays)]++;
+    const b: Record<Urgency, number> = { buy: 0, ok: 0, idle: 0 };
+    for (const i of items) b[urgencyOf(i)]++;
     return b;
-  }, [items, coverDays]);
+  }, [items]);
 
   /* ── filters ─────────────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
@@ -375,7 +359,7 @@ export function Stock() {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = items.filter((i) => {
-      if (statusFilter !== 'all' && urgencyOf(i, coverDays) !== statusFilter) return false;
+      if (statusFilter !== 'all' && urgencyOf(i) !== statusFilter) return false;
       if (categoryFilter && i.category !== categoryFilter) return false;
       if (!q) return true;
       return (
@@ -384,16 +368,12 @@ export function Stock() {
         (i.sku ?? '').toLowerCase().includes(q)
       );
     });
-    // Soonest-to-run-out first, so the top of the table IS the shopping list.
-    // Items that never run out (no sales) sort last by construction. Only
-    // re-derives on reload/filter change, never live, so a just-restocked row
-    // doesn't jump away mid-action; column click-sorters still override.
-    return filtered.sort((a, b) => {
-      const da = daysCoverOf(a) ?? Infinity;
-      const db = daysCoverOf(b) ?? Infinity;
-      return da - db || a.stock - b.stock;
-    });
-  }, [items, query, statusFilter, categoryFilter, coverDays]);
+    // Emptiest shelf first, so the top of the table IS the shopping list, and
+    // sorted by the same number the rule reads — no second concept to follow.
+    // Only re-derives on reload/filter change, never live, so a just-restocked
+    // row doesn't jump away mid-action; column click-sorters still override.
+    return filtered.sort((a, b) => a.stock - b.stock || b.perDay - a.perDay);
+  }, [items, query, statusFilter, categoryFilter]);
 
   const totals = useMemo(() => {
     const pieces = items.reduce((s, i) => s + i.stock, 0);
@@ -409,13 +389,13 @@ export function Stock() {
     const acc = new Map<string, { category: string; buy: number; count: number; pieces: number }>();
     for (const i of items) {
       const row = acc.get(i.category) ?? { category: i.category, buy: 0, count: 0, pieces: 0 };
-      if (urgencyOf(i, coverDays) === 'buy') row.buy += 1;
+      if (urgencyOf(i) === 'buy') row.buy += 1;
       row.pieces += i.stock;
       row.count += 1;
       acc.set(i.category, row);
     }
     return [...acc.values()].filter((r) => r.buy > 0).sort((a, b) => b.buy - a.buy);
-  }, [items, coverDays]);
+  }, [items]);
 
   /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
   const [buyListOpen, setBuyListOpen] = useState(false);
@@ -427,9 +407,9 @@ export function Stock() {
   const buyRows = useMemo(
     () =>
       items
-        .filter((i) => urgencyOf(i, coverDays) === 'buy')
-        .sort((a, b) => (daysCoverOf(a) ?? Infinity) - (daysCoverOf(b) ?? Infinity)),
-    [items, coverDays],
+        .filter((i) => urgencyOf(i) === 'buy')
+        .sort((a, b) => a.stock - b.stock || b.perDay - a.perDay),
+    [items],
   );
 
   const buyTotals = useMemo(() => {
@@ -607,37 +587,6 @@ export function Stock() {
         ) : (
           <Text type="secondary" style={{ fontSize: 13 }}>—</Text>
         ),
-    },
-    {
-      title: 'เหลืออีก',
-      width: 120,
-      align: 'right',
-      sorter: (a, b) => (daysCoverOf(a) ?? Infinity) - (daysCoverOf(b) ?? Infinity),
-      render: (_, i) => {
-        const d = daysCoverOf(i);
-        if (d === null) {
-          return (
-            <Tooltip title={`ไม่มียอดขายใน ${SALES_WINDOW_DAYS} วัน — คำนวณไม่ได้`}>
-              <Text type="secondary" style={{ fontSize: 13 }}>ไม่ขยับ</Text>
-            </Tooltip>
-          );
-        }
-        // "<1 วัน" reads as a countdown for something already gone, and every
-        // out-of-stock row said it — call the shelf being empty what it is.
-        if (i.stock === 0) {
-          return (
-            <Text strong style={{ fontSize: 15, color: URGENCY_COLOR.buy }}>
-              หมดแล้ว
-            </Text>
-          );
-        }
-        return (
-          <Text strong style={{ fontSize: 17, color: URGENCY_COLOR[urgencyOf(i, coverDays)] }}>
-            {d < 1 ? '<1' : Math.floor(d)}
-            <Text type="secondary" style={{ fontSize: 12 }}> วัน</Text>
-          </Text>
-        );
-      },
     },
     {
       title: 'ควรซื้อ',
@@ -981,7 +930,6 @@ export function Stock() {
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
                 options={[
                   { label: `${URGENCY_LABEL.buy} (${buckets.buy})`, value: 'buy' },
-                  { label: `${URGENCY_LABEL.soon} (${buckets.soon})`, value: 'soon' },
                   { label: `ทั้งหมด (${items.length})`, value: 'all' },
                   { label: `${URGENCY_LABEL.idle} (${buckets.idle})`, value: 'idle' },
                 ]}
@@ -999,8 +947,8 @@ export function Stock() {
                 actionable is hidden below the fold. */}
             <Text type="secondary" style={{ fontSize: 12 }}>
               {buckets.buy > 0
-                ? `แสดง ${shown.length} รายการ · เรียงของที่จะหมดก่อนขึ้นบนสุด — ${buckets.buy} รายการบนสุดคือของที่ต้องซื้อรอบนี้`
-                : `แสดง ${shown.length} รายการ · ของที่ขายอยู่มีพอขายเกิน ${coverDays} วันทุกรายการ`}
+                ? `แสดง ${shown.length} รายการ · เรียงของที่เหลือน้อยที่สุดขึ้นบนสุด — ${buckets.buy} รายการที่เหลือต่ำกว่า ${LOW_STOCK_PIECES} ชิ้น คือของที่ต้องซื้อรอบนี้`
+                : `แสดง ${shown.length} รายการ · ทุกรายการมีของเหลือตั้งแต่ ${LOW_STOCK_PIECES} ชิ้นขึ้นไป`}
             </Text>
             <Table
               rowKey="variantId"
