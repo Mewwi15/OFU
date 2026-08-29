@@ -87,9 +87,6 @@ const SALES_WINDOW_DAYS = 30;
 /** How long the shelf has to last after a restock run. */
 const COVER_DAYS = 7;
 
-/** Category bars, darkest = most cash tied up. */
-const CAT_BAR = ['#C2410C', '#EA580C', '#F97316', '#FB923C', '#FDBA74', '#FED7AA', '#FFEDD5'];
-
 /** One sellable item (variant) flattened with its product facts. */
 type Item = {
   variantId: string;
@@ -381,20 +378,21 @@ export function Stock() {
     return { pieces, outCount };
   }, [items]);
 
-  /** Items needing a buy, per category — which corner of the shop this trip is
-   *  actually for. Deliberately a COUNT, not a value: money questions (what the
-   *  stock is worth, what margin it carries) belong on รายงาน, which already
-   *  owns them with a date range attached. */
+  /** Every category, split by state. Stacked rather than "items to buy only":
+   *  the buy count alone says what to fetch but not how each part of the shop
+   *  is doing — ของใช้ในบ้าน having 121 to buy reads very differently once you
+   *  see it also has 132 sitting untouched. Counts, not money: value questions
+   *  belong on รายงาน, which owns them with a date range. */
   const byCategory = useMemo(() => {
-    const acc = new Map<string, { category: string; buy: number; count: number; pieces: number }>();
+    type Row = { category: string; buy: number; idle: number; ok: number; count: number };
+    const acc = new Map<string, Row>();
     for (const i of items) {
-      const row = acc.get(i.category) ?? { category: i.category, buy: 0, count: 0, pieces: 0 };
-      if (urgencyOf(i) === 'buy') row.buy += 1;
-      row.pieces += i.stock;
+      const row = acc.get(i.category) ?? { category: i.category, buy: 0, idle: 0, ok: 0, count: 0 };
+      row[urgencyOf(i)] += 1;
       row.count += 1;
       acc.set(i.category, row);
     }
-    return [...acc.values()].filter((r) => r.buy > 0).sort((a, b) => b.buy - a.buy);
+    return [...acc.values()].sort((a, b) => b.buy - a.buy || b.count - a.count);
   }, [items]);
 
   /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
@@ -827,7 +825,7 @@ export function Stock() {
           <Col xs={24} lg={16}>
             <div className="mb-1 flex items-baseline justify-between">
               <Text style={{ fontSize: 13, color: '#6B625C' }}>
-                ต้องซื้อแยกตามหมวดหมู่ — คลิกแท่งเพื่อกรอง
+                สภาพสต๊อกแยกตามหมวดหมู่ — คลิกช่วงสีเพื่อกรอง
               </Text>
               {categoryFilter && (
                 <Button type="link" size="small" onClick={() => setCategoryFilter(null)}>
@@ -840,14 +838,14 @@ export function Stock() {
                 overview is a way into the list rather than a picture beside it. */}
             {byCategory.length === 0 ? (
               <div className="flex h-[140px] items-center justify-center rounded-lg" style={{ background: '#FAFAF9' }}>
-                <Text type="secondary">ไม่มีรายการที่ต้องซื้อรอบนี้</Text>
+                <Text type="secondary">ยังไม่มีสินค้าในระบบ</Text>
               </div>
             ) : (
-            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 40)}>
+            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 36)}>
               <BarChart
                 data={byCategory}
                 layout="vertical"
-                margin={{ top: 0, right: 56, bottom: 0, left: 0 }}
+                margin={{ top: 0, right: 12, bottom: 0, left: 0 }}
                 barCategoryGap={6}
               >
                 <XAxis type="number" hide />
@@ -865,35 +863,49 @@ export function Stock() {
                 />
                 <RcTooltip
                   cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                  formatter={(v: number) => [`${v} รายการ`, 'ต้องซื้อ']}
+                  formatter={(v: number, n: string) => [`${v} รายการ`, n]}
                   labelFormatter={(l: string) => {
                     const r = byCategory.find((c) => c.category === l);
-                    return r ? `${l} — มีทั้งหมด ${r.count} รายการ` : l;
+                    return r ? `${l} — ทั้งหมด ${r.count} รายการ` : l;
                   }}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
-                <Bar
-                  dataKey="buy"
-                  radius={[0, 4, 4, 0]}
-                  cursor="pointer"
-                  onClick={(d: { category?: string }) =>
-                    setCategoryFilter(categoryFilter === d.category ? null : (d.category ?? null))
-                  }
-                  label={{
-                    position: 'right',
-                    fontSize: 12,
-                    fill: '#2B2320',
-                    formatter: (v: number) => `${v} รายการ`,
-                  }}
-                >
-                  {byCategory.map((c, idx) => (
-                    <Cell
-                      key={c.category}
-                      fill={CAT_BAR[Math.min(idx, CAT_BAR.length - 1)]}
-                      opacity={!categoryFilter || categoryFilter === c.category ? 1 : 0.35}
-                    />
-                  ))}
-                </Bar>
+                {/* Stacked: one row per category shows the whole picture, and
+                    each colour is its own click target that sets BOTH filters —
+                    "the 121 ของใช้ในบ้าน I have to buy" is one click. */}
+                {(['buy', 'idle', 'ok'] as Urgency[]).map((u, si) => (
+                  <Bar
+                    key={u}
+                    dataKey={u}
+                    name={URGENCY_LABEL[u]}
+                    stackId="s"
+                    fill={URGENCY_COLOR[u]}
+                    radius={si === 2 ? [0, 4, 4, 0] : undefined}
+                    cursor="pointer"
+                    onClick={(d: { category?: string }) => {
+                      const same = categoryFilter === d.category && statusFilter === u;
+                      setCategoryFilter(same ? null : (d.category ?? null));
+                      setStatusFilter(same ? 'all' : u);
+                    }}
+                    label={
+                      u === 'buy'
+                        ? {
+                            position: 'insideLeft',
+                            fontSize: 11,
+                            fill: '#fff',
+                            formatter: (v: number) => (v > 0 ? String(v) : ''),
+                          }
+                        : undefined
+                    }
+                  >
+                    {byCategory.map((c) => (
+                      <Cell
+                        key={c.category}
+                        opacity={!categoryFilter || categoryFilter === c.category ? 1 : 0.3}
+                      />
+                    ))}
+                  </Bar>
+                ))}
               </BarChart>
             </ResponsiveContainer>
             )}
