@@ -203,6 +203,11 @@ const daysCoverOf = (i: Item): number | null =>
   i.perDay > 0 ? i.stock / i.perDay : null;
 
 const urgencyOf = (i: Item, coverDays: number): Urgency => {
+  // An empty shelf is a buy, full stop — owner: "ไงก็ต้องซื้ออยู่แล้ว". It used
+  // to fall to `idle` when the item had no recent sales, which split the answer
+  // across two tiles that then disagreed (ต้องซื้อ 56 vs หมดแล้ว 95) for no
+  // reason the person restocking cares about.
+  if (i.stock === 0) return 'buy';
   const d = daysCoverOf(i);
   if (d === null) return 'idle';
   if (d < coverDays) return 'buy';
@@ -210,9 +215,14 @@ const urgencyOf = (i: Item, coverDays: number): Urgency => {
   return 'ok';
 };
 
-/** Pieces to buy so the shelf reaches the cover target. */
-const suggestQty = (i: Item, coverDays: number): number =>
-  Math.max(0, Math.ceil(i.perDay * coverDays - i.stock));
+/** Pieces to buy so the shelf reaches the cover target. An empty shelf with no
+ *  sales rate has no computable target, so it asks for one piece rather than
+ *  landing on the sheet as "ควรซื้อ 0". */
+const suggestQty = (i: Item, coverDays: number): number => {
+  const target = Math.ceil(i.perDay * coverDays - i.stock);
+  if (i.stock === 0) return Math.max(1, target);
+  return Math.max(0, target);
+};
 
 /* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
 
@@ -867,10 +877,14 @@ export function Stock() {
                 hint="ไม่เหลือบนชั้นเลย"
                 accent={totals.outCount > 0 ? URGENCY_COLOR.buy : undefined}
               />
+              {/* Same source as the ไม่ขยับ filter below, so the tile and the
+                  chip can never disagree. Now that empty shelves count as a
+                  buy, what is left here is the dead stock proper: goods sitting
+                  on the shelf that nobody has bought in a month. */}
               <StatTile
                 label={`ไม่ขยับ ${SALES_WINDOW_DAYS} วัน`}
                 value={`${buckets.idle} รายการ`}
-                hint="ไม่มียอดขายเลย"
+                hint="มีของค้างแต่ไม่มียอดขาย"
               />
             </div>
           </Col>
