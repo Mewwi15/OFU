@@ -62,16 +62,7 @@ import {
   setStockQty,
   type Product,
 } from '../lib/api';
-import {
-  Bar,
-  BarChart,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip as RcTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RcTooltip } from 'recharts';
 
 import { productThumb } from '../lib/image';
 import { getShopName } from '../lib/orders';
@@ -346,6 +337,16 @@ export function Stock() {
   const coverDays = COVER_DAYS;
 
   const items = useMemo(() => flatten(products, perDay), [products, perDay]);
+
+  /** Ring slices — same three states as the filter chips, so what the ring
+   *  shows and what a click does are never two different things. */
+  const donut = useMemo(
+    () =>
+      (['buy', 'idle', 'ok'] as Urgency[])
+        .map((key) => ({ key, name: URGENCY_LABEL[key], value: items.filter((i) => urgencyOf(i) === key).length }))
+        .filter((d) => d.value > 0),
+    [items],
+  );
 
   const buckets = useMemo(() => {
     const b: Record<Urgency, number> = { buy: 0, ok: 0, idle: 0 };
@@ -837,99 +838,124 @@ export function Stock() {
           <Col xs={24} lg={16}>
             <div className="mb-1 flex items-baseline justify-between">
               <Text style={{ fontSize: 13, color: '#6B625C' }}>
-                สภาพสต๊อกแยกตามหมวดหมู่ — คลิกช่วงสีเพื่อกรอง
+                สภาพสต๊อกทั้งร้าน — คลิกเพื่อกรอง
               </Text>
-              {categoryFilter && (
-                <Button type="link" size="small" onClick={() => setCategoryFilter(null)}>
+              {(categoryFilter || statusFilter !== 'all') && (
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => { setCategoryFilter(null); setStatusFilter('all'); }}
+                >
                   ล้างตัวกรอง
                 </Button>
               )}
             </div>
-            {/* Real chart, not CSS widths — recharts handles the scale, the
-                axis and the hit areas. Clicking a bar filters the table, so the
-                overview is a way into the list rather than a picture beside it. */}
-            {byCategory.length === 0 ? (
-              <div className="flex h-[140px] items-center justify-center rounded-lg" style={{ background: '#FAFAF9' }}>
-                <Text type="secondary">ยังไม่มีสินค้าในระบบ</Text>
-              </div>
-            ) : (
-            <ResponsiveContainer width="100%" height={26 + byCategory.length * 30}>
-              <BarChart
-                data={byCategory}
-                layout="vertical"
-                margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
-                barCategoryGap={10}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  width={118}
-                  tickLine={false}
-                  axisLine={false}
-                  // interval={0} or recharts thins the ticks to fit and drops
-                  // the name off most bars — a category chart where four of
-                  // seven bars are anonymous tells you nothing.
-                  interval={0}
-                  tick={{ fontSize: 13, fill: '#2B2320' }}
-                />
-                <RcTooltip
-                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                  formatter={(v: number, n: string) => [`${v} รายการ`, n]}
-                  labelFormatter={(l: string) => {
-                    const r = byCategory.find((c) => c.category === l);
-                    return r ? `${l} — ทั้งหมด ${r.count} รายการ` : l;
-                  }}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                />
-                <Legend
-                  verticalAlign="top"
-                  align="left"
-                  height={26}
-                  iconType="circle"
-                  iconSize={9}
-                  wrapperStyle={{ fontSize: 12, color: '#6E625C', paddingLeft: 118 }}
-                />
-                {/* Stacked: one row per category shows the whole picture, and
-                    each colour is its own click target that sets BOTH filters —
-                    "the 121 ของใช้ในบ้าน I have to buy" is one click. */}
-                {(['buy', 'idle', 'ok'] as Urgency[]).map((u, si) => (
-                  <Bar
-                    key={u}
-                    dataKey={u}
-                    name={URGENCY_LABEL[u]}
-                    stackId="s"
-                    fill={URGENCY_FILL[u]}
-                    barSize={18}
-                    radius={si === 2 ? [0, 3, 3, 0] : si === 0 ? [3, 0, 0, 3] : undefined}
-                    cursor="pointer"
-                    onClick={(d: { category?: string }) => {
-                      const same = categoryFilter === d.category && statusFilter === u;
-                      setCategoryFilter(same ? null : (d.category ?? null));
-                      setStatusFilter(same ? 'all' : u);
-                    }}
-                    // Count inside the segment only where the block is wide
-                    // enough to hold it — a "2" squeezed into three pixels of
-                    // bar is what made this look untidy.
-                    label={{
-                      position: 'insideLeft',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      fill: u === 'idle' ? '#6E625C' : '#fff',
-                      formatter: (v: number) => (v >= 12 ? String(v) : ''),
+
+            {/* Donut, replacing the stacked bars: seven rows of three colours
+                asked the reader to compare lengths across rows before anything
+                meant anything. One ring answers "how is the shop doing" at a
+                glance, and the list beside it keeps the per-category detail at
+                one line each instead of one bar each. */}
+            <Row gutter={16} align="middle">
+              <Col xs={24} sm={10}>
+                <div style={{ position: 'relative' }}>
+                  <ResponsiveContainer width="100%" height={176}>
+                    <PieChart>
+                      <RcTooltip
+                        formatter={(v: number, n: string) => [`${v} รายการ`, n]}
+                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                      />
+                      <Pie
+                        data={donut}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={52}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        stroke="none"
+                        cursor="pointer"
+                        onClick={(d) =>
+                          setStatusFilter(statusFilter === d.key ? 'all' : (d.key as Urgency))
+                        }
+                      >
+                        {donut.map((d) => (
+                          <Cell
+                            key={d.key}
+                            fill={URGENCY_FILL[d.key]}
+                            opacity={statusFilter === 'all' || statusFilter === d.key ? 1 : 0.3}
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Total sits in the hole: the ring shows the split, the
+                      middle answers "out of how many". */}
+                  <div
+                    style={{
+                      position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
                     }}
                   >
-                    {byCategory.map((c) => (
-                      <Cell
+                    <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.1, color: '#2B2320' }}>
+                      {items.length}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#8C837D' }}>รายการ</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                  {donut.map((d) => (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => setStatusFilter(statusFilter === d.key ? 'all' : d.key)}
+                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+                      className="inline-flex items-center gap-1.5"
+                    >
+                      <i style={{ width: 9, height: 9, borderRadius: 999, background: URGENCY_FILL[d.key] }} />
+                      <span style={{ fontSize: 12, color: '#6E625C' }}>
+                        {d.name} <b style={{ color: '#2B2320' }}>{d.value}</b>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </Col>
+
+              <Col xs={24} sm={14}>
+                <div style={{ maxHeight: 206, overflowY: 'auto' }}>
+                  {byCategory.map((c) => {
+                    const active = categoryFilter === c.category;
+                    return (
+                      <button
                         key={c.category}
-                        opacity={!categoryFilter || categoryFilter === c.category ? 1 : 0.3}
-                      />
-                    ))}
-                  </Bar>
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-            )}
+                        type="button"
+                        onClick={() => setCategoryFilter(active ? null : c.category)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left"
+                        style={{
+                          background: active ? '#F2F5F3' : 'transparent',
+                          border: 0,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span className="flex-1 truncate" style={{ fontSize: 13, color: '#2B2320' }}>
+                          {c.category}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#A8A099' }}>{c.count}</span>
+                        <span
+                          style={{
+                            minWidth: 52, textAlign: 'right', fontSize: 13, fontWeight: 700,
+                            color: c.buy > 0 ? URGENCY_COLOR.buy : '#C9C3BE',
+                          }}
+                        >
+                          {c.buy > 0 ? `ซื้อ ${c.buy}` : '—'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Col>
+            </Row>
           </Col>
         </Row>
       </Card>
