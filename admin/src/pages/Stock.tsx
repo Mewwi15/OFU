@@ -432,7 +432,6 @@ export function Stock() {
           unit: i.unit,
           image: i.image,
           stock: i.stock,
-          perDay: i.perDay,
           buy: suggestQty(i, coverDays),
           cost: i.cost,
         })),
@@ -574,19 +573,6 @@ export function Stock() {
           <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
         </Text>
       ),
-    },
-    {
-      title: 'ขาย/วัน',
-      width: 95,
-      align: 'right',
-      responsive: ['lg'],
-      sorter: (a, b) => a.perDay - b.perDay,
-      render: (_, i) =>
-        i.perDay > 0 ? (
-          <Text style={{ fontSize: 14 }}>{i.perDay.toFixed(1)}</Text>
-        ) : (
-          <Text type="secondary" style={{ fontSize: 13 }}>—</Text>
-        ),
     },
     {
       title: 'ควรซื้อ',
@@ -1042,10 +1028,6 @@ export function Stock() {
             {
               title: 'เหลือ', width: 78, align: 'right',
               render: (_, i: Item) => <Text style={{ fontSize: 14 }}>{i.stock}</Text>,
-            },
-            {
-              title: 'ขาย/วัน', width: 82, align: 'right',
-              render: (_, i: Item) => <Text style={{ fontSize: 14 }}>{i.perDay.toFixed(1)}</Text>,
             },
             {
               title: 'ต้องซื้อ', width: 96, align: 'right',

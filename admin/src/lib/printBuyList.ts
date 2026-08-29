@@ -22,7 +22,6 @@ export type BuyListRow = {
   unit: string | null;
   image: string | undefined;
   stock: number;
-  perDay: number;
   buy: number;
   cost: number | null;
 };
@@ -55,7 +54,6 @@ export function printBuyList(rows: BuyListRow[], shopName: string, coverDays: nu
           <div class="meta">${esc(r.barcode ?? 'ไม่มีบาร์โค้ด')} · ${esc(r.category)}</div>
         </td>
         <td class="left">${r.stock}</td>
-        <td class="rate">${r.perDay.toFixed(1)}</td>
         <td class="buy">${r.buy}<span class="unit"> ${esc(r.unit ?? 'ชิ้น')}</span></td>
         <td class="tick"><span class="cbox"></span></td>
       </tr>`;
@@ -88,7 +86,7 @@ export function printBuyList(rows: BuyListRow[], shopName: string, coverDays: nu
     td.nm { font-size: 18px; font-weight: 700; line-height: 1.3; }
     td.nm .sz { font-size: 15px; font-weight: 400; }
     td.nm .meta { font-size: 12px; font-weight: 400; color: #555; margin-top: 3px; }
-    td.left, td.rate { text-align: center; width: 74px; font-size: 16px; color: #333; }
+    td.left { text-align: center; width: 78px; font-size: 16px; color: #333; }
     /* The number the trip exists to produce — biggest thing on the sheet. */
     td.buy { text-align: center; width: 96px; font-size: 30px; font-weight: 800; }
     td.buy .unit { font-size: 13px; font-weight: 400; color: #444; }
@@ -123,13 +121,13 @@ export function printBuyList(rows: BuyListRow[], shopName: string, coverDays: nu
       <thead>
         <tr>
           <th>#</th><th>รูป</th><th class="nm">สินค้า</th>
-          <th>เหลือ</th><th>ขาย/วัน</th><th>ต้องซื้อ</th><th>✓</th>
+          <th>เหลือ</th><th>ต้องซื้อ</th><th>✓</th>
         </tr>
       </thead>
       <tbody>${body}</tbody>
       <tfoot>
         <tr>
-          <td colspan="5" style="text-align:right">รวม</td>
+          <td colspan="4" style="text-align:right">รวม</td>
           <td style="text-align:center">${pieces.toLocaleString('th-TH')}</td>
           <td></td>
         </tr>
