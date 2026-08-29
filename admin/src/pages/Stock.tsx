@@ -305,7 +305,9 @@ export function Stock() {
 
   /* ── filters ─────────────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | Urgency>('all');
+  // Opens on the buy list, not the catalogue: 58 rows to act on beats 832 rows
+  // to scroll. "ทั้งหมด" is one click away for lookups.
+  const [statusFilter, setStatusFilter] = useState<'all' | Urgency>('buy');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const categories = useMemo(
@@ -449,6 +451,9 @@ export function Stock() {
       title: 'ราคาขาย',
       width: 110,
       align: 'right',
+      // Doesn't feed the buy decision — kept for lookups, dropped on narrower
+      // screens so the four numbers that DO decide it aren't fighting for room.
+      responsive: ['xl'],
       sorter: (a, b) => a.price - b.price,
       render: (_, i) => <Text style={{ fontSize: 14 }}>{baht(i.price)}</Text>,
     },
@@ -495,6 +500,15 @@ export function Stock() {
             </Tooltip>
           );
         }
+        // "<1 วัน" reads as a countdown for something already gone, and every
+        // out-of-stock row said it — call the shelf being empty what it is.
+        if (i.stock === 0) {
+          return (
+            <Text strong style={{ fontSize: 15, color: URGENCY_COLOR.buy }}>
+              หมดแล้ว
+            </Text>
+          );
+        }
         return (
           <Text strong style={{ fontSize: 17, color: URGENCY_COLOR[urgencyOf(i, coverDays)] }}>
             {d < 1 ? '<1' : Math.floor(d)}
@@ -510,9 +524,11 @@ export function Stock() {
       render: (_, i) => {
         const q = suggestQty(i, coverDays);
         if (q === 0) return <Text type="secondary" style={{ fontSize: 13 }}>—</Text>;
+        // The one number the page exists to produce — sized to be read at a
+        // glance while walking the wholesaler's aisles.
         return (
           <Tooltip title={`ให้พอขาย ${coverDays} วันที่อัตรา ${i.perDay.toFixed(1)}/วัน`}>
-            <Text strong style={{ fontSize: 16, color: '#2B2320' }}>
+            <Text strong style={{ fontSize: 22, color: '#2B2320' }}>
               {q}
               <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
             </Text>
@@ -703,42 +719,28 @@ export function Stock() {
             </Text>
           </Col>
 
+          {/* No proportional bar. With 547 of 832 rows idle and 58 needing a
+              buy, a to-scale bar spends 93% of its width on the two states
+              that need no decision and renders the urgent one as a sliver —
+              it drew the eye to exactly the wrong thing. The count in the
+              filter below is the honest summary. */}
           <Col xs={24} md={15}>
-            <div className="flex h-3 w-full overflow-hidden rounded-full" style={{ background: '#F1F0EE' }}>
-              {(['buy', 'soon', 'ok', 'idle'] as Urgency[]).map((u) =>
-                buckets[u] === 0 ? null : (
-                  <Tooltip key={u} title={`${URGENCY_LABEL[u]} ${buckets[u]} รายการ — คลิกเพื่อกรอง`}>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setStatusFilter(statusFilter === u ? 'all' : u)}
-                      onKeyDown={(e) => e.key === 'Enter' && setStatusFilter(statusFilter === u ? 'all' : u)}
-                      style={{
-                        width: `${(buckets[u] / Math.max(items.length, 1)) * 100}%`,
-                        background: URGENCY_COLOR[u],
-                        cursor: 'pointer',
-                        opacity: statusFilter === 'all' || statusFilter === u ? 1 : 0.3,
-                      }}
-                    />
-                  </Tooltip>
-                ),
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <Text style={{ fontSize: 15 }}>รอบนี้ต้องซื้อ</Text>
+              <Text strong style={{ fontSize: 30, lineHeight: 1, color: URGENCY_COLOR.buy }}>
+                {buckets.buy}
+              </Text>
+              <Text style={{ fontSize: 15 }}>รายการ</Text>
+              {buckets.soon > 0 && (
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  · ใกล้อีก {buckets.soon}
+                </Text>
               )}
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              {(['buy', 'soon', 'ok', 'idle'] as Urgency[]).map((u) => (
-                <span key={u} className="inline-flex items-center gap-1.5">
-                  <i style={{ width: 8, height: 8, borderRadius: 999, background: URGENCY_COLOR[u] }} />
-                  <Text style={{ fontSize: 13 }}>
-                    {URGENCY_LABEL[u]} <Text strong>{buckets[u]}</Text>
-                  </Text>
-                </span>
-              ))}
-              <span className="ml-auto">
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  เงินจมในสต๊อก {baht(Math.round(totals.costValue))} · ขายหมดได้ {baht(Math.round(totals.saleValue))}
-                </Text>
-              </span>
-            </div>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              จาก {items.length} รายการ · {buckets.idle} รายการไม่มียอดขายใน {SALES_WINDOW_DAYS} วัน
+              {' · '}เงินจมในสต๊อก {baht(Math.round(totals.costValue))}
+            </Text>
           </Col>
         </Row>
       </Card>
@@ -757,10 +759,10 @@ export function Stock() {
                 value={statusFilter}
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
                 options={[
+                  { label: `${URGENCY_LABEL.buy} (${buckets.buy})`, value: 'buy' },
+                  { label: `${URGENCY_LABEL.soon} (${buckets.soon})`, value: 'soon' },
                   { label: `ทั้งหมด (${items.length})`, value: 'all' },
-                  { label: `ต้องซื้อ (${buckets.buy})`, value: 'buy' },
-                  { label: `ใกล้ (${buckets.soon})`, value: 'soon' },
-                  { label: `ไม่ขยับ (${buckets.idle})`, value: 'idle' },
+                  { label: `${URGENCY_LABEL.idle} (${buckets.idle})`, value: 'idle' },
                 ]}
               />
               <Select
@@ -794,10 +796,10 @@ export function Stock() {
                     ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
                     : 'ยังไม่มีสินค้าในระบบ',
               }}
-              rowClassName={(i) => {
-                const u = urgencyOf(i, coverDays);
-                return u === 'buy' ? 'stock-row-out' : u === 'soon' ? 'stock-row-low' : '';
-              }}
+              // No row tint. Sorting already puts the urgent rows on top, so
+              // tinting them painted the whole first screen pink and the colour
+              // stopped meaning anything — the เหลืออีก figure carries it.
+              rowClassName={() => ''}
             />
           </Space>
         </Card>
