@@ -119,7 +119,7 @@ function flatten(products: Product[], perDay: Record<string, number>): Item[] {
       productId: p.id,
       productName: p.name,
       size: v.size,
-      category: p.categories?.name ?? '—',
+      category: p.categories?.name ?? 'ไม่ระบุหมวด',
       image,
       barcode: v.barcode ?? null,
       sku: v.sku ?? null,
@@ -731,38 +731,55 @@ export function Stock() {
           the same row until you price them. */}
       <Card size="small" styles={{ body: { padding: '16px 18px' } }}>
         <Row gutter={[24, 16]}>
+          {/* Labels at full strength, not the muted grey they were — the owner
+              could not read the summary at a glance. The buy count leads: it is
+              the only figure here that asks for a decision today. */}
           <Col xs={24} lg={8}>
-            <Row gutter={[16, 12]}>
-              <Col xs={8} lg={24}>
-                <Text type="secondary" style={{ fontSize: 12 }}>เงินจมในสต๊อก</Text>
+            <div
+              className="mb-4 rounded-lg px-4 py-3"
+              style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
+            >
+              <Text style={{ fontSize: 13, color: '#7F1D1D' }}>ต้องซื้อรอบนี้</Text>
+              <div className="flex items-baseline gap-2">
+                <Text strong style={{ fontSize: 34, lineHeight: 1.1, color: URGENCY_COLOR.buy }}>
+                  {buckets.buy}
+                </Text>
+                <Text style={{ fontSize: 15, color: '#7F1D1D' }}>รายการ</Text>
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <Text style={{ fontSize: 13, color: '#6B625C' }}>เงินจมในสต๊อก</Text>
+              <div>
+                <Text strong style={{ fontSize: 30, lineHeight: 1.15 }}>
+                  {baht(Math.round(totals.costValue))}
+                </Text>
+              </div>
+            </div>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Text style={{ fontSize: 13, color: '#6B625C' }}>ขายหมดได้</Text>
                 <div>
-                  <Text strong style={{ fontSize: 26, lineHeight: 1.2 }}>
-                    {baht(Math.round(totals.costValue))}
-                  </Text>
+                  <Text strong style={{ fontSize: 19 }}>{baht(Math.round(totals.saleValue))}</Text>
                 </div>
               </Col>
-              <Col xs={8} lg={12}>
-                <Text type="secondary" style={{ fontSize: 12 }}>ขายหมดได้</Text>
+              <Col span={12}>
+                <Text style={{ fontSize: 13, color: '#6B625C' }}>ของในร้าน</Text>
                 <div>
-                  <Text strong style={{ fontSize: 17 }}>{baht(Math.round(totals.saleValue))}</Text>
-                </div>
-              </Col>
-              <Col xs={8} lg={12}>
-                <Text type="secondary" style={{ fontSize: 12 }}>ของในร้าน</Text>
-                <div>
-                  <Text strong style={{ fontSize: 17 }}>
+                  <Text strong style={{ fontSize: 19 }}>
                     {totals.pieces.toLocaleString('th-TH')}
-                    <Text type="secondary" style={{ fontSize: 12 }}> ชิ้น</Text>
+                    <Text style={{ fontSize: 13, color: '#6B625C' }}> ชิ้น</Text>
                   </Text>
                 </div>
-                <Text type="secondary" style={{ fontSize: 11 }}>{items.length} รายการ</Text>
+                <Text style={{ fontSize: 12, color: '#8C837D' }}>{items.length} รายการ</Text>
               </Col>
             </Row>
           </Col>
 
           <Col xs={24} lg={16}>
             <div className="mb-1 flex items-baseline justify-between">
-              <Text type="secondary" style={{ fontSize: 12 }}>เงินจมแยกตามหมวดหมู่</Text>
+              <Text style={{ fontSize: 13, color: '#6B625C' }}>เงินจมแยกตามหมวดหมู่ — คลิกแท่งเพื่อกรอง</Text>
               {categoryFilter && (
                 <Button type="link" size="small" onClick={() => setCategoryFilter(null)}>
                   ล้างตัวกรอง
@@ -772,7 +789,7 @@ export function Stock() {
             {/* Real chart, not CSS widths — recharts handles the scale, the
                 axis and the hit areas. Clicking a bar filters the table, so the
                 overview is a way into the list rather than a picture beside it. */}
-            <ResponsiveContainer width="100%" height={Math.max(120, byCategory.length * 28)}>
+            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 34)}>
               <BarChart
                 data={byCategory}
                 layout="vertical"
@@ -783,10 +800,14 @@ export function Stock() {
                 <YAxis
                   type="category"
                   dataKey="category"
-                  width={104}
+                  width={118}
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 12, fill: '#6B625C' }}
+                  // interval={0} or recharts thins the ticks to fit and drops
+                  // the name off most bars — a category chart where four of
+                  // seven bars are anonymous tells you nothing.
+                  interval={0}
+                  tick={{ fontSize: 13, fill: '#2B2320' }}
                 />
                 <RcTooltip
                   cursor={{ fill: 'rgba(0,0,0,0.04)' }}
