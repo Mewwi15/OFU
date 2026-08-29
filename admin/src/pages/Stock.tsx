@@ -386,25 +386,26 @@ export function Stock() {
   }, [items, query, statusFilter, categoryFilter, coverDays]);
 
   const totals = useMemo(() => {
-    const costValue = items.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
-    const saleValue = items.reduce((s, i) => s + i.price * i.stock, 0);
     const pieces = items.reduce((s, i) => s + i.stock, 0);
-    return { costValue, saleValue, pieces };
+    const outCount = items.filter((i) => i.stock === 0).length;
+    return { pieces, outCount };
   }, [items]);
 
-  /** Cash tied up per category — the overview answer to "how much stock do we
-   *  have", in the unit that decides anything (money, not piece counts). */
+  /** Items needing a buy, per category — which corner of the shop this trip is
+   *  actually for. Deliberately a COUNT, not a value: money questions (what the
+   *  stock is worth, what margin it carries) belong on รายงาน, which already
+   *  owns them with a date range attached. */
   const byCategory = useMemo(() => {
-    const acc = new Map<string, { category: string; cost: number; count: number; pieces: number }>();
+    const acc = new Map<string, { category: string; buy: number; count: number; pieces: number }>();
     for (const i of items) {
-      const row = acc.get(i.category) ?? { category: i.category, cost: 0, count: 0, pieces: 0 };
-      row.cost += (i.cost ?? 0) * i.stock;
+      const row = acc.get(i.category) ?? { category: i.category, buy: 0, count: 0, pieces: 0 };
+      if (urgencyOf(i, coverDays) === 'buy') row.buy += 1;
       row.pieces += i.stock;
       row.count += 1;
       acc.set(i.category, row);
     }
-    return [...acc.values()].sort((a, b) => b.cost - a.cost);
-  }, [items]);
+    return [...acc.values()].filter((r) => r.buy > 0).sort((a, b) => b.buy - a.buy);
+  }, [items, coverDays]);
 
   /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
   const [buyListOpen, setBuyListOpen] = useState(false);
@@ -846,40 +847,36 @@ export function Stock() {
                 rows never lined up because only one had a sub-line. Each tile
                 also says what its number MEANS: ฿176,668 next to ฿222,862 is
                 inert until you show that the gap is the margin. */}
+            {/* Counts only. Money moved out entirely (owner: "เรื่องเงินไม่ต้อง
+                อยู่ในสต๊อกปะครับ") — รายงาน already carries stock value, cost of
+                goods sold and margin with a date range, and repeating a slice of
+                it here answered a question nobody opened this page to ask. */}
             <div className="grid grid-cols-2 gap-2">
-              <StatTile
-                label="เงินจมในสต๊อก"
-                value={baht(Math.round(totals.costValue))}
-                hint="ต้นทุนของที่วางอยู่บนชั้น"
-                span2
-              />
-              <StatTile
-                label="ขายหมดได้"
-                value={baht(Math.round(totals.saleValue))}
-                hint="ถ้าขายได้ทุกชิ้น"
-              />
-              <StatTile
-                label="กำไรถ้าขายหมด"
-                value={baht(Math.round(totals.saleValue - totals.costValue))}
-                hint={
-                  totals.costValue > 0
-                    ? `+${Math.round(((totals.saleValue - totals.costValue) / totals.costValue) * 100)}% จากทุน`
-                    : undefined
-                }
-                accent="#15803D"
-              />
               <StatTile
                 label="ของในร้าน"
                 value={`${totals.pieces.toLocaleString('th-TH')} ชิ้น`}
-                hint={`${items.length} รายการ · ${buckets.idle} รายการไม่ขยับ`}
+                hint={`${items.length} รายการ`}
                 span2
+              />
+              <StatTile
+                label="หมดแล้ว"
+                value={`${totals.outCount} รายการ`}
+                hint="ไม่เหลือบนชั้นเลย"
+                accent={totals.outCount > 0 ? URGENCY_COLOR.buy : undefined}
+              />
+              <StatTile
+                label={`ไม่ขยับ ${SALES_WINDOW_DAYS} วัน`}
+                value={`${buckets.idle} รายการ`}
+                hint="ไม่มียอดขายเลย"
               />
             </div>
           </Col>
 
           <Col xs={24} lg={16}>
             <div className="mb-1 flex items-baseline justify-between">
-              <Text style={{ fontSize: 13, color: '#6B625C' }}>เงินจมแยกตามหมวดหมู่ — คลิกแท่งเพื่อกรอง</Text>
+              <Text style={{ fontSize: 13, color: '#6B625C' }}>
+                ต้องซื้อแยกตามหมวดหมู่ — คลิกแท่งเพื่อกรอง
+              </Text>
               {categoryFilter && (
                 <Button type="link" size="small" onClick={() => setCategoryFilter(null)}>
                   ล้างตัวกรอง
@@ -889,7 +886,12 @@ export function Stock() {
             {/* Real chart, not CSS widths — recharts handles the scale, the
                 axis and the hit areas. Clicking a bar filters the table, so the
                 overview is a way into the list rather than a picture beside it. */}
-            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 34)}>
+            {byCategory.length === 0 ? (
+              <div className="flex h-[140px] items-center justify-center rounded-lg" style={{ background: '#FAFAF9' }}>
+                <Text type="secondary">ไม่มีรายการที่ต้องซื้อรอบนี้</Text>
+              </div>
+            ) : (
+            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 40)}>
               <BarChart
                 data={byCategory}
                 layout="vertical"
@@ -911,15 +913,15 @@ export function Stock() {
                 />
                 <RcTooltip
                   cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                  formatter={(v: number) => [baht(Math.round(v)), 'เงินจม']}
+                  formatter={(v: number) => [`${v} รายการ`, 'ต้องซื้อ']}
                   labelFormatter={(l: string) => {
                     const r = byCategory.find((c) => c.category === l);
-                    return r ? `${l} — ${r.count} รายการ · ${r.pieces.toLocaleString('th-TH')} ชิ้น` : l;
+                    return r ? `${l} — มีทั้งหมด ${r.count} รายการ` : l;
                   }}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
                 <Bar
-                  dataKey="cost"
+                  dataKey="buy"
                   radius={[0, 4, 4, 0]}
                   cursor="pointer"
                   onClick={(d: { category?: string }) =>
@@ -927,9 +929,9 @@ export function Stock() {
                   }
                   label={{
                     position: 'right',
-                    fontSize: 11,
-                    fill: '#6B625C',
-                    formatter: (v: number) => baht(Math.round(v)),
+                    fontSize: 12,
+                    fill: '#2B2320',
+                    formatter: (v: number) => `${v} รายการ`,
                   }}
                 >
                   {byCategory.map((c, idx) => (
@@ -942,6 +944,7 @@ export function Stock() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </Col>
         </Row>
       </Card>
