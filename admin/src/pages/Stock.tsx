@@ -23,6 +23,7 @@ import {
   RiDownload2Line,
   RiImage2Line,
   RiMore2Line,
+  RiPrinterLine,
   RiScales3Line,
   RiUpload2Line,
 } from '@remixicon/react';
@@ -72,6 +73,8 @@ import {
 } from 'recharts';
 
 import { productThumb } from '../lib/image';
+import { getShopName } from '../lib/orders';
+import { printBuyList } from '../lib/printBuyList';
 
 const { Text } = Typography;
 
@@ -376,6 +379,55 @@ export function Stock() {
     }
     return [...acc.values()].sort((a, b) => b.cost - a.cost);
   }, [items]);
+
+  /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
+  const [buyListOpen, setBuyListOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  /** Everything due this run, soonest to run out first — the sheet's contents.
+   *  Independent of the table's filters: the printed list must be the whole
+   *  buy, not whatever category happens to be selected on screen. */
+  const buyRows = useMemo(
+    () =>
+      items
+        .filter((i) => urgencyOf(i, coverDays) === 'buy')
+        .sort((a, b) => (daysCoverOf(a) ?? Infinity) - (daysCoverOf(b) ?? Infinity)),
+    [items, coverDays],
+  );
+
+  const buyTotals = useMemo(() => {
+    const pieces = buyRows.reduce((s, i) => s + suggestQty(i, coverDays), 0);
+    const priced = buyRows.filter((i) => i.cost != null);
+    const estimate = priced.reduce((s, i) => s + (i.cost ?? 0) * suggestQty(i, coverDays), 0);
+    return { pieces, estimate, pricedCount: priced.length };
+  }, [buyRows, coverDays]);
+
+  const doPrintBuyList = async () => {
+    setPrinting(true);
+    try {
+      const shopName = await getShopName();
+      printBuyList(
+        buyRows.map((i) => ({
+          name: i.productName,
+          size: i.size,
+          barcode: i.barcode,
+          category: i.category,
+          unit: i.unit,
+          image: i.image,
+          stock: i.stock,
+          perDay: i.perDay,
+          buy: suggestQty(i, coverDays),
+          cost: i.cost,
+        })),
+        shopName,
+        coverDays,
+      );
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   /* ── row-action modal (เติม / นับ / เกณฑ์เตือน) ─────────────────────────── */
   type Action = 'receive' | 'set' | 'threshold';
@@ -735,11 +787,26 @@ export function Stock() {
               could not read the summary at a glance. The buy count leads: it is
               the only figure here that asks for a decision today. */}
           <Col xs={24} lg={8}>
+            {/* The whole box is the button — the number is what the owner
+                reaches for, so make the target the number, not a link beside it. */}
             <div
-              className="mb-4 rounded-lg px-4 py-3"
-              style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}
+              role="button"
+              tabIndex={0}
+              onClick={() => buckets.buy > 0 && setBuyListOpen(true)}
+              onKeyDown={(e) => e.key === 'Enter' && buckets.buy > 0 && setBuyListOpen(true)}
+              className="mb-4 rounded-lg px-4 py-3 transition-shadow hover:shadow-md"
+              style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                cursor: buckets.buy > 0 ? 'pointer' : 'default',
+              }}
             >
-              <Text style={{ fontSize: 13, color: '#7F1D1D' }}>ต้องซื้อรอบนี้</Text>
+              <div className="flex items-center justify-between">
+                <Text style={{ fontSize: 13, color: '#7F1D1D' }}>ต้องซื้อรอบนี้</Text>
+                {buckets.buy > 0 && (
+                  <Text style={{ fontSize: 12, color: '#B91C1C' }}>ดูใบสั่งซื้อ →</Text>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
                 <Text strong style={{ fontSize: 34, lineHeight: 1.1, color: URGENCY_COLOR.buy }}>
                   {buckets.buy}
@@ -904,6 +971,96 @@ export function Stock() {
             />
           </Space>
         </Card>
+
+      {/* ใบสั่งซื้อของ — on screen for checking, printable for the trip.
+          The browser print dialog's "Save as PDF" covers the PDF ask, so there
+          is no extra library and no server round-trip to make one. */}
+      <Modal
+        open={buyListOpen}
+        onCancel={() => setBuyListOpen(false)}
+        title={`ใบสั่งซื้อของ — ${buyRows.length} รายการ`}
+        width={860}
+        footer={[
+          <Button key="close" onClick={() => setBuyListOpen(false)}>ปิด</Button>,
+          <Button
+            key="print"
+            type="primary"
+            loading={printing}
+            icon={<RiPrinterLine className="w-4 h-4" />}
+            onClick={doPrintBuyList}
+          >
+            พิมพ์ / บันทึก PDF
+          </Button>,
+        ]}
+      >
+        <Row gutter={16} className="mb-3">
+          <Col span={8}>
+            <Text type="secondary" style={{ fontSize: 12 }}>ต้องซื้อ</Text>
+            <div><Text strong style={{ fontSize: 20 }}>{buyRows.length} รายการ</Text></div>
+          </Col>
+          <Col span={8}>
+            <Text type="secondary" style={{ fontSize: 12 }}>รวมจำนวน</Text>
+            <div><Text strong style={{ fontSize: 20 }}>{buyTotals.pieces.toLocaleString('th-TH')} ชิ้น</Text></div>
+          </Col>
+          <Col span={8}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              ประมาณการเงิน
+              {buyTotals.pricedCount < buyRows.length && ` (รู้ทุน ${buyTotals.pricedCount}/${buyRows.length})`}
+            </Text>
+            <div><Text strong style={{ fontSize: 20 }}>{baht(Math.round(buyTotals.estimate))}</Text></div>
+          </Col>
+        </Row>
+
+        <Table
+          rowKey="variantId"
+          size="small"
+          dataSource={buyRows}
+          pagination={false}
+          scroll={{ y: 380 }}
+          columns={[
+            {
+              title: 'สินค้า',
+              render: (_, i: Item) => (
+                <div className="flex items-center gap-2">
+                  <Avatar
+                    shape="square"
+                    size={32}
+                    src={i.image ?? undefined}
+                    style={{ background: '#F5F5F5', color: '#BFBFBF', flex: 'none' }}
+                    icon={<RiImage2Line style={{ fontSize: 15 }} />}
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{itemLabel(i)}</div>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {i.barcode ?? 'ไม่มีบาร์โค้ด'} · {i.category}
+                    </Text>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              title: 'เหลือ', width: 78, align: 'right',
+              render: (_, i: Item) => <Text style={{ fontSize: 14 }}>{i.stock}</Text>,
+            },
+            {
+              title: 'ขาย/วัน', width: 82, align: 'right',
+              render: (_, i: Item) => <Text style={{ fontSize: 14 }}>{i.perDay.toFixed(1)}</Text>,
+            },
+            {
+              title: 'ต้องซื้อ', width: 96, align: 'right',
+              render: (_, i: Item) => (
+                <Text strong style={{ fontSize: 19 }}>
+                  {suggestQty(i, coverDays)}
+                  <Text type="secondary" style={{ fontSize: 11 }}> {i.unit ?? 'ชิ้น'}</Text>
+                </Text>
+              ),
+            },
+          ]}
+        />
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          คำนวณให้พอขายอีก {coverDays} วัน จากยอดขายเฉลี่ย {SALES_WINDOW_DAYS} วันล่าสุด
+        </Text>
+      </Modal>
 
       {/* row action modal */}
       <Modal

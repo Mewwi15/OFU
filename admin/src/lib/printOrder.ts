@@ -31,7 +31,7 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
  * content (incl. images) has loaded, then removes the iframe afterwards. No
  * visible popup window. A timeout fallback prints even if `onload` is missed
  * (e.g. a slow/broken image) and a longer one guarantees cleanup. */
-function printHtml(html: string) {
+export function printHtml(html: string) {
   const iframe = document.createElement('iframe');
   Object.assign(iframe.style, {
     position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0',
@@ -64,7 +64,7 @@ function printHtml(html: string) {
   setTimeout(cleanup, 60000); // safety net so the iframe never lingers
 }
 
-const BASE_CSS = `
+export const BASE_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Sarabun', 'Noto Sans Thai', 'Leelawadee UI', system-ui, sans-serif; color: #000; }
   .muted { color: #333; }
