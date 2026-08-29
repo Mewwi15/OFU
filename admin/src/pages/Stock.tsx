@@ -41,9 +41,10 @@ import {
   Row,
   Segmented,
   Select,
+  Slider,
   Space,
-  Statistic,
   Table,
+  Tooltip,
   Typography,
   Upload,
 } from 'antd';
@@ -56,6 +57,7 @@ import { ACTION_COLOR } from '../lib/actionColors';
 import {
   apiError,
   listProducts,
+  listSalesPerDay,
   receiveStock,
   setStockQty,
   type Product,
@@ -65,6 +67,10 @@ import { productThumb } from '../lib/image';
 const { Text } = Typography;
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
+/** Window the sales rate is averaged over — long enough to smooth a slow week,
+ *  short enough to follow a product going in or out of season. */
+const SALES_WINDOW_DAYS = 30;
 
 /** One sellable item (variant) flattened with its product facts. */
 type Item = {
@@ -83,9 +89,11 @@ type Item = {
   reserved: number;
   available: number;
   threshold: number;
+  /** Units sold per day over the sales window (0 = nothing sold). */
+  perDay: number;
 };
 
-function flatten(products: Product[]): Item[] {
+function flatten(products: Product[], perDay: Record<string, number>): Item[] {
   return products.flatMap((p) => {
     const image = productThumb(
       p.product_images.find((i) => i.is_primary)?.storage_path ?? p.product_images[0]?.storage_path ?? null,
@@ -107,6 +115,7 @@ function flatten(products: Product[]): Item[] {
       reserved: v.reserved_qty,
       available: v.available_qty,
       threshold: v.low_stock_threshold,
+      perDay: perDay[v.id] ?? 0,
     }));
   });
 }
@@ -114,15 +123,52 @@ function flatten(products: Product[]): Item[] {
 const itemLabel = (i: { productName: string; size: string | null }) =>
   i.productName + (i.size ? ` (${i.size})` : '');
 
-const statusOf = (i: Item): 'out' | 'low' | 'ok' =>
-  i.stock === 0 ? 'out' : i.stock <= i.threshold ? 'low' : 'ok';
+/* ── "จะหมดเมื่อไหร่" แทน "เหลือกี่ชิ้น" ─────────────────────────────────────
+ * A flat low-stock threshold (5 for most of this shop's catalogue) flagged
+ * HALF of it at once: something selling one piece a quarter with 4 left looked
+ * exactly as urgent as a bestseller with 4 left. The number that actually
+ * decides "buy it today?" is how many DAYS the shelf lasts at the rate it
+ * really sells — so that is what the page ranks and colours by now.
+ *
+ * The owner has no fixed restock run (the ledger shows gaps of 1, 2, 4, 8, and
+ * once 20 days), so the cover target is a control at the top of the page rather
+ * than stored config: set it to however long this trip has to last.
+ *
+ * Anything with no sales in the window has no rate, so it can't run out — it
+ * falls to `idle` and sinks to the bottom on its own. That is what silences the
+ * hundreds of dead catalogue rows, with no special case anywhere.
+ */
+type Urgency = 'buy' | 'soon' | 'ok' | 'idle';
 
-/** Big-and-obvious status colours (matches the row tint in index.css). */
-const STATUS_COLOR: Record<'ok' | 'low' | 'out', string> = {
+const URGENCY_COLOR: Record<Urgency, string> = {
+  buy: '#dc2626',
+  soon: '#c2410c',
   ok: '#15803d',
-  low: '#c2410c',
-  out: '#dc2626',
+  idle: '#9CA3AF',
 };
+
+const URGENCY_LABEL: Record<Urgency, string> = {
+  buy: 'ต้องซื้อ',
+  soon: 'ใกล้',
+  ok: 'พอ',
+  idle: 'ไม่ขยับ',
+};
+
+/** Days the shelf lasts at the current rate; null = no sales, never runs out. */
+const daysCoverOf = (i: Item): number | null =>
+  i.perDay > 0 ? i.stock / i.perDay : null;
+
+const urgencyOf = (i: Item, coverDays: number): Urgency => {
+  const d = daysCoverOf(i);
+  if (d === null) return 'idle';
+  if (d < coverDays) return 'buy';
+  if (d < coverDays * 1.5) return 'soon';
+  return 'ok';
+};
+
+/** Pieces to buy so the shelf reaches the cover target. */
+const suggestQty = (i: Item, coverDays: number): number =>
+  Math.max(0, Math.ceil(i.perDay * coverDays - i.stock));
 
 /* ── CSV helpers (Excel-friendly: BOM + CRLF; quotes escaped) ─────────────── */
 
@@ -222,10 +268,19 @@ export function Stock() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  /** Sales rate per variant. Missing/failed → every row reads as `idle`, which
+   *  degrades to the plain catalogue rather than to a wall of false alarms. */
+  const [perDay, setPerDay] = useState<Record<string, number>>({});
+
   const reload = useCallback(async (force = false) => {
     setLoading(true);
     try {
-      setProducts(await listProducts(force));
+      const [rows, rate] = await Promise.all([
+        listProducts(force),
+        listSalesPerDay(SALES_WINDOW_DAYS).catch(() => ({} as Record<string, number>)),
+      ]);
+      setProducts(rows);
+      setPerDay(rate);
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -236,13 +291,21 @@ export function Stock() {
     void reload();
   }, [reload]);
 
-  const items = useMemo(() => flatten(products), [products]);
-  const lowCount = useMemo(() => items.filter((i) => statusOf(i) !== 'ok').length, [items]);
-  const outCount = useMemo(() => items.filter((i) => statusOf(i) === 'out').length, [items]);
+  /** How many days this buying trip has to last. No fixed restock run exists,
+   *  so it is a control, not config — see the note above `urgencyOf`. */
+  const [coverDays, setCoverDays] = useState(7);
+
+  const items = useMemo(() => flatten(products, perDay), [products, perDay]);
+
+  const buckets = useMemo(() => {
+    const b: Record<Urgency, number> = { buy: 0, soon: 0, ok: 0, idle: 0 };
+    for (const i of items) b[urgencyOf(i, coverDays)]++;
+    return b;
+  }, [items, coverDays]);
 
   /* ── filters ─────────────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'out'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | Urgency>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const categories = useMemo(
@@ -253,8 +316,7 @@ export function Stock() {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = items.filter((i) => {
-      if (statusFilter === 'low' && statusOf(i) === 'ok') return false;
-      if (statusFilter === 'out' && statusOf(i) !== 'out') return false;
+      if (statusFilter !== 'all' && urgencyOf(i, coverDays) !== statusFilter) return false;
       if (categoryFilter && i.category !== categoryFilter) return false;
       if (!q) return true;
       return (
@@ -263,16 +325,16 @@ export function Stock() {
         (i.sku ?? '').toLowerCase().includes(q)
       );
     });
-    // Triage order: หมด → ใกล้หมด → ปกติ, then lowest stock first — so with
-    // 400+ products the handful that need restocking sit at the top on load.
-    // Only re-derives when items change (reload), never live, so a just-
-    // restocked row doesn't jump away mid-action; column click-sorters still
-    // override (no column sets defaultSortOrder).
-    const rank = { out: 0, low: 1, ok: 2 } as const;
-    return filtered.sort(
-      (a, b) => rank[statusOf(a)] - rank[statusOf(b)] || a.stock - b.stock,
-    );
-  }, [items, query, statusFilter, categoryFilter]);
+    // Soonest-to-run-out first, so the top of the table IS the shopping list.
+    // Items that never run out (no sales) sort last by construction. Only
+    // re-derives on reload/filter change, never live, so a just-restocked row
+    // doesn't jump away mid-action; column click-sorters still override.
+    return filtered.sort((a, b) => {
+      const da = daysCoverOf(a) ?? Infinity;
+      const db = daysCoverOf(b) ?? Infinity;
+      return da - db || a.stock - b.stock;
+    });
+  }, [items, query, statusFilter, categoryFilter, coverDays]);
 
   const totals = useMemo(() => {
     const costValue = items.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
@@ -393,18 +455,70 @@ export function Stock() {
     {
       title: 'คงเหลือ',
       dataIndex: 'stock',
-      width: 150,
+      width: 110,
       align: 'right',
       sorter: (a, b) => a.stock - b.stock,
       render: (s: number, i) => (
-        // One line only — status is carried by the number colour + the row tint.
-        // No reserved/sellable sub-line: this shop deducts stock on order, there
-        // is no reservation hold (owner 2026-07-16).
-        <Text strong style={{ fontSize: 18, color: STATUS_COLOR[statusOf(i)] }}>
+        // Plain now — urgency moved to เหลืออีก, which is the number that
+        // actually decides whether to buy. No reserved/sellable sub-line: this
+        // shop deducts stock on order, there is no reservation hold.
+        <Text strong style={{ fontSize: 17 }}>
           {s}
           <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
         </Text>
       ),
+    },
+    {
+      title: 'ขาย/วัน',
+      width: 95,
+      align: 'right',
+      responsive: ['lg'],
+      sorter: (a, b) => a.perDay - b.perDay,
+      render: (_, i) =>
+        i.perDay > 0 ? (
+          <Text style={{ fontSize: 14 }}>{i.perDay.toFixed(1)}</Text>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 13 }}>—</Text>
+        ),
+    },
+    {
+      title: 'เหลืออีก',
+      width: 120,
+      align: 'right',
+      sorter: (a, b) => (daysCoverOf(a) ?? Infinity) - (daysCoverOf(b) ?? Infinity),
+      render: (_, i) => {
+        const d = daysCoverOf(i);
+        if (d === null) {
+          return (
+            <Tooltip title={`ไม่มียอดขายใน ${SALES_WINDOW_DAYS} วัน — คำนวณไม่ได้`}>
+              <Text type="secondary" style={{ fontSize: 13 }}>ไม่ขยับ</Text>
+            </Tooltip>
+          );
+        }
+        return (
+          <Text strong style={{ fontSize: 17, color: URGENCY_COLOR[urgencyOf(i, coverDays)] }}>
+            {d < 1 ? '<1' : Math.floor(d)}
+            <Text type="secondary" style={{ fontSize: 12 }}> วัน</Text>
+          </Text>
+        );
+      },
+    },
+    {
+      title: 'ควรซื้อ',
+      width: 105,
+      align: 'right',
+      render: (_, i) => {
+        const q = suggestQty(i, coverDays);
+        if (q === 0) return <Text type="secondary" style={{ fontSize: 13 }}>—</Text>;
+        return (
+          <Tooltip title={`ให้พอขาย ${coverDays} วันที่อัตรา ${i.perDay.toFixed(1)}/วัน`}>
+            <Text strong style={{ fontSize: 16, color: '#2B2320' }}>
+              {q}
+              <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
+            </Text>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'จัดการ',
@@ -562,23 +676,72 @@ export function Stock() {
         </Space>
       </div>
 
-      <Row gutter={[12, 12]}>
-        <Col xs={12} md={8}>
-          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-            <Statistic title="รายการสินค้า" value={items.length} />
-          </Card>
-        </Col>
-        <Col xs={12} md={8}>
-          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-            <Statistic title="เงินจมในสต๊อก (ตามทุน)" value={totals.costValue} prefix="฿" />
-          </Card>
-        </Col>
-        <Col xs={12} md={8}>
-          <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-            <Statistic title="ขายหมดได้เงิน (ตามราคาขาย)" value={totals.saleValue} prefix="฿" />
-          </Card>
-        </Col>
-      </Row>
+      {/* Cover target + the mix it produces. The bar segments are the status
+          filter — clicking a colour is the same as picking it in Segmented, so
+          the summary is the way into the list instead of a read-only header. */}
+      <Card size="small" styles={{ body: { padding: '14px 16px' } }}>
+        <Row gutter={[16, 12]} align="middle">
+          <Col xs={24} md={9}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              เผื่อของให้พอขายอีก
+            </Text>
+            <div className="flex items-center gap-3">
+              <Slider
+                min={1}
+                max={30}
+                value={coverDays}
+                onChange={setCoverDays}
+                style={{ flex: 1, margin: '4px 0' }}
+                tooltip={{ formatter: (v) => `${v} วัน` }}
+              />
+              <Text strong style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
+                {coverDays} วัน
+              </Text>
+            </div>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              ตั้งตามว่าอีกกี่วันจะได้ไปซื้อของรอบหน้า
+            </Text>
+          </Col>
+
+          <Col xs={24} md={15}>
+            <div className="flex h-3 w-full overflow-hidden rounded-full" style={{ background: '#F1F0EE' }}>
+              {(['buy', 'soon', 'ok', 'idle'] as Urgency[]).map((u) =>
+                buckets[u] === 0 ? null : (
+                  <Tooltip key={u} title={`${URGENCY_LABEL[u]} ${buckets[u]} รายการ — คลิกเพื่อกรอง`}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setStatusFilter(statusFilter === u ? 'all' : u)}
+                      onKeyDown={(e) => e.key === 'Enter' && setStatusFilter(statusFilter === u ? 'all' : u)}
+                      style={{
+                        width: `${(buckets[u] / Math.max(items.length, 1)) * 100}%`,
+                        background: URGENCY_COLOR[u],
+                        cursor: 'pointer',
+                        opacity: statusFilter === 'all' || statusFilter === u ? 1 : 0.3,
+                      }}
+                    />
+                  </Tooltip>
+                ),
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              {(['buy', 'soon', 'ok', 'idle'] as Urgency[]).map((u) => (
+                <span key={u} className="inline-flex items-center gap-1.5">
+                  <i style={{ width: 8, height: 8, borderRadius: 999, background: URGENCY_COLOR[u] }} />
+                  <Text style={{ fontSize: 13 }}>
+                    {URGENCY_LABEL[u]} <Text strong>{buckets[u]}</Text>
+                  </Text>
+                </span>
+              ))}
+              <span className="ml-auto">
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  เงินจมในสต๊อก {baht(Math.round(totals.costValue))} · ขายหมดได้ {baht(Math.round(totals.saleValue))}
+                </Text>
+              </span>
+            </div>
+          </Col>
+        </Row>
+      </Card>
 
       <Card>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -595,8 +758,9 @@ export function Stock() {
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
                 options={[
                   { label: `ทั้งหมด (${items.length})`, value: 'all' },
-                  { label: `ใกล้หมด (${lowCount})`, value: 'low' },
-                  { label: `หมด (${outCount})`, value: 'out' },
+                  { label: `ต้องซื้อ (${buckets.buy})`, value: 'buy' },
+                  { label: `ใกล้ (${buckets.soon})`, value: 'soon' },
+                  { label: `ไม่ขยับ (${buckets.idle})`, value: 'idle' },
                 ]}
               />
               <Select
@@ -611,9 +775,9 @@ export function Stock() {
             {/* Trust line — after the auto-triage-sort, tell the owner nothing
                 actionable is hidden below the fold. */}
             <Text type="secondary" style={{ fontSize: 12 }}>
-              {lowCount > 0
-                ? `แสดง ${shown.length} รายการ · เรียงของที่ต้องเติม (ใกล้หมด ${lowCount} · หมด ${outCount}) ขึ้นบนสุดให้แล้ว`
-                : `แสดง ${shown.length} รายการ · สต๊อกเพียงพอทุกรายการ`}
+              {buckets.buy > 0
+                ? `แสดง ${shown.length} รายการ · เรียงของที่จะหมดก่อนขึ้นบนสุด — ${buckets.buy} รายการบนสุดคือของที่ต้องซื้อรอบนี้`
+                : `แสดง ${shown.length} รายการ · ของที่ขายอยู่มีพอขายเกิน ${coverDays} วันทุกรายการ`}
             </Text>
             <Table
               rowKey="variantId"
@@ -630,13 +794,10 @@ export function Stock() {
                     ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
                     : 'ยังไม่มีสินค้าในระบบ',
               }}
-              rowClassName={(i) =>
-                statusOf(i) === 'out'
-                  ? 'stock-row-out'
-                  : statusOf(i) === 'low'
-                    ? 'stock-row-low'
-                    : ''
-              }
+              rowClassName={(i) => {
+                const u = urgencyOf(i, coverDays);
+                return u === 'buy' ? 'stock-row-out' : u === 'soon' ? 'stock-row-low' : '';
+              }}
             />
           </Space>
         </Card>

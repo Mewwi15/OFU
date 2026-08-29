@@ -854,6 +854,53 @@ export async function listStockMovements(
   return data as StockMovement[];
 }
 
+/**
+ * Units actually sold per variant per day, averaged over the last `days`.
+ *
+ * Read straight off the ledger rather than the sales tables: every channel
+ * (POS + online) already writes there, so one query covers both and no join is
+ * needed. Reasons are summed SIGNED and negated at the end — an online order
+ * that was later cancelled/expired/rejected wrote a matching positive restock
+ * row, so counting only `online_place` would inflate the rate for exactly the
+ * items whose orders fell through.
+ *
+ * Aggregating client-side keeps this a pure front-end change (no migration to
+ * ship before the page works). Volume is small — a month of movements for this
+ * shop is under a thousand rows — but it pages anyway so it does not silently
+ * truncate at PostgREST's row cap as the shop grows. Move it into an RPC if the
+ * row count ever makes the round-trip noticeable.
+ */
+const SALE_LEDGER_REASONS = [
+  'online_place', 'pos_sale',                                        // stock out (negative)
+  'online_cancel_restock', 'online_expiry_restock',                  // put back (positive)
+  'online_reject_restock', 'pos_refund',
+];
+
+export async function listSalesPerDay(days = 30): Promise<Record<string, number>> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const net: Record<string, number> = {};
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('stock_movements_view')
+      .select('variant_id, delta_stock')
+      .in('reason', SALE_LEDGER_REASONS)
+      .gte('created_at', since)
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const r of data ?? []) {
+      net[r.variant_id] = (net[r.variant_id] ?? 0) + r.delta_stock;
+    }
+    if ((data?.length ?? 0) < PAGE) break;
+  }
+  const perDay: Record<string, number> = {};
+  for (const [id, delta] of Object.entries(net)) {
+    const sold = -delta; // ledger is negative when stock leaves
+    if (sold > 0) perDay[id] = sold / days;
+  }
+  return perDay;
+}
+
 /** Goods-in: adds qty to a variant with its own 'receive' ledger reason. */
 /* ── ใบรับเข้าสินค้า (0074 — ย้ายการรับของจาก ETS มาที่นี่) ────────────────── */
 export type GoodsReceipt = {
