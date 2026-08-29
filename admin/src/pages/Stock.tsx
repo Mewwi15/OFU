@@ -388,7 +388,13 @@ export function Stock() {
   const totals = useMemo(() => {
     const pieces = items.reduce((s, i) => s + i.stock, 0);
     const outCount = items.filter((i) => i.stock === 0).length;
-    return { pieces, outCount };
+    // Empty shelves split into two different problems: the ones customers
+    // actually buy (restock them) and the ones nobody has asked for in a month
+    // (a "do we still carry this?" question, not a buying one). Showing the
+    // split stops "หมดแล้ว 95" and "ต้องซื้อ 56" from looking like they
+    // contradict each other.
+    const outSelling = items.filter((i) => i.stock === 0 && i.perDay > 0).length;
+    return { pieces, outCount, outSelling };
   }, [items]);
 
   /** Items needing a buy, per category — which corner of the shop this trip is
@@ -861,7 +867,7 @@ export function Stock() {
               <StatTile
                 label="หมดแล้ว"
                 value={`${totals.outCount} รายการ`}
-                hint="ไม่เหลือบนชั้นเลย"
+                hint={`ต้องซื้อ ${totals.outSelling} · ไม่มีคนซื้อ ${totals.outCount - totals.outSelling}`}
                 accent={totals.outCount > 0 ? URGENCY_COLOR.buy : undefined}
               />
               <StatTile
