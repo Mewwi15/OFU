@@ -41,7 +41,6 @@ import {
   Row,
   Segmented,
   Select,
-  Slider,
   Space,
   Table,
   Tooltip,
@@ -62,6 +61,16 @@ import {
   setStockQty,
   type Product,
 } from '../lib/api';
+import {
+  Bar,
+  BarChart,
+  Cell,
+  ResponsiveContainer,
+  Tooltip as RcTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
 import { productThumb } from '../lib/image';
 
 const { Text } = Typography;
@@ -71,6 +80,12 @@ const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 /** Window the sales rate is averaged over — long enough to smooth a slow week,
  *  short enough to follow a product going in or out of season. */
 const SALES_WINDOW_DAYS = 30;
+
+/** How long the shelf has to last after a restock run. */
+const COVER_DAYS = 7;
+
+/** Category bars, darkest = most cash tied up. */
+const CAT_BAR = ['#C2410C', '#EA580C', '#F97316', '#FB923C', '#FDBA74', '#FED7AA', '#FFEDD5'];
 
 /** One sellable item (variant) flattened with its product facts. */
 type Item = {
@@ -291,9 +306,12 @@ export function Stock() {
     void reload();
   }, [reload]);
 
-  /** How many days this buying trip has to last. No fixed restock run exists,
-   *  so it is a control, not config — see the note above `urgencyOf`. */
-  const [coverDays, setCoverDays] = useState(7);
+  /** Days of stock a run has to leave behind. Was a slider at the top of the
+   *  page; the owner opened the page and had to work out what to type into it
+   *  before it showed anything, which is the wrong trade for a screen you
+   *  glance at. Fixed at a week — the value that covered nearly every gap in
+   *  this shop's own restock history. */
+  const coverDays = COVER_DAYS;
 
   const items = useMemo(() => flatten(products, perDay), [products, perDay]);
 
@@ -341,7 +359,22 @@ export function Stock() {
   const totals = useMemo(() => {
     const costValue = items.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
     const saleValue = items.reduce((s, i) => s + i.price * i.stock, 0);
-    return { costValue, saleValue };
+    const pieces = items.reduce((s, i) => s + i.stock, 0);
+    return { costValue, saleValue, pieces };
+  }, [items]);
+
+  /** Cash tied up per category — the overview answer to "how much stock do we
+   *  have", in the unit that decides anything (money, not piece counts). */
+  const byCategory = useMemo(() => {
+    const acc = new Map<string, { category: string; cost: number; count: number; pieces: number }>();
+    for (const i of items) {
+      const row = acc.get(i.category) ?? { category: i.category, cost: 0, count: 0, pieces: 0 };
+      row.cost += (i.cost ?? 0) * i.stock;
+      row.pieces += i.stock;
+      row.count += 1;
+      acc.set(i.category, row);
+    }
+    return [...acc.values()].sort((a, b) => b.cost - a.cost);
   }, [items]);
 
   /* ── row-action modal (เติม / นับ / เกณฑ์เตือน) ─────────────────────────── */
@@ -692,55 +725,102 @@ export function Stock() {
         </Space>
       </div>
 
-      {/* Cover target + the mix it produces. The bar segments are the status
-          filter — clicking a colour is the same as picking it in Segmented, so
-          the summary is the way into the list instead of a read-only header. */}
-      <Card size="small" styles={{ body: { padding: '14px 16px' } }}>
-        <Row gutter={[16, 12]} align="middle">
-          <Col xs={24} md={9}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              เผื่อของให้พอขายอีก
-            </Text>
-            <div className="flex items-center gap-3">
-              <Slider
-                min={1}
-                max={30}
-                value={coverDays}
-                onChange={setCoverDays}
-                style={{ flex: 1, margin: '4px 0' }}
-                tooltip={{ formatter: (v) => `${v} วัน` }}
-              />
-              <Text strong style={{ fontSize: 18, whiteSpace: 'nowrap' }}>
-                {coverDays} วัน
-              </Text>
-            </div>
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              ตั้งตามว่าอีกกี่วันจะได้ไปซื้อของรอบหน้า
-            </Text>
+      {/* Overview first — the page is called สต๊อก, so it opens by answering
+          "how much do we have", and only then "what needs buying". Value, not
+          piece counts: 3,569 pieces of household goods and 25 of fresh food are
+          the same row until you price them. */}
+      <Card size="small" styles={{ body: { padding: '16px 18px' } }}>
+        <Row gutter={[24, 16]}>
+          <Col xs={24} lg={8}>
+            <Row gutter={[16, 12]}>
+              <Col xs={8} lg={24}>
+                <Text type="secondary" style={{ fontSize: 12 }}>เงินจมในสต๊อก</Text>
+                <div>
+                  <Text strong style={{ fontSize: 26, lineHeight: 1.2 }}>
+                    {baht(Math.round(totals.costValue))}
+                  </Text>
+                </div>
+              </Col>
+              <Col xs={8} lg={12}>
+                <Text type="secondary" style={{ fontSize: 12 }}>ขายหมดได้</Text>
+                <div>
+                  <Text strong style={{ fontSize: 17 }}>{baht(Math.round(totals.saleValue))}</Text>
+                </div>
+              </Col>
+              <Col xs={8} lg={12}>
+                <Text type="secondary" style={{ fontSize: 12 }}>ของในร้าน</Text>
+                <div>
+                  <Text strong style={{ fontSize: 17 }}>
+                    {totals.pieces.toLocaleString('th-TH')}
+                    <Text type="secondary" style={{ fontSize: 12 }}> ชิ้น</Text>
+                  </Text>
+                </div>
+                <Text type="secondary" style={{ fontSize: 11 }}>{items.length} รายการ</Text>
+              </Col>
+            </Row>
           </Col>
 
-          {/* No proportional bar. With 547 of 832 rows idle and 58 needing a
-              buy, a to-scale bar spends 93% of its width on the two states
-              that need no decision and renders the urgent one as a sliver —
-              it drew the eye to exactly the wrong thing. The count in the
-              filter below is the honest summary. */}
-          <Col xs={24} md={15}>
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <Text style={{ fontSize: 15 }}>รอบนี้ต้องซื้อ</Text>
-              <Text strong style={{ fontSize: 30, lineHeight: 1, color: URGENCY_COLOR.buy }}>
-                {buckets.buy}
-              </Text>
-              <Text style={{ fontSize: 15 }}>รายการ</Text>
-              {buckets.soon > 0 && (
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  · ใกล้อีก {buckets.soon}
-                </Text>
+          <Col xs={24} lg={16}>
+            <div className="mb-1 flex items-baseline justify-between">
+              <Text type="secondary" style={{ fontSize: 12 }}>เงินจมแยกตามหมวดหมู่</Text>
+              {categoryFilter && (
+                <Button type="link" size="small" onClick={() => setCategoryFilter(null)}>
+                  ล้างตัวกรอง
+                </Button>
               )}
             </div>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              จาก {items.length} รายการ · {buckets.idle} รายการไม่มียอดขายใน {SALES_WINDOW_DAYS} วัน
-              {' · '}เงินจมในสต๊อก {baht(Math.round(totals.costValue))}
-            </Text>
+            {/* Real chart, not CSS widths — recharts handles the scale, the
+                axis and the hit areas. Clicking a bar filters the table, so the
+                overview is a way into the list rather than a picture beside it. */}
+            <ResponsiveContainer width="100%" height={Math.max(120, byCategory.length * 28)}>
+              <BarChart
+                data={byCategory}
+                layout="vertical"
+                margin={{ top: 0, right: 56, bottom: 0, left: 0 }}
+                barCategoryGap={6}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="category"
+                  width={104}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 12, fill: '#6B625C' }}
+                />
+                <RcTooltip
+                  cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                  formatter={(v: number) => [baht(Math.round(v)), 'เงินจม']}
+                  labelFormatter={(l: string) => {
+                    const r = byCategory.find((c) => c.category === l);
+                    return r ? `${l} — ${r.count} รายการ · ${r.pieces.toLocaleString('th-TH')} ชิ้น` : l;
+                  }}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Bar
+                  dataKey="cost"
+                  radius={[0, 4, 4, 0]}
+                  cursor="pointer"
+                  onClick={(d: { category?: string }) =>
+                    setCategoryFilter(categoryFilter === d.category ? null : (d.category ?? null))
+                  }
+                  label={{
+                    position: 'right',
+                    fontSize: 11,
+                    fill: '#6B625C',
+                    formatter: (v: number) => baht(Math.round(v)),
+                  }}
+                >
+                  {byCategory.map((c, idx) => (
+                    <Cell
+                      key={c.category}
+                      fill={CAT_BAR[Math.min(idx, CAT_BAR.length - 1)]}
+                      opacity={!categoryFilter || categoryFilter === c.category ? 1 : 0.35}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </Col>
         </Row>
       </Card>
