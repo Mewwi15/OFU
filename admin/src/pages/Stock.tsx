@@ -66,6 +66,7 @@ import {
   Bar,
   BarChart,
   Cell,
+  Legend,
   ResponsiveContainer,
   Tooltip as RcTooltip,
   XAxis,
@@ -151,10 +152,21 @@ const LOW_STOCK_PIECES = 3;
 
 type Urgency = 'buy' | 'ok' | 'idle';
 
+/** Straight off the admin theme (src/theme.ts) rather than raw tailwind reds
+ *  and greys — the page sits inside a sage-green tool, and #dc2626/#15803d read
+ *  as a foreign widget dropped into it. */
 const URGENCY_COLOR: Record<Urgency, string> = {
-  buy: '#dc2626',
-  ok: '#15803d',
-  idle: '#9CA3AF',
+  buy: '#E5484D',   // colorError
+  ok: '#5B8C6E',    // colorPrimary (sage)
+  idle: '#D6D0CB',  // warm neutral, same family as the borders
+};
+
+/** Softer fills for the chart so seven stacked rows don't vibrate; the solid
+ *  colours above stay for text and the single-figure callouts. */
+const URGENCY_FILL: Record<Urgency, string> = {
+  buy: '#E5484D',
+  ok: '#8FB3A0',
+  idle: '#E9E4DF',
 };
 
 const URGENCY_LABEL: Record<Urgency, string> = {
@@ -764,24 +776,24 @@ export function Stock() {
               tabIndex={0}
               onClick={() => buckets.buy > 0 && setBuyListOpen(true)}
               onKeyDown={(e) => e.key === 'Enter' && buckets.buy > 0 && setBuyListOpen(true)}
-              className="mb-4 rounded-lg px-4 py-3 transition-shadow hover:shadow-md"
+              className="mb-3 rounded-lg px-4 py-3 transition-shadow hover:shadow-md"
               style={{
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
+                background: '#FDF3F3',
+                border: `1px solid ${URGENCY_COLOR.buy}33`,
                 cursor: buckets.buy > 0 ? 'pointer' : 'default',
               }}
             >
               <div className="flex items-center justify-between">
-                <Text style={{ fontSize: 13, color: '#7F1D1D' }}>ต้องซื้อรอบนี้</Text>
+                <Text style={{ fontSize: 13, color: '#8C4B4D' }}>ต้องซื้อรอบนี้</Text>
                 {buckets.buy > 0 && (
-                  <Text style={{ fontSize: 12, color: '#B91C1C' }}>ดูใบสั่งซื้อ →</Text>
+                  <Text style={{ fontSize: 12, color: URGENCY_COLOR.buy }}>ดูใบสั่งซื้อ →</Text>
                 )}
               </div>
               <div className="flex items-baseline gap-2">
                 <Text strong style={{ fontSize: 34, lineHeight: 1.1, color: URGENCY_COLOR.buy }}>
                   {buckets.buy}
                 </Text>
-                <Text style={{ fontSize: 15, color: '#7F1D1D' }}>รายการ</Text>
+                <Text style={{ fontSize: 15, color: '#8C4B4D' }}>รายการ</Text>
               </div>
             </div>
 
@@ -841,12 +853,12 @@ export function Stock() {
                 <Text type="secondary">ยังไม่มีสินค้าในระบบ</Text>
               </div>
             ) : (
-            <ResponsiveContainer width="100%" height={Math.max(140, byCategory.length * 36)}>
+            <ResponsiveContainer width="100%" height={26 + byCategory.length * 30}>
               <BarChart
                 data={byCategory}
                 layout="vertical"
-                margin={{ top: 0, right: 12, bottom: 0, left: 0 }}
-                barCategoryGap={6}
+                margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
+                barCategoryGap={10}
               >
                 <XAxis type="number" hide />
                 <YAxis
@@ -870,6 +882,14 @@ export function Stock() {
                   }}
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                 />
+                <Legend
+                  verticalAlign="top"
+                  align="left"
+                  height={26}
+                  iconType="circle"
+                  iconSize={9}
+                  wrapperStyle={{ fontSize: 12, color: '#6E625C', paddingLeft: 118 }}
+                />
                 {/* Stacked: one row per category shows the whole picture, and
                     each colour is its own click target that sets BOTH filters —
                     "the 121 ของใช้ในบ้าน I have to buy" is one click. */}
@@ -879,24 +899,25 @@ export function Stock() {
                     dataKey={u}
                     name={URGENCY_LABEL[u]}
                     stackId="s"
-                    fill={URGENCY_COLOR[u]}
-                    radius={si === 2 ? [0, 4, 4, 0] : undefined}
+                    fill={URGENCY_FILL[u]}
+                    barSize={18}
+                    radius={si === 2 ? [0, 3, 3, 0] : si === 0 ? [3, 0, 0, 3] : undefined}
                     cursor="pointer"
                     onClick={(d: { category?: string }) => {
                       const same = categoryFilter === d.category && statusFilter === u;
                       setCategoryFilter(same ? null : (d.category ?? null));
                       setStatusFilter(same ? 'all' : u);
                     }}
-                    label={
-                      u === 'buy'
-                        ? {
-                            position: 'insideLeft',
-                            fontSize: 11,
-                            fill: '#fff',
-                            formatter: (v: number) => (v > 0 ? String(v) : ''),
-                          }
-                        : undefined
-                    }
+                    // Count inside the segment only where the block is wide
+                    // enough to hold it — a "2" squeezed into three pixels of
+                    // bar is what made this look untidy.
+                    label={{
+                      position: 'insideLeft',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      fill: u === 'idle' ? '#6E625C' : '#fff',
+                      formatter: (v: number) => (v >= 12 ? String(v) : ''),
+                    }}
                   >
                     {byCategory.map((c) => (
                       <Cell
