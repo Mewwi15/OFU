@@ -34,17 +34,71 @@ const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 const C = { brand: '#5B8C6E', err: '#E5484D', warn: '#E08C00', ok: '#1E9E5C', muted: '#6E625C' };
 
-/** ช่องตัวเลขในแถบสรุป — ขนาดเท่ากันทุกใบ อ่านเป็นชุดเดียว */
+/** ช่องตัวเลขในแถบสรุป
+ *
+ * ตัวเลขเงินคือสิ่งที่คนเปิดหน้านี้มาอ่าน จึงให้มันใหญ่จริง (28px) และป้ายกำกับ
+ * ใช้สีเข้มพออ่านออก ไม่ใช่เทาจาง ๆ ของ antd secondary — เจ้าของทักสองหน้าแล้ว
+ * ว่า "ตัวเลขไม่ชัด" ทั้งที่หน้าจอมีที่เหลือเฟือ
+ */
 function Tile({
-  label, value, hint, accent, big,
-}: { label: string; value: string; hint?: string; accent?: string; big?: boolean }) {
+  label, value, hint, accent,
+}: { label: string; value: string; hint?: string; accent?: string }) {
   return (
     <div className="rounded-lg px-4 py-3" style={{ background: '#FAFAF9', border: '1px solid #EDEAE7' }}>
-      <div style={{ fontSize: 12, color: C.muted }}>{label}</div>
-      <div style={{ fontSize: big ? 30 : 22, fontWeight: 700, lineHeight: 1.25, color: accent ?? '#2B2320' }}>
+      <div style={{ fontSize: 13, color: '#5C534E', lineHeight: 1.4 }}>{label}</div>
+      <div
+        style={{
+          fontSize: 28, fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap',
+          color: accent ?? '#2B2320', fontVariantNumeric: 'tabular-nums',
+        }}
+      >
         {value}
       </div>
-      {hint && <div style={{ fontSize: 11, color: '#8C837D' }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 12, color: '#8C837D', lineHeight: 1.4 }}>{hint}</div>}
+    </div>
+  );
+}
+
+/** ตัวเลขพระเอกของหน้า — ได้การ์ดของตัวเอง ไม่ต้องแย่งพื้นที่กับช่องอื่น
+ *  4 ช่องที่เหลือเป็นข้อมูลประกอบ ตัวเลขนี้คือคำตอบว่าลิ้นชักควรมีเท่าไหร่ */
+function HeroTile({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div
+      className="flex h-full flex-col justify-center rounded-lg px-5 py-4"
+      style={{ background: '#F2F6F3', border: `1px solid ${C.brand}33` }}
+    >
+      <div style={{ fontSize: 14, color: '#4A5F52' }}>{label}</div>
+      <div
+        style={{
+          fontSize: 44, fontWeight: 800, lineHeight: 1.1, color: C.brand,
+          whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </div>
+      {hint && <div style={{ fontSize: 12, color: '#6E7E73' }}>{hint}</div>}
+    </div>
+  );
+}
+
+/** แถวเงิน ป้ายซ้าย ตัวเลขขวา — ตัวเลขเรียงตรงกันด้วย tabular-nums จะได้กวาดตา
+ *  ลงมาเทียบกันได้โดยไม่ต้องเพ่ง */
+function MoneyRow({
+  label, value, strong, muted,
+}: { label: string; value: string; strong?: boolean; muted?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between py-1.5" style={{ borderBottom: '1px solid #F0EDEA' }}>
+      <span style={{ fontSize: 14, color: '#5C534E' }}>{label}</span>
+      <span
+        style={{
+          fontSize: strong ? 20 : 16,
+          fontWeight: strong ? 700 : 500,
+          color: muted ? '#8C837D' : '#2B2320',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -82,8 +136,8 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
             title: 'รอบ',
             render: (_: unknown, r: ShiftRow) => (
               <div>
-                <div style={{ fontSize: 13 }}>{dayjs(r.opened_at).format('DD/MM/YYYY')}</div>
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                <div style={{ fontSize: 14, color: '#2B2320' }}>{dayjs(r.opened_at).format('DD/MM/YYYY')}</div>
+                <Typography.Text style={{ fontSize: 12, color: '#8C837D' }}>
                   {dayjs(r.opened_at).format('HH:mm')} – {r.closed_at ? dayjs(r.closed_at).format('HH:mm') : '—'}
                 </Typography.Text>
               </div>
@@ -91,17 +145,25 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
           },
           {
             title: 'ควรมี', align: 'right' as const, width: 96,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 13 }}>{baht(r.expected_cash ?? 0)}</span>,
+            render: (_: unknown, r: ShiftRow) => (
+              <span style={{ fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>{baht(r.expected_cash ?? 0)}</span>
+            ),
           },
           {
             title: 'นับได้', align: 'right' as const, width: 96,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 13 }}>{baht(r.counted_cash ?? 0)}</span>,
+            render: (_: unknown, r: ShiftRow) => (
+              <span style={{ fontSize: 15, fontVariantNumeric: 'tabular-nums' }}>{baht(r.counted_cash ?? 0)}</span>
+            ),
           },
           {
             title: 'ผลต่าง', align: 'right' as const, width: 110,
             render: (_: unknown, r: ShiftRow) => {
               const v = overShortText(r.over_short ?? 0);
-              return <span style={{ fontSize: 13, fontWeight: 700, color: v.color }}>{v.text}</span>;
+              return (
+                <span style={{ fontSize: 15, fontWeight: 700, color: v.color, fontVariantNumeric: 'tabular-nums' }}>
+                  {v.text}
+                </span>
+              );
             },
           },
         ] as ColumnsType<ShiftRow>)}
@@ -283,13 +345,27 @@ export function Shift() {
           </Typography.Text>
         }
       >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          <Tile label="เงินตั้งต้น" value={baht(shift.opening_float)} />
-          <Tile label="เงินสดขายในรอบ" value={baht(cashInShift)} hint="รวมเก็บเงินปลายทาง" />
-          <Tile label="โอน PromptPay" value={baht(o?.promptpay ?? 0)} hint="ไม่อยู่ในลิ้นชัก" />
-          <Tile label="จำนวนบิล" value={`${o?.count ?? 0} บิล`} hint={o?.count ? `เฉลี่ย ${baht(Math.round((o.gross ?? 0) / o.count))}/บิล` : undefined} />
-          <Tile label="ลิ้นชักควรมีตอนนี้" value={baht(expectedNow)} accent={C.brand} big />
-        </div>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} lg={9}>
+            <HeroTile
+              label="ลิ้นชักควรมีตอนนี้"
+              value={baht(expectedNow)}
+              hint={`เงินตั้งต้น ${baht(shift.opening_float)} + เงินสดขาย ${baht(cashInShift)}`}
+            />
+          </Col>
+          <Col xs={24} lg={15}>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <Tile label="เงินตั้งต้น" value={baht(shift.opening_float)} />
+              <Tile label="เงินสดขายในรอบ" value={baht(cashInShift)} hint="รวมเก็บเงินปลายทาง" />
+              <Tile label="โอน PromptPay" value={baht(o?.promptpay ?? 0)} hint="ไม่อยู่ในลิ้นชัก" />
+              <Tile
+                label="จำนวนบิล"
+                value={`${o?.count ?? 0}`}
+                hint={o?.count ? `เฉลี่ย ${baht(Math.round((o.gross ?? 0) / o.count))} / บิล` : 'ยังไม่มีบิล'}
+              />
+            </div>
+          </Col>
+        </Row>
       </Card>
 
       <Row gutter={[16, 16]}>
@@ -321,12 +397,12 @@ export function Shift() {
                   style={{ background: '#FAFAF9', border: `1px solid ${overShortText(diff).color}33` }}
                 >
                   <div className="flex items-center justify-between">
-                    <span style={{ fontSize: 13, color: C.muted }}>ผลต่างจากที่ควรมี</span>
-                    <span style={{ fontSize: 24, fontWeight: 700, color: overShortText(diff).color }}>
+                    <span style={{ fontSize: 14, color: '#5C534E' }}>ผลต่างจากที่ควรมี</span>
+                    <span style={{ fontSize: 32, fontWeight: 800, color: overShortText(diff).color, fontVariantNumeric: 'tabular-nums' }}>
                       {overShortText(diff).text}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#8C837D' }}>
+                  <div style={{ fontSize: 12, color: '#8C837D' }}>
                     ควรมี {baht(expectedNow)} · นับได้ {baht(Number(counted))} — ตัวตัดสินจริงมาจากเซิร์ฟเวอร์ตอนกดปิด
                   </div>
                 </div>
@@ -337,18 +413,16 @@ export function Shift() {
 
         <Col xs={24} lg={11}>
           <Card title="ยอดขายในรอบนี้" style={{ height: '100%' }}>
-            <Descriptions
-              size="small"
-              column={1}
-              items={[
-                { key: 'g', label: 'ยอดขายรวม', children: <b>{baht(o?.gross ?? 0)}</b> },
-                { key: 'c', label: 'เงินสด', children: baht(o?.cash ?? 0) },
-                { key: 'p', label: 'โอน PromptPay', children: baht(o?.promptpay ?? 0) },
-                { key: 's', label: 'เครดิตร้าน', children: baht(o?.store_credit ?? 0) },
-                { key: 'd', label: 'ส่วนลด', children: `- ${baht(o?.discount ?? 0)}` },
-                { key: 'r', label: 'คืนเงิน', children: `- ${baht(o?.refunds ?? 0)}` },
-              ]}
-            />
+            {/* แถวของเราเอง ไม่ใช้ Descriptions ของ antd — ตัวหนังสือมันเล็กและ
+                จางเกินกว่าจะกวาดตาอ่านตัวเลขเงินได้ */}
+            <div className="mb-3 flex flex-col">
+              <MoneyRow label="ยอดขายรวม" value={baht(o?.gross ?? 0)} strong />
+              <MoneyRow label="เงินสด" value={baht(o?.cash ?? 0)} />
+              <MoneyRow label="โอน PromptPay" value={baht(o?.promptpay ?? 0)} />
+              <MoneyRow label="เครดิตร้าน" value={baht(o?.store_credit ?? 0)} />
+              <MoneyRow label="ส่วนลด" value={`− ${baht(o?.discount ?? 0)}`} muted />
+              <MoneyRow label="คืนเงิน" value={`− ${baht(o?.refunds ?? 0)}`} muted />
+            </div>
             {(dash?.top?.length ?? 0) > 0 && (
               <>
                 <Typography.Text style={{ fontSize: 12, color: C.muted }}>ขายดีในรอบนี้</Typography.Text>
