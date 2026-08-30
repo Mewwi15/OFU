@@ -44,7 +44,17 @@ function useChatUnread(): number {
 export type NavItem = { to: string; label: string; Icon: typeof RiCashLine; ownerOnly?: boolean };
 /** หมวดย่อยในโซน — ใช้เฉพาะหลังร้านที่เมนูเยอะจนต้องแยกอีกชั้น */
 export type NavSection = { title: string; items: NavItem[] };
-export type NavGroup = { title: string; items?: NavItem[]; sections?: NavSection[] };
+export type NavGroup = { title: string; color: string; items?: NavItem[]; sections?: NavSection[] };
+
+/* สีประจำโซน (เจ้าของสั่ง 30 ส.ค. 2026 "หลังร้านกับหน้าร้านแยกสีกันหน่อย")
+ * คุมให้อยู่ตระกูลเดียวกันทั้งสามสี — ความอิ่มสีต่ำและน้ำหนักใกล้กัน ไม่งั้นเมนูข้าง
+ * จะกลายเป็นป้ายไฟ ตัดกับธีมแอดมินที่เป็นเขียวเสจเรียบ ๆ
+ * ใช้แค่ที่หัวโซนกับจุดนำหน้า ไม่ระบายพื้นทั้งแถบ เพราะรายการเมนูต้องอ่านง่ายกว่าหัวข้อ */
+const ZONE = {
+  front: '#5B8C6E',   // เขียวเสจ — สีแบรนด์ ให้โซนที่ทำเงินอยู่ตรงหน้า
+  online: '#4A7C94',  // ฟ้าอมเทา — ลูกค้าอยู่ปลายสาย
+  back: '#8A6A4F',    // น้ำตาลอุ่น — งานหลังบ้าน ไม่ต้องเรียกสายตา
+} as const;
 
 /* เมนูแบ่งสามโซนตามที่เจ้าของสั่ง 30 ส.ค. 2026: หน้าร้าน · ออนไลน์ · หลังร้าน
  *
@@ -63,6 +73,7 @@ export type NavGroup = { title: string; items?: NavItem[]; sections?: NavSection
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'หน้าร้าน',
+    color: ZONE.front,
     items: [
       { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
       { to: '/shift', label: 'เปิด-ปิดรอบ', Icon: RiSafe2Line },
@@ -71,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'ออนไลน์',
+    color: ZONE.online,
     items: [
       { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
       { to: '/chat', label: 'แชตลูกค้า', Icon: RiChat1Line },
@@ -78,6 +90,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'หลังร้าน',
+    color: ZONE.back,
     sections: [
       {
         // ของในร้าน — ตั้งแต่ของเข้ามาจนขึ้นชั้นให้ลูกค้าเห็น
@@ -225,7 +238,18 @@ export function Sidebar({
              เป็นแค่ป้ายคั่น กดพับไม่ได้ */
           type: 'submenu' as const,
           key: g.title,
-          label: g.title,
+          /* จุดสีเป็น "ไอคอน" ของ submenu ไม่ใช่แปะไว้ใน label — ตอนยุบเมนูข้าง
+             antd ซ่อน label เหลือแต่ไอคอน ถ้าเอาจุดไว้ใน label หัวโซนจะกลายเป็น
+             ช่องว่างเปล่า แยกโซนไม่ออกเลยตอนยุบ */
+          icon: (
+            <i
+              style={{
+                width: 9, height: 9, background: g.color,
+                display: 'inline-block', flex: '0 0 9px',
+              }}
+            />
+          ),
+          label: <span style={{ color: g.color, fontWeight: 700 }}>{g.title}</span>,
           children:
             /* ล็อกอยู่ = ซ่อนเมนูหลังร้านทั้งโซน เหลือรายการเดียวไว้ใส่รหัส กดแล้วพาไป
                หน้าสต๊อกซึ่งด่านดักถามรหัสให้เอง ไม่ต้องมีกลไกถามรหัสซ้ำอีกชุด */
