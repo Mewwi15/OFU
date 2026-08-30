@@ -10,6 +10,10 @@
  * อยู่แล้ว ไม่ได้ขัดกับที่สั่ง แค่มีตาข่ายรับไว้ตอนลืมกดปิด
  */
 
+import { useEffect, useState } from 'react';
+
+import { backOfficePinSet } from './api';
+
 const KEY = 'ofu.backOffice.unlocked';
 const EVT = 'ofu-back-office';
 
@@ -54,3 +58,24 @@ const BACK_OFFICE_PATHS = [
 
 export const isBackOfficePath = (pathname: string) =>
   BACK_OFFICE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+/**
+ * หลังร้าน "ล็อกอยู่" แปลว่า ตั้งรหัสไว้แล้ว และยังไม่ได้ปลด
+ *
+ * ต้องถามฐานข้อมูลใหม่ทุกครั้งที่สถานะเปลี่ยน ไม่ใช่ถามครั้งเดียวตอนเปิดแอป —
+ * บั๊กที่เจ้าของเจอ (30 ส.ค.): เปิดแอปค้างไว้ตั้งแต่ยังไม่มีรหัส แล้วไปตั้งรหัส
+ * ในหน้าตั้งค่า ด่านยังจำคำตอบเก่าว่า "ยังไม่มีรหัส" อยู่ กดสต๊อกจึงเข้าได้เลย
+ * โดยไม่ถามอะไร จนกว่าจะรีเฟรชหน้าเว็บ
+ */
+export function useBackOfficeLock(): { locked: boolean; ready: boolean } {
+  const [pinSet, setPinSet] = useState<boolean | null>(null);
+  const [open, setOpen] = useState(isBackOfficeUnlocked);
+
+  useEffect(() => {
+    const load = () => { void backOfficePinSet().then(setPinSet).catch(() => setPinSet(false)); };
+    load();
+    return onBackOfficeChange(() => { setOpen(isBackOfficeUnlocked()); load(); });
+  }, []);
+
+  return { locked: pinSet === true && !open, ready: pinSet !== null };
+}

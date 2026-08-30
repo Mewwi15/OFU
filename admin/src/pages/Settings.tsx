@@ -33,6 +33,7 @@ import {
   listDeletionRequests,
   type DeletionRequest,
 } from '../lib/deletionRequests';
+import { unlockBackOffice } from '../lib/backOffice';
 import { contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Text } = Typography;
@@ -81,6 +82,9 @@ function BackOfficePinCard() {
     setBusy(true);
     try {
       await setBackOfficePin(pin);
+      // ปลดให้เลย — เจ้าของเพิ่งพิสูจน์ตัวเองด้วยการตั้งรหัส ถ้าไม่ปลดจะโดนด่าน
+      // เตะออกจากหน้าตั้งค่าที่ยืนอยู่ทันทีที่กดบันทึก
+      unlockBackOffice();
       setIsSet(true); setPin(''); setPin2('');
       message.success('ตั้งรหัสหลังร้านแล้ว');
     } catch (e) {

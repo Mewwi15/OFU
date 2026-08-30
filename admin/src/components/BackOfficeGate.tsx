@@ -17,18 +17,11 @@
 import { RiLock2Line } from '@remixicon/react';
 import { Button, Card, Input, message } from 'antd';
 import type { InputRef } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { apiError, backOfficePinSet, verifyBackOfficePin } from '../lib/api';
-import {
-  isBackOfficePath,
-  isBackOfficeUnlocked,
-  onBackOfficeChange,
-  unlockBackOffice,
-} from '../lib/backOffice';
-
-
+import { apiError, verifyBackOfficePin } from '../lib/api';
+import { isBackOfficePath, unlockBackOffice, useBackOfficeLock } from '../lib/backOffice';
 
 const C = { brand: '#5B8C6E' };
 const INK = { strong: '#2B2320', body: '#5C534E' } as const;
@@ -38,26 +31,16 @@ export function BackOfficeGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const gated = isBackOfficePath(pathname);
 
-  // null = ยังไม่รู้ว่าร้านนี้ตั้งรหัสไว้หรือยัง (อย่าเพิ่งตัดสินว่าต้องใส่)
-  const [pinExists, setPinExists] = useState<boolean | null>(null);
-  const [ok, setOk] = useState(isBackOfficeUnlocked);
+  const { locked, ready } = useBackOfficeLock();
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<InputRef>(null);
-
-  useEffect(() => {
-    backOfficePinSet().then(setPinExists).catch(() => setPinExists(false));
-  }, []);
-
-  // ตามสถานะกลาง — ปุ่มล็อกบนแถบบนกดเมื่อไหร่ ด่านต้องเด้งกลับมาทันที
-  useEffect(() => onBackOfficeChange(() => setOk(isBackOfficeUnlocked())), []);
 
   const submit = async () => {
     setBusy(true);
     try {
       if (await verifyBackOfficePin(pin)) {
         unlockBackOffice();
-        setOk(true);
         setPin('');
       } else {
         message.error('รหัสไม่ถูกต้อง');
@@ -72,8 +55,9 @@ export function BackOfficeGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (!gated || ok || pinExists === false) return <>{children}</>;
-  if (pinExists === null) return null;   // รอคำตอบ อย่าเพิ่งกะพริบด่านขึ้นมา
+  if (!gated) return <>{children}</>;
+  if (!ready) return null;              // ยังไม่รู้ว่าตั้งรหัสไว้ไหม อย่าเพิ่งกะพริบด่าน
+  if (!locked) return <>{children}</>;
 
   return (
     <div className="grid place-items-center" style={{ minHeight: '70vh' }}>

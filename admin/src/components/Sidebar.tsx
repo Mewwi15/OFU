@@ -10,6 +10,7 @@ import {
   RiHistoryLine,
   RiRocket2Line,
   RiImageLine,
+  RiLock2Line,
   RiLogoutBoxRLine,
   RiMegaphoneLine,
   RiMenuFoldLine,
@@ -25,6 +26,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
+import { useBackOfficeLock } from '../lib/backOffice';
 import { subscribeChatActivity, totalUnread } from '../lib/chat';
 
 /** Live unread-chat total for the sidebar badge (best-effort). */
@@ -140,6 +142,7 @@ export function Sidebar({
   const chatUnread = useChatUnread();
   const active = NAV.find((n) => navMatches(pathname, n.to))?.to ?? '/pos';
   const isOwner = profile?.tier === 'owner';
+  const { locked: backOfficeLocked } = useBackOfficeLock();
 
   return (
     <div className="flex flex-col h-full">
@@ -153,7 +156,22 @@ export function Sidebar({
           nav(key);
           onNavigate?.();
         }}
-        items={NAV_GROUPS.map((g) => ({
+        items={NAV_GROUPS.map((g) =>
+          /* ล็อกอยู่ = ซ่อนเมนูหลังร้านทั้งกลุ่ม เหลือปุ่มเดียวไว้ใส่รหัส (เจ้าของสั่ง
+             30 ส.ค.: "ต้องซ่อนเมนูหลังร้านด้วย ถ้าใส่ถึงจะเห็น") — กดแล้วพาไปหน้าสต๊อก
+             ซึ่งด่านจะดักถามรหัสให้เอง ไม่ต้องมีกลไกถามรหัสซ้ำอีกชุด */
+          g.title === 'หลังร้าน' && backOfficeLocked
+            ? {
+                type: 'group' as const,
+                key: g.title,
+                label: g.title,
+                children: [{
+                  key: '/stock',
+                  icon: <RiLock2Line className="w-[18px] h-[18px]" />,
+                  label: 'ใส่รหัสเพื่อเข้า',
+                }],
+              }
+            : ({
           type: 'group' as const,
           key: g.title,
           label: g.title,
@@ -172,7 +190,7 @@ export function Sidebar({
                   n.label
                 ),
             })),
-        }))}
+          }))}
       />
       <div className="p-3 border-t border-[#E8E8E8]">
         <Button
