@@ -115,3 +115,21 @@ body {
 .stock-row-low:hover > td { background: #ffedd5 !important; }
 .stock-row-out > td { background: #fef2f2 !important; }
 .stock-row-out:hover > td { background: #fee2e2 !important; }
+
+/* เมนูข้าง: แยกโซนให้ชัด (เจ้าของสั่ง 30 ส.ค. 2026 "ช่วยแยกให้ชัดเจนนิดนึง")
+   antd วางหัวกลุ่มเป็นตัวเล็กสีจางเท่ากับรายการเมนู สามโซนเลยกลืนเป็นก้อนเดียว
+   ทำให้หัวกลุ่มอ่านเป็น "ป้ายหมวด" จริง ๆ: ตัวเล็กลงแต่เข้มขึ้น เพิ่มระยะห่าง
+   และขีดเส้นคั่นเหนือกลุ่มที่สองเป็นต้นไป (กลุ่มแรกไม่ต้อง จะได้ไม่ซ้ำกับเส้น
+   ใต้โลโก้) */
+.ant-menu-item-group-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em;
+  color: #8C837D !important;
+  padding-block: 8px !important;
+}
+.ant-menu-item-group + .ant-menu-item-group > .ant-menu-item-group-title {
+  margin-top: 14px;
+  padding-top: 14px !important;
+  border-top: 1px solid #EFECEA;
+}
