@@ -42,7 +42,9 @@ function useChatUnread(): number {
 }
 
 export type NavItem = { to: string; label: string; Icon: typeof RiCashLine; ownerOnly?: boolean };
-export type NavGroup = { title: string; items: NavItem[] };
+/** หมวดย่อยในโซน — ใช้เฉพาะหลังร้านที่เมนูเยอะจนต้องแยกอีกชั้น */
+export type NavSection = { title: string; items: NavItem[] };
+export type NavGroup = { title: string; items?: NavItem[]; sections?: NavSection[] };
 
 /* เมนูแบ่งสามโซนตามที่เจ้าของสั่ง 30 ส.ค. 2026: หน้าร้าน · ออนไลน์ · หลังร้าน
  *
@@ -52,6 +54,10 @@ export type NavGroup = { title: string; items: NavItem[] };
  * คนละจังหวะ คนละความเร่งด่วน หาไม่เจอถ้าเอาไปกองรวมกัน
  *
  * หลังร้านคืองานที่นั่งทำตอนว่างหรือปิดร้าน และเป็นโซนเดียวที่ต้องใส่รหัสเข้า
+ * เมนูในนั้นมี 13 อัน ยาวจนเลื่อนหา เจ้าของสั่งให้แยกหมวดอีกชั้น (30 ส.ค.) จึงมี
+ * sections ซ้อนข้างใน ส่วนสองโซนแรกมีไม่กี่อัน ไม่ต้องแยกซ้ำ
+ *
+ * ทุกโซนพับได้ตามที่สั่ง — ใช้ submenu ของ antd ไม่ใช่ group ที่พับไม่ได้
  */
 // eslint-disable-next-line react/only-export-components -- nav data lives beside its component
 export const NAV_GROUPS: NavGroup[] = [
@@ -72,26 +78,52 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'หลังร้าน',
-    items: [
-      { to: '/stock', label: 'สต๊อก', Icon: RiInboxArchiveLine },
-      { to: '/receive', label: 'รับของเข้า', Icon: RiInboxUnarchiveLine },
-      { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
-      { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
-      { to: '/promotions', label: 'โปรโมชั่น', Icon: RiCouponLine, ownerOnly: true },
-      { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
-      { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
-      { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
-      { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
-      { to: '/audit-log', label: 'ประวัติแก้ไข', Icon: RiHistoryLine, ownerOnly: true },
-      { to: '/deploys', label: 'อัปเดตระบบ', Icon: RiRocket2Line, ownerOnly: true },
-      { to: '/staff', label: 'พนักงาน', Icon: RiTeamLine, ownerOnly: true },
-      { to: '/settings', label: 'ตั้งค่า', Icon: RiSettings3Line },
+    sections: [
+      {
+        // ของในร้าน — ตั้งแต่ของเข้ามาจนขึ้นชั้นให้ลูกค้าเห็น
+        title: 'สินค้าและสต๊อก',
+        items: [
+          { to: '/stock', label: 'สต๊อก', Icon: RiInboxArchiveLine },
+          { to: '/receive', label: 'รับของเข้า', Icon: RiInboxUnarchiveLine },
+          { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
+          { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
+        ],
+      },
+      {
+        // ของที่ยิงออกไปหาลูกค้า
+        title: 'การตลาด',
+        items: [
+          { to: '/promotions', label: 'โปรโมชั่น', Icon: RiCouponLine, ownerOnly: true },
+          { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
+          { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
+        ],
+      },
+      {
+        title: 'เงินและรายงาน',
+        items: [
+          { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
+          { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
+        ],
+      },
+      {
+        // ของที่ตั้งครั้งเดียวแล้วแทบไม่กลับมาแตะ
+        title: 'ตั้งค่าระบบ',
+        items: [
+          { to: '/staff', label: 'พนักงาน', Icon: RiTeamLine, ownerOnly: true },
+          { to: '/settings', label: 'ตั้งค่า', Icon: RiSettings3Line },
+          { to: '/audit-log', label: 'ประวัติแก้ไข', Icon: RiHistoryLine, ownerOnly: true },
+          { to: '/deploys', label: 'อัปเดตระบบ', Icon: RiRocket2Line, ownerOnly: true },
+        ],
+      },
     ],
   },
 ];
 
 // eslint-disable-next-line react/only-export-components -- nav data lives beside its component
-export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => [
+  ...(g.items ?? []),
+  ...(g.sections ?? []).flatMap((sec) => sec.items),
+]);
 
 // Match on a path boundary so e.g. "/pos-sales" doesn't get captured by "/pos".
 const navMatches = (pathname: string, to: string) => pathname === to || pathname.startsWith(to + '/');
@@ -147,6 +179,33 @@ export function Sidebar({
   const isOwner = profile?.tier === 'owner';
   const { locked: backOfficeLocked } = useBackOfficeLock();
 
+  /* โซนที่เปิดค้างไว้ — เปิดโซนของหน้าที่ยืนอยู่ให้อัตโนมัติ ไม่งั้นรีเฟรชแล้ว
+     เมนูพับหมดจนมองไม่เห็นว่าตัวเองอยู่ตรงไหน */
+  const zoneOf = (p: string) =>
+    NAV_GROUPS.find((g) =>
+      [...(g.items ?? []), ...(g.sections ?? []).flatMap((sec) => sec.items)].some((n) => navMatches(p, n.to)),
+    )?.title;
+  const [openKeys, setOpenKeys] = useState<string[]>(() => [zoneOf(pathname) ?? 'หน้าร้าน']);
+  useEffect(() => {
+    const z = zoneOf(pathname);
+    if (z) setOpenKeys((cur) => (cur.includes(z) ? cur : [...cur, z]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const navItem = (n: NavItem) => ({
+    key: n.to,
+    icon: <n.Icon className="w-[18px] h-[18px]" />,
+    label:
+      n.to === '/chat' && chatUnread > 0 ? (
+        <span className="flex items-center justify-between gap-2">
+          {n.label}
+          <Badge count={chatUnread} size="small" />
+        </span>
+      ) : (
+        n.label
+      ),
+  });
+
   return (
     <div className="flex flex-col h-full">
       <Brand collapsed={collapsed} onToggle={onToggle} />
@@ -159,41 +218,30 @@ export function Sidebar({
           nav(key);
           onNavigate?.();
         }}
-        items={NAV_GROUPS.map((g) =>
-          /* ล็อกอยู่ = ซ่อนเมนูหลังร้านทั้งกลุ่ม เหลือปุ่มเดียวไว้ใส่รหัส (เจ้าของสั่ง
-             30 ส.ค.: "ต้องซ่อนเมนูหลังร้านด้วย ถ้าใส่ถึงจะเห็น") — กดแล้วพาไปหน้าสต๊อก
-             ซึ่งด่านจะดักถามรหัสให้เอง ไม่ต้องมีกลไกถามรหัสซ้ำอีกชุด */
-          g.title === 'หลังร้าน' && backOfficeLocked
-            ? {
-                type: 'group' as const,
-                key: g.title,
-                label: g.title,
-                children: [{
-                  key: '/stock',
-                  icon: <RiLock2Line className="w-[18px] h-[18px]" />,
-                  label: 'ใส่รหัสเพื่อเข้า',
-                }],
-              }
-            : ({
-          type: 'group' as const,
+        openKeys={openKeys}
+        onOpenChange={setOpenKeys}
+        items={NAV_GROUPS.map((g) => ({
+          /* submenu ไม่ใช่ group เพราะเจ้าของสั่งให้หัวข้อหลักพับได้ — group ของ antd
+             เป็นแค่ป้ายคั่น กดพับไม่ได้ */
+          type: 'submenu' as const,
           key: g.title,
           label: g.title,
-          children: g.items
-            .filter((n) => !n.ownerOnly || isOwner)
-            .map((n) => ({
-              key: n.to,
-              icon: <n.Icon className="w-[18px] h-[18px]" />,
-              label:
-                n.to === '/chat' && chatUnread > 0 ? (
-                  <span className="flex items-center justify-between gap-2">
-                    {n.label}
-                    <Badge count={chatUnread} size="small" />
-                  </span>
-                ) : (
-                  n.label
-                ),
-            })),
-          }))}
+          children:
+            /* ล็อกอยู่ = ซ่อนเมนูหลังร้านทั้งโซน เหลือรายการเดียวไว้ใส่รหัส กดแล้วพาไป
+               หน้าสต๊อกซึ่งด่านดักถามรหัสให้เอง ไม่ต้องมีกลไกถามรหัสซ้ำอีกชุด */
+            g.title === 'หลังร้าน' && backOfficeLocked
+              ? [{ key: '/stock', icon: <RiLock2Line className="w-[18px] h-[18px]" />, label: 'ใส่รหัสเพื่อเข้า' }]
+              : g.sections
+                ? g.sections
+                    .map((sec) => ({
+                      type: 'group' as const,
+                      key: `${g.title}/${sec.title}`,
+                      label: sec.title,
+                      children: sec.items.filter((n) => !n.ownerOnly || isOwner).map(navItem),
+                    }))
+                    .filter((sec) => sec.children.length > 0)
+                : (g.items ?? []).filter((n) => !n.ownerOnly || isOwner).map(navItem),
+        }))}
       />
       <div className="p-3 border-t border-[#E8E8E8]">
         <Button
