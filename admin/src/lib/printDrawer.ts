@@ -118,3 +118,30 @@ export function printNoSaleSlip(s: NoSaleSlip) {
     <div class="sign">ผู้เปิดลิ้นชัก</div>
   </body></html>`);
 }
+
+/**
+ * สลิปสั้นตอนกดนับเงินเปิดรอบ — มีหน้าที่เดียวคือทำให้ลิ้นชักเด้งก่อนนับ
+ *
+ * เจ้าของทัก 30 ส.ค. 2026 ว่ากด "เริ่มนับ" แล้วลิ้นชักไม่เปิด ซึ่งเป็นลำดับที่ผม
+ * วางผิดเอง — เดิมพิมพ์ใบเปิดรอบตอนกดเปิดรอบเสร็จ (คิดถึงแค่จังหวะเอาเงินทอนใส่)
+ * ลืมไปว่าก่อนหน้านั้นต้องนับของที่อยู่ในลิ้นชักก่อน ซึ่งเปิดลิ้นชักไม่ได้เลย
+ *
+ * ตั้งใจให้สั้นที่สุดเท่าที่ยังอ่านรู้เรื่อง เพราะมันคือกระดาษที่พ่นออกมาเพื่อ
+ * กระตุกสลักเท่านั้น ใบเปิดรอบเต็ม ๆ ที่มียอดเงินยังพิมพ์ตอนจบเหมือนเดิม
+ */
+export function printCountKickSlip(shopName: string, cashier: string) {
+  const cfg = getReceiptConfig();
+  const cw = contentMm(cfg.paperWidth);
+  const at = new Date().toISOString();
+
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  <title>นับเงินเปิดรอบ</title>
+  <style>${slipCss(cfg.paperWidth, cw)}
+    body { padding: 2mm 0 3mm; }
+  </style></head><body>
+    <div class="shop">${esc(shopName)}</div>
+    <div class="doc">นับเงินเปิดรอบ</div>
+    ${row('เวลา', `${d(at).format('DD/MM HH:mm')} น.`)}
+    ${cashier ? row('ผู้นับ', esc(cashier)) : ''}
+  </body></html>`);
+}

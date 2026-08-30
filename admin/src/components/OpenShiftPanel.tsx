@@ -22,7 +22,7 @@ import { useEffect, useState } from 'react';
 
 import { apiError, listShifts, listStaff, openShift, type Staff } from '../lib/api';
 import { getShopName } from '../lib/orders';
-import { printShiftOpenSlip } from '../lib/printDrawer';
+import { printCountKickSlip, printShiftOpenSlip } from '../lib/printDrawer';
 import { CashCountModal } from './CashCountModal';
 import { LiveClock } from './LiveClock';
 
@@ -81,6 +81,18 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
       message.error(apiError(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /* กดปุ่มนับ = ลิ้นชักต้องเปิด ทุกครั้ง รวมทั้งตอน "นับใหม่" ด้วย เพราะคนที่กด
+   * นับใหม่มักปิดลิ้นชักไปแล้ว งานพิมพ์คือสิ่งเดียวที่สั่งให้สลักเด้งได้ (printDrawer.ts)
+   * ล้มก็ปล่อยผ่าน ตัวนับต้องเปิดให้ได้อยู่ดี ไม่งั้นเครื่องพิมพ์พังแล้วนับเงินไม่ได้เลย */
+  const startCount = async () => {
+    setCounting(true);
+    try {
+      printCountKickSlip(await getShopName().catch(() => 'ร้านอู้ฟู่'), matched?.name ?? code);
+    } catch {
+      message.warning('เปิดลิ้นชักไม่ได้ — พิมพ์สลิปไม่สำเร็จ');
     }
   };
 
@@ -187,7 +199,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
                 icon={<RiCalculatorLine className="w-5 h-5" />}
                 className="mt-4"
                 style={{ height: 60, fontSize: 20, fontWeight: 600 }}
-                onClick={() => setCounting(true)}
+                onClick={() => void startCount()}
               >
                 {counted == null ? 'เริ่มนับ' : 'นับใหม่'}
               </Button>
