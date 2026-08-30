@@ -11,7 +11,7 @@
  */
 
 
-import type { CashLine } from './api';
+import type { CashLine, CashSummary } from './api';
 import { BASE_CSS, printHtml } from './printOrder';
 import { d } from './time';
 
@@ -36,6 +36,9 @@ export type ShiftReport = {
   overShort: number;
   openedBy: string | null;
   closedBy: string | null;
+  /* บรรทัดกระทบยอดจาก shift_cash_summary (0089) — ใบนี้ต้องพิมพ์สูตรทีละบรรทัด
+     ไม่ใช่โชว์แค่ "ขาด 140" ไม่งั้นเวลาไม่ตรงก็ไม่รู้จะไปเพ่งตรงไหน */
+  recon: CashSummary | null;
   openingBreakdown: CashLine[] | null;
   closingBreakdown: CashLine[] | null;
   top: { name: string; qty: number; amount: number }[];
@@ -143,10 +146,14 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
       ${line('ยอดขายรวม', baht(r.gross), true)}
     </table>
 
-    <h2>ลิ้นชักเงิน</h2>
+    <h2>ลิ้นชักเงิน — ที่มาของยอด "ควรมี" ทีละบรรทัด</h2>
     <table class="kv">
-      ${line('เงินตั้งต้น', baht(r.openingFloat))}
-      ${line('เงินสดรับในรอบ', baht(r.cash))}
+      ${line('เงินตั้งต้น', baht(r.recon?.opening ?? r.openingFloat))}
+      ${line('+ ขายรับเป็นเงินสด', baht(r.recon?.sales ?? r.cash)) }
+      ${(r.recon?.cod ?? 0) !== 0 ? line('+ เงินสด COD', baht(r.recon?.cod ?? 0)) : ''}
+      ${(r.recon?.refunds ?? 0) !== 0 ? line('− คืนเงินลูกค้า', `- ${baht(r.recon?.refunds ?? 0)}`) : ''}
+      ${(r.recon?.paid_in ?? 0) !== 0 ? line('+ นำเงินเข้าระหว่างรอบ', baht(r.recon?.paid_in ?? 0)) : ''}
+      ${(r.recon?.paid_out ?? 0) !== 0 ? line('− นำเงินออกระหว่างรอบ', `- ${baht(r.recon?.paid_out ?? 0)}`) : ''}
       ${line('ควรมีในลิ้นชัก', baht(r.expected), true)}
       ${line('นับได้จริง', baht(r.counted), true)}
     </table>

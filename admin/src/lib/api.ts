@@ -10,6 +10,7 @@ const VALIDATION_DETAIL_TH: Record<string, string> = {
   pin_format: 'รหัสต้องเป็นตัวเลข 4-8 หลัก',
   staff_code_format: 'รหัสพนักงานต้องเป็นตัวเลข',
   staff_name_required: 'กรอกชื่อพนักงาน',
+  amount_positive: 'จำนวนเงินต้องมากกว่า 0',
   'split allows cash/promptpay only': 'แบ่งจ่ายได้เฉพาะเงินสด/พร้อมเพย์เท่านั้น',
   'payments must sum to total': 'ยอดที่แบ่งจ่ายรวมกันไม่เท่ากับยอดสุทธิ',
   code_required: 'กรอกโค้ดส่วนลด',
@@ -830,6 +831,24 @@ export async function listDrawerOpens(shiftId: string): Promise<DrawerOpen[]> {
   if (error) throw error;
   return (data ?? []) as DrawerOpen[];
 }
+
+/* ── กระทบยอดเงินสดในลิ้นชัก (0089) ────────────────────────────────────────────
+ * สูตรเดียวใช้ทั้งจอระหว่างวัน ตอนปิดรอบ และใบที่ปริ้น — เดิมจอกับตอนปิดคำนวณ
+ * คนละที่ด้วยคนละสูตร เลยเพี้ยนกันได้เงียบ ๆ */
+export type CashSummary = {
+  opening: number; sales: number; cod: number;
+  refunds: number; paid_in: number; paid_out: number; expected: number;
+};
+export type CashMovement = { at: string; direction: 'in' | 'out'; amount: number; reason: string; who: string };
+
+export const shiftCashSummary = (shiftId: string) =>
+  rpc<CashSummary>('shift_cash_summary', { p_shift_id: shiftId });
+export const recordCashMovement = (direction: 'in' | 'out', amount: number, reason: string, cashier_code?: string) =>
+  rpc<{ shift_id: string | null }>('record_cash_movement', {
+    p_direction: direction, p_amount: amount, p_reason: reason, p_cashier_code: cashier_code ?? null,
+  });
+export const listCashMovements = (shiftId: string) =>
+  rpc<CashMovement[]>('list_cash_movements', { p_shift_id: shiftId });
 
 /* ── พนักงาน (0087) ──────────────────────────────────────────────────────────
  * 0085 เพิ่มช่องรหัสพนักงานไว้ แต่ใครพิมพ์อะไรก็ผ่าน ตารางนี้ทำให้รหัสมีความหมาย:
