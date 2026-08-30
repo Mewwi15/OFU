@@ -61,6 +61,69 @@ const fmtTime = (iso: string) =>
 
 const SHOP_MODE_LABEL: Record<ShopMode, string> = { delivery: 'จัดส่ง', online: 'ออนไลน์' };
 
+/**
+ * ช่องเลขพัสดุในตาราง — กรอกได้ตรงแถวเลย ไม่ต้องเปิดออเดอร์
+ *
+ * เจ้าของสั่งเพิ่มคอลัมน์นี้ 30 ส.ค. 2026 เพราะเวลาลูกค้าทักมาถามว่าของถึงไหน
+ * ต้องหาเลขพัสดุให้ไว ถ้าต้องคลิกเข้าไปทีละใบก็ไม่ต่างจากจดไว้นอกระบบ
+ *
+ * ใช้ set_order_tracking_no ของเดิม (0046) ไม่ได้ทำที่เก็บใหม่ — parcel_shipments
+ * มีอยู่แล้วพร้อม courier/สถานะ Flash และการยิง push แจ้งลูกค้าตอนของออกจากร้าน
+ */
+function TrackingCell({ order, onSaved }: { order: Order; onSaved: () => void }) {
+  const { message } = App.useApp();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(order.tracking_no ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    const next = value.trim();
+    if (next === (order.tracking_no ?? '')) { setEditing(false); return; }
+    setBusy(true);
+    try {
+      await setOrderTrackingNo(order.id, next);
+      setEditing(false);
+      onSaved();
+      message.success('บันทึกเลขพัสดุแล้ว');
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setValue(order.tracking_no ?? ''); setEditing(true); }}
+        className="text-left w-full"
+        style={{ cursor: 'pointer' }}
+      >
+        {order.tracking_no ? (
+          <span className="font-mono text-[13px] text-[#2B2320]">{order.tracking_no}</span>
+        ) : (
+          <span className="text-[13px] text-[#5B8C6E]">+ ใส่เลขพัสดุ</span>
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <Input
+      size="small"
+      autoFocus
+      disabled={busy}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onPressEnter={() => void save()}
+      onBlur={() => void save()}
+      placeholder="เลขพัสดุ"
+      style={{ fontFamily: 'monospace' }}
+    />
+  );
+}
+
 const ORDER_STATUS: Record<OrderStatus, { label: string; color: string }> = {
   placed: { label: 'สั่งซื้อแล้ว', color: 'default' },
   awaiting_payment: { label: 'รอชำระเงิน', color: 'gold' },
@@ -226,6 +289,31 @@ export function Orders() {
       dataIndex: 'order_number',
       key: 'order_number',
       render: (v: string) => <span className="font-semibold text-[#2B2320]">{v}</span>,
+    },
+    {
+      title: 'ชื่อลูกค้า',
+      key: 'ship_recipient',
+      width: 150,
+      render: (_, o) =>
+        o.ship_recipient ? (
+          <span className="text-[#2B2320]">{o.ship_recipient}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        ),
+    },
+    {
+      /* เลขพัสดุมาจาก parcel_shipments (0046) ซึ่งมีเฉพาะออเดอร์ส่งพัสดุ — ออเดอร์
+         จัดส่งเองใช้ไรเดอร์ ไม่มีเลขพัสดุ จึงไม่ให้กรอก ไม่ใช่ปล่อยให้กรอกแล้วค่อย
+         ให้ RPC เด้ง NOT_PARCEL_ORDER กลับมา */
+      title: 'เลขพัสดุ',
+      key: 'tracking_no',
+      width: 190,
+      render: (_, o) =>
+        o.shop_mode !== 'online' ? (
+          <span className="text-gray-300">—</span>
+        ) : (
+          <TrackingCell order={o} onSaved={load} />
+        ),
     },
     {
       title: 'ช่องทาง',

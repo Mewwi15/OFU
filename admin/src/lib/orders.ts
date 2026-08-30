@@ -63,6 +63,8 @@ export type Order = {
   row_version: number;
   /** เวลาที่พิมพ์ใบจัดสินค้าครั้งแรก · null = ยังไม่พิมพ์ (0068) */
   printed_at: string | null;
+  /** เลขพัสดุจาก parcel_shipments (0046) — มีเฉพาะออเดอร์ส่งพัสดุ (online) */
+  tracking_no: string | null;
 };
 
 export type OrderItem = {
@@ -77,7 +79,7 @@ export type OrderItem = {
 };
 
 const ORDER_COLS =
-  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, ship_lat, ship_lng, cod_collected_at, cod_amount, placed_at, row_version, printed_at';
+  'id, order_number, shop_mode, payment_method, order_status, payment_status, total, subtotal, delivery_fee, discount_amount, ship_recipient, ship_phone, ship_address_text, ship_lat, ship_lng, cod_collected_at, cod_amount, placed_at, row_version, printed_at, parcel_shipments(tracking_no)';
 
 /* ── Reads (RLS: admin can read own shop) ────────────────────────────────────── */
 export async function listOrders(): Promise<Order[]> {
@@ -87,7 +89,16 @@ export async function listOrders(): Promise<Order[]> {
     .order('placed_at', { ascending: false })
     .limit(100);
   if (error) throw error;
-  return data as unknown as Order[];
+  /* PostgREST คืน parcel_shipments เป็นก้อนซ้อน (อ็อบเจ็กต์หรืออาเรย์แล้วแต่ว่ามัน
+     เดาความสัมพันธ์เป็นแบบไหน) แบนให้เหลือ tracking_no ตรง ๆ ตั้งแต่ตรงนี้ หน้าจอ
+     จะได้ไม่ต้องรู้ว่าเลขพัสดุจริง ๆ อยู่คนละตาราง */
+  return (data as unknown as (Omit<Order, 'tracking_no'> & {
+    parcel_shipments?: { tracking_no: string | null } | { tracking_no: string | null }[] | null;
+  })[]).map(({ parcel_shipments, ...o }) => ({
+    ...o,
+    tracking_no:
+      (Array.isArray(parcel_shipments) ? parcel_shipments[0] : parcel_shipments)?.tracking_no ?? null,
+  }));
 }
 
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
@@ -244,3 +255,4 @@ export async function getShopName(): Promise<string> {
  */
 export const markCodCollected = (orderId: string, amount?: number) =>
   rpc('mark_cod_collected', { p_order_id: orderId, p_amount: amount });
+
