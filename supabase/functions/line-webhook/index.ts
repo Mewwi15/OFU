@@ -20,6 +20,13 @@
 // LINE_CHANNEL_SECRET, OWNER_BIND_SECRET.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import {
+  OWNER_QUICK_REPLY,
+  ordersFlex,
+  stockFlex,
+  type OrdersSummary,
+  type StockSummary,
+} from './flex.ts';
 const LINE_TOKEN_URL = 'https://api.line.me/oauth2/v3/token';
 const LINE_REPLY_URL = 'https://api.line.me/v2/bot/message/reply';
 
@@ -37,15 +44,26 @@ async function lineToken(): Promise<string> {
   return data.access_token;
 }
 
-async function reply(replyToken: string, text: string): Promise<void> {
-  await fetch(LINE_REPLY_URL, {
+/** `msg` = plain text, or a ready-made message object (Flex). `quickReply`
+ *  rides on the last message so the owner always has the two buttons to hand. */
+async function reply(
+  replyToken: string,
+  msg: string | Record<string, unknown>,
+  quickReply?: Record<string, unknown>,
+): Promise<void> {
+  const message = typeof msg === 'string' ? { type: 'text', text: msg } : { ...msg };
+  if (quickReply) (message as Record<string, unknown>).quickReply = quickReply;
+  const res = await fetch(LINE_REPLY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${await lineToken()}`,
     },
-    body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] }),
+    body: JSON.stringify({ replyToken, messages: [message] }),
   });
+  // A malformed Flex payload is rejected with a 400 that explains exactly which
+  // property is wrong — worth surfacing, otherwise the bot just goes quiet.
+  if (!res.ok) console.error('LINE reply failed', res.status, await res.text());
 }
 
 async function validSignature(rawBody: string, signature: string | null): Promise<boolean> {
@@ -95,6 +113,41 @@ Deno.serve(async (req) => {
 
     if (ev.type === 'message' && ev.message?.type === 'text' && ev.replyToken) {
       const text = (ev.message.text ?? '').trim();
+
+      // ── แดชบอร์ดร้านสำหรับเจ้าของ ────────────────────────────────────────
+      // เฉพาะบัญชีที่ผูกไว้เท่านั้น: การ์ดพวกนี้มีจำนวนคงเหลือทั้งร้านและยอด
+      // ขายรายวัน คนอื่นทักมาต้องเงียบเหมือนเดิม ไม่ใช่ตอบว่า "คุณไม่มีสิทธิ์"
+      // ซึ่งเท่ากับยืนยันว่ามีอะไรให้เข้าถึง
+      const word = text.toLowerCase();
+      const wantStock = ['สต๊อก', 'สตอก', 'สต็อก', 'stock'].includes(word);
+      const wantOrders = ['ออเดอร์', 'ออร์เดอร์', 'order', 'orders'].includes(word);
+
+      if (wantStock || wantOrders) {
+        const { data: shop } = await supabase
+          .from('shops')
+          .select('id, line_owner_user_id')
+          .limit(1)
+          .maybeSingle();
+        if (shop?.line_owner_user_id !== userId) continue; // ไม่ใช่เจ้าของ → เงียบ
+
+        const adminUrl = Deno.env.get('ADMIN_URL') ?? undefined;
+        try {
+          if (wantStock) {
+            const { data, error } = await supabase.rpc('stock_buy_list', { p_limit: 8 });
+            if (error) throw error;
+            await reply(ev.replyToken, stockFlex(data as StockSummary, adminUrl), OWNER_QUICK_REPLY);
+          } else {
+            const { data, error } = await supabase.rpc('orders_summary', { p_limit: 8 });
+            if (error) throw error;
+            await reply(ev.replyToken, ordersFlex(data as OrdersSummary, adminUrl), OWNER_QUICK_REPLY);
+          }
+        } catch (e) {
+          console.error('dashboard reply failed', e);
+          await reply(ev.replyToken, 'ดึงข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งครับ', OWNER_QUICK_REPLY);
+        }
+        continue;
+      }
+
       const secret = Deno.env.get('OWNER_BIND_SECRET');
       // No secret configured = binding switched off entirely. Never treat an
       // empty env as "match everything".
@@ -106,13 +159,17 @@ Deno.serve(async (req) => {
           .maybeSingle();
         if (!shop) continue;
         if (shop.line_owner_user_id === userId) {
-          await reply(ev.replyToken, 'บัญชีนี้ผูกเป็นเจ้าของร้านอยู่แล้ว');
+          await reply(ev.replyToken, 'บัญชีนี้ผูกเป็นเจ้าของร้านอยู่แล้ว', OWNER_QUICK_REPLY);
         } else {
           // Correct secret always rebinds — including over an existing holder.
           // Knowing the secret IS the ownership proof, so recovering from a
           // squatted binding is just typing it once.
           await supabase.from('shops').update({ line_owner_user_id: userId }).eq('id', shop.id);
-          await reply(ev.replyToken, 'ผูกบัญชีเจ้าของร้านเรียบร้อย\nออเดอร์ใหม่และสลิปที่ลูกค้าแนบจะแจ้งเตือนที่แชทนี้');
+          await reply(
+            ev.replyToken,
+            'ผูกบัญชีเจ้าของร้านเรียบร้อย\nออเดอร์ใหม่และสลิปที่ลูกค้าแนบจะแจ้งเตือนที่แชทนี้\n\nพิมพ์ "สต๊อก" หรือ "ออเดอร์" เพื่อดูสถานะร้านได้ตลอดเวลา',
+            OWNER_QUICK_REPLY,
+          );
         }
       }
       // wrong guesses (including the old public phrase): stay silent
