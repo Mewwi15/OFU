@@ -27,6 +27,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth';
+import { ZONE } from '../theme';
 import { useBackOfficeLock } from '../lib/backOffice';
 import { subscribeChatActivity, totalUnread } from '../lib/chat';
 
@@ -46,15 +47,6 @@ export type NavItem = { to: string; label: string; Icon: typeof RiCashLine; owne
 export type NavSection = { title: string; items: NavItem[] };
 export type NavGroup = { title: string; color: string; items?: NavItem[]; sections?: NavSection[] };
 
-/* สีประจำโซน (เจ้าของสั่ง 30 ส.ค. 2026 "หลังร้านกับหน้าร้านแยกสีกันหน่อย")
- * คุมให้อยู่ตระกูลเดียวกันทั้งสามสี — ความอิ่มสีต่ำและน้ำหนักใกล้กัน ไม่งั้นเมนูข้าง
- * จะกลายเป็นป้ายไฟ ตัดกับธีมแอดมินที่เป็นเขียวเสจเรียบ ๆ
- * ใช้แค่ที่หัวโซนกับจุดนำหน้า ไม่ระบายพื้นทั้งแถบ เพราะรายการเมนูต้องอ่านง่ายกว่าหัวข้อ */
-const ZONE = {
-  front: '#5B8C6E',   // เขียวเสจ — สีแบรนด์ ให้โซนที่ทำเงินอยู่ตรงหน้า
-  online: '#4A7C94',  // ฟ้าอมเทา — ลูกค้าอยู่ปลายสาย
-  back: '#8A6A4F',    // น้ำตาลอุ่น — งานหลังบ้าน ไม่ต้องเรียกสายตา
-} as const;
 
 /* เมนูแบ่งสามโซนตามที่เจ้าของสั่ง 30 ส.ค. 2026: หน้าร้าน · ออนไลน์ · หลังร้าน
  *

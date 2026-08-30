@@ -23,12 +23,14 @@ import { useEffect, useState } from 'react';
 import { apiError, listShifts, listStaff, openShift, type Staff } from '../lib/api';
 import { getShopName } from '../lib/orders';
 import { printCashCountSheet, printCountKickSlip, printShiftOpenSlip } from '../lib/printDrawer';
+import { ZONE, ZONE_DARK } from '../theme';
 import { CashCountModal, type CountLine } from './CashCountModal';
 import { LiveClock } from './LiveClock';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
-const C = { brand: '#5B8C6E', brandDark: '#4A7259', err: '#E5484D' };
+/* จอนี้อยู่ในโซนหน้าร้าน จึงใช้สีโซนหน้าร้าน ให้ตรงกับจุดสีในเมนูข้าง (0762626) */
+const C = { brand: ZONE.front, brandDark: ZONE_DARK.front, err: '#E5484D' };
 const INK = { strong: '#2B2320', body: '#5C534E', mute: '#8C837D', hair: '#E8E8E8' } as const;
 const num = { fontVariantNumeric: 'tabular-nums' } as const;
 

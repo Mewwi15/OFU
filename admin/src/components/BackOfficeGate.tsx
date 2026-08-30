@@ -22,8 +22,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { apiError, verifyBackOfficePin } from '../lib/api';
 import { isBackOfficePath, unlockBackOffice, useBackOfficeLock } from '../lib/backOffice';
+import { ZONE } from '../theme';
 
-const C = { brand: '#5B8C6E' };
+/* การ์ดนี้เป็นประตูของโซนหลังร้าน จึงใช้สีโซนหลังร้าน ไม่ใช่เขียวแบรนด์ของหน้าร้าน
+ * — เห็นสีแล้วรู้ทันทีว่ากำลังจะเข้าไปโซนไหน ตรงกับจุดสีในเมนูข้าง */
+const C = { brand: ZONE.back };
 const INK = { strong: '#2B2320', body: '#5C534E' } as const;
 
 export function BackOfficeGate({ children }: { children: React.ReactNode }) {
