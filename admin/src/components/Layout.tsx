@@ -1,10 +1,11 @@
 import { AudioMutedOutlined, SoundOutlined } from '@ant-design/icons';
-import { RiMenuLine, RiNotification3Line } from '@remixicon/react';
+import { RiLockUnlockLine, RiMenuLine, RiNotification3Line } from '@remixicon/react';
 import { Avatar, Badge, Button, Drawer, Grid, Layout as AntLayout, Tooltip } from 'antd';
-import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { BackOfficeGate } from './BackOfficeGate';
+import { isBackOfficeUnlocked, lockBackOffice, onBackOfficeChange } from '../lib/backOffice';
 
 import { useAuth } from '../auth';
 import { VOICE_STORAGE_KEY } from '../lib/voiceAnnounce';
@@ -18,6 +19,10 @@ export function Layout() {
   const { pathname } = useLocation();
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const navigate = useNavigate();
+  // สถานะปลดล็อกหลังร้าน ตามจากที่กลาง เพื่อให้ปุ่มหายทันทีที่กดล็อก
+  const [backOfficeOpen, setBackOfficeOpen] = useState(isBackOfficeUnlocked);
+  useEffect(() => onBackOfficeChange(() => setBackOfficeOpen(isBackOfficeUnlocked())), []);
   const [collapsed, setCollapsed] = useState(false);
   const isDesktop = screens.lg;
   const initials = (profile?.displayName || 'แอ').trim().slice(0, 2).toUpperCase();
@@ -79,6 +84,18 @@ export function Layout() {
           )}
           <span className="text-[15px] font-medium text-[#2B2320]">{currentNavLabel(pathname)}</span>
           <div className="ml-auto flex items-center gap-3">
+            {/* ปุ่มล็อกหลังร้าน — โผล่เฉพาะตอนปลดอยู่ เจ้าของสั่งว่าจะปิดตอนไหนก็ได้
+                จึงต้องกดถึงได้ตลอดจากทุกหน้า ไม่ใช่ซ่อนอยู่ในหน้าตั้งค่า */}
+            {backOfficeOpen && (
+              <Tooltip title="ล็อกหลังร้าน — ครั้งหน้าต้องใส่รหัสใหม่">
+                <Button
+                  size="small"
+                  icon={<RiLockUnlockLine className="w-4 h-4" />}
+                  onClick={() => { lockBackOffice(); navigate('/pos'); }}>
+                  ล็อกหลังร้าน
+                </Button>
+              </Tooltip>
+            )}
             <Tooltip title={voiceOn ? 'เสียงประกาศออเดอร์: เปิด' : 'เสียงประกาศออเดอร์: ปิด'}>
               <Button
                 type={voiceOn ? 'primary' : 'text'}

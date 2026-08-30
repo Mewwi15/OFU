@@ -9,9 +9,9 @@
  *    ที่กันข้อมูลอยู่คือ RLS กับ admin_tier ในฐานข้อมูลเหมือนเดิม รหัสนี้แค่แยก
  *    "เผลอกด" ออกจาก "ตั้งใจเข้า"
  *
- * ปลดล็อกแล้วจำไว้ใน sessionStorage — ผูกกับแท็บ ปิดแท็บก็ลืม และหมดอายุใน 30 นาที
- * ไม่ใช้ localStorage เพราะนั่นแปลว่าปลดครั้งเดียวจบตลอดกาลบนเครื่องนั้น
- * ซึ่งเท่ากับไม่มีด่าน
+ * ปลดแล้วปลดยาว จะปิดเมื่อไหร่กดปุ่มล็อกบนแถบบนเอง (เจ้าของสั่ง: "จะเปิดก็ใส่
+ * ปิดตอนไหนก็ได้") — ตอนแรกผมใส่ตัวจับเวลา 30 นาทีไว้ ถูกสั่งเอาออก
+ * สถานะอยู่ใน lib/backOffice.ts เพราะปุ่มล็อกบนแถบบนต้องเห็นสถานะเดียวกัน
  */
 
 import { RiLock2Line } from '@remixicon/react';
@@ -21,36 +21,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { apiError, backOfficePinSet, verifyBackOfficePin } from '../lib/api';
+import {
+  isBackOfficePath,
+  isBackOfficeUnlocked,
+  onBackOfficeChange,
+  unlockBackOffice,
+} from '../lib/backOffice';
 
-/** เส้นทางที่นับเป็นหลังร้าน — ต้องตรงกับกลุ่ม "หลังร้าน" ใน Sidebar.tsx */
-const BACK_OFFICE_PATHS = [
-  '/stock', '/receive', '/products', '/categories', '/promotions', '/banners',
-  '/broadcast', '/reports', '/store-credit', '/audit-log', '/deploys', '/settings',
-  '/scan-lab',
-];
 
-const isBackOffice = (pathname: string) =>
-  BACK_OFFICE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-
-const KEY = 'ofu.backOffice.unlockedUntil';
-const WINDOW_MS = 30 * 60 * 1000;
-
-function unlocked(): boolean {
-  try {
-    const until = Number(sessionStorage.getItem(KEY) ?? 0);
-    return Number.isFinite(until) && until > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function markUnlocked() {
-  try {
-    sessionStorage.setItem(KEY, String(Date.now() + WINDOW_MS));
-  } catch {
-    /* โหมดส่วนตัว/ปิด storage — ก็แค่ต้องใส่รหัสใหม่ทุกครั้ง ไม่ถึงกับพัง */
-  }
-}
 
 const C = { brand: '#5B8C6E' };
 const INK = { strong: '#2B2320', body: '#5C534E' } as const;
@@ -58,11 +36,11 @@ const INK = { strong: '#2B2320', body: '#5C534E' } as const;
 export function BackOfficeGate({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const gated = isBackOffice(pathname);
+  const gated = isBackOfficePath(pathname);
 
   // null = ยังไม่รู้ว่าร้านนี้ตั้งรหัสไว้หรือยัง (อย่าเพิ่งตัดสินว่าต้องใส่)
   const [pinExists, setPinExists] = useState<boolean | null>(null);
-  const [ok, setOk] = useState(unlocked);
+  const [ok, setOk] = useState(isBackOfficeUnlocked);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<InputRef>(null);
@@ -71,16 +49,14 @@ export function BackOfficeGate({ children }: { children: React.ReactNode }) {
     backOfficePinSet().then(setPinExists).catch(() => setPinExists(false));
   }, []);
 
-  // เข้าหน้าหลังร้านใหม่ทุกครั้ง เช็กว่าหน้าต่างเวลายังไม่หมดอายุ
-  useEffect(() => {
-    if (gated) setOk(unlocked());
-  }, [gated, pathname]);
+  // ตามสถานะกลาง — ปุ่มล็อกบนแถบบนกดเมื่อไหร่ ด่านต้องเด้งกลับมาทันที
+  useEffect(() => onBackOfficeChange(() => setOk(isBackOfficeUnlocked())), []);
 
   const submit = async () => {
     setBusy(true);
     try {
       if (await verifyBackOfficePin(pin)) {
-        markUnlocked();
+        unlockBackOffice();
         setOk(true);
         setPin('');
       } else {
@@ -141,9 +117,6 @@ export function BackOfficeGate({ children }: { children: React.ReactNode }) {
           >
             กลับไปหน้าขาย
           </Button>
-          <div style={{ fontSize: 12, color: INK.strong, opacity: 0.45, textAlign: 'center', marginTop: 10 }}>
-            ปลดล็อกแล้วใช้ได้ 30 นาที
-          </div>
         </div>
       </Card>
     </div>
