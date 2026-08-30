@@ -4,20 +4,20 @@
  * เจ้าของสรุปหลักการให้เอง 30 ส.ค. 2026: "ระบบ POS ที่ดีที่สุดคือการบอกให้ผู้ใช้
  * ชัดเจน ไม่ใช่แบบตัวหนังสือเล็ก ๆ ไม่ชัดเจน เยอะเกินไป และเรียงโฟลไม่ชัดเจน"
  *
- * ของเดิมผิดสามข้อพร้อมกัน: ป้าย "รหัสพนักงาน" 13px จาง ๆ · มีของให้อ่านเต็มการ์ด
- * ทั้งที่ต้องทำแค่สองอย่าง · และไม่มีอะไรบอกว่าต้องทำอะไรก่อนหลัง ปุ่ม "นับเงิน"
- * กับปุ่ม "เปิดรอบ" ยืนอยู่ด้วยกันเฉย ๆ คนใหม่มายืนหน้าเครื่องเดาไม่ออกว่ากดอันไหนก่อน
+ * รอบก่อนผมวางสามขั้นเรียงลงมาพร้อมกัน แล้วหรี่ขั้นที่ยังไม่ถึงเป็น opacity .45
+ * ผลคือสองในสามของการ์ดเป็นสีเทาตาย เจ้าของบอกสั้น ๆ ว่า "ไม่สวย" — และถูก
+ * มันไม่ได้อ่านว่า "ทำข้อ 1 ก่อน" แต่อ่านว่าจอเสีย ของที่ยังทำไม่ได้ไม่ควรอยู่บนจอ
+ * ตั้งแต่แรก
  *
- * ทำใหม่เป็นขั้นที่นับได้ 1-2-3 เรียงลงมา ขั้นที่ยังไม่ถึงจะจางและกดไม่ได้ ขั้นที่
- * ทำเสร็จติดเครื่องหมายถูก เหลือขั้นเดียวที่สว่างอยู่เสมอ — คนหน้าเครื่องไม่ต้อง
- * อ่านอะไรเลย แค่ทำอันที่สว่าง
- *
- * ตัวหนังสือใหญ่ทั้งจอ (ป้าย 18 · ช่องกรอก 30 · ปุ่ม 22) เพราะจอ POS อยู่ห่างระดับ
- * แขนเหยียดและคนกดคือคนที่กำลังรีบ ไม่ใช่คนนั่งอ่านจอคอม
+ * ตอนนี้เป็นทีละขั้นจริง — บนจอมีของแค่ขั้นที่กำลังทำ ที่เหลือย่อเป็นจุดสามจุด
+ * ข้างบน หัวการ์ดเป็นแถบเขียวของแบรนด์เพื่อให้มันดูเป็นเครื่องขายของ ไม่ใช่ฟอร์ม
+ * กรอกเอกสารสีขาวล้วน และใช้ Card ของ antd เพื่อให้ได้เงานุ่มชุดเดียวกับการ์ด
+ * อื่นทั้งระบบ (index.css เติมให้ .ant-card-bordered) — ของเดิมผมทำเป็น div เปล่า
+ * มันเลยแบนอยู่ตัวเดียวในแอป
  */
 
-import { RiCalculatorLine, RiCheckLine } from '@remixicon/react';
-import { Button, Input, message } from 'antd';
+import { RiArrowLeftLine, RiCalculatorLine } from '@remixicon/react';
+import { Button, Card, Input, message } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { apiError, listShifts, openShift } from '../lib/api';
@@ -28,39 +28,21 @@ import { LiveClock } from './LiveClock';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
-const C = { brand: '#5B8C6E', ok: '#1E9E5C', err: '#E5484D' };
-const INK = { strong: '#2B2320', body: '#5C534E', mute: '#B4ADA8', hair: '#E8E8E8' } as const;
+const C = { brand: '#5B8C6E', brandDark: '#4A7259', err: '#E5484D' };
+const INK = { strong: '#2B2320', body: '#5C534E', mute: '#8C837D', hair: '#E8E8E8' } as const;
 const num = { fontVariantNumeric: 'tabular-nums' } as const;
 
-/** หัวขั้น — เลขขั้นตัวใหญ่ + ชื่อขั้น สถานะบอกด้วยความเข้มของสี ไม่ใช่ด้วยคำอธิบาย */
-function StepHead({ n, label, state }: { n: number; label: string; state: 'todo' | 'now' | 'done' }) {
-  const on = state !== 'todo';
-  return (
-    <div className="flex items-center gap-3">
-      <span
-        className="grid place-items-center"
-        style={{
-          width: 34, height: 34, flex: '0 0 34px',
-          background: state === 'done' ? C.ok : on ? C.brand : '#F0EEEC',
-          color: on ? '#fff' : INK.mute,
-          fontSize: 18, fontWeight: 700, ...num,
-        }}
-      >
-        {state === 'done' ? <RiCheckLine className="w-5 h-5" /> : n}
-      </span>
-      <span style={{ fontSize: 18, fontWeight: 600, color: on ? INK.strong : INK.mute }}>{label}</span>
-    </div>
-  );
-}
+const STEPS = ['รหัสพนักงาน', 'นับเงิน', 'ยืนยัน'] as const;
 
 export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
+  const [step, setStep] = useState(0);
   const [code, setCode] = useState('');
   const [counted, setCounted] = useState<number | null>(null);
   const [counting, setCounting] = useState(false);
   const [busy, setBusy] = useState(false);
-  /* ยอดที่นับได้ตอนปิดรอบที่แล้ว = เงินที่ควรจะยังอยู่ในลิ้นชักเช้านี้
-   * ไม่เอามาเติมให้ (นั่นคือการข้ามการนับ) แต่เอาไว้เทียบหลังนับเสร็จ —
-   * ถ้ากลางคืนเงินหายไป เมื่อก่อนไม่มีใครรู้เลยเพราะยอดตั้งต้นถูกยกมาทั้งก้อน */
+
+  /* ยอดที่นับได้ตอนปิดรอบที่แล้ว = เงินที่ควรจะยังอยู่ในลิ้นชักเช้านี้ ไม่เอามาเติมให้
+   * (นั่นคือการข้ามการนับ) แต่เอาไว้เทียบหลังนับเสร็จ ถ้ากลางคืนเงินหายจะได้เห็น */
   const [expected, setExpected] = useState<number | null>(null);
   useEffect(() => {
     listShifts()
@@ -68,17 +50,13 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
       .catch(() => {});
   }, []);
 
-  const step1Done = code !== '';
-  const step2Done = counted != null;
-
   const submit = async () => {
     setBusy(true);
     try {
       await openShift(counted ?? 0, code);
       onOpened();
-      /* งานพิมพ์คือสิ่งที่ทำให้ลิ้นชักเด้ง (ดู printDrawer.ts) และตอนนี้คือจังหวะที่
-       * ต้องเอาเงินทอนใส่ ล้มก็ปล่อยผ่าน — รอบเปิดสำเร็จไปแล้ว ห้ามให้เครื่องพิมพ์
-       * มาคว่ำการเปิดรอบ */
+      /* งานพิมพ์คือสิ่งที่ทำให้ลิ้นชักเด้ง (ดู printDrawer.ts) และตอนนี้คือจังหวะที่ต้อง
+       * เอาเงินทอนใส่ ล้มก็ปล่อยผ่าน — รอบเปิดสำเร็จแล้ว ห้ามให้เครื่องพิมพ์มาคว่ำ */
       try {
         printShiftOpenSlip({
           shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
@@ -96,91 +74,187 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
     }
   };
 
-  const row = 'px-6 py-5';
+  const diff = counted != null && expected != null ? counted - expected : null;
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${INK.hair}`, width: 520, maxWidth: '94vw' }}>
-      <div className="px-6 pt-7 pb-5 text-center">
-        <div style={{ fontSize: 38, fontWeight: 700, color: INK.strong, lineHeight: 1.15 }}>เปิดรอบ</div>
-        <div className="mt-1">
-          <LiveClock size={16} />
+    <>
+      <Card
+        style={{ width: 460, maxWidth: '94vw' }}
+        styles={{ body: { padding: 0, overflow: 'hidden' } }}
+      >
+        {/* หัวการ์ดสีแบรนด์ — ให้จอมีสี ไม่ใช่ขาวล้วนเหมือนฟอร์มกรอกเอกสาร */}
+        <div className="px-7 pt-6 pb-5 text-center" style={{ background: C.brand }}>
+          <div style={{ fontSize: 34, fontWeight: 700, color: '#fff', lineHeight: 1.15 }}>เปิดรอบ</div>
+          <div style={{ marginTop: 2, opacity: 0.85 }}>
+            <LiveClock size={15} color="#fff" />
+          </div>
         </div>
-      </div>
 
-      {/* ── 1. รหัสพนักงาน ─────────────────────────────────────────────── */}
-      <div className={row} style={{ borderTop: `1px solid ${INK.hair}` }}>
-        <StepHead n={1} label="ใส่รหัสพนักงาน" state={step1Done ? 'done' : 'now'} />
-        <Input
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
-          placeholder="รหัสของคุณ"
-          inputMode="numeric"
-          autoComplete="off"
-          autoFocus
-          className="mt-3"
-          style={{ height: 64, fontSize: 30, fontWeight: 700, textAlign: 'center', ...num }}
-        />
-      </div>
-
-      {/* ── 2. นับเงิน — ล็อกไว้จนกว่าจะมีรหัส ────────────────────────────── */}
-      <div className={row} style={{ borderTop: `1px solid ${INK.hair}`, opacity: step1Done ? 1 : 0.45 }}>
-        <StepHead n={2} label="นับเงินในลิ้นชัก" state={!step1Done ? 'todo' : step2Done ? 'done' : 'now'} />
-        {step2Done ? (
-          <div className="mt-3 flex items-center justify-between">
-            <span style={{ fontSize: 40, fontWeight: 700, color: INK.strong, lineHeight: 1.1, ...num }}>
-              {baht(counted)}
-            </span>
-            <Button size="large" style={{ height: 48, fontSize: 16 }} onClick={() => setCounting(true)}>
-              นับใหม่
-            </Button>
-          </div>
-        ) : (
-          <Button
-            type="primary" size="large" block
-            disabled={!step1Done}
-            icon={<RiCalculatorLine className="w-5 h-5" />}
-            className="mt-3"
-            style={{ height: 64, fontSize: 22 }}
-            onClick={() => setCounting(true)}
-          >
-            นับเงิน
-          </Button>
-        )}
-        {/* เงียบไว้ถ้าตรง — ขึ้นเฉพาะตอนไม่ตรงกับยอดที่ปิดรอบเมื่อวาน ซึ่งแปลว่า
-            เงินหายหรือเกินระหว่างที่ปิดร้าน ต้องรู้ก่อนเริ่มขาย ไม่ใช่ไปรู้สิ้นเดือน */}
-        {step2Done && expected != null && counted !== expected && (
-          <div
-            className="mt-3 flex items-center justify-between px-4 py-3"
-            style={{ background: '#FFF6F6', borderLeft: `4px solid ${C.err}` }}
-          >
-            <span style={{ fontSize: 15, color: INK.body, ...num }}>รอบที่แล้วปิดด้วย {baht(expected)}</span>
-            <span style={{ fontSize: 20, fontWeight: 700, color: C.err, ...num }}>
-              {counted > expected ? `เกิน ${baht(counted - expected)}` : `ขาด ${baht(expected - counted)}`}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── 3. เปิดรอบ ─────────────────────────────────────────────────── */}
-      <div className={row} style={{ borderTop: `1px solid ${INK.hair}`, opacity: step2Done ? 1 : 0.45 }}>
-        <StepHead n={3} label="เริ่มขาย" state={step2Done ? 'now' : 'todo'} />
-        <Button
-          type="primary" size="large" block
-          loading={busy}
-          disabled={!step1Done || !step2Done}
-          className="mt-3"
-          style={{ height: 64, fontSize: 22, fontWeight: 700 }}
-          onClick={() => void submit()}
+        {/* จุดบอกขั้น — ย่อสามขั้นเหลือแถวเดียว แทนที่จะวางกองไว้ทั้งสามขั้น */}
+        <div
+          className="flex items-center justify-center gap-2 py-3"
+          style={{ background: C.brandDark }}
         >
-          เปิดรอบ
-        </Button>
-      </div>
+          {STEPS.map((label, i) => (
+            <span
+              key={label}
+              className="px-3 py-1"
+              style={{
+                fontSize: 12,
+                fontWeight: i === step ? 700 : 400,
+                color: i === step ? C.brandDark : 'rgba(255,255,255,.72)',
+                background: i === step ? '#fff' : 'transparent',
+              }}
+            >
+              {i + 1}. {label}
+            </span>
+          ))}
+        </div>
+
+        <div className="px-7 py-7">
+          {/* ── ขั้น 1: รหัสพนักงาน ─────────────────────────────────────── */}
+          {step === 0 && (
+            <>
+              <div style={{ fontSize: 19, fontWeight: 600, color: INK.strong, textAlign: 'center' }}>
+                ใส่รหัสพนักงาน
+              </div>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
+                onPressEnter={() => code && setStep(1)}
+                inputMode="numeric"
+                autoComplete="off"
+                autoFocus
+                className="mt-4"
+                style={{
+                  height: 72, fontSize: 34, fontWeight: 700, textAlign: 'center',
+                  letterSpacing: '.18em', color: INK.strong, ...num,
+                }}
+              />
+              <Button
+                type="primary" size="large" block
+                disabled={code === ''}
+                className="mt-5"
+                style={{ height: 60, fontSize: 20, fontWeight: 600 }}
+                onClick={() => setStep(1)}
+              >
+                ถัดไป
+              </Button>
+            </>
+          )}
+
+          {/* ── ขั้น 2: นับเงิน ────────────────────────────────────────── */}
+          {step === 1 && (
+            <>
+              <div style={{ fontSize: 19, fontWeight: 600, color: INK.strong, textAlign: 'center' }}>
+                นับเงินในลิ้นชัก
+              </div>
+              <div
+                className="mt-4 py-6 text-center"
+                style={{ background: counted == null ? '#FAFAFA' : '#F3F7F4' }}
+              >
+                <div style={{ fontSize: 13, color: INK.mute }}>นับได้</div>
+                <div
+                  style={{
+                    fontSize: 46, fontWeight: 700, lineHeight: 1.15, marginTop: 2, ...num,
+                    color: counted == null ? INK.hair : INK.strong,
+                  }}
+                >
+                  {counted == null ? '฿0' : baht(counted)}
+                </div>
+              </div>
+              <Button
+                type={counted == null ? 'primary' : 'default'}
+                size="large" block
+                icon={<RiCalculatorLine className="w-5 h-5" />}
+                className="mt-4"
+                style={{ height: 60, fontSize: 20, fontWeight: 600 }}
+                onClick={() => setCounting(true)}
+              >
+                {counted == null ? 'เริ่มนับ' : 'นับใหม่'}
+              </Button>
+              {counted != null && (
+                <Button
+                  type="primary" size="large" block
+                  className="mt-3"
+                  style={{ height: 60, fontSize: 20, fontWeight: 600 }}
+                  onClick={() => setStep(2)}
+                >
+                  ถัดไป
+                </Button>
+              )}
+            </>
+          )}
+
+          {/* ── ขั้น 3: ยืนยัน ─────────────────────────────────────────── */}
+          {step === 2 && (
+            <>
+              <div style={{ fontSize: 19, fontWeight: 600, color: INK.strong, textAlign: 'center' }}>
+                ตรวจแล้วกดเปิดรอบ
+              </div>
+
+              <div className="mt-4" style={{ border: `1px solid ${INK.hair}` }}>
+                <div className="flex items-center justify-between px-5 py-3">
+                  <span style={{ fontSize: 15, color: INK.body }}>พนักงาน</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: INK.strong, ...num }}>{code}</span>
+                </div>
+                <div
+                  className="flex items-center justify-between px-5 py-3"
+                  style={{ borderTop: `1px solid ${INK.hair}` }}
+                >
+                  <span style={{ fontSize: 15, color: INK.body }}>เงินในลิ้นชัก</span>
+                  <span style={{ fontSize: 26, fontWeight: 700, color: INK.strong, ...num }}>
+                    {baht(counted ?? 0)}
+                  </span>
+                </div>
+              </div>
+
+              {/* เงียบสนิทถ้าตรงกับยอดปิดเมื่อวาน ขึ้นเฉพาะตอนไม่ตรง = เงินหาย/เกินข้ามคืน */}
+              {diff != null && diff !== 0 && (
+                <div
+                  className="mt-3 flex items-center justify-between px-5 py-3"
+                  style={{ background: '#FFF6F6', borderLeft: `4px solid ${C.err}` }}
+                >
+                  <span style={{ fontSize: 14, color: INK.body, ...num }}>
+                    รอบที่แล้วปิดด้วย {baht(expected ?? 0)}
+                  </span>
+                  <span style={{ fontSize: 19, fontWeight: 700, color: C.err, ...num }}>
+                    {diff > 0 ? `เกิน ${baht(diff)}` : `ขาด ${baht(-diff)}`}
+                  </span>
+                </div>
+              )}
+
+              <Button
+                type="primary" size="large" block
+                loading={busy}
+                className="mt-5"
+                style={{ height: 60, fontSize: 20, fontWeight: 700 }}
+                onClick={() => void submit()}
+              >
+                เปิดรอบ
+              </Button>
+            </>
+          )}
+
+          {step > 0 && !busy && (
+            <Button
+              type="text" block
+              className="mt-2"
+              style={{ height: 44, color: INK.mute }}
+              icon={<RiArrowLeftLine className="w-4 h-4" />}
+              onClick={() => setStep(step - 1)}
+            >
+              ย้อนกลับ
+            </Button>
+          )}
+        </div>
+      </Card>
 
       <CashCountModal
         open={counting}
         onClose={() => setCounting(false)}
         onDone={(total) => { setCounted(total); setCounting(false); }}
       />
-    </div>
+    </>
   );
 }
