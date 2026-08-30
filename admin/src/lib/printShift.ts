@@ -10,9 +10,9 @@
  * ของเบราว์เซอร์เพื่อเก็บเป็นไฟล์ได้เลย
  */
 
-import dayjs from 'dayjs';
 
 import { BASE_CSS, printHtml } from './printOrder';
+import { d } from './time';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -37,7 +37,7 @@ export type ShiftReport = {
 };
 
 export function printShiftReport(r: ShiftReport, shopName: string) {
-  const fmt = (iso: string | null) => (iso ? dayjs(iso).format('DD/MM/YYYY HH:mm') : '—');
+  const fmt = (iso: string | null) => (iso ? d(iso).format('DD/MM/YYYY HH:mm') : '—');
   const verdict =
     r.overShort === 0 ? 'พอดีเป๊ะ' : r.overShort < 0 ? `ขาด ${baht(-r.overShort)}` : `เกิน ${baht(r.overShort)}`;
   const verdictColor = r.overShort === 0 ? '#1E7A46' : r.overShort < 0 ? '#B3261E' : '#8A5A00';

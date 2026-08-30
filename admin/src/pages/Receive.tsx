@@ -31,6 +31,10 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs, { type Dayjs } from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 
+// ตั้งชื่อ thDate เพราะไฟล์นี้มีตัวแปรท้องถิ่นชื่อ d อยู่แล้ว (พารามิเตอร์ DatePicker
+// และตัวแปรอ่านวันที่จากไฟล์ import) — ชื่อซ้ำจะบังกันเงียบ ๆ ตอนมีคนมาแก้ทีหลัง
+import { d as thDate } from '../lib/time';
+
 dayjs.extend(customParseFormat);
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
@@ -375,7 +379,7 @@ export function Receive() {
           {v}{r.voided_at ? <Tag className="ml-1" color="default">ยกเลิก</Tag> : null}
         </span>
       ) },
-    { title: 'วันที่รับ', dataIndex: 'received_at', width: 130, render: (v, r) => dayjs(v ?? r.created_at).format('DD/MM/YYYY') },
+    { title: 'วันที่รับ', dataIndex: 'received_at', width: 130, render: (v, r) => thDate(v ?? r.created_at).format('DD/MM/YYYY') },
     { title: 'ผู้ขาย', dataIndex: 'supplier', render: (v) => v ?? <Typography.Text type="secondary">—</Typography.Text> },
     { title: 'เลขเอกสาร', dataIndex: 'doc_number', width: 140, render: (v) => v ?? '—' },
     { title: 'รายการ', dataIndex: 'line_count', width: 90, align: 'right' },
@@ -837,7 +841,7 @@ export function printReceiptSheet(
     tfoot td{border:0;font-weight:700;padding-top:10px}
   </style></head><body>
     <h1>ใบรับเข้าสินค้า ${esc(head.receipt_number)}</h1>
-    <p class="m">วันที่รับ ${dayjs(head.received_at).format('DD/MM/YYYY')}${head.supplier ? ` · ผู้ขาย ${esc(head.supplier)}` : ''}${head.doc_number ? ` · เอกสาร ${esc(head.doc_number)}` : ''}</p>
+    <p class="m">วันที่รับ ${thDate(head.received_at).format('DD/MM/YYYY')}${head.supplier ? ` · ผู้ขาย ${esc(head.supplier)}` : ''}${head.doc_number ? ` · เอกสาร ${esc(head.doc_number)}` : ''}</p>
     <table>
       <thead><tr><th>บาร์โค้ด</th><th>สินค้า</th><th class="r">จำนวน</th><th class="r">ทุน/หน่วย</th><th class="r">รวม</th></tr></thead>
       <tbody>${lines.map((l) => `<tr>

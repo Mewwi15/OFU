@@ -30,6 +30,7 @@ import {
   type PromoScope,
   type PromoType,
 } from '../lib/api';
+import { d } from '../lib/time';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -134,8 +135,8 @@ export function Promotions() {
       render: (_, p) =>
         p.active_from || p.active_to ? (
           <span className="text-xs text-gray-500">
-            {p.active_from ? dayjs(p.active_from).format('D MMM') : '—'} –{' '}
-            {p.active_to ? dayjs(p.active_to).format('D MMM') : '—'}
+            {p.active_from ? d(p.active_from).format('D MMM') : '—'} –{' '}
+            {p.active_to ? d(p.active_to).format('D MMM') : '—'}
           </span>
         ) : (
           <Text type="secondary" className="text-xs">

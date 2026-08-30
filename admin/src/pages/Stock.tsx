@@ -49,7 +49,6 @@ import {
   Upload,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -67,6 +66,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RcTooltip } from '
 import { productThumb } from '../lib/image';
 import { getShopName } from '../lib/orders';
 import { printBuyList } from '../lib/printBuyList';
+import { d } from '../lib/time';
 
 const { Text } = Typography;
 
@@ -231,7 +231,7 @@ function exportCsv(items: Item[]) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `stock-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`;
+  a.download = `stock-${d().format('YYYY-MM-DD-HHmm')}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
 }

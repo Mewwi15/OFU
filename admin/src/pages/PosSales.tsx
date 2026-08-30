@@ -1,6 +1,6 @@
+import type { Dayjs } from 'dayjs';
 import { RiFileList3Line, RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
 import { App, Button, Card, Checkbox, DatePicker, Drawer, Input, InputNumber, Modal, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
-import dayjs, { type Dayjs } from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -19,6 +19,7 @@ import {
   refundPosSaleItems,
   type Shift,
 } from '../lib/api';
+import { d } from '../lib/time';
 
 const { Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -243,7 +244,7 @@ export function PosSales() {
         const sh = shifts.get(s.shift_id);
         return (
           <span className={`text-xs ${s.shift_id === currentShiftId ? 'font-semibold text-[#B83C18]' : 'text-gray-500'}`}>
-            {sh ? dayjs(sh.opened_at).format('DD/MM HH:mm') : '…'}
+            {sh ? d(sh.opened_at).format('DD/MM HH:mm') : '…'}
             {s.shift_id === currentShiftId ? ' (ปัจจุบัน)' : ''}
           </span>
         );

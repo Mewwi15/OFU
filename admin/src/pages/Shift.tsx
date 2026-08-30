@@ -20,7 +20,6 @@
 import { RiCalculatorLine, RiPrinterLine } from '@remixicon/react';
 import { Alert, Button, Card, InputNumber, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -34,6 +33,7 @@ import {
   type Shift as ShiftRow,
 } from '../lib/api';
 import { getShopName } from '../lib/orders';
+import { d, since } from '../lib/time';
 import { printShiftReport } from '../lib/printShift';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -79,9 +79,9 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
             title: 'วันที่',
             render: (_: unknown, r: ShiftRow) => (
               <span style={{ fontSize: T.body, color: INK.strong }}>
-                {dayjs(r.opened_at).format('DD/MM/YYYY')}{' '}
+                {d(r.opened_at).format('DD/MM/YYYY')}{' '}
                 <span style={{ color: INK.mute, fontSize: 12 }}>
-                  {dayjs(r.opened_at).format('HH:mm')}–{r.closed_at ? dayjs(r.closed_at).format('HH:mm') : ''}
+                  {d(r.opened_at).format('HH:mm')}–{r.closed_at ? d(r.closed_at).format('HH:mm') : ''}
                 </span>
               </span>
             ),
@@ -286,7 +286,7 @@ export function Shift() {
   }
 
   /* ── รอบเปิดอยู่ ───────────────────────────────────────────────────────── */
-  const openMins = dayjs().diff(dayjs(shift.opened_at), 'minute');
+  const openMins = d().diff(d(shift.opened_at), 'minute');
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -308,8 +308,14 @@ export function Shift() {
             <i style={{ width: 7, height: 7, borderRadius: 999, background: C.brand, display: 'inline-block' }} />
             รอบเปิดอยู่
           </span>
-          <span style={{ fontSize: T.lbl, color: INK.mute }}>
-            เปิดเมื่อ {dayjs(shift.opened_at).format('DD/MM HH:mm')}
+          {/* "เปิดมาแล้วเท่าไหร่" มาก่อนเวลานาฬิกา เพราะคำถามแรกตอนมาเห็นรอบค้างคือ
+              "นี่ของเมื่อไหร่" ไม่ใช่ "กี่โมง" — เลขนี้ขยับเองทุก 30 วิ ตาม refresh */}
+          <span className="inline-flex items-baseline gap-2" style={{ fontSize: T.lbl }}>
+            <span style={{ color: INK.body }}>เปิดมาแล้ว {since(shift.opened_at)}</span>
+            <span style={{ color: INK.hair }}>·</span>
+            <span style={{ color: INK.mute, ...num }}>
+              {d(shift.opened_at).format('DD/MM HH:mm')} น.
+            </span>
           </span>
         </div>
 
