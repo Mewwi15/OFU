@@ -18,7 +18,7 @@
  */
 
 import { RiCalculatorLine, RiInboxUnarchiveLine, RiPrinterLine } from '@remixicon/react';
-import { Alert, Button, Card, InputNumber, Modal, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -155,17 +155,13 @@ export function Shift() {
     return () => clearInterval(t);
   }, [refresh]);
 
-  // เงินที่นับได้ตอนปิดรอบที่แล้ว คือเงินที่ยังอยู่ในลิ้นชักเช้านี้ — เติมให้เลย
-  // ไม่ต้องนับซ้ำ (เจ้าของสั่ง 30 ส.ค.) แก้ทับได้ถ้าหยิบเงินออกไปตอนกลางคืน
-  useEffect(() => {
-    if (!shift && amount === '' && lastClosed?.counted_cash != null) {
-      setAmount(lastClosed.counted_cash);
-    }
-  }, [shift, amount, lastClosed]);
+  // ยอดที่นับได้ตอนปิดรอบที่แล้ว = เงินที่ "ควรจะ" ยังอยู่ในลิ้นชักเช้านี้
+  // เดิมผมเติมเลขนี้ลงช่องยอดให้เลย ซึ่งผิด — มันคือความคาดหวัง ไม่ใช่ของที่นับมา
+  // ตอนนี้ใช้เป็นตัวเทียบอย่างเดียว ถ้ากลางคืนเงินหายไปจะได้เห็นตั้งแต่เปิดร้าน
+  const expectedAtOpen = lastClosed?.counted_cash ?? null;
 
   const cashIn = dash?.onsite.cash ?? 0;                   // เงินสดที่รับเข้ามาในรอบ (รวม COD)
   const inDrawer = (shift?.opening_float ?? 0) + cashIn;   // ควรมีเท่านี้ในลิ้นชักตอนนี้
-  const diff = amount === '' ? null : Number(amount) - inDrawer;
 
   const doOpen = async () => {
     setBusy(true);
@@ -230,31 +226,59 @@ export function Shift() {
 
   if (shift === undefined) return <Card loading title="เปิด-ปิดรอบ" />;
 
-  // ช่องกรอกเงินคือโมเมนต์เดียวที่คนต้องลงมือบนหน้านี้ จึงให้มันใหญ่จริง
-  // ตัวเลขชิดขวาแบบเครื่องคิดเลข และปุ่มนับทีละใบสูงเท่ากันพอดี ไม่เหลื่อม
-  const cashInput = (placeholder: string) => (
-    <div className="flex" style={{ border: `1px solid ${INK.hair}` }}>
-      <InputNumber
-        min={0}
-        variant="borderless"
-        controls={false}
-        prefix={<span style={{ fontSize: T.lead, color: INK.mute }}>฿</span>}
-        placeholder={placeholder}
-        style={{ flex: 1, height: 56 }}
-        styles={{ input: { fontSize: 26, fontWeight: 700, textAlign: 'right', ...num } }}
-        value={amount === '' ? undefined : amount}
-        onChange={(v) => setAmount(v ?? '')}
-        autoFocus
-      />
+  /* เจ้าของสั่ง 30 ส.ค.: "ห้ามกรอกตัวเลขเต็มแบบนี้ ต้องนับมือเท่านั้น เข้าออกต้องตรง"
+   * ช่องพิมพ์ยอดถูกถอดออกทั้งหน้า เหลือทางเดียวคือกดนับทีละใบ เพราะเลขที่พิมพ์เอง
+   * มันคือเลขที่คนคิดว่าน่าจะใช่ ไม่ใช่เลขที่อยู่ในลิ้นชักจริง แล้วยอดขาด/เกินก็
+   * กลายเป็นของปลอมตามไปด้วย — ทั้งใบปิดรอบและการไล่เงินหายพังหมด
+   *
+   * expected = เลขที่ควรจะเป็น (ตอนเปิด = ยอดปิดรอบที่แล้ว · ตอนปิด = ตั้งต้น + ขายสด)
+   * ถ้าไม่ตรงต้องเห็นทันทีตรงนั้น ไม่ใช่ไปรู้ตอนสิ้นเดือน */
+  const countedBlock = (expected: number | null) =>
+    amount === '' ? (
       <Button
-        type="text"
+        type="primary" size="large" block
+        icon={<RiCalculatorLine className="w-4 h-4" />}
+        style={{ height: 56, fontSize: T.lead }}
         onClick={() => setCounter(true)}
-        style={{ height: 56, borderLeft: `1px solid ${INK.hair}`, paddingInline: 18, color: C.brand }}
       >
-        <RiCalculatorLine className="w-4 h-4" /> นับทีละใบ
+        นับเงินในลิ้นชัก
       </Button>
-    </div>
-  );
+    ) : (
+      <div>
+        <div
+          className="flex items-baseline justify-between px-5 py-4"
+          style={{ border: `1px solid ${INK.hair}`, background: INK.wash }}
+        >
+          <span style={{ fontSize: T.lbl, color: INK.body }}>นับได้</span>
+          <span style={{ fontSize: 34, fontWeight: 700, color: INK.strong, lineHeight: 1.1, ...num }}>
+            {baht(Number(amount))}
+          </span>
+        </div>
+        {expected != null && (
+          <div
+            className="flex items-center justify-between px-5 py-3"
+            style={{
+              borderLeft: `3px solid ${overShort(Number(amount) - expected).color}`,
+              background: INK.wash, marginTop: 8,
+            }}
+          >
+            <span style={{ fontSize: T.lbl, color: INK.body, ...num }}>ควรมี {baht(expected)}</span>
+            <span
+              style={{ fontSize: T.lead, fontWeight: 700, color: overShort(Number(amount) - expected).color, ...num }}
+            >
+              {overShort(Number(amount) - expected).text}
+            </span>
+          </div>
+        )}
+        <Button
+          type="text" size="small"
+          style={{ marginTop: 6, paddingInline: 0, color: C.brand }}
+          onClick={() => { setAmount(''); setCounter(true); }}
+        >
+          นับใหม่
+        </Button>
+      </div>
+    );
 
   const counterModal = (
     <CashCountModal
@@ -347,14 +371,14 @@ export function Shift() {
           <div className="px-6 py-5">
             <div style={{ fontSize: T.lead, fontWeight: 600, color: INK.strong }}>เปิดรอบ</div>
             <div style={{ fontSize: T.body, color: INK.body, marginTop: 2 }}>
-              นับเงินในลิ้นชักตอนนี้ แล้วกดเปิดรอบ
+              นับเงินในลิ้นชักทีละใบ แล้วกดเปิดรอบ
             </div>
-            {lastClosed?.counted_cash != null && (
+            {expectedAtOpen != null && (
               <div style={{ fontSize: T.lbl, color: INK.mute, marginTop: 6 }}>
-                เติมยอดจากรอบที่แล้วให้แล้ว ({baht(lastClosed.counted_cash)}) — แก้ได้ถ้าไม่ตรง
+                รอบที่แล้วปิดด้วย {baht(expectedAtOpen)} — นับดูว่ายังอยู่ครบไหม
               </div>
             )}
-            <div className="mt-4">{cashInput('เงินในลิ้นชัก')}</div>
+            <div className="mt-4">{countedBlock(expectedAtOpen)}</div>
           </div>
           <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
             <Button
@@ -507,21 +531,10 @@ export function Shift() {
         destroyOnHidden
       >
         <div style={{ fontSize: T.body, color: INK.body, marginBottom: 14 }}>
-          นับเงินจริงในลิ้นชัก แล้วกรอกยอด — ระบบจะเทียบกับ{' '}
+          นับเงินในลิ้นชักทีละใบ — ระบบจะเทียบกับ{' '}
           <b style={{ color: INK.strong, ...num }}>{baht(inDrawer)}</b> ที่ควรมี
         </div>
-        {cashInput('นับได้จริง')}
-        {diff != null && (
-          <div
-            className="mt-4 flex items-center justify-between px-4 py-3"
-            style={{ background: INK.wash, borderLeft: `3px solid ${overShort(diff).color}` }}
-          >
-            <span style={{ fontSize: T.body, color: INK.body }}>ผลต่าง</span>
-            <span style={{ fontSize: 26, fontWeight: 700, color: overShort(diff).color, ...num }}>
-              {overShort(diff).text}
-            </span>
-          </div>
-        )}
+        {countedBlock(inDrawer)}
       </Modal>
       {counterModal}
     </div>
