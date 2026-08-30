@@ -12,7 +12,7 @@
  * เย็น:  นับเงินจริง → เห็น พอดี/ขาด/เกิน → ปิดรอบ (ตัวตัดสินจริงมาจากเซิร์ฟเวอร์)
  */
 
-import { Alert, Button, Card, Col, Descriptions, InputNumber, Modal, Row, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, InputNumber, Modal, Row, Steps, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
@@ -100,6 +100,37 @@ function MoneyRow({
         {value}
       </span>
     </div>
+  );
+}
+
+/** แถบบอกว่าตอนนี้อยู่ขั้นไหนของวัน
+ *
+ * หน้านี้เปลี่ยนหน้าตาไปเลยตามว่ามีรอบเปิดอยู่หรือไม่ ซึ่งถ้าไม่บอกอะไรเลยคนเปิด
+ * มาจะไม่รู้ว่ากำลังดูอะไรอยู่ ("ไม่เข้าใจ flow หน้านี้เลย" — เจ้าของ 30 ส.ค.)
+ * และที่สำคัญกว่านั้น: **ขายได้ตามปกติแม้ไม่เปิดรอบ** (create_pos_sale ไม่บังคับ
+ * ตั้งแต่ 0021) ถ้าไม่พูดตรง ๆ คนจะเดาว่าต้องเปิดรอบก่อนถึงจะขายได้ แล้วกลัวจะ
+ * ทำผิดขั้นตอน — จึงเขียนบอกไว้ในแถบนี้เลย
+ */
+function FlowSteps({ current }: { current: 0 | 1 }) {
+  return (
+    <Card styles={{ body: { padding: '16px 20px' } }}>
+      <Steps
+        size="small"
+        current={current}
+        items={[
+          { title: 'เปิดร้าน', description: 'นับเงินทอนในลิ้นชัก แล้วกดเปิดรอบ' },
+          { title: 'ขายทั้งวัน', description: 'ระบบรวมเงินสดที่รับเข้ามาให้เอง' },
+          { title: 'ปิดร้าน', description: 'นับเงินจริง เทียบกับที่ควรมี' },
+        ]}
+      />
+      <div style={{ fontSize: 13, color: '#5C534E', marginTop: 12 }}>
+        หน้านี้มีไว้<b>ตรวจว่าเงินในลิ้นชักตรงกับยอดขายไหม</b> — ไม่ได้เกี่ยวกับการขาย
+        <br />
+        <span style={{ color: '#8C837D' }}>
+          ขายหน้าร้านได้ตามปกติแม้ไม่เปิดรอบ · เปิดรอบไว้เพื่อให้ตอนเย็นรู้ว่าเงินขาดหรือเกินเท่าไหร่
+        </span>
+      </div>
+    </Card>
   );
 }
 
@@ -281,6 +312,7 @@ export function Shift() {
     return (
       <div className="flex flex-col gap-4">
         {justClosed && <ClosedSummary row={justClosed.row} onPrint={() => void printReport(justClosed.row, justClosed.dash)} />}
+        <FlowSteps current={0} />
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={10}>
             <Card title="เปิดรอบขาย" style={{ height: '100%' }}>
@@ -336,6 +368,8 @@ export function Shift() {
           description="ถ้าเมื่อวานลืมปิด ให้ปิดรอบนี้แล้วเปิดรอบใหม่ ไม่งั้นยอดของสองวันจะรวมกัน"
         />
       )}
+
+      <FlowSteps current={1} />
 
       <Card
         title={`รอบปัจจุบัน — เปิดเมื่อ ${dayjs(shift.opened_at).format('DD/MM HH:mm')}`}
