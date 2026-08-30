@@ -86,29 +86,34 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
         scroll={{ y: 260 }}
         columns={([
           {
-            title: 'วันที่',
+            /* วัน/เวลาเรียงสองบรรทัด ไม่ใช่บรรทัดเดียว — ตารางนี้ย้ายมาอยู่คอลัมน์ข้าง
+               กว้าง 400px แล้ว บรรทัดเดียวจะดันจนตารางเลื่อนแนวนอน */
+            title: 'รอบ',
             render: (_: unknown, r: ShiftRow) => (
-              <span style={{ fontSize: T.body, color: INK.strong }}>
-                {d(r.opened_at).format('DD/MM/YYYY')}{' '}
-                <span style={{ color: INK.mute, fontSize: 12 }}>
+              <div style={{ lineHeight: 1.35 }}>
+                <div style={{ fontSize: T.body, color: INK.strong, ...num }}>{d(r.opened_at).format('DD/MM/YY')}</div>
+                <div style={{ fontSize: 12, color: INK.mute, ...num }}>
                   {d(r.opened_at).format('HH:mm')}–{r.closed_at ? d(r.closed_at).format('HH:mm') : ''}
-                </span>
-              </span>
+                </div>
+              </div>
             ),
           },
           {
-            title: 'ควรมี', align: 'right' as const, width: 110,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: T.val, color: INK.body, ...num }}>{baht(r.expected_cash ?? 0)}</span>,
+            /* "ควรมี/นับได้" ซ้อนกันในช่องเดียว เพราะมันคือคู่ที่อ่านเทียบกันอยู่แล้ว
+               และประหยัดที่ไปหนึ่งคอลัมน์เต็ม ๆ */
+            title: 'ควรมี / นับได้', align: 'right' as const, width: 104,
+            render: (_: unknown, r: ShiftRow) => (
+              <div style={{ lineHeight: 1.35 }}>
+                <div style={{ fontSize: 12, color: INK.mute, ...num }}>{baht(r.expected_cash ?? 0)}</div>
+                <div style={{ fontSize: T.body, color: INK.strong, ...num }}>{baht(r.counted_cash ?? 0)}</div>
+              </div>
+            ),
           },
           {
-            title: 'นับได้', align: 'right' as const, width: 110,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: T.val, color: INK.strong, ...num }}>{baht(r.counted_cash ?? 0)}</span>,
-          },
-          {
-            title: 'ผลต่าง', align: 'right' as const, width: 120,
+            title: 'ผลต่าง', align: 'right' as const, width: 96,
             render: (_: unknown, r: ShiftRow) => {
               const v = overShort(r.over_short ?? 0);
-              return <span style={{ fontSize: T.val, fontWeight: 600, color: v.color, ...num }}>{v.text}</span>;
+              return <span style={{ fontSize: T.body, fontWeight: 600, color: v.color, ...num }}>{v.text}</span>;
             },
           },
         ] as ColumnsType<ShiftRow>)}
@@ -335,7 +340,8 @@ export function Shift() {
   /* ── ยังไม่เปิดรอบ ─────────────────────────────────────────────────────── */
   if (!shift) {
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      <div className="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex flex-col gap-4">
         {doneCard}
         <Card styles={{ body: { padding: 0 } }}>
           <div className="px-6 py-5">
@@ -359,6 +365,7 @@ export function Shift() {
             </Button>
           </div>
         </Card>
+        </div>
         <ShiftHistory rows={history} />
         {counterModal}
       </div>
@@ -369,7 +376,8 @@ export function Shift() {
   const openMins = d().diff(d(shift.opened_at), 'minute');
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    <div className="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="flex flex-col gap-4">
       {openMins > 20 * 60 && (
         <Alert
           type="warning" showIcon
@@ -446,6 +454,9 @@ export function Shift() {
         </div>
       </Card>
 
+      </div>
+      <ShiftHistory rows={history} />
+
       {noSaleModal}
       <Modal
         open={drawerLog}
@@ -484,8 +495,6 @@ export function Shift() {
           ]}
         />
       </Modal>
-
-      <ShiftHistory rows={history} />
 
       <Modal
         open={closing}
