@@ -11,6 +11,7 @@ import {
   RiSearchLine,
   RiShoppingBasket2Line,
   RiSubtractLine,
+  RiCalculatorLine,
 } from '@remixicon/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
@@ -62,6 +63,7 @@ import {
   type InputRef,
 } from 'antd';
 
+import { CashCountModal } from '../components/CashCountModal';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
@@ -171,8 +173,8 @@ export function Pos() {
   // null = กำลังเช็ค · true = มีรอบ · false = ต้องเปิดก่อน
   // เช็คไม่ได้ (ออฟไลน์) = ปล่อยขาย — offline-first สำคัญกว่าวินัยรอบ
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null);
-  const [floatInput, setFloatInput] = useState<number | ''>('');
   const [openingShift, setOpeningShift] = useState(false);
+  const [counting, setCounting] = useState(false);   // ตัวนับเงินทีละใบของด่านเปิดรอบ
   const recheckShift = useCallback(() => {
     getOpenShift()
       .then((sh) => setShiftOpen(!!sh))
@@ -621,42 +623,42 @@ export function Pos() {
   if (shiftOpen === false) {
     return (
       <div className="grid place-items-center min-h-[60vh]">
+        {/* เจ้าของสั่ง 30 ส.ค.: ยอดเงินต้องมาจากการนับมือเท่านั้น ห้ามพิมพ์ยอดรวมเอง
+            ด่านนี้เคยมีช่องพิมพ์ "เงินตั้งต้น เช่น 1000" กับลิงก์ชวนไปนับละเอียดที่
+            หน้าอื่น ซึ่งแปลว่าทางที่เร็วกว่าคือทางที่ผิด แล้วก็ไม่มีใครเดินทางที่ถูก
+            ตอนนี้เหลือทางเดียวคือตัวนับทีละใบตัวเดียวกับหน้าเปิด-ปิดรอบ */}
         <Card style={{ width: 420, maxWidth: '92vw' }}>
-          <div className="text-center space-y-1 mb-4">
-            <div className="text-[22px] font-extrabold text-tremor-content-strong">ยังไม่ได้เปิดรอบขาย</div>
-            <div className="text-tremor-content">
-              นับเงินทอนตั้งต้นในลิ้นชัก แล้วเปิดรอบก่อนเริ่มขาย — บิลทุกใบจะถูกนับเข้ารอบ
+          <div className="text-center mb-6">
+            <div className="text-[38px] font-extrabold leading-tight text-tremor-content-strong">
+              เปิดรอบ
             </div>
           </div>
-          <div className="flex gap-2 justify-center">
-            <InputNumber
-              min={0}
-              size="large"
-              placeholder="เงินตั้งต้น เช่น 1000"
-              style={{ width: 200 }}
-              value={floatInput === '' ? undefined : floatInput}
-              onChange={(v) => setFloatInput(v ?? '')}
-              autoFocus
-            />
-            <Button
-              type="primary"
-              size="large"
-              loading={openingShift}
-              onClick={() => {
-                setOpeningShift(true);
-                openShift(Number(floatInput) || 0)
-                  .then(() => setShiftOpen(true))
-                  .catch((e) => setError(apiError(e)))
-                  .finally(() => setOpeningShift(false));
-              }}>
-              เปิดรอบ
-            </Button>
-          </div>
-          <div className="text-center mt-3">
-            <a href="/shift" className="text-[13px]">นับเงินแบบละเอียด (แบงก์/เหรียญ) ที่หน้า เปิด-ปิดรอบ</a>
-          </div>
+          {/* ปุ่มเดียวกันรับหน้าที่โชว์สถานะกำลังเปิดรอบด้วย — พอกด "ใช้ยอดนี้" ในตัวนับ
+              แล้วโมดัลปิดลง ถ้าไม่มีอะไรขยับตรงนี้เลยจะดูเหมือนกดไม่ติด */}
+          <Button
+            type="primary"
+            size="large"
+            block
+            loading={openingShift}
+            style={{ height: 56, fontSize: 20 }}
+            icon={<RiCalculatorLine className="w-4 h-4" />}
+            onClick={() => setCounting(true)}>
+            {openingShift ? 'กำลังเปิดรอบ…' : 'นับเงินในลิ้นชัก'}
+          </Button>
           {error ? <div className="mt-3 text-center text-red-600 text-sm">{error}</div> : null}
         </Card>
+        <CashCountModal
+          open={counting}
+          onClose={() => setCounting(false)}
+          onDone={(total) => {
+            setCounting(false);
+            setOpeningShift(true);
+            openShift(total)
+              .then(() => setShiftOpen(true))
+              .catch((e) => setError(apiError(e)))
+              .finally(() => setOpeningShift(false));
+          }}
+        />
       </div>
     );
   }
