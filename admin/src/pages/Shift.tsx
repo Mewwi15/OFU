@@ -29,19 +29,19 @@ import {
   listDrawerOpens,
   listShifts,
   logDrawerOpen,
-  openShift,
   posDashboard,
   type Dashboard,
   type DrawerOpen,
   type Shift as ShiftRow,
 } from '../lib/api';
 import { getShopName } from '../lib/orders';
-import { printNoSaleSlip, printShiftOpenSlip } from '../lib/printDrawer';
+import { printNoSaleSlip } from '../lib/printDrawer';
 import { printShiftReport } from '../lib/printShift';
 import { getReceiptConfig } from '../lib/receiptConfig';
 import { d, since } from '../lib/time';
 import { CashCountModal } from '../components/CashCountModal';
 import { LiveClock } from '../components/LiveClock';
+import { OpenShiftPanel } from '../components/OpenShiftPanel';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -139,7 +139,6 @@ export function Shift() {
   const [drawerOpens, setDrawerOpens] = useState<DrawerOpen[]>([]);
   const [code, setCode] = useState('');                    // รหัสพนักงานที่กำลังเปิด/ปิดรอบ
 
-  const lastClosed = history.find((r) => r.closed_at);
 
   const refresh = useCallback(async () => {
     const s = await getOpenShift().catch(() => null);
@@ -159,45 +158,10 @@ export function Shift() {
     return () => clearInterval(t);
   }, [refresh]);
 
-  // ยอดที่นับได้ตอนปิดรอบที่แล้ว = เงินที่ "ควรจะ" ยังอยู่ในลิ้นชักเช้านี้
-  // เดิมผมเติมเลขนี้ลงช่องยอดให้เลย ซึ่งผิด — มันคือความคาดหวัง ไม่ใช่ของที่นับมา
-  // ตอนนี้ใช้เป็นตัวเทียบอย่างเดียว ถ้ากลางคืนเงินหายไปจะได้เห็นตั้งแต่เปิดร้าน
-  const expectedAtOpen = lastClosed?.counted_cash ?? null;
 
   const cashIn = dash?.onsite.cash ?? 0;                   // เงินสดที่รับเข้ามาในรอบ (รวม COD)
   const inDrawer = (shift?.opening_float ?? 0) + cashIn;   // ควรมีเท่านี้ในลิ้นชักตอนนี้
 
-  const doOpen = async () => {
-    setBusy(true);
-    const float = Number(amount) || 0;
-    try {
-      await openShift(float, code);
-      setAmount('');
-      setCode('');
-      setDone(null);
-      await refresh();
-      message.success('เปิดรอบแล้ว — ขายได้เลย');
-      // พิมพ์ใบเปิดรอบทันที เพราะงานพิมพ์คือสิ่งที่ทำให้ลิ้นชักเด้ง (ดู printDrawer.ts)
-      // ตอนนี้แหละที่ต้องเอาเงินทอนใส่ ถ้าพลาดตรงนี้ต้องไปง้างลิ้นชักเอง
-      // ล้มก็ปล่อยผ่าน — รอบเปิดสำเร็จไปแล้ว ห้ามให้เครื่องพิมพ์มาคว่ำการเปิดรอบ
-      try {
-        printShiftOpenSlip({
-          shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
-          openedAt: new Date().toISOString(),
-          openingFloat: float,
-          // รหัสที่พนักงานกรอกจริงตอนนี้ ไม่ใช่ cashierName ที่ตั้งค้างไว้ต่อเครื่อง
-          // ซึ่งเป็นค่าเดิมตลอดไม่ว่าใครมายืนหน้าเครื่อง
-          cashier: code,
-        });
-      } catch {
-        message.warning('เปิดรอบแล้ว แต่พิมพ์ใบเปิดรอบไม่ได้ — ลิ้นชักอาจไม่เด้ง');
-      }
-    } catch (e) {
-      message.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const doClose = async () => {
     if (!shift || amount === '') return;
@@ -393,35 +357,7 @@ export function Shift() {
       <div className="grid w-full grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="flex flex-col gap-4">
         {doneCard}
-        <Card styles={{ body: { padding: 0 } }}>
-          {/* คำอธิบายใต้หัวข้อถูกสั่งเอาออก — ปุ่มข้างล่างเขียนว่า "นับเงินในลิ้นชัก"
-              อยู่แล้ว บรรทัดนั้นแค่พูดซ้ำสิ่งที่ปุ่มบอก
-              ยอดรอบที่แล้วก็เอาออกจากตรงนี้เหมือนกัน ไปโผล่ตอนนับเสร็จในฐานะ
-              "ควรมี" แทน — บอกคำตอบก่อนนับคือการชี้นำคนนับ */}
-          <div className="px-6 pt-8 pb-6">
-            <div
-              style={{
-                fontSize: T.title, fontWeight: 700, color: INK.strong,
-                lineHeight: 1.15, textAlign: 'center', letterSpacing: '-.01em',
-              }}
-            >
-              เปิดรอบ
-            </div>
-            <div className="mt-1 text-center">
-              <LiveClock size={T.val} />
-            </div>
-            <div className="mt-7">{codeField}</div>
-            <div className="mt-4">{countedBlock(expectedAtOpen)}</div>
-          </div>
-          <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
-            <Button
-              type="primary" size="large" block
-              loading={busy} disabled={amount === '' || code === ''} onClick={() => void doOpen()}
-            >
-              เปิดรอบ
-            </Button>
-          </div>
-        </Card>
+        <OpenShiftPanel onOpened={() => { setDone(null); void refresh(); }} />
         </div>
         <ShiftHistory rows={history} />
         {counterModal}

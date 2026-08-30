@@ -11,7 +11,6 @@ import {
   RiSearchLine,
   RiShoppingBasket2Line,
   RiSubtractLine,
-  RiCalculatorLine,
 } from '@remixicon/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
@@ -21,7 +20,6 @@ import {
   createPosSale,
   getOpenShift,
   getShopInfo,
-  openShift,
   listCategories,
   listPosCatalog,
   type Category,
@@ -63,8 +61,7 @@ import {
   type InputRef,
 } from 'antd';
 
-import { CashCountModal } from '../components/CashCountModal';
-import { LiveClock } from '../components/LiveClock';
+import { OpenShiftPanel } from '../components/OpenShiftPanel';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
@@ -174,9 +171,6 @@ export function Pos() {
   // null = กำลังเช็ค · true = มีรอบ · false = ต้องเปิดก่อน
   // เช็คไม่ได้ (ออฟไลน์) = ปล่อยขาย — offline-first สำคัญกว่าวินัยรอบ
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null);
-  const [openingShift, setOpeningShift] = useState(false);
-  const [counting, setCounting] = useState(false);   // ตัวนับเงินทีละใบของด่านเปิดรอบ
-  const [shiftCode, setShiftCode] = useState('');    // รหัสพนักงานที่เปิดรอบ
   const recheckShift = useCallback(() => {
     getOpenShift()
       .then((sh) => setShiftOpen(!!sh))
@@ -624,61 +618,8 @@ export function Pos() {
   /* ── ด่านเปิดรอบ: ไม่มีรอบ = ขายไม่ได้ (เจ้าของสั่ง: "ต้องเปิดรอบก่อนเท่านั้น") ── */
   if (shiftOpen === false) {
     return (
-      <div className="grid place-items-center min-h-[60vh]">
-        {/* เจ้าของสั่ง 30 ส.ค.: ยอดเงินต้องมาจากการนับมือเท่านั้น ห้ามพิมพ์ยอดรวมเอง
-            ด่านนี้เคยมีช่องพิมพ์ "เงินตั้งต้น เช่น 1000" กับลิงก์ชวนไปนับละเอียดที่
-            หน้าอื่น ซึ่งแปลว่าทางที่เร็วกว่าคือทางที่ผิด แล้วก็ไม่มีใครเดินทางที่ถูก
-            ตอนนี้เหลือทางเดียวคือตัวนับทีละใบตัวเดียวกับหน้าเปิด-ปิดรอบ */}
-        <Card style={{ width: 420, maxWidth: '92vw' }}>
-          <div className="text-center mb-6">
-            <div className="text-[38px] font-extrabold leading-tight text-tremor-content-strong">
-              เปิดรอบ
-            </div>
-            <div className="mt-1">
-              <LiveClock />
-            </div>
-          </div>
-          {/* รหัสพนักงานต้องมาก่อนนับเงิน — บัญชีที่ล็อกอินเป็นบัญชีร่วมของร้าน
-              ชี้ตัวคนไม่ได้ ถ้าไม่ใส่ตรงนี้ RPC ก็ปฏิเสธอยู่ดี (0085) */}
-          <div className="mb-4">
-            <div className="text-[13px] text-tremor-content mb-1.5">รหัสพนักงาน</div>
-            <Input
-              value={shiftCode}
-              onChange={(e) => setShiftCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
-              placeholder="เช่น 07"
-              inputMode="numeric"
-              autoComplete="off"
-              autoFocus
-              style={{ height: 52, fontSize: 22, fontWeight: 700, textAlign: 'center' }}
-            />
-          </div>
-          {/* ปุ่มเดียวกันรับหน้าที่โชว์สถานะกำลังเปิดรอบด้วย — พอกด "ใช้ยอดนี้" ในตัวนับ
-              แล้วโมดัลปิดลง ถ้าไม่มีอะไรขยับตรงนี้เลยจะดูเหมือนกดไม่ติด */}
-          <Button
-            type="primary"
-            size="large"
-            block
-            loading={openingShift}
-            disabled={shiftCode === ''}
-            style={{ height: 56, fontSize: 20 }}
-            icon={<RiCalculatorLine className="w-4 h-4" />}
-            onClick={() => setCounting(true)}>
-            {openingShift ? 'กำลังเปิดรอบ…' : 'นับเงินในลิ้นชัก'}
-          </Button>
-          {error ? <div className="mt-3 text-center text-red-600 text-sm">{error}</div> : null}
-        </Card>
-        <CashCountModal
-          open={counting}
-          onClose={() => setCounting(false)}
-          onDone={(total) => {
-            setCounting(false);
-            setOpeningShift(true);
-            openShift(total, shiftCode)
-              .then(() => setShiftOpen(true))
-              .catch((e) => setError(apiError(e)))
-              .finally(() => setOpeningShift(false));
-          }}
-        />
+      <div className="grid place-items-center min-h-[70vh]">
+        <OpenShiftPanel onOpened={() => setShiftOpen(true)} />
       </div>
     );
   }
