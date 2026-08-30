@@ -4,6 +4,8 @@ import { Avatar, Badge, Button, Drawer, Grid, Layout as AntLayout, Tooltip } fro
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
+import { BackOfficeGate } from './BackOfficeGate';
+
 import { useAuth } from '../auth';
 import { VOICE_STORAGE_KEY } from '../lib/voiceAnnounce';
 import { OrderAlerts } from './OrderAlerts';
@@ -95,7 +97,10 @@ export function Layout() {
           </div>
         </Header>
         <Content style={{ padding: isDesktop ? 28 : 16, overflowY: 'auto', flex: '1 1 auto' }}>
-          <Outlet />
+          {/* ด่านรหัสหลังร้านครอบเฉพาะเนื้อหา เมนูข้างยังอยู่ให้กดกลับหน้าร้านได้ */}
+          <BackOfficeGate>
+            <Outlet />
+          </BackOfficeGate>
         </Content>
       </AntLayout>
 

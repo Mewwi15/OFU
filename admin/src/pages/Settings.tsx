@@ -14,6 +14,7 @@ import {
   Switch,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import { useEffect, useState } from 'react';
 
@@ -21,6 +22,8 @@ import { useAuth } from '../auth';
 import { Receipt, type ReceiptProps } from '../components/Receipt';
 import {
   apiError,
+  backOfficePinSet,
+  setBackOfficePin,
   getShopSettingsFull,
   updateShopSettings,
   type ShopSettingsFull,
@@ -57,6 +60,60 @@ function sampleReceipt(shop: ShopSettingsFull): ReceiptProps {
     cashPaid: 250,
     change: 250 - subtotal,
   };
+}
+
+/**
+ * รหัสเข้าหลังร้าน — เจ้าของเท่านั้นที่ตั้งได้ (บังคับที่ RPC ไม่ใช่แค่ซ่อนปุ่ม)
+ *
+ * ตราบใดที่ยังไม่ตั้ง หลังร้านเปิดโล่ง ต้องบอกให้เห็นชัด ๆ ไม่ใช่ปล่อยให้เจ้าของ
+ * เข้าใจว่ากันไว้แล้วทั้งที่ยังไม่ได้กัน
+ */
+function BackOfficePinCard() {
+  const [isSet, setIsSet] = useState<boolean | null>(null);
+  const [pin, setPin] = useState('');
+  const [pin2, setPin2] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { backOfficePinSet().then(setIsSet).catch(() => setIsSet(null)); }, []);
+
+  const save = async () => {
+    if (pin !== pin2) { message.error('รหัสสองช่องไม่ตรงกัน'); return; }
+    setBusy(true);
+    try {
+      await setBackOfficePin(pin);
+      setIsSet(true); setPin(''); setPin2('');
+      message.success('ตั้งรหัสหลังร้านแล้ว');
+    } catch (e) {
+      message.error(apiError(e));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Card title="รหัสเข้าหลังร้าน" size="small">
+      {isSet === false && (
+        <Alert
+          type="warning" showIcon className="mb-3"
+          message="ยังไม่ได้ตั้งรหัส — ตอนนี้ใครก็เข้าหลังร้านได้"
+        />
+      )}
+      <div className="text-xs text-gray-400 mb-3">
+        ตัวเลข 4-8 หลัก · ใส่ครั้งเดียวใช้ได้ 30 นาที · ใส่ผิดติดกัน 5 ครั้งล็อก 5 นาที
+      </div>
+      <Space direction="vertical" size={8} className="w-full">
+        <Input.Password
+          value={pin} placeholder={isSet ? 'รหัสใหม่' : 'ตั้งรหัส'} inputMode="numeric"
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+        />
+        <Input.Password
+          value={pin2} placeholder="ใส่รหัสอีกครั้ง" inputMode="numeric"
+          onChange={(e) => setPin2(e.target.value.replace(/\D/g, '').slice(0, 8))}
+        />
+        <Button type="primary" loading={busy} disabled={pin.length < 4 || pin2 === ''} onClick={() => void save()}>
+          {isSet ? 'เปลี่ยนรหัส' : 'ตั้งรหัส'}
+        </Button>
+      </Space>
+    </Card>
+  );
 }
 
 export function Settings() {
@@ -120,8 +177,9 @@ export function Settings() {
           </Form>
         </Card>
 
-        {/* ── ขนาดกระดาษ + ทดสอบอุปกรณ์ ──────────────────────────────── */}
+        {/* ── ขนาดกระดาษ + ทดสอบอุปกรณ์ + รหัสหลังร้าน ─────────────────── */}
         <Space direction="vertical" size={16} className="w-full">
+          <BackOfficePinCard />
           <Card title="ขนาดกระดาษ" size="small">
             <Segmented
               block

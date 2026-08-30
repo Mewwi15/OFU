@@ -7,6 +7,7 @@ import { supabase } from './supabase';
  * generic fallback, which reads as "it broke" with no clue what to fix. */
 const VALIDATION_DETAIL_TH: Record<string, string> = {
   'discount exceeds subtotal': 'ส่วนลดเกินยอดซื้อ กรุณาลดจำนวนส่วนลด',
+  pin_format: 'รหัสต้องเป็นตัวเลข 4-8 หลัก',
   'split allows cash/promptpay only': 'แบ่งจ่ายได้เฉพาะเงินสด/พร้อมเพย์เท่านั้น',
   'payments must sum to total': 'ยอดที่แบ่งจ่ายรวมกันไม่เท่ากับยอดสุทธิ',
   code_required: 'กรอกโค้ดส่วนลด',
@@ -47,6 +48,7 @@ export function apiError(e: unknown): string {
     SHIFT_ALREADY_OPEN: 'มีกะที่เปิดอยู่แล้ว',
     SHIFT_CLOSED: 'กะนี้ปิดแล้ว',
     CASHIER_CODE_REQUIRED: 'ต้องใส่รหัสพนักงานก่อน',
+    PIN_LOCKED: 'ใส่รหัสผิดหลายครั้ง กรุณารอสักครู่แล้วลองใหม่',
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
     INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
@@ -813,6 +815,13 @@ export async function listDrawerOpens(shiftId: string): Promise<DrawerOpen[]> {
   if (error) throw error;
   return (data ?? []) as DrawerOpen[];
 }
+
+/* ── รหัสเข้าหลังร้าน (0086) ─────────────────────────────────────────────────
+ * ด่านกันคนเดินผ่าน ไม่ใช่ระบบสิทธิ์ — เครื่อง POS ตั้งหน้าเคาน์เตอร์และล็อกอิน
+ * ค้างทั้งวัน ใครเดินมาก็กดเข้ารายงาน/ต้นทุน/ตั้งค่าได้ ตัวจริงยังเป็น RLS เหมือนเดิม */
+export const backOfficePinSet = () => rpc<boolean>('back_office_pin_set', {});
+export const verifyBackOfficePin = (pin: string) => rpc<boolean>('verify_back_office_pin', { p_pin: pin });
+export const setBackOfficePin = (pin: string) => rpc<void>('set_back_office_pin', { p_pin: pin });
 
 /* ── store credit ────────────────────────────────────────────────────────────── */
 export type Customer = { user_id: string; display_name: string | null; phone: string | null; balance: number };
