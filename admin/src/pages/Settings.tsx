@@ -96,9 +96,10 @@ function BackOfficePinCard() {
           message="ยังไม่ได้ตั้งรหัส — ตอนนี้ใครก็เข้าหลังร้านได้"
         />
       )}
-      <div className="text-xs text-gray-400 mb-3">
-        ตัวเลข 4-8 หลัก · ใส่ครั้งเดียวใช้ได้ 30 นาที · ใส่ผิดติดกัน 5 ครั้งล็อก 5 นาที
-      </div>
+      {/* เดิมยัดกฎสามข้อไว้บรรทัดเดียวคั่นด้วยจุด เจ้าของอ่านแล้วถามว่า "คือไร"
+          ตอนตั้งรหัสต้องรู้แค่ว่าใส่อะไรได้ ส่วนเรื่องหมดอายุ 30 นาทีกับล็อก 5 นาที
+          ไปบอกตอนที่มันเกิดขึ้นจริงบนด่านเอา ไม่ใช่มากองรวมกันตรงนี้ */}
+      <div className="text-xs text-gray-400 mb-3">ตัวเลข 4-8 หลัก</div>
       <Space direction="vertical" size={8} className="w-full">
         <Input.Password
           value={pin} placeholder={isSet ? 'รหัสใหม่' : 'ตั้งรหัส'} inputMode="numeric"
