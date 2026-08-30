@@ -33,6 +33,8 @@ import {
   type Shift as ShiftRow,
 } from '../lib/api';
 import { getShopName } from '../lib/orders';
+import { printShiftOpenSlip } from '../lib/printDrawer';
+import { getReceiptConfig } from '../lib/receiptConfig';
 import { d, since } from '../lib/time';
 import { printShiftReport } from '../lib/printShift';
 
@@ -146,12 +148,26 @@ export function Shift() {
 
   const doOpen = async () => {
     setBusy(true);
+    const float = Number(amount) || 0;
     try {
-      await openShift(Number(amount) || 0);
+      await openShift(float);
       setAmount('');
       setDone(null);
       await refresh();
       message.success('เปิดรอบแล้ว — ขายได้เลย');
+      // พิมพ์ใบเปิดรอบทันที เพราะงานพิมพ์คือสิ่งที่ทำให้ลิ้นชักเด้ง (ดู printDrawer.ts)
+      // ตอนนี้แหละที่ต้องเอาเงินทอนใส่ ถ้าพลาดตรงนี้ต้องไปง้างลิ้นชักเอง
+      // ล้มก็ปล่อยผ่าน — รอบเปิดสำเร็จไปแล้ว ห้ามให้เครื่องพิมพ์มาคว่ำการเปิดรอบ
+      try {
+        printShiftOpenSlip({
+          shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
+          openedAt: new Date().toISOString(),
+          openingFloat: float,
+          cashier: getReceiptConfig().cashierName,
+        });
+      } catch {
+        message.warning('เปิดรอบแล้ว แต่พิมพ์ใบเปิดรอบไม่ได้ — ลิ้นชักอาจไม่เด้ง');
+      }
     } catch (e) {
       message.error(apiError(e));
     } finally {
