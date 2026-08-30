@@ -35,6 +35,7 @@ import {
   markOrderPrinted,
   nextStatus,
   rejectSlip,
+  orderRiders,
   setOrderTrackingNo,
   type CancelReason,
   type Order,
@@ -220,12 +221,14 @@ export function Orders() {
   const [bucket, setBucket] = useState<string>('all');
   const [mode, setMode] = useState<string>('all');
   const [printFilter, setPrintFilter] = useState<string>('all');
+  const [riders, setRiders] = useState<Map<string, { name: string; state: string }>>(new Map());
 
   async function load() {
     setLoading(true);
     try {
       const data = await listOrders();
       setOrders(data);
+      orderRiders().then(setRiders).catch(() => {});
       setSelected((cur) => (cur ? data.find((o) => o.id === cur.id) ?? null : null));
     } catch (e) {
       message.error(apiError(e));
@@ -305,12 +308,19 @@ export function Orders() {
       /* เลขพัสดุมาจาก parcel_shipments (0046) ซึ่งมีเฉพาะออเดอร์ส่งพัสดุ — ออเดอร์
          จัดส่งเองใช้ไรเดอร์ ไม่มีเลขพัสดุ จึงไม่ให้กรอก ไม่ใช่ปล่อยให้กรอกแล้วค่อย
          ให้ RPC เด้ง NOT_PARCEL_ORDER กลับมา */
-      title: 'เลขพัสดุ',
+      title: 'เลขพัสดุ / ผู้ส่ง',
       key: 'tracking_no',
       width: 190,
       render: (_, o) =>
         o.shop_mode !== 'online' ? (
-          <span className="text-gray-300">—</span>
+          /* ออเดอร์จัดส่งเองไม่มีเลขพัสดุ แต่คำถามที่คอลัมน์นี้ตอบคือ "ของถึงไหน"
+             ซึ่งฝั่งจัดส่งเองตอบด้วยชื่อคนถือของ · ยังไม่จ่ายงานให้ขึ้นสีส้ม
+             กลายเป็นตัวเตือนงานตกค้างไปในตัว */
+          riders.get(o.id) ? (
+            <span className="text-[13px] text-[#2B2320]">ไรเดอร์ {riders.get(o.id)!.name}</span>
+          ) : (
+            <span className="text-[13px] text-[#E08C00]">ยังไม่จ่ายงาน</span>
+          )
         ) : (
           <TrackingCell order={o} onSaved={load} />
         ),

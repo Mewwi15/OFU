@@ -256,3 +256,12 @@ export async function getShopName(): Promise<string> {
 export const markCodCollected = (orderId: string, amount?: number) =>
   rpc('mark_cod_collected', { p_order_id: orderId, p_amount: amount });
 
+
+/** ใครถือออเดอร์จัดส่งอยู่ — ใช้คู่กับเลขพัสดุในคอลัมน์เดียวกัน (0090)
+ *  คืนเป็น Map ให้หน้าจอ lookup ตรง ๆ ไม่ต้องวนหาเอง */
+export async function orderRiders(): Promise<Map<string, { name: string; state: string }>> {
+  const { data, error } = await supabase.rpc('list_order_riders');
+  if (error) throw error;
+  const rows = (data ?? []) as { order_id: string; rider_name: string; state: string }[];
+  return new Map(rows.map((r) => [r.order_id, { name: r.rider_name, state: r.state }]));
+}
