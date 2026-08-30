@@ -52,7 +52,7 @@ export function onBackOfficeChange(fn: () => void): () => void {
 /** เส้นทางที่นับเป็นหลังร้าน — ต้องตรงกับกลุ่ม "หลังร้าน" ใน Sidebar.tsx */
 const BACK_OFFICE_PATHS = [
   '/stock', '/receive', '/products', '/categories', '/promotions', '/banners',
-  '/broadcast', '/reports', '/store-credit', '/audit-log', '/deploys', '/settings',
+  '/broadcast', '/reports', '/store-credit', '/audit-log', '/deploys', '/settings', '/staff',
   '/scan-lab',
 ];
 

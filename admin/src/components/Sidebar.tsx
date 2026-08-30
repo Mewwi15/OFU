@@ -19,6 +19,7 @@ import {
   RiSettings3Line,
   RiShoppingBag3Line,
   RiStore2Line,
+  RiTeamLine,
   RiWallet3Line,
 } from '@remixicon/react';
 import { Badge, Button, Menu } from 'antd';
@@ -82,6 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
       { to: '/audit-log', label: 'ประวัติแก้ไข', Icon: RiHistoryLine, ownerOnly: true },
       { to: '/deploys', label: 'อัปเดตระบบ', Icon: RiRocket2Line, ownerOnly: true },
+      { to: '/staff', label: 'พนักงาน', Icon: RiTeamLine, ownerOnly: true },
       { to: '/settings', label: 'ตั้งค่า', Icon: RiSettings3Line },
     ],
   },

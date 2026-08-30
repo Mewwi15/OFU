@@ -28,10 +28,12 @@ import {
   getOpenShift,
   listDrawerOpens,
   listShifts,
+  listStaff,
   logDrawerOpen,
   posDashboard,
   type Dashboard,
   type DrawerOpen,
+  type Staff,
   type Shift as ShiftRow,
 } from '../lib/api';
 import { getShopName } from '../lib/orders';
@@ -67,7 +69,7 @@ const num = { fontVariantNumeric: 'tabular-nums' } as const;
  * ก็ไร้ความหมายเหมือนไม่ได้บันทึก */
 const NO_SALE_REASONS = ['แลกแบงก์ให้ลูกค้า', 'เติมเงินทอน', 'เก็บเงินออกจากลิ้นชัก', 'ตรวจนับเงินระหว่างรอบ'] as const;
 
-function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
+function ShiftHistory({ rows, nameOf }: { rows: ShiftRow[]; nameOf: (c: string | null) => string | null }) {
   const closed = rows.filter((r) => r.closed_at);
   if (closed.length === 0) return null;
   const off = closed.filter((r) => (r.over_short ?? 0) !== 0).length;
@@ -96,7 +98,7 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
                 <div style={{ fontSize: T.body, color: INK.strong, ...num }}>{d(r.opened_at).format('DD/MM/YY')}</div>
                 <div style={{ fontSize: 12, color: INK.mute, ...num }}>
                   {d(r.opened_at).format('HH:mm')}–{r.closed_at ? d(r.closed_at).format('HH:mm') : ''}
-                  {r.cashier_code ? ` · ${r.cashier_code}` : ''}
+                  {r.cashier_code ? ` · ${nameOf(r.cashier_code) ?? r.cashier_code}` : ''}
                 </div>
               </div>
             ),
@@ -137,7 +139,14 @@ export function Shift() {
   const [noSale, setNoSale] = useState(false);             // หน้าต่างถามเหตุผลเปิดลิ้นชักเปล่า
   const [drawerLog, setDrawerLog] = useState(false);       // หน้าต่างดูประวัติเปิดเปล่าของรอบ
   const [drawerOpens, setDrawerOpens] = useState<DrawerOpen[]>([]);
-  const [code, setCode] = useState('');                    // รหัสพนักงานที่กำลังเปิด/ปิดรอบ
+  const [code, setCode] = useState('');
+  /* รหัส→ชื่อ ใช้ทั้งแถบสถานะ ตารางประวัติ และใบที่ปริ้น — เก็บชื่อไว้บนรอบไม่ได้
+   * เพราะรอบเก่าที่บันทึกก่อนมีระบบพนักงานจะไม่มีชื่อ แปลตอนแสดงผลจึงครอบคลุมกว่า */
+  const [staff, setStaff] = useState<Staff[]>([]);
+  useEffect(() => { listStaff().then(setStaff).catch(() => {}); }, []);
+  const nameOf = (c: string | null) => staff.find((p) => p.code === c)?.name ?? null;
+  const withName = (c: string | null) => (c ? (nameOf(c) ? `${nameOf(c)} (${c})` : c) : null);
+  const closeCodeOk = code !== '' && (staff.length === 0 || staff.some((p) => p.code === code && p.active));                    // รหัสพนักงานที่กำลังเปิด/ปิดรอบ
 
 
   const refresh = useCallback(async () => {
@@ -190,7 +199,7 @@ export function Shift() {
         cash: o?.cash ?? 0, promptpay: o?.promptpay ?? 0, storeCredit: o?.store_credit ?? 0,
         refunds: o?.refunds ?? 0, discount: o?.discount ?? 0, bills: o?.count ?? 0, gross: o?.gross ?? 0,
         expected: row.expected_cash ?? 0, counted: row.counted_cash ?? 0, overShort: row.over_short ?? 0,
-        openedBy: row.cashier_code, closedBy: row.closed_by_code,
+        openedBy: withName(row.cashier_code), closedBy: withName(row.closed_by_code),
         top: d?.top ?? [],
       },
       await getShopName().catch(() => 'ร้านอู้ฟู่'),
@@ -274,7 +283,7 @@ export function Shift() {
       printNoSaleSlip({
         shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
         at: new Date().toISOString(),
-        cashier: shift?.cashier_code ?? getReceiptConfig().cashierName,
+        cashier: withName(shift?.cashier_code ?? null) ?? getReceiptConfig().cashierName,
         reason,
         seq: res.count,
       });
@@ -300,6 +309,14 @@ export function Shift() {
         autoComplete="off"
         style={{ height: 52, fontSize: 22, fontWeight: 700, textAlign: 'center', ...num }}
       />
+      <div style={{ minHeight: 22, marginTop: 4, textAlign: 'center' }}>
+        {nameOf(code) && (
+          <span style={{ fontSize: T.val, fontWeight: 600, color: C.brand }}>{nameOf(code)}</span>
+        )}
+        {code !== '' && !nameOf(code) && staff.length > 0 && (
+          <span style={{ fontSize: T.lbl, color: C.err }}>ไม่มีรหัสนี้ในระบบ</span>
+        )}
+      </div>
     </div>
   );
 
@@ -359,7 +376,7 @@ export function Shift() {
         {doneCard}
         <OpenShiftPanel onOpened={() => { setDone(null); void refresh(); }} />
         </div>
-        <ShiftHistory rows={history} />
+        <ShiftHistory rows={history} nameOf={nameOf} />
         {counterModal}
       </div>
     );
@@ -394,7 +411,7 @@ export function Shift() {
           <span className="inline-flex items-baseline gap-2" style={{ fontSize: T.lbl }}>
             {shift.cashier_code && (
               <>
-                <span style={{ color: INK.body }}>พนักงาน {shift.cashier_code}</span>
+                <span style={{ color: INK.body }}>พนักงาน {withName(shift.cashier_code)}</span>
                 <span style={{ color: INK.hair }}>·</span>
               </>
             )}
@@ -452,7 +469,7 @@ export function Shift() {
       </Card>
 
       </div>
-      <ShiftHistory rows={history} />
+      <ShiftHistory rows={history} nameOf={nameOf} />
 
       {noSaleModal}
       <Modal
@@ -499,7 +516,7 @@ export function Shift() {
         onCancel={() => { setClosing(false); setAmount(''); setCode(''); }}
         okText="ปิดรอบ"
         cancelText="ยังก่อน"
-        okButtonProps={{ danger: true, disabled: amount === '' || code === '', loading: busy }}
+        okButtonProps={{ danger: true, disabled: amount === '' || !closeCodeOk, loading: busy }}
         onOk={() => void doClose()}
         destroyOnHidden
       >

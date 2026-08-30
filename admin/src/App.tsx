@@ -26,6 +26,7 @@ import { Reports } from './pages/Reports';
 import { Stock } from './pages/Stock';
 import { ScanLab } from './pages/ScanLab';
 import { Settings } from './pages/Settings';
+import { Staff } from './pages/Staff';
 import { StoreCredit } from './pages/StoreCredit';
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="/banners" element={<Banners />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/staff" element={<Staff />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
           <Route path="/deploys" element={<Deploys />} />

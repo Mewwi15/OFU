@@ -20,7 +20,7 @@ import { RiArrowLeftLine, RiCalculatorLine } from '@remixicon/react';
 import { Button, Card, Input, message } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { apiError, listShifts, openShift } from '../lib/api';
+import { apiError, listShifts, listStaff, openShift, type Staff } from '../lib/api';
 import { getShopName } from '../lib/orders';
 import { printShiftOpenSlip } from '../lib/printDrawer';
 import { CashCountModal } from './CashCountModal';
@@ -49,6 +49,16 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
       .then((rows) => setExpected(rows.find((r) => r.closed_at)?.counted_cash ?? null))
       .catch(() => {});
   }, []);
+
+  /* รายชื่อพนักงานไว้เฉลยชื่อทันทีที่พิมพ์รหัสถูก (0087) — คนหน้าเครื่องจะได้เห็นว่า
+   * พิมพ์ถูกคนก่อนกดถัดไป ไม่ใช่ไปรู้ตอนกดเปิดรอบแล้วเด้ง error
+   * ลิสต์ว่าง = ยังไม่ได้ตั้งพนักงาน ระบบยังปล่อยผ่านทุกรหัส (ฝั่ง RPC ก็เหมือนกัน) */
+  const [staff, setStaff] = useState<Staff[] | null>(null);
+  useEffect(() => { listStaff().then(setStaff).catch(() => setStaff([])); }, []);
+
+  const noStaffYet = staff != null && staff.length === 0;
+  const matched = staff?.find((p) => p.code === code && p.active) ?? null;
+  const codeOk = code !== '' && (noStaffYet || matched != null);
 
   const submit = async () => {
     setBusy(true);
@@ -121,7 +131,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
               <Input
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
-                onPressEnter={() => code && setStep(1)}
+                onPressEnter={() => codeOk && setStep(1)}
                 inputMode="numeric"
                 autoComplete="off"
                 autoFocus
@@ -131,10 +141,18 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
                   letterSpacing: '.18em', color: INK.strong, ...num,
                 }}
               />
+              <div className="mt-3 text-center" style={{ minHeight: 26 }}>
+                {matched && (
+                  <span style={{ fontSize: 20, fontWeight: 600, color: C.brandDark }}>{matched.name}</span>
+                )}
+                {code !== '' && !matched && !noStaffYet && (
+                  <span style={{ fontSize: 15, color: C.err }}>ไม่มีรหัสนี้ในระบบ</span>
+                )}
+              </div>
               <Button
                 type="primary" size="large" block
-                disabled={code === ''}
-                className="mt-5"
+                disabled={!codeOk}
+                className="mt-2"
                 style={{ height: 60, fontSize: 20, fontWeight: 600 }}
                 onClick={() => setStep(1)}
               >
@@ -196,7 +214,10 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
               <div className="mt-4" style={{ border: `1px solid ${INK.hair}` }}>
                 <div className="flex items-center justify-between px-5 py-3">
                   <span style={{ fontSize: 15, color: INK.body }}>พนักงาน</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: INK.strong, ...num }}>{code}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: INK.strong }}>
+                    {matched ? `${matched.name} ` : ''}
+                    <span style={{ ...num }}>({code})</span>
+                  </span>
                 </div>
                 <div
                   className="flex items-center justify-between px-5 py-3"

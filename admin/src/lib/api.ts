@@ -8,6 +8,8 @@ import { supabase } from './supabase';
 const VALIDATION_DETAIL_TH: Record<string, string> = {
   'discount exceeds subtotal': 'ส่วนลดเกินยอดซื้อ กรุณาลดจำนวนส่วนลด',
   pin_format: 'รหัสต้องเป็นตัวเลข 4-8 หลัก',
+  staff_code_format: 'รหัสพนักงานต้องเป็นตัวเลข',
+  staff_name_required: 'กรอกชื่อพนักงาน',
   'split allows cash/promptpay only': 'แบ่งจ่ายได้เฉพาะเงินสด/พร้อมเพย์เท่านั้น',
   'payments must sum to total': 'ยอดที่แบ่งจ่ายรวมกันไม่เท่ากับยอดสุทธิ',
   code_required: 'กรอกโค้ดส่วนลด',
@@ -49,6 +51,8 @@ export function apiError(e: unknown): string {
     SHIFT_CLOSED: 'กะนี้ปิดแล้ว',
     CASHIER_CODE_REQUIRED: 'ต้องใส่รหัสพนักงานก่อน',
     PIN_LOCKED: 'ใส่รหัสผิดหลายครั้ง กรุณารอสักครู่แล้วลองใหม่',
+    UNKNOWN_STAFF_CODE: 'ไม่มีรหัสพนักงานนี้ในระบบ',
+    DUPLICATE_STAFF_CODE: 'รหัสนี้มีพนักงานใช้อยู่แล้ว',
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
     INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
@@ -815,6 +819,18 @@ export async function listDrawerOpens(shiftId: string): Promise<DrawerOpen[]> {
   if (error) throw error;
   return (data ?? []) as DrawerOpen[];
 }
+
+/* ── พนักงาน (0087) ──────────────────────────────────────────────────────────
+ * 0085 เพิ่มช่องรหัสพนักงานไว้ แต่ใครพิมพ์อะไรก็ผ่าน ตารางนี้ทำให้รหัสมีความหมาย:
+ * รู้ว่ารหัสไหนของใคร · ใส่มั่วเปิดรอบไม่ได้ · ประวัติแสดงชื่อแทนตัวเลข */
+export type Staff = { id: string; code: string; name: string; active: boolean };
+
+export const listStaff = () => rpc<Staff[]>('list_staff', {});
+export const upsertStaff = (p: { id?: string; code: string; name: string; active?: boolean }) =>
+  rpc<Staff>('upsert_staff', {
+    p_id: p.id ?? null, p_code: p.code, p_name: p.name, p_active: p.active ?? true,
+  });
+export const deleteStaff = (id: string) => rpc<void>('delete_staff', { p_id: id });
 
 /* ── รหัสเข้าหลังร้าน (0086) ─────────────────────────────────────────────────
  * ด่านกันคนเดินผ่าน ไม่ใช่ระบบสิทธิ์ — เครื่อง POS ตั้งหน้าเคาน์เตอร์และล็อกอิน
