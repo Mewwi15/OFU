@@ -53,6 +53,7 @@ export function apiError(e: unknown): string {
     PIN_LOCKED: 'ใส่รหัสผิดหลายครั้ง กรุณารอสักครู่แล้วลองใหม่',
     UNKNOWN_STAFF_CODE: 'ไม่มีรหัสพนักงานนี้ในระบบ',
     DUPLICATE_STAFF_CODE: 'รหัสนี้มีพนักงานใช้อยู่แล้ว',
+    BREAKDOWN_MISMATCH: 'ยอดที่นับแยกชนิดรวมแล้วไม่เท่ากับยอดรวม — นับใหม่อีกครั้ง',
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
     INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
@@ -445,12 +446,22 @@ export type Shift = {
      ต้องมีรหัสแยก และคนเปิดกับคนปิดเป็นคนละคนได้ (0085) */
   cashier_code: string | null;
   closed_by_code: string | null;
+  /* ผลนับแยกชนิดตอนเปิด/ปิด (0088) — เอาไว้เทียบว่าแต่ละชนิดขยับไปเท่าไหร่
+     ฐานข้อมูลตรวจให้แล้วว่ารวมกันเท่ากับยอดที่กรอกจริง ไม่งั้นมันจะโกหกตัวเอง */
+  opening_breakdown: CashLine[] | null;
+  closing_breakdown: CashLine[] | null;
 };
 
-export const openShift = (opening_float: number, cashier_code: string) =>
-  rpc<Shift>('open_shift', { p_opening_float: opening_float, p_cashier_code: cashier_code });
-export const closeShift = (id: string, counted: number, cashier_code: string) =>
-  rpc<Shift>('close_shift', { p_shift_id: id, p_counted_cash: counted, p_cashier_code: cashier_code });
+export type CashLine = { denom: number; count: number };
+
+export const openShift = (opening_float: number, cashier_code: string, breakdown?: CashLine[]) =>
+  rpc<Shift>('open_shift', {
+    p_opening_float: opening_float, p_cashier_code: cashier_code, p_breakdown: breakdown ?? null,
+  });
+export const closeShift = (id: string, counted: number, cashier_code: string, breakdown?: CashLine[]) =>
+  rpc<Shift>('close_shift', {
+    p_shift_id: id, p_counted_cash: counted, p_cashier_code: cashier_code, p_breakdown: breakdown ?? null,
+  });
 
 export async function getOpenShift(): Promise<Shift | null> {
   // Scope to the current cashier — create_pos_sale requires an open shift for
@@ -795,7 +806,7 @@ export const refundPosSaleItems = (
 export async function listShifts(): Promise<Shift[]> {
   const { data, error } = await supabase
     .from('pos_shifts')
-    .select('id, opening_float, opened_at, closed_at, counted_cash, expected_cash, over_short, cashier_code, closed_by_code')
+    .select('id, opening_float, opened_at, closed_at, counted_cash, expected_cash, over_short, cashier_code, closed_by_code, opening_breakdown, closing_breakdown')
     .order('opened_at', { ascending: false })
     .limit(50);
   if (error) throw error;

@@ -64,7 +64,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
   const submit = async () => {
     setBusy(true);
     try {
-      await openShift(counted ?? 0, code);
+      await openShift(counted ?? 0, code, countLines);
       onOpened();
       /* งานพิมพ์คือสิ่งที่ทำให้ลิ้นชักเด้ง (ดู printDrawer.ts) และตอนนี้คือจังหวะที่ต้อง
        * เอาเงินทอนใส่ ล้มก็ปล่อยผ่าน — รอบเปิดสำเร็จแล้ว ห้ามให้เครื่องพิมพ์มาคว่ำ */

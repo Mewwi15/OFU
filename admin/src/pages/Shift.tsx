@@ -32,6 +32,7 @@ import {
   logDrawerOpen,
   posDashboard,
   type Dashboard,
+  type CashLine,
   type DrawerOpen,
   type Staff,
   type Shift as ShiftRow,
@@ -132,6 +133,7 @@ export function Shift() {
   const [dash, setDash] = useState<Dashboard | null>(null);
   const [history, setHistory] = useState<ShiftRow[]>([]);
   const [amount, setAmount] = useState<number | ''>('');   // ใช้ทั้งตอนเปิดและตอนปิด
+  const [countLines, setCountLines] = useState<CashLine[]>([]);   // แจกแจงทีละชนิดตอนปิดรอบ
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);           // เปิดหน้าต่างนับเงินปิดรอบ
   const [counter, setCounter] = useState(false);           // เปิดตัวนับเงินทีละใบ
@@ -176,7 +178,7 @@ export function Shift() {
     if (!shift || amount === '') return;
     setBusy(true);
     try {
-      const row = await closeShift(shift.id, Number(amount), code);
+      const row = await closeShift(shift.id, Number(amount), code, countLines);
       setDone({ row, dash });
       setCode('');
       setShift(null);
@@ -200,6 +202,7 @@ export function Shift() {
         refunds: o?.refunds ?? 0, discount: o?.discount ?? 0, bills: o?.count ?? 0, gross: o?.gross ?? 0,
         expected: row.expected_cash ?? 0, counted: row.counted_cash ?? 0, overShort: row.over_short ?? 0,
         openedBy: withName(row.cashier_code), closedBy: withName(row.closed_by_code),
+        openingBreakdown: row.opening_breakdown, closingBreakdown: row.closing_breakdown,
         top: d?.top ?? [],
       },
       await getShopName().catch(() => 'ร้านอู้ฟู่'),
@@ -266,7 +269,7 @@ export function Shift() {
     <CashCountModal
       open={counter}
       onClose={() => setCounter(false)}
-      onDone={(total) => { setAmount(total); setCounter(false); }}
+      onDone={(total, lines) => { setAmount(total); setCountLines(lines); setCounter(false); }}
     />
   );
 

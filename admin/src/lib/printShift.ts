@@ -11,6 +11,7 @@
  */
 
 
+import type { CashLine } from './api';
 import { BASE_CSS, printHtml } from './printOrder';
 import { d } from './time';
 
@@ -35,6 +36,8 @@ export type ShiftReport = {
   overShort: number;
   openedBy: string | null;
   closedBy: string | null;
+  openingBreakdown: CashLine[] | null;
+  closingBreakdown: CashLine[] | null;
   top: { name: string; qty: number; amount: number }[];
 };
 
@@ -43,6 +46,38 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
   const verdict =
     r.overShort === 0 ? 'พอดีเป๊ะ' : r.overShort < 0 ? `ขาด ${baht(-r.overShort)}` : `เกิน ${baht(r.overShort)}`;
   const verdictColor = r.overShort === 0 ? '#1E7A46' : r.overShort < 0 ? '#B3261E' : '#8A5A00';
+
+  /* ตารางเทียบชนิดแบงก์ระหว่างเปิดกับปิดรอบ (เจ้าของสั่ง 30 ส.ค. 2026)
+   *
+   * ยอดรวมตรงหรือไม่ตรงไม่เกี่ยวกับชนิดแบงก์เลย — ทอน 84 บาทเป็นแบงก์ 50+20+10
+   * หรือเป็นเหรียญบาท 84 เหรียญ ลิ้นชักก็ได้เพิ่มเท่ากัน ตารางนี้จึงไม่ได้มีไว้
+   * ตรวจว่าเงินตรงไหม แต่มีไว้ตอบสองคำถามที่ยอดรวมตอบไม่ได้:
+   *   1. พรุ่งนี้ต้องเตรียมแบงก์ย่อยเพิ่มไหม (ชนิดไหนร่อยหรอ)
+   *   2. ถ้าเงินขาด หายเป็นแบงก์อะไร ไปไล่ต่อได้ถูกที่
+   */
+  const denomLabel = (v: number) =>
+    v >= 20 ? `ธนบัตร ${v.toLocaleString('th-TH')}` : v >= 1 ? `เหรียญ ${v}` : `เหรียญ ${v * 100} สต.`;
+
+  const denoms = [
+    ...new Set([...(r.openingBreakdown ?? []), ...(r.closingBreakdown ?? [])].map((l) => l.denom)),
+  ].sort((a, b) => b - a);
+
+  const countAt = (list: CashLine[] | null, denom: number) =>
+    list?.find((l) => l.denom === denom)?.count ?? 0;
+
+  const cashRows = denoms.map((dn) => {
+    const o = countAt(r.openingBreakdown, dn);
+    const c = countAt(r.closingBreakdown, dn);
+    const delta = c - o;
+    return `<tr>
+      <td>${denomLabel(dn)}</td>
+      <td class="num">${o}</td>
+      <td class="num">${c}</td>
+      <td class="num" style="color:${delta < 0 ? '#B3261E' : delta > 0 ? '#1E7A46' : '#666'}">
+        ${delta > 0 ? '+' : ''}${delta}
+      </td>
+    </tr>`;
+  }).join('');
 
   const topRows = r.top.slice(0, 10).map((t, i) => `
     <tr>
@@ -120,6 +155,15 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
       <span class="t">ผลต่าง</span>
       <span class="v">${verdict}</span>
     </div>
+
+    ${cashRows ? `<h2>ชนิดเงินในลิ้นชัก — เทียบเปิดรอบกับปิดรอบ</h2>
+    <table class="top">
+      <thead><tr><th>ชนิด</th><th>เปิดรอบ</th><th>ปิดรอบ</th><th>เปลี่ยนไป</th></tr></thead>
+      <tbody>${cashRows}</tbody>
+    </table>
+    <p style="font-size:12px;color:#555;margin-top:5px">
+      ติดลบมาก = ชนิดนั้นร่อยหรอ ควรเตรียมเพิ่มสำหรับรอบหน้า
+    </p>` : ''}
 
     ${topRows ? `<h2>สินค้าขายดีในรอบ</h2>
     <table class="top">
