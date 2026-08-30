@@ -48,7 +48,7 @@ const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
  * เป็นเหลี่ยมไม่มีเงา ให้ตรงกับธีมแอดมิน (borderRadius: 0 ทั้งระบบ) ที่ผมเผลอ
  * ใส่มุมโค้งกับเงานุ่มสวนไว้ */
 const C = { brand: '#5B8C6E', err: '#E5484D', warn: '#E08C00', ok: '#1E9E5C' };
-const T = { lbl: 13, body: 14, val: 15, lead: 20, hero: 56 } as const;
+const T = { lbl: 13, body: 14, val: 15, lead: 20, title: 38, hero: 56 } as const;
 const INK = { strong: '#2B2320', body: '#5C534E', mute: '#8C837D', hair: '#E8E8E8', wash: '#FAFAFA' } as const;
 
 /** ขาด/เกิน ใช้ภาษาเดียวกันทุกที่บนหน้านี้ */
@@ -368,15 +368,20 @@ export function Shift() {
         <div className="flex flex-col gap-4">
         {doneCard}
         <Card styles={{ body: { padding: 0 } }}>
-          <div className="px-6 py-5">
-            <div style={{ fontSize: T.lead, fontWeight: 600, color: INK.strong }}>เปิดรอบ</div>
-            <div style={{ fontSize: T.body, color: INK.body, marginTop: 2 }}>
-              นับเงินในลิ้นชักทีละใบ แล้วกดเปิดรอบ
+          {/* คำอธิบายใต้หัวข้อถูกสั่งเอาออก — ปุ่มข้างล่างเขียนว่า "นับเงินในลิ้นชัก"
+              อยู่แล้ว บรรทัดนั้นแค่พูดซ้ำสิ่งที่ปุ่มบอก
+              ยอดรอบที่แล้วก็เอาออกจากตรงนี้เหมือนกัน ไปโผล่ตอนนับเสร็จในฐานะ
+              "ควรมี" แทน — บอกคำตอบก่อนนับคือการชี้นำคนนับ */}
+          <div className="px-6 pt-8 pb-6">
+            <div
+              style={{
+                fontSize: T.title, fontWeight: 700, color: INK.strong,
+                lineHeight: 1.15, textAlign: 'center', letterSpacing: '-.01em',
+              }}
+            >
+              เปิดรอบ
             </div>
-            {/* เดิมบอกไว้ตรงนี้ว่ารอบที่แล้วปิดด้วยเท่าไหร่ เจ้าของสั่งเอาออก —
-                และมันถูกแล้ว การบอกคำตอบก่อนนับคือการชี้นำคนนับ ตัวเลขนี้ยังอยู่
-                แต่ไปโผล่ตอนนับเสร็จในฐานะ "ควรมี" ซึ่งเป็นจังหวะที่ถูกต้อง */}
-            <div className="mt-4">{countedBlock(expectedAtOpen)}</div>
+            <div className="mt-7">{countedBlock(expectedAtOpen)}</div>
           </div>
           <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
             <Button
