@@ -76,6 +76,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
           openedAt: new Date().toISOString(),
           openingFloat: counted ?? 0,
           cashier: code,
+          lines: countLines,
         });
       } catch {
         message.warning('เปิดรอบแล้ว แต่พิมพ์ใบเปิดรอบไม่ได้ — ลิ้นชักอาจไม่เด้ง');

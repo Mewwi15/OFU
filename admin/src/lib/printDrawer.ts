@@ -48,11 +48,39 @@ const slipCss = (paperWidth: number, cw: number) => `
 const row = (label: string, value: string) =>
   `<div class="r"><span>${label}</span><span class="v">${value}</span></div>`;
 
+const denomLabelOf = (v: number) =>
+  v >= 20 ? `ธนบัตร ${v.toLocaleString('th-TH')}` : v >= 1 ? `เหรียญ ${v}` : `เหรียญ ${v * 100} สต.`;
+
+/** ตารางแจกแจงชนิดเงิน — ใบเปิดรอบกับใบนับเงินใช้ตัวเดียวกัน จะได้ไม่แตกกันทีหลัง */
+const denomTable = (lines: CountLine[]) =>
+  lines.length === 0
+    ? ''
+    : `<table>
+        <thead><tr><td>ชนิด</td><td class="c">จำนวน</td><td class="n">รวม</td></tr></thead>
+        <tbody>${lines
+          .map((l) => `<tr>
+            <td>${denomLabelOf(l.denom)}</td>
+            <td class="c">${l.count}</td>
+            <td class="n">${(l.denom * l.count).toLocaleString('th-TH')}</td>
+          </tr>`)
+          .join('')}</tbody>
+      </table>`;
+
+const TABLE_CSS = `
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    td { padding: 2px 0; font-size: 9px; }
+    td.c { text-align: center; width: 22%; }
+    td.n { text-align: right; width: 30%; white-space: nowrap; }
+    thead td { font-weight: 700; border-bottom: 1px solid #000; }`;
+
 export type OpenSlip = {
   shopName: string;
   openedAt: string;
   openingFloat: number;
   cashier: string;
+  /** แจกแจงชนิดเงินที่นับได้ (เจ้าของสั่ง 30 ส.ค. 2026 ให้ใบเปิดรอบบอกด้วยว่ากี่ใบกี่เหรียญ)
+   *  — เดิมพิมพ์แต่ยอดรวม พรุ่งนี้เงินไม่ตรงก็ย้อนไม่ได้ว่าเมื่อวานนับแบงก์พันไว้กี่ใบ */
+  lines?: CountLine[];
 };
 
 export function printShiftOpenSlip(s: OpenSlip) {
@@ -61,7 +89,7 @@ export function printShiftOpenSlip(s: OpenSlip) {
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบเปิดรอบ</title>
-  <style>${slipCss(cfg.paperWidth, cw)}
+  <style>${slipCss(cfg.paperWidth, cw)}${TABLE_CSS}
     .float { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px;
              display: flex; justify-content: space-between; align-items: baseline; }
     .float .t { font-size: 10px; font-weight: 700; }
@@ -72,6 +100,7 @@ export function printShiftOpenSlip(s: OpenSlip) {
     ${row('วันที่', d(s.openedAt).format('DD/MM/YYYY'))}
     ${row('เวลา', `${d(s.openedAt).format('HH:mm')} น.`)}
     ${s.cashier ? row('พนักงาน', esc(s.cashier)) : ''}
+    ${denomTable(s.lines ?? [])}
     <div class="float">
       <span class="t">เงินตั้งต้น</span>
       <span class="n">${baht(s.openingFloat)}</span>
@@ -147,9 +176,6 @@ export function printCountKickSlip(shopName: string, cashier: string) {
   </body></html>`);
 }
 
-const denomLabel = (v: number) =>
-  v >= 20 ? `ธนบัตร ${v.toLocaleString('th-TH')}` : v >= 1 ? `เหรียญ ${v}` : `เหรียญ ${v * 100} สต.`;
-
 /**
  * ใบนับเงินในลิ้นชัก — แจกแจงทีละชนิดว่าแบงก์อะไรกี่ใบ รวมเท่าไหร่
  *
@@ -169,22 +195,9 @@ export function printCashCountSheet(p: {
   const cfg = getReceiptConfig();
   const cw = contentMm(cfg.paperWidth);
 
-  const rows = p.lines
-    .map((l) => `<tr>
-      <td>${denomLabel(l.denom)}</td>
-      <td class="c">${l.count}</td>
-      <td class="n">${(l.denom * l.count).toLocaleString('th-TH')}</td>
-    </tr>`)
-    .join('');
-
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบนับเงินในลิ้นชัก</title>
-  <style>${slipCss(cfg.paperWidth, cw)}
-    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-    td { padding: 2px 0; font-size: 9px; }
-    td.c { text-align: center; width: 22%; }
-    td.n { text-align: right; width: 30%; white-space: nowrap; }
-    thead td { font-weight: 700; border-bottom: 1px solid #000; }
+  <style>${slipCss(cfg.paperWidth, cw)}${TABLE_CSS}
     .sum { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px;
            display: flex; justify-content: space-between; align-items: baseline; }
     .sum .t { font-size: 10px; font-weight: 700; }
@@ -194,10 +207,7 @@ export function printCashCountSheet(p: {
     <div class="doc">ใบนับเงินในลิ้นชัก</div>
     ${row('เวลา', `${d(p.at).format('DD/MM HH:mm')} น.`)}
     ${p.cashier ? row('ผู้นับ', esc(p.cashier)) : ''}
-    <table>
-      <thead><tr><td>ชนิด</td><td class="c">จำนวน</td><td class="n">รวม</td></tr></thead>
-      <tbody>${rows || '<tr><td colspan="3">— ไม่มี —</td></tr>'}</tbody>
-    </table>
+    ${denomTable(p.lines) || '<div class="note">— ไม่มีรายละเอียด —</div>'}
     <div class="sum">
       <span class="t">รวมทั้งสิ้น</span>
       <span class="n">${baht(p.total)}</span>
