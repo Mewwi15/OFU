@@ -1,6 +1,6 @@
 import type { Dayjs } from 'dayjs';
 import { RiFileList3Line, RiPrinterLine, RiRefund2Line, RiSearchLine } from '@remixicon/react';
-import { App, Button, Card, Checkbox, DatePicker, Drawer, Input, InputNumber, Modal, Segmented, Select, Statistic, Table, Tag, Typography } from 'antd';
+import { App, Button, Card, Checkbox, DatePicker, Drawer, Input, InputNumber, Modal, Segmented, Select, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -20,14 +20,16 @@ import {
   type Shift,
 } from '../lib/api';
 import { d } from '../lib/time';
+import { ZONE } from '../theme';
 
-const { Text } = Typography;
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
+/* ป้ายวิธีชำระ ใช้จานสีเดียวกับโซนในเมนูข้าง — ของเดิมเป็น gold/blue/purple ของ antd
+ * ซึ่งสดกว่าธีมแอดมินทั้งระบบอยู่คนละระดับ ตารางเลยดูเป็นป้ายไฟ */
 const PAY: Record<string, { label: string; color: string }> = {
-  cash: { label: 'เงินสด', color: 'gold' },
-  promptpay: { label: 'พร้อมเพย์', color: 'blue' },
-  store_credit: { label: 'เครดิตร้าน', color: 'purple' },
+  cash: { label: 'เงินสด', color: ZONE.front },
+  promptpay: { label: 'พร้อมเพย์', color: ZONE.online },
+  store_credit: { label: 'เครดิตร้าน', color: ZONE.back },
 };
 const STATUS: Record<string, { label: string; color: string }> = {
   completed: { label: 'สำเร็จ', color: 'success' },
@@ -35,11 +37,11 @@ const STATUS: Record<string, { label: string; color: string }> = {
   voided: { label: 'ยกเลิก', color: 'default' },
 };
 
-const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
-const timeParts = (iso: string) => {
-  const d = new Date(iso);
-  return { date: d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short' }), time: d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) };
-};
+/* ตรึงเวลาไทยเหมือนที่แก้ไปทั้งระบบแล้ว — ของเดิมใช้ new Date() เปล่า ๆ ซึ่งแปลตาม
+ * timezone ของเครื่องที่เปิดเว็บ เปิดจากมือถือที่โซนเพี้ยนแล้ว "ยอดขายวันนี้" จะนับ
+ * คนละวันเงียบ ๆ */
+const isToday = (iso: string) => d(iso).format('YYYY-MM-DD') === d().format('YYYY-MM-DD');
+const timeParts = (iso: string) => ({ date: d(iso).format('DD/MM'), time: d(iso).format('HH:mm') });
 
 export function PosSales() {
   const { message } = App.useApp();
@@ -190,9 +192,9 @@ export function PosSales() {
       dataIndex: 'sale_number',
       key: 'no',
       render: (v: string, s) => (
-        <div>
-          <div className="font-semibold text-[#2B2320]">{v}</div>
-          {s.customer_name && <div className="text-xs text-gray-400">{s.customer_name}</div>}
+        <div className="leading-tight">
+          <div className="font-semibold text-[15px] text-[#2B2320] tabular-nums">{v}</div>
+          {s.customer_name && <div className="text-[13px] text-[#8C837D]">{s.customer_name}</div>}
         </div>
       ),
     },
@@ -202,9 +204,9 @@ export function PosSales() {
       render: (_, s) => {
         const t = timeParts(s.created_at);
         return (
-          <div className="leading-tight">
-            <div className="text-[#2B2320]">{t.time}</div>
-            <div className="text-xs text-gray-400">{t.date}</div>
+          <div className="leading-tight tabular-nums">
+            <div className="text-[15px] text-[#2B2320]">{t.time}</div>
+            <div className="text-[13px] text-[#8C837D]">{t.date}</div>
           </div>
         );
       },
@@ -213,7 +215,14 @@ export function PosSales() {
       title: 'วิธีชำระ',
       key: 'pay',
       render: (_, s) => (
-        <Tag color={PAY[s.payment_method]?.color} variant="filled">
+        <Tag
+          style={{
+            color: PAY[s.payment_method]?.color,
+            borderColor: PAY[s.payment_method]?.color,
+            background: 'transparent',
+            fontSize: 13,
+          }}
+        >
           {PAY[s.payment_method]?.label ?? s.payment_method}
         </Tag>
       ),
@@ -226,11 +235,11 @@ export function PosSales() {
       sorter: (a, b) => a.total - b.total,
       render: (v: number, s) => (
         <div className="leading-tight">
-          <span className={`font-semibold tabular-nums ${s.status === 'refunded' ? 'text-gray-400 line-through' : 'text-[#2B2320]'}`}>
+          <span className={`font-semibold text-[16px] tabular-nums ${s.status === 'refunded' ? 'text-[#B4ADA8] line-through' : 'text-[#2B2320]'}`}>
             {baht(v)}
           </span>
           {s.refunded_amount > 0 && s.status !== 'refunded' ? (
-            <div className="text-xs text-red-600 tabular-nums">คืนแล้ว −{baht(s.refunded_amount)}</div>
+            <div className="text-[13px] tabular-nums" style={{ color: '#E5484D' }}>คืนแล้ว −{baht(s.refunded_amount)}</div>
           ) : null}
         </div>
       ),
@@ -243,9 +252,13 @@ export function PosSales() {
         if (!s.shift_id) return <span className="text-gray-300">—</span>;
         const sh = shifts.get(s.shift_id);
         return (
-          <span className={`text-xs ${s.shift_id === currentShiftId ? 'font-semibold text-[#B83C18]' : 'text-gray-500'}`}>
+          <span
+            className="text-[13px] tabular-nums"
+            style={{ color: s.shift_id === currentShiftId ? ZONE.front : '#8C837D',
+                     fontWeight: s.shift_id === currentShiftId ? 600 : 400 }}
+          >
             {sh ? d(sh.opened_at).format('DD/MM HH:mm') : '…'}
-            {s.shift_id === currentShiftId ? ' (ปัจจุบัน)' : ''}
+            {s.shift_id === currentShiftId ? ' · รอบนี้' : ''}
           </span>
         );
       },
@@ -255,8 +268,13 @@ export function PosSales() {
       key: 'status',
       align: 'center',
       width: 130,
+      /* บิลปกติไม่ติดป้าย — เดิมทุกแถวมีป้าย "สำเร็จ" สีเขียวเรียงกันเป็นตับ ซึ่งไม่ได้
+         บอกอะไรเลยเพราะบิลเกือบทั้งหมดสำเร็จ แล้วบิลที่มีปัญหาจริงก็จมหายไปในนั้น
+         ตอนนี้เห็นป้ายเมื่อไหร่แปลว่าแถวนั้นต้องดู */
       render: (_, s) =>
-        s.refunded_amount > 0 && s.status === 'completed' ? (
+        s.status === 'completed' && s.refunded_amount === 0 ? (
+          <span className="text-[#D9D4D0]">—</span>
+        ) : s.refunded_amount > 0 && s.status === 'completed' ? (
           <Tag color="warning" variant="filled">คืนบางส่วน</Tag>
         ) : (
           <Tag color={STATUS[s.status]?.color} variant="filled">
@@ -287,34 +305,35 @@ export function PosSales() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <Text type="secondary">ประวัติการขาย POS · แตะที่บิลเพื่อดูรายละเอียด / คืนเงิน</Text>
+      {/* บรรทัดอธิบายหน้าถูกเอาออก — "แตะที่บิลเพื่อดูรายละเอียด" คือสิ่งที่คนกด
+          หนึ่งครั้งก็รู้เอง และเจ้าของเคยตีกลับเรื่องเอาคำอธิบายไปแปะบนหน้าเว็บ
+          การ์ดสรุปเหลือสามใบ ตัด "บิลล่าสุด (แสดง)" ทิ้ง — มันคือจำนวนแถวที่โหลด
+          มาแล้ว ไม่ใช่ตัวเลขของร้าน เปลี่ยนตามการกดโหลดเพิ่มด้วยซ้ำ */}
+      <div className="flex items-center justify-end mb-3">
         <Button onClick={() => void load()}>รีเฟรช</Button>
       </div>
 
-      {/* daily summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic
-            title="ยอดขายวันนี้"
-            value={summary.todayTotal}
-            prefix="฿"
-            styles={{ content: { color: '#241F1B', fontWeight: 700 } }}
-          />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+          <div className="text-[13px] text-[#5C534E]">ยอดขายวันนี้</div>
+          <div className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#2B2320', lineHeight: 1.2 }}>
+            {baht(summary.todayTotal)}
+          </div>
         </Card>
-        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic title="บิลวันนี้" value={summary.todayCount} suffix="บิล" />
+        <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+          <div className="text-[13px] text-[#5C534E]">บิลวันนี้</div>
+          <div className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#2B2320', lineHeight: 1.2 }}>
+            {summary.todayCount} <span style={{ fontSize: 15, fontWeight: 400, color: '#8C837D' }}>บิล</span>
+          </div>
         </Card>
-        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic title="บิลล่าสุด (แสดง)" value={summary.shownCount} suffix="บิล" />
-        </Card>
-        <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
-          <Statistic
-            title="คืนเงิน"
-            value={summary.refundedCount}
-            suffix="บิล"
-            styles={{ content: { color: summary.refundedCount ? '#E5484D' : undefined } }}
-          />
+        <Card size="small" styles={{ body: { padding: '14px 18px' } }}>
+          <div className="text-[13px] text-[#5C534E]">คืนเงิน</div>
+          <div
+            className="tabular-nums"
+            style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, color: summary.refundedCount ? '#E5484D' : '#2B2320' }}
+          >
+            {summary.refundedCount} <span style={{ fontSize: 15, fontWeight: 400, color: '#8C837D' }}>บิล</span>
+          </div>
         </Card>
       </div>
 
