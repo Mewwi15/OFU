@@ -18,7 +18,7 @@
  */
 
 import { RiCalculatorLine, RiInboxUnarchiveLine, RiPrinterLine } from '@remixicon/react';
-import { Alert, Button, Card, Modal, Table, Typography, message } from 'antd';
+import { Alert, Button, Card, Input, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -41,6 +41,7 @@ import { printShiftReport } from '../lib/printShift';
 import { getReceiptConfig } from '../lib/receiptConfig';
 import { d, since } from '../lib/time';
 import { CashCountModal } from '../components/CashCountModal';
+import { LiveClock } from '../components/LiveClock';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -95,6 +96,7 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
                 <div style={{ fontSize: T.body, color: INK.strong, ...num }}>{d(r.opened_at).format('DD/MM/YY')}</div>
                 <div style={{ fontSize: 12, color: INK.mute, ...num }}>
                   {d(r.opened_at).format('HH:mm')}–{r.closed_at ? d(r.closed_at).format('HH:mm') : ''}
+                  {r.cashier_code ? ` · ${r.cashier_code}` : ''}
                 </div>
               </div>
             ),
@@ -135,6 +137,7 @@ export function Shift() {
   const [noSale, setNoSale] = useState(false);             // หน้าต่างถามเหตุผลเปิดลิ้นชักเปล่า
   const [drawerLog, setDrawerLog] = useState(false);       // หน้าต่างดูประวัติเปิดเปล่าของรอบ
   const [drawerOpens, setDrawerOpens] = useState<DrawerOpen[]>([]);
+  const [code, setCode] = useState('');                    // รหัสพนักงานที่กำลังเปิด/ปิดรอบ
 
   const lastClosed = history.find((r) => r.closed_at);
 
@@ -168,8 +171,9 @@ export function Shift() {
     setBusy(true);
     const float = Number(amount) || 0;
     try {
-      await openShift(float);
+      await openShift(float, code);
       setAmount('');
+      setCode('');
       setDone(null);
       await refresh();
       message.success('เปิดรอบแล้ว — ขายได้เลย');
@@ -181,7 +185,9 @@ export function Shift() {
           shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
           openedAt: new Date().toISOString(),
           openingFloat: float,
-          cashier: getReceiptConfig().cashierName,
+          // รหัสที่พนักงานกรอกจริงตอนนี้ ไม่ใช่ cashierName ที่ตั้งค้างไว้ต่อเครื่อง
+          // ซึ่งเป็นค่าเดิมตลอดไม่ว่าใครมายืนหน้าเครื่อง
+          cashier: code,
         });
       } catch {
         message.warning('เปิดรอบแล้ว แต่พิมพ์ใบเปิดรอบไม่ได้ — ลิ้นชักอาจไม่เด้ง');
@@ -197,8 +203,9 @@ export function Shift() {
     if (!shift || amount === '') return;
     setBusy(true);
     try {
-      const row = await closeShift(shift.id, Number(amount));
+      const row = await closeShift(shift.id, Number(amount), code);
       setDone({ row, dash });
+      setCode('');
       setShift(null);
       setDash(null);
       setAmount('');
@@ -219,6 +226,7 @@ export function Shift() {
         cash: o?.cash ?? 0, promptpay: o?.promptpay ?? 0, storeCredit: o?.store_credit ?? 0,
         refunds: o?.refunds ?? 0, discount: o?.discount ?? 0, bills: o?.count ?? 0, gross: o?.gross ?? 0,
         expected: row.expected_cash ?? 0, counted: row.counted_cash ?? 0, overShort: row.over_short ?? 0,
+        openedBy: row.cashier_code, closedBy: row.closed_by_code,
         top: d?.top ?? [],
       },
       await getShopName().catch(() => 'ร้านอู้ฟู่'),
@@ -302,7 +310,7 @@ export function Shift() {
       printNoSaleSlip({
         shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
         at: new Date().toISOString(),
-        cashier: getReceiptConfig().cashierName,
+        cashier: shift?.cashier_code ?? getReceiptConfig().cashierName,
         reason,
         seq: res.count,
       });
@@ -313,6 +321,23 @@ export function Shift() {
       setBusy(false);
     }
   };
+
+  /* รหัสพนักงาน — บัญชีที่ล็อกอินบนเครื่อง POS เป็นบัญชีร่วมของร้าน ชี้ตัวคนไม่ได้
+   * รหัสนี้คือสิ่งที่บอกว่าใครยืนอยู่หน้าเครื่องตอนนั้น และคนเปิดกับคนปิดเป็นคนละคนได้
+   * inputMode numeric เพื่อให้จอสัมผัสเด้งแป้นตัวเลขขึ้นมา ไม่ใช่แป้นพิมพ์เต็ม */
+  const codeField = (
+    <div>
+      <div style={{ fontSize: T.lbl, color: INK.body, marginBottom: 6 }}>รหัสพนักงาน</div>
+      <Input
+        value={code}
+        onChange={(e) => setCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
+        placeholder="เช่น 07"
+        inputMode="numeric"
+        autoComplete="off"
+        style={{ height: 52, fontSize: 22, fontWeight: 700, textAlign: 'center', ...num }}
+      />
+    </div>
+  );
 
   const noSaleModal = (
     <Modal
@@ -382,12 +407,16 @@ export function Shift() {
             >
               เปิดรอบ
             </div>
-            <div className="mt-7">{countedBlock(expectedAtOpen)}</div>
+            <div className="mt-1 text-center">
+              <LiveClock size={T.val} />
+            </div>
+            <div className="mt-7">{codeField}</div>
+            <div className="mt-4">{countedBlock(expectedAtOpen)}</div>
           </div>
           <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
             <Button
               type="primary" size="large" block
-              loading={busy} disabled={amount === ''} onClick={() => void doOpen()}
+              loading={busy} disabled={amount === '' || code === ''} onClick={() => void doOpen()}
             >
               เปิดรอบ
             </Button>
@@ -427,11 +456,15 @@ export function Shift() {
           {/* "เปิดมาแล้วเท่าไหร่" มาก่อนเวลานาฬิกา เพราะคำถามแรกตอนมาเห็นรอบค้างคือ
               "นี่ของเมื่อไหร่" ไม่ใช่ "กี่โมง" — เลขนี้ขยับเองทุก 30 วิ ตาม refresh */}
           <span className="inline-flex items-baseline gap-2" style={{ fontSize: T.lbl }}>
+            {shift.cashier_code && (
+              <>
+                <span style={{ color: INK.body }}>พนักงาน {shift.cashier_code}</span>
+                <span style={{ color: INK.hair }}>·</span>
+              </>
+            )}
             <span style={{ color: INK.body }}>เปิดมาแล้ว {since(shift.opened_at)}</span>
             <span style={{ color: INK.hair }}>·</span>
-            <span style={{ color: INK.mute, ...num }}>
-              {d(shift.opened_at).format('DD/MM HH:mm')} น.
-            </span>
+            <LiveClock size={T.lbl} showDate={false} />
           </span>
         </div>
 
@@ -475,7 +508,7 @@ export function Shift() {
           </Button>
           <Button
             danger type="primary" size="large" className="flex-1"
-            onClick={() => { setAmount(''); setClosing(true); }}
+            onClick={() => { setAmount(''); setCode(''); setClosing(true); }}
           >
             ปิดรอบ
           </Button>
@@ -527,10 +560,10 @@ export function Shift() {
       <Modal
         open={closing}
         title="ปิดรอบ — นับเงินในลิ้นชัก"
-        onCancel={() => { setClosing(false); setAmount(''); }}
+        onCancel={() => { setClosing(false); setAmount(''); setCode(''); }}
         okText="ปิดรอบ"
         cancelText="ยังก่อน"
-        okButtonProps={{ danger: true, disabled: amount === '', loading: busy }}
+        okButtonProps={{ danger: true, disabled: amount === '' || code === '', loading: busy }}
         onOk={() => void doClose()}
         destroyOnHidden
       >
@@ -539,6 +572,7 @@ export function Shift() {
           <b style={{ color: INK.strong, ...num }}>{baht(inDrawer)}</b> ที่ควรมี
         </div>
         {countedBlock(inDrawer)}
+        <div className="mt-4">{codeField}</div>
       </Modal>
       {counterModal}
     </div>

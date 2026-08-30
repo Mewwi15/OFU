@@ -33,6 +33,8 @@ export type ShiftReport = {
   expected: number;
   counted: number;
   overShort: number;
+  openedBy: string | null;
+  closedBy: string | null;
   top: { name: string; qty: number; amount: number }[];
 };
 
@@ -90,8 +92,8 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
         <div class="doc">ใบสรุปปิดรอบ</div>
       </div>
       <div class="when">
-        เปิดรอบ ${fmt(r.openedAt)}<br>
-        ปิดรอบ ${fmt(r.closedAt)}
+        เปิดรอบ ${fmt(r.openedAt)}${r.openedBy ? ` · พนักงาน ${esc(r.openedBy)}` : ''}<br>
+        ปิดรอบ ${fmt(r.closedAt)}${r.closedBy ? ` · พนักงาน ${esc(r.closedBy)}` : ''}
       </div>
     </div>
 
@@ -126,7 +128,7 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
     </table>` : ''}
 
     <div class="sign">
-      <div>ผู้นับเงิน</div>
+      <div>ผู้นับเงิน${r.closedBy ? ` (${esc(r.closedBy)})` : ''}</div>
       <div>ผู้ตรวจสอบ</div>
     </div>
   </body></html>`);

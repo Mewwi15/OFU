@@ -64,6 +64,7 @@ import {
 } from 'antd';
 
 import { CashCountModal } from '../components/CashCountModal';
+import { LiveClock } from '../components/LiveClock';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
@@ -175,6 +176,7 @@ export function Pos() {
   const [shiftOpen, setShiftOpen] = useState<boolean | null>(null);
   const [openingShift, setOpeningShift] = useState(false);
   const [counting, setCounting] = useState(false);   // ตัวนับเงินทีละใบของด่านเปิดรอบ
+  const [shiftCode, setShiftCode] = useState('');    // รหัสพนักงานที่เปิดรอบ
   const recheckShift = useCallback(() => {
     getOpenShift()
       .then((sh) => setShiftOpen(!!sh))
@@ -632,6 +634,23 @@ export function Pos() {
             <div className="text-[38px] font-extrabold leading-tight text-tremor-content-strong">
               เปิดรอบ
             </div>
+            <div className="mt-1">
+              <LiveClock />
+            </div>
+          </div>
+          {/* รหัสพนักงานต้องมาก่อนนับเงิน — บัญชีที่ล็อกอินเป็นบัญชีร่วมของร้าน
+              ชี้ตัวคนไม่ได้ ถ้าไม่ใส่ตรงนี้ RPC ก็ปฏิเสธอยู่ดี (0085) */}
+          <div className="mb-4">
+            <div className="text-[13px] text-tremor-content mb-1.5">รหัสพนักงาน</div>
+            <Input
+              value={shiftCode}
+              onChange={(e) => setShiftCode(e.target.value.replace(/\s/g, '').slice(0, 20))}
+              placeholder="เช่น 07"
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              style={{ height: 52, fontSize: 22, fontWeight: 700, textAlign: 'center' }}
+            />
           </div>
           {/* ปุ่มเดียวกันรับหน้าที่โชว์สถานะกำลังเปิดรอบด้วย — พอกด "ใช้ยอดนี้" ในตัวนับ
               แล้วโมดัลปิดลง ถ้าไม่มีอะไรขยับตรงนี้เลยจะดูเหมือนกดไม่ติด */}
@@ -640,6 +659,7 @@ export function Pos() {
             size="large"
             block
             loading={openingShift}
+            disabled={shiftCode === ''}
             style={{ height: 56, fontSize: 20 }}
             icon={<RiCalculatorLine className="w-4 h-4" />}
             onClick={() => setCounting(true)}>
@@ -653,7 +673,7 @@ export function Pos() {
           onDone={(total) => {
             setCounting(false);
             setOpeningShift(true);
-            openShift(total)
+            openShift(total, shiftCode)
               .then(() => setShiftOpen(true))
               .catch((e) => setError(apiError(e)))
               .finally(() => setOpeningShift(false));

@@ -46,6 +46,7 @@ export function apiError(e: unknown): string {
     NO_OPEN_SHIFT: 'ยังไม่ได้เปิดกะ กรุณาเปิดกะก่อนขาย',
     SHIFT_ALREADY_OPEN: 'มีกะที่เปิดอยู่แล้ว',
     SHIFT_CLOSED: 'กะนี้ปิดแล้ว',
+    CASHIER_CODE_REQUIRED: 'ต้องใส่รหัสพนักงานก่อน',
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
     INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
@@ -434,12 +435,16 @@ export type Shift = {
   counted_cash: number | null;
   expected_cash: number | null;
   over_short: number | null;
+  /* รหัสพนักงานที่เปิด/ปิดรอบ — บัญชีที่ล็อกอินเป็นบัญชีร่วมของร้าน จึงชี้ตัวคนไม่ได้
+     ต้องมีรหัสแยก และคนเปิดกับคนปิดเป็นคนละคนได้ (0085) */
+  cashier_code: string | null;
+  closed_by_code: string | null;
 };
 
-export const openShift = (opening_float: number) =>
-  rpc<Shift>('open_shift', { p_opening_float: opening_float });
-export const closeShift = (id: string, counted: number) =>
-  rpc<Shift>('close_shift', { p_shift_id: id, p_counted_cash: counted });
+export const openShift = (opening_float: number, cashier_code: string) =>
+  rpc<Shift>('open_shift', { p_opening_float: opening_float, p_cashier_code: cashier_code });
+export const closeShift = (id: string, counted: number, cashier_code: string) =>
+  rpc<Shift>('close_shift', { p_shift_id: id, p_counted_cash: counted, p_cashier_code: cashier_code });
 
 export async function getOpenShift(): Promise<Shift | null> {
   // Scope to the current cashier — create_pos_sale requires an open shift for
@@ -784,7 +789,7 @@ export const refundPosSaleItems = (
 export async function listShifts(): Promise<Shift[]> {
   const { data, error } = await supabase
     .from('pos_shifts')
-    .select('id, opening_float, opened_at, closed_at, counted_cash, expected_cash, over_short')
+    .select('id, opening_float, opened_at, closed_at, counted_cash, expected_cash, over_short, cashier_code, closed_by_code')
     .order('opened_at', { ascending: false })
     .limit(50);
   if (error) throw error;
