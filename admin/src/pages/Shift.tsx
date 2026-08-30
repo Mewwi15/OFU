@@ -12,7 +12,8 @@
  * เย็น:  นับเงินจริง → เห็น พอดี/ขาด/เกิน → ปิดรอบ (ตัวตัดสินจริงมาจากเซิร์ฟเวอร์)
  */
 
-import { Alert, Button, Card, Descriptions, InputNumber, Modal, Statistic, Typography, message } from 'antd';
+import { Alert, Button, Card, Col, Descriptions, InputNumber, Modal, Row, Table, Typography, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -20,27 +21,110 @@ import {
   apiError,
   closeShift,
   getOpenShift,
+  listShifts,
   openShift,
   posDashboard,
   type Dashboard,
   type Shift as ShiftRow,
 } from '../lib/api';
+import { getShopName } from '../lib/orders';
+import { printShiftReport } from '../lib/printShift';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
+const C = { brand: '#5B8C6E', err: '#E5484D', warn: '#E08C00', ok: '#1E9E5C', muted: '#6E625C' };
+
+/** ช่องตัวเลขในแถบสรุป — ขนาดเท่ากันทุกใบ อ่านเป็นชุดเดียว */
+function Tile({
+  label, value, hint, accent, big,
+}: { label: string; value: string; hint?: string; accent?: string; big?: boolean }) {
+  return (
+    <div className="rounded-lg px-4 py-3" style={{ background: '#FAFAF9', border: '1px solid #EDEAE7' }}>
+      <div style={{ fontSize: 12, color: C.muted }}>{label}</div>
+      <div style={{ fontSize: big ? 30 : 22, fontWeight: 700, lineHeight: 1.25, color: accent ?? '#2B2320' }}>
+        {value}
+      </div>
+      {hint && <div style={{ fontSize: 11, color: '#8C837D' }}>{hint}</div>}
+    </div>
+  );
+}
+
+/** ขาด/เกิน ใช้ภาษาเดียวกันทุกที่บนหน้านี้ */
+function overShortText(n: number) {
+  if (n === 0) return { text: 'พอดีเป๊ะ', color: C.ok };
+  if (n < 0) return { text: `ขาด ${baht(-n)}`, color: C.err };
+  return { text: `เกิน ${baht(n)}`, color: C.warn };
+}
+
+function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
+  const closed = rows.filter((r) => r.closed_at);
+  const offCount = closed.filter((r) => (r.over_short ?? 0) !== 0).length;
+  return (
+    <Card
+      title="ประวัติรอบที่ผ่านมา"
+      extra={
+        closed.length > 0 ? (
+          <Typography.Text style={{ fontSize: 12, color: C.muted }}>
+            {closed.length} รอบล่าสุด · เงินไม่ตรง {offCount} รอบ
+          </Typography.Text>
+        ) : null
+      }
+    >
+      <Table
+        rowKey="id"
+        size="small"
+        pagination={false}
+        dataSource={closed.slice(0, 12)}
+        scroll={{ y: 300 }}
+        locale={{ emptyText: 'ยังไม่มีรอบที่ปิดแล้ว' }}
+        columns={([
+          {
+            title: 'รอบ',
+            render: (_: unknown, r: ShiftRow) => (
+              <div>
+                <div style={{ fontSize: 13 }}>{dayjs(r.opened_at).format('DD/MM/YYYY')}</div>
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  {dayjs(r.opened_at).format('HH:mm')} – {r.closed_at ? dayjs(r.closed_at).format('HH:mm') : '—'}
+                </Typography.Text>
+              </div>
+            ),
+          },
+          {
+            title: 'ควรมี', align: 'right' as const, width: 96,
+            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 13 }}>{baht(r.expected_cash ?? 0)}</span>,
+          },
+          {
+            title: 'นับได้', align: 'right' as const, width: 96,
+            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 13 }}>{baht(r.counted_cash ?? 0)}</span>,
+          },
+          {
+            title: 'ผลต่าง', align: 'right' as const, width: 110,
+            render: (_: unknown, r: ShiftRow) => {
+              const v = overShortText(r.over_short ?? 0);
+              return <span style={{ fontSize: 13, fontWeight: 700, color: v.color }}>{v.text}</span>;
+            },
+          },
+        ] as ColumnsType<ShiftRow>)}
+      />
+    </Card>
+  );
+}
 
 export function Shift() {
   const [shift, setShift] = useState<ShiftRow | null | undefined>(undefined); // undefined = loading
   const [dash, setDash] = useState<Dashboard | null>(null);
+  const [history, setHistory] = useState<ShiftRow[]>([]);
   const [float, setFloat] = useState<number | ''>('');
   const [counted, setCounted] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
-  const [justClosed, setJustClosed] = useState<ShiftRow | null>(null);
+  const [justClosed, setJustClosed] = useState<{ row: ShiftRow; dash: Dashboard | null } | null>(null);
   const [counterFor, setCounterFor] = useState<'float' | 'counted' | null>(null);
 
   const refresh = useCallback(async () => {
     const s = await getOpenShift().catch(() => null);
     setShift(s);
     if (s) setDash(await posDashboard(s.opened_at, new Date().toISOString()).catch(() => null));
+    listShifts().then(setHistory).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -80,16 +164,40 @@ export function Shift() {
       onOk: async () => {
         try {
           const r = await closeShift(shift.id, Number(counted));
-          setJustClosed(r);
+          setJustClosed({ row: r, dash });
           setShift(null);
           setDash(null);
           setCounted('');
           message.success('ปิดรอบเรียบร้อย');
+          listShifts().then(setHistory).catch(() => {});
         } catch (e) {
           message.error(apiError(e));
         }
       },
     });
+  };
+
+  const printReport = async (row: ShiftRow, d: Dashboard | null) => {
+    const o = d?.onsite;
+    printShiftReport(
+      {
+        openedAt: row.opened_at,
+        closedAt: row.closed_at,
+        openingFloat: row.opening_float,
+        cash: o?.cash ?? 0,
+        promptpay: o?.promptpay ?? 0,
+        storeCredit: o?.store_credit ?? 0,
+        refunds: o?.refunds ?? 0,
+        discount: o?.discount ?? 0,
+        bills: o?.count ?? 0,
+        gross: o?.gross ?? 0,
+        expected: row.expected_cash ?? 0,
+        counted: row.counted_cash ?? 0,
+        overShort: row.over_short ?? 0,
+        top: d?.top ?? [],
+      },
+      await getShopName().catch(() => 'ร้านอู้ฟู่'),
+    );
   };
 
   if (shift === undefined) return <Card loading title="เปิด-ปิดรอบขาย" />;
@@ -106,104 +214,182 @@ export function Shift() {
     />
   );
 
-  /* ── ยังไม่เปิดรอบ ── */
+  /* ── ยังไม่เปิดรอบ ─────────────────────────────────────────────────────── */
   if (!shift) {
     return (
-      <div className="flex flex-col gap-4 max-w-xl">
-        {justClosed ? <ClosedSummary row={justClosed} /> : null}
-        <Card title="เปิดรอบขาย">
-          <Typography.Paragraph type="secondary">
-            นับเงินทอนตั้งต้นในลิ้นชัก แล้วเปิดรอบก่อนเริ่มขายของวัน — บิลทุกใบหลังจากนี้
-            จะถูกนับเข้ารอบ เพื่อให้ตอนเย็นรู้ว่าลิ้นชักควรมีเงินเท่าไหร่
-          </Typography.Paragraph>
-          <div className="flex gap-2 items-center flex-wrap">
-            <InputNumber
-              min={0}
-              size="large"
-              placeholder="เงินตั้งต้น เช่น 1000"
-              style={{ width: 200 }}
-              value={float === '' ? undefined : float}
-              onChange={(v) => setFloat(v ?? '')}
-              autoFocus
-            />
-            <Button size="large" onClick={() => setCounterFor('float')}>
-              นับเงิน
-            </Button>
-            <Button type="primary" size="large" loading={busy} onClick={() => void doOpen()}>
-              เปิดรอบ
-            </Button>
-          </div>
-        </Card>
+      <div className="flex flex-col gap-4">
+        {justClosed && <ClosedSummary row={justClosed.row} onPrint={() => void printReport(justClosed.row, justClosed.dash)} />}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={10}>
+            <Card title="เปิดรอบขาย" style={{ height: '100%' }}>
+              <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
+                นับเงินทอนตั้งต้นในลิ้นชัก แล้วเปิดรอบก่อนเริ่มขายของวัน — บิลทุกใบหลังจากนี้
+                จะถูกนับเข้ารอบ เพื่อให้ตอนเย็นรู้ว่าลิ้นชักควรมีเงินเท่าไหร่
+              </Typography.Paragraph>
+              <div className="flex flex-col gap-3">
+                <InputNumber
+                  min={0}
+                  size="large"
+                  placeholder="เงินตั้งต้น เช่น 1000"
+                  style={{ width: '100%' }}
+                  prefix="฿"
+                  value={float === '' ? undefined : float}
+                  onChange={(v) => setFloat(v ?? '')}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <Button size="large" style={{ flex: 1 }} onClick={() => setCounterFor('float')}>
+                    นับเงินทีละใบ
+                  </Button>
+                  <Button type="primary" size="large" style={{ flex: 1 }} loading={busy} onClick={() => void doOpen()}>
+                    เปิดรอบ
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </Col>
+          <Col xs={24} lg={14}>
+            <ShiftHistory rows={history} />
+          </Col>
+        </Row>
         {counterModal}
       </div>
     );
   }
 
-  /* ── รอบเปิดอยู่ ── */
+  /* ── รอบเปิดอยู่ ───────────────────────────────────────────────────────── */
+  const openedFor = dayjs().diff(dayjs(shift.opened_at), 'minute');
+  const hours = Math.floor(openedFor / 60);
+  // เปิดค้างข้ามวันมักแปลว่าลืมปิด ไม่ใช่ขายยาว — บอกไว้ก่อนตัวเลขจะเพี้ยนสะสม
+  const stale = openedFor > 20 * 60;
+  const o = dash?.onsite;
+
   return (
-    <div className="flex flex-col gap-4 max-w-2xl">
-      <Card title={`รอบปัจจุบัน — เปิดเมื่อ ${dayjs(shift.opened_at).format('DD/MM HH:mm')}`}>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Statistic title="เงินตั้งต้น" value={shift.opening_float} prefix="฿" />
-          <Statistic title="เงินสดขายในรอบ (รวม COD)" value={cashInShift} prefix="฿" />
-          <Statistic title="โอน PromptPay" value={dash?.onsite.promptpay ?? 0} prefix="฿" />
-          <Statistic
-            title="ลิ้นชักควรมีตอนนี้"
-            value={expectedNow}
-            prefix="฿"
-            valueStyle={{ fontWeight: 700 }}
-          />
+    <div className="flex flex-col gap-4">
+      {stale && (
+        <Alert
+          type="warning"
+          showIcon
+          message="รอบนี้เปิดค้างมานานกว่า 20 ชั่วโมง"
+          description="ถ้าเมื่อวานลืมปิด ให้ปิดรอบนี้แล้วเปิดรอบใหม่ ไม่งั้นยอดของสองวันจะรวมกัน"
+        />
+      )}
+
+      <Card
+        title={`รอบปัจจุบัน — เปิดเมื่อ ${dayjs(shift.opened_at).format('DD/MM HH:mm')}`}
+        extra={
+          <Typography.Text style={{ fontSize: 12, color: C.muted }}>
+            เปิดมาแล้ว {hours > 0 ? `${hours} ชม. ` : ''}{openedFor % 60} นาที · ตัวเลขเดินเองทุก 30 วินาที
+          </Typography.Text>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <Tile label="เงินตั้งต้น" value={baht(shift.opening_float)} />
+          <Tile label="เงินสดขายในรอบ" value={baht(cashInShift)} hint="รวมเก็บเงินปลายทาง" />
+          <Tile label="โอน PromptPay" value={baht(o?.promptpay ?? 0)} hint="ไม่อยู่ในลิ้นชัก" />
+          <Tile label="จำนวนบิล" value={`${o?.count ?? 0} บิล`} hint={o?.count ? `เฉลี่ย ${baht(Math.round((o.gross ?? 0) / o.count))}/บิล` : undefined} />
+          <Tile label="ลิ้นชักควรมีตอนนี้" value={baht(expectedNow)} accent={C.brand} big />
         </div>
-        <Typography.Text type="secondary" style={{ fontSize: 12.5 }}>
-          ตัวเลขเดินเองทุก 30 วินาที · โอน/เครดิตไม่อยู่ในลิ้นชักจึงไม่ถูกนับรวม
-        </Typography.Text>
       </Card>
 
-      <Card title="ปิดรอบ — นับเงินในลิ้นชัก">
-        <div className="flex gap-2 items-center flex-wrap">
-          <InputNumber
-            min={0}
-            size="large"
-            placeholder="นับได้จริง เช่น 4520"
-            style={{ width: 200 }}
-            value={counted === '' ? undefined : counted}
-            onChange={(v) => setCounted(v ?? '')}
-          />
-          <Button size="large" onClick={() => setCounterFor('counted')}>
-            นับเงิน
-          </Button>
-          <Button danger type="primary" size="large" disabled={counted === ''} onClick={doClose}>
-            ปิดรอบ
-          </Button>
-          {diff != null ? (
-            <Typography.Text
-              strong
-              style={{ color: diff === 0 ? 'var(--ant-color-success)' : diff < 0 ? 'var(--ant-color-error)' : 'var(--ant-color-warning)' }}>
-              {diff === 0 ? 'พอดีเป๊ะ' : diff < 0 ? `ขาด ${baht(-diff)}` : `เกิน ${baht(diff)}`}
-            </Typography.Text>
-          ) : null}
-        </div>
-      </Card>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={13}>
+          <Card title="ปิดรอบ — นับเงินในลิ้นชัก" style={{ height: '100%' }}>
+            <div className="flex flex-col gap-3">
+              <InputNumber
+                min={0}
+                size="large"
+                placeholder="นับได้จริง เช่น 4520"
+                style={{ width: '100%' }}
+                prefix="฿"
+                value={counted === '' ? undefined : counted}
+                onChange={(v) => setCounted(v ?? '')}
+              />
+              <div className="flex gap-2">
+                <Button size="large" style={{ flex: 1 }} onClick={() => setCounterFor('counted')}>
+                  นับเงินทีละใบ
+                </Button>
+                <Button danger type="primary" size="large" style={{ flex: 1 }} disabled={counted === ''} onClick={doClose}>
+                  ปิดรอบ
+                </Button>
+              </div>
+
+              {/* ผลต่างโผล่ทันทีที่กรอก ไม่ต้องกดปิดก่อนถึงจะรู้ว่าขาดหรือเกิน */}
+              {diff != null && (
+                <div
+                  className="rounded-lg px-4 py-3"
+                  style={{ background: '#FAFAF9', border: `1px solid ${overShortText(diff).color}33` }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span style={{ fontSize: 13, color: C.muted }}>ผลต่างจากที่ควรมี</span>
+                    <span style={{ fontSize: 24, fontWeight: 700, color: overShortText(diff).color }}>
+                      {overShortText(diff).text}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#8C837D' }}>
+                    ควรมี {baht(expectedNow)} · นับได้ {baht(Number(counted))} — ตัวตัดสินจริงมาจากเซิร์ฟเวอร์ตอนกดปิด
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} lg={11}>
+          <Card title="ยอดขายในรอบนี้" style={{ height: '100%' }}>
+            <Descriptions
+              size="small"
+              column={1}
+              items={[
+                { key: 'g', label: 'ยอดขายรวม', children: <b>{baht(o?.gross ?? 0)}</b> },
+                { key: 'c', label: 'เงินสด', children: baht(o?.cash ?? 0) },
+                { key: 'p', label: 'โอน PromptPay', children: baht(o?.promptpay ?? 0) },
+                { key: 's', label: 'เครดิตร้าน', children: baht(o?.store_credit ?? 0) },
+                { key: 'd', label: 'ส่วนลด', children: `- ${baht(o?.discount ?? 0)}` },
+                { key: 'r', label: 'คืนเงิน', children: `- ${baht(o?.refunds ?? 0)}` },
+              ]}
+            />
+            {(dash?.top?.length ?? 0) > 0 && (
+              <>
+                <Typography.Text style={{ fontSize: 12, color: C.muted }}>ขายดีในรอบนี้</Typography.Text>
+                <div className="mt-1 flex flex-col gap-1">
+                  {dash!.top.slice(0, 5).map((t) => (
+                    <div key={t.name} className="flex items-center justify-between">
+                      <span className="truncate" style={{ fontSize: 13 }}>{t.name}</span>
+                      <span style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>
+                        {t.qty} ชิ้น · {baht(t.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      <ShiftHistory rows={history} />
       {counterModal}
     </div>
   );
 }
 
-function ClosedSummary({ row }: { row: ShiftRow }) {
-  const os = row.over_short ?? 0;
+function ClosedSummary({ row, onPrint }: { row: ShiftRow; onPrint: () => void }) {
+  const v = overShortText(row.over_short ?? 0);
   return (
     <Alert
-      type={os === 0 ? 'success' : os < 0 ? 'error' : 'warning'}
+      type={(row.over_short ?? 0) === 0 ? 'success' : (row.over_short ?? 0) < 0 ? 'error' : 'warning'}
       showIcon
-      message={
-        os === 0 ? 'ปิดรอบแล้ว — เงินพอดีเป๊ะ'
-        : os < 0 ? `ปิดรอบแล้ว — เงินขาด ${baht(-os)}`
-        : `ปิดรอบแล้ว — เงินเกิน ${baht(os)}`
+      message={`ปิดรอบแล้ว — ${v.text}`}
+      action={
+        <Button size="small" onClick={onPrint}>
+          พิมพ์ใบสรุป
+        </Button>
       }
       description={
         <Descriptions
           size="small"
-          column={1}
+          column={{ xs: 1, sm: 3 }}
           items={[
             { key: 'e', label: 'ลิ้นชักควรมี', children: baht(row.expected_cash ?? 0) },
             { key: 'c', label: 'นับได้จริง', children: baht(row.counted_cash ?? 0) },
