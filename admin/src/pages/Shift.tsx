@@ -373,11 +373,9 @@ export function Shift() {
             <div style={{ fontSize: T.body, color: INK.body, marginTop: 2 }}>
               นับเงินในลิ้นชักทีละใบ แล้วกดเปิดรอบ
             </div>
-            {expectedAtOpen != null && (
-              <div style={{ fontSize: T.lbl, color: INK.mute, marginTop: 6 }}>
-                รอบที่แล้วปิดด้วย {baht(expectedAtOpen)} — นับดูว่ายังอยู่ครบไหม
-              </div>
-            )}
+            {/* เดิมบอกไว้ตรงนี้ว่ารอบที่แล้วปิดด้วยเท่าไหร่ เจ้าของสั่งเอาออก —
+                และมันถูกแล้ว การบอกคำตอบก่อนนับคือการชี้นำคนนับ ตัวเลขนี้ยังอยู่
+                แต่ไปโผล่ตอนนับเสร็จในฐานะ "ควรมี" ซึ่งเป็นจังหวะที่ถูกต้อง */}
             <div className="mt-4">{countedBlock(expectedAtOpen)}</div>
           </div>
           <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
