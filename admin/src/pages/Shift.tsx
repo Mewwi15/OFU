@@ -17,6 +17,7 @@
  * ตั้งแต่ 0021) — รอบมีไว้เพื่อการนับเงินอย่างเดียว
  */
 
+import { RiCalculatorLine, RiPrinterLine } from '@remixicon/react';
 import { Alert, Button, Card, InputNumber, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -37,7 +38,13 @@ import { printShiftReport } from '../lib/printShift';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
+/* สเกลเดียวทั้งหน้า — เดิมผมสุ่มขนาด 13/14/15/22/28/40/52 ปน ๆ กัน หน้าจึงดู
+ * "ทำรวก ๆ" ตามที่เจ้าของทัก ทุกตัวเลขข้างล่างนี้มาจากสเกลเดียว และผิวการ์ด
+ * เป็นเหลี่ยมไม่มีเงา ให้ตรงกับธีมแอดมิน (borderRadius: 0 ทั้งระบบ) ที่ผมเผลอ
+ * ใส่มุมโค้งกับเงานุ่มสวนไว้ */
 const C = { brand: '#5B8C6E', err: '#E5484D', warn: '#E08C00', ok: '#1E9E5C' };
+const T = { lbl: 13, body: 14, val: 15, lead: 20, hero: 56 } as const;
+const INK = { strong: '#2B2320', body: '#5C534E', mute: '#8C837D', hair: '#E8E8E8', wash: '#FAFAFA' } as const;
 
 /** ขาด/เกิน ใช้ภาษาเดียวกันทุกที่บนหน้านี้ */
 function overShort(n: number) {
@@ -71,9 +78,9 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
           {
             title: 'วันที่',
             render: (_: unknown, r: ShiftRow) => (
-              <span style={{ fontSize: 14 }}>
+              <span style={{ fontSize: T.body, color: INK.strong }}>
                 {dayjs(r.opened_at).format('DD/MM/YYYY')}{' '}
-                <span style={{ color: '#8C837D', fontSize: 12 }}>
+                <span style={{ color: INK.mute, fontSize: 12 }}>
                   {dayjs(r.opened_at).format('HH:mm')}–{r.closed_at ? dayjs(r.closed_at).format('HH:mm') : ''}
                 </span>
               </span>
@@ -81,17 +88,17 @@ function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
           },
           {
             title: 'ควรมี', align: 'right' as const, width: 110,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 15, ...num }}>{baht(r.expected_cash ?? 0)}</span>,
+            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: T.val, color: INK.body, ...num }}>{baht(r.expected_cash ?? 0)}</span>,
           },
           {
             title: 'นับได้', align: 'right' as const, width: 110,
-            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: 15, ...num }}>{baht(r.counted_cash ?? 0)}</span>,
+            render: (_: unknown, r: ShiftRow) => <span style={{ fontSize: T.val, color: INK.strong, ...num }}>{baht(r.counted_cash ?? 0)}</span>,
           },
           {
             title: 'ผลต่าง', align: 'right' as const, width: 120,
             render: (_: unknown, r: ShiftRow) => {
               const v = overShort(r.over_short ?? 0);
-              return <span style={{ fontSize: 15, fontWeight: 700, color: v.color, ...num }}>{v.text}</span>;
+              return <span style={{ fontSize: T.val, fontWeight: 600, color: v.color, ...num }}>{v.text}</span>;
             },
           },
         ] as ColumnsType<ShiftRow>)}
@@ -186,19 +193,29 @@ export function Shift() {
 
   if (shift === undefined) return <Card loading title="เปิด-ปิดรอบ" />;
 
+  // ช่องกรอกเงินคือโมเมนต์เดียวที่คนต้องลงมือบนหน้านี้ จึงให้มันใหญ่จริง
+  // ตัวเลขชิดขวาแบบเครื่องคิดเลข และปุ่มนับทีละใบสูงเท่ากันพอดี ไม่เหลื่อม
   const cashInput = (placeholder: string) => (
-    <div className="flex gap-2">
+    <div className="flex" style={{ border: `1px solid ${INK.hair}` }}>
       <InputNumber
         min={0}
-        size="large"
-        prefix="฿"
+        variant="borderless"
+        controls={false}
+        prefix={<span style={{ fontSize: T.lead, color: INK.mute }}>฿</span>}
         placeholder={placeholder}
-        style={{ flex: 1, fontSize: 22 }}
+        style={{ flex: 1, height: 56 }}
+        styles={{ input: { fontSize: 26, fontWeight: 700, textAlign: 'right', ...num } }}
         value={amount === '' ? undefined : amount}
         onChange={(v) => setAmount(v ?? '')}
         autoFocus
       />
-      <Button size="large" onClick={() => setCounter(true)}>นับทีละใบ</Button>
+      <Button
+        type="text"
+        onClick={() => setCounter(true)}
+        style={{ height: 56, borderLeft: `1px solid ${INK.hair}`, paddingInline: 18, color: C.brand }}
+      >
+        <RiCalculatorLine className="w-4 h-4" /> นับทีละใบ
+      </Button>
     </div>
   );
 
@@ -212,16 +229,23 @@ export function Shift() {
 
   /* ── ปิดรอบไปแล้ว: ผลลัพธ์ + เอกสาร ─────────────────────────────────────── */
   const doneCard = done && (
-    <Card>
-      <div className="flex flex-col items-center gap-1 py-2">
-        <span style={{ fontSize: 15, color: '#5C534E' }}>ปิดรอบเรียบร้อย</span>
-        <span style={{ fontSize: 40, fontWeight: 800, color: overShort(done.row.over_short ?? 0).color, ...num }}>
+    <Card styles={{ body: { padding: 0 } }}>
+      <div className="flex flex-col items-center px-6 py-7" style={{ background: INK.wash }}>
+        <span style={{ fontSize: T.lbl, color: INK.body, letterSpacing: '.02em' }}>ปิดรอบเรียบร้อย</span>
+        <span
+          style={{
+            fontSize: 40, fontWeight: 700, lineHeight: 1.2, marginTop: 4,
+            color: overShort(done.row.over_short ?? 0).color, ...num,
+          }}
+        >
           {overShort(done.row.over_short ?? 0).text}
         </span>
-        <span style={{ fontSize: 13, color: '#8C837D', ...num }}>
+        <span style={{ fontSize: T.lbl, color: INK.mute, marginTop: 2, ...num }}>
           ควรมี {baht(done.row.expected_cash ?? 0)} · นับได้ {baht(done.row.counted_cash ?? 0)}
         </span>
-        <Button className="mt-3" size="large" onClick={() => void doPrint(done.row, done.dash)}>
+      </div>
+      <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
+        <Button block size="large" icon={<RiPrinterLine className="w-4 h-4" />} onClick={() => void doPrint(done.row, done.dash)}>
           พิมพ์เอกสารปิดรอบ
         </Button>
       </div>
@@ -233,22 +257,27 @@ export function Shift() {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
         {doneCard}
-        <Card title="เปิดรอบ">
-          <Typography.Paragraph style={{ fontSize: 14, color: '#5C534E' }}>
-            นับเงินในลิ้นชักตอนนี้ แล้วกดเปิดรอบ
+        <Card styles={{ body: { padding: 0 } }}>
+          <div className="px-6 py-5">
+            <div style={{ fontSize: T.lead, fontWeight: 600, color: INK.strong }}>เปิดรอบ</div>
+            <div style={{ fontSize: T.body, color: INK.body, marginTop: 2 }}>
+              นับเงินในลิ้นชักตอนนี้ แล้วกดเปิดรอบ
+            </div>
             {lastClosed?.counted_cash != null && (
-              <><br /><span style={{ color: '#8C837D', fontSize: 13 }}>
+              <div style={{ fontSize: T.lbl, color: INK.mute, marginTop: 6 }}>
                 เติมยอดจากรอบที่แล้วให้แล้ว ({baht(lastClosed.counted_cash)}) — แก้ได้ถ้าไม่ตรง
-              </span></>
+              </div>
             )}
-          </Typography.Paragraph>
-          {cashInput('เงินในลิ้นชัก')}
-          <Button
-            type="primary" size="large" block className="mt-3"
-            loading={busy} disabled={amount === ''} onClick={() => void doOpen()}
-          >
-            เปิดรอบ
-          </Button>
+            <div className="mt-4">{cashInput('เงินในลิ้นชัก')}</div>
+          </div>
+          <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
+            <Button
+              type="primary" size="large" block
+              loading={busy} disabled={amount === ''} onClick={() => void doOpen()}
+            >
+              เปิดรอบ
+            </Button>
+          </div>
         </Card>
         <ShiftHistory rows={history} />
         {counterModal}
@@ -269,19 +298,41 @@ export function Shift() {
         />
       )}
 
-      <Card title={`รอบเปิดอยู่ — เปิดเมื่อ ${dayjs(shift.opened_at).format('DD/MM HH:mm')}`}>
-        <div className="flex flex-col items-center py-3">
-          <span style={{ fontSize: 15, color: '#5C534E' }}>เงินในลิ้นชักตอนนี้</span>
-          <span style={{ fontSize: 52, fontWeight: 800, lineHeight: 1.1, color: C.brand, ...num }}>
-            {baht(inDrawer)}
+      <Card styles={{ body: { padding: 0 } }}>
+        {/* แถบสถานะบาง ๆ ด้านบน จุดเขียวบอกว่ารอบกำลังเดินอยู่ */}
+        <div
+          className="flex items-center justify-between px-6 py-3"
+          style={{ borderBottom: `1px solid ${INK.hair}` }}
+        >
+          <span className="inline-flex items-center gap-2" style={{ fontSize: T.lbl, color: INK.body }}>
+            <i style={{ width: 7, height: 7, borderRadius: 999, background: C.brand, display: 'inline-block' }} />
+            รอบเปิดอยู่
           </span>
-          <span style={{ fontSize: 13, color: '#8C837D', ...num }}>
-            เปิดร้านด้วย {baht(shift.opening_float)} + ขายได้ {baht(cashIn)}
+          <span style={{ fontSize: T.lbl, color: INK.mute }}>
+            เปิดเมื่อ {dayjs(shift.opened_at).format('DD/MM HH:mm')}
           </span>
         </div>
-        <Button danger type="primary" size="large" block onClick={() => { setAmount(''); setClosing(true); }}>
-          ปิดรอบ
-        </Button>
+
+        <div className="flex flex-col items-center px-6 py-9">
+          <span style={{ fontSize: T.lbl, color: INK.body, letterSpacing: '.02em' }}>เงินในลิ้นชักตอนนี้</span>
+          <span
+            style={{ fontSize: T.hero, fontWeight: 700, lineHeight: 1.1, color: INK.strong, marginTop: 6, ...num }}
+          >
+            {baht(inDrawer)}
+          </span>
+          {/* ที่มาของตัวเลข วางเป็นสมการสั้น ๆ ให้เห็นว่าบวกมาจากอะไร */}
+          <span className="mt-3 inline-flex items-center gap-2" style={{ fontSize: T.lbl, color: INK.mute, ...num }}>
+            <span>เปิดร้าน {baht(shift.opening_float)}</span>
+            <span style={{ color: INK.hair }}>+</span>
+            <span>ขายได้ {baht(cashIn)}</span>
+          </span>
+        </div>
+
+        <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
+          <Button danger type="primary" size="large" block onClick={() => { setAmount(''); setClosing(true); }}>
+            ปิดรอบ
+          </Button>
+        </div>
       </Card>
 
       <ShiftHistory rows={history} />
@@ -296,18 +347,20 @@ export function Shift() {
         onOk={() => void doClose()}
         destroyOnHidden
       >
-        <Typography.Paragraph style={{ fontSize: 14, color: '#5C534E' }}>
-          นับเงินจริงในลิ้นชัก แล้วกรอกยอด — ระบบจะเทียบกับ {baht(inDrawer)} ที่ควรมี
-        </Typography.Paragraph>
+        <div style={{ fontSize: T.body, color: INK.body, marginBottom: 14 }}>
+          นับเงินจริงในลิ้นชัก แล้วกรอกยอด — ระบบจะเทียบกับ{' '}
+          <b style={{ color: INK.strong, ...num }}>{baht(inDrawer)}</b> ที่ควรมี
+        </div>
         {cashInput('นับได้จริง')}
         {diff != null && (
-          <div className="mt-3 rounded-lg px-4 py-3" style={{ background: '#FAFAF9', border: `1px solid ${overShort(diff).color}33` }}>
-            <div className="flex items-center justify-between">
-              <span style={{ fontSize: 14, color: '#5C534E' }}>ผลต่าง</span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: overShort(diff).color, ...num }}>
-                {overShort(diff).text}
-              </span>
-            </div>
+          <div
+            className="mt-4 flex items-center justify-between px-4 py-3"
+            style={{ background: INK.wash, borderLeft: `3px solid ${overShort(diff).color}` }}
+          >
+            <span style={{ fontSize: T.body, color: INK.body }}>ผลต่าง</span>
+            <span style={{ fontSize: 26, fontWeight: 700, color: overShort(diff).color, ...num }}>
+              {overShort(diff).text}
+            </span>
           </div>
         )}
       </Modal>
