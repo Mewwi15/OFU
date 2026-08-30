@@ -14,6 +14,7 @@
  * สลิปนี้ก็ต้อง 58mm ไม่งั้นเครื่องพิมพ์ตีกลับเป็น Letter แล้วพ่นกระดาษยาวเป็นเมตร
  */
 
+import type { CountLine } from '../components/CashCountModal';
 import { printHtml } from './printOrder';
 import { contentMm, getReceiptConfig } from './receiptConfig';
 import { d } from './time';
@@ -143,5 +144,64 @@ export function printCountKickSlip(shopName: string, cashier: string) {
     <div class="doc">นับเงินเปิดรอบ</div>
     ${row('เวลา', `${d(at).format('DD/MM HH:mm')} น.`)}
     ${cashier ? row('ผู้นับ', esc(cashier)) : ''}
+  </body></html>`);
+}
+
+const denomLabel = (v: number) =>
+  v >= 20 ? `ธนบัตร ${v.toLocaleString('th-TH')}` : v >= 1 ? `เหรียญ ${v}` : `เหรียญ ${v * 100} สต.`;
+
+/**
+ * ใบนับเงินในลิ้นชัก — แจกแจงทีละชนิดว่าแบงก์อะไรกี่ใบ รวมเท่าไหร่
+ *
+ * เจ้าของสั่ง 30 ส.ค. 2026: นับเสร็จถึงขั้นที่ 3 ต้องปริ้นได้ว่าเงินในลิ้นชักมีเท่าไหร่
+ *
+ * ตั้งใจแจกแจงทีละชนิด ไม่ใช่พิมพ์แต่ยอดรวม เพราะยอดรวมอย่างเดียวตรวจย้อนหลังไม่ได้
+ * ว่านับพลาดตรงไหน ถ้าพรุ่งนี้เงินไม่ตรง กระดาษใบนี้บอกได้ว่าเมื่อวานนับแบงก์พัน
+ * ไว้กี่ใบ แล้วไปไล่เทียบกับของจริงได้ทันที
+ */
+export function printCashCountSheet(p: {
+  shopName: string;
+  at: string;
+  cashier: string;
+  lines: CountLine[];
+  total: number;
+}) {
+  const cfg = getReceiptConfig();
+  const cw = contentMm(cfg.paperWidth);
+
+  const rows = p.lines
+    .map((l) => `<tr>
+      <td>${denomLabel(l.denom)}</td>
+      <td class="c">${l.count}</td>
+      <td class="n">${(l.denom * l.count).toLocaleString('th-TH')}</td>
+    </tr>`)
+    .join('');
+
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  <title>ใบนับเงินในลิ้นชัก</title>
+  <style>${slipCss(cfg.paperWidth, cw)}
+    table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    td { padding: 2px 0; font-size: 9px; }
+    td.c { text-align: center; width: 22%; }
+    td.n { text-align: right; width: 30%; white-space: nowrap; }
+    thead td { font-weight: 700; border-bottom: 1px solid #000; }
+    .sum { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px;
+           display: flex; justify-content: space-between; align-items: baseline; }
+    .sum .t { font-size: 10px; font-weight: 700; }
+    .sum .n { font-size: 16px; font-weight: 700; }
+  </style></head><body>
+    <div class="shop">${esc(p.shopName)}</div>
+    <div class="doc">ใบนับเงินในลิ้นชัก</div>
+    ${row('เวลา', `${d(p.at).format('DD/MM HH:mm')} น.`)}
+    ${p.cashier ? row('ผู้นับ', esc(p.cashier)) : ''}
+    <table>
+      <thead><tr><td>ชนิด</td><td class="c">จำนวน</td><td class="n">รวม</td></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3">— ไม่มี —</td></tr>'}</tbody>
+    </table>
+    <div class="sum">
+      <span class="t">รวมทั้งสิ้น</span>
+      <span class="n">${baht(p.total)}</span>
+    </div>
+    <div class="sign">ผู้นับเงิน</div>
   </body></html>`);
 }

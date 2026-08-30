@@ -14,6 +14,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
+export type CountLine = { denom: number; count: number };
+
 const DENOMS = [1000, 500, 100, 50, 20, 10, 5, 2, 1, 0.5, 0.25] as const;
 const denomLabel = (v: number) =>
   v >= 20 ? `ธนบัตร ${v.toLocaleString('th-TH')}` : v >= 1 ? `เหรียญ ${v}` : `เหรียญ ${v * 100} สต.`;
@@ -25,7 +27,9 @@ export function CashCountModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onDone: (total: number) => void;
+  /* ส่งรายละเอียดทีละชนิดออกไปด้วย ไม่ใช่แค่ยอดรวม — ใบนับเงินที่ปริ้นต้องแจกแจง
+     ได้ว่าแบงก์พันกี่ใบ เหรียญบาทกี่เหรียญ ไม่งั้นตรวจย้อนหลังไม่ได้ว่านับพลาดตรงไหน */
+  onDone: (total: number, lines: CountLine[]) => void;
 }) {
   const [counts, setCounts] = useState<number[]>(() => DENOMS.map(() => 0));
   const [active, setActive] = useState(0);
@@ -92,7 +96,7 @@ export function CashCountModal({
             <Button size="large" onClick={onClose}>
               ปิด
             </Button>
-            <Button size="large" type="primary" onClick={() => onDone(Math.round(total))}>
+            <Button size="large" type="primary" onClick={() => onDone(Math.round(total), DENOMS.map((d, i) => ({ denom: d, count: counts[i] || 0 })).filter((l) => l.count > 0))}>
               ใช้ยอดนี้
             </Button>
           </div>

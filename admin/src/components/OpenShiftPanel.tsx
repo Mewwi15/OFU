@@ -16,14 +16,14 @@
  * มันเลยแบนอยู่ตัวเดียวในแอป
  */
 
-import { RiArrowLeftLine, RiCalculatorLine } from '@remixicon/react';
+import { RiArrowLeftLine, RiCalculatorLine, RiPrinterLine } from '@remixicon/react';
 import { Button, Card, Input, message } from 'antd';
 import { useEffect, useState } from 'react';
 
 import { apiError, listShifts, listStaff, openShift, type Staff } from '../lib/api';
 import { getShopName } from '../lib/orders';
-import { printCountKickSlip, printShiftOpenSlip } from '../lib/printDrawer';
-import { CashCountModal } from './CashCountModal';
+import { printCashCountSheet, printCountKickSlip, printShiftOpenSlip } from '../lib/printDrawer';
+import { CashCountModal, type CountLine } from './CashCountModal';
 import { LiveClock } from './LiveClock';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
@@ -38,6 +38,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
   const [step, setStep] = useState(0);
   const [code, setCode] = useState('');
   const [counted, setCounted] = useState<number | null>(null);
+  const [countLines, setCountLines] = useState<CountLine[]>([]);   // แจกแจงทีละชนิดไว้ปริ้น
   const [counting, setCounting] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -93,6 +94,20 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
       printCountKickSlip(await getShopName().catch(() => 'ร้านอู้ฟู่'), matched?.name ?? code);
     } catch {
       message.warning('เปิดลิ้นชักไม่ได้ — พิมพ์สลิปไม่สำเร็จ');
+    }
+  };
+
+  const printCount = async () => {
+    try {
+      printCashCountSheet({
+        shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
+        at: new Date().toISOString(),
+        cashier: matched?.name ?? code,
+        lines: countLines,
+        total: counted ?? 0,
+      });
+    } catch {
+      message.warning('พิมพ์ใบนับเงินไม่ได้');
     }
   };
 
@@ -257,10 +272,21 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
                 </div>
               )}
 
+              {/* ปริ้นใบนับเงินก่อนกดเปิดรอบได้ — เจ้าของสั่งให้ขั้นนี้ปริ้นได้ว่าเงิน
+                  ในลิ้นชักมีเท่าไหร่ ใบนี้แจกแจงทีละชนิด ต่างจากใบเปิดรอบที่บอกแต่ยอดรวม */}
+              <Button
+                size="large" block
+                icon={<RiPrinterLine className="w-5 h-5" />}
+                className="mt-4"
+                style={{ height: 56, fontSize: 18 }}
+                onClick={() => void printCount()}
+              >
+                พิมพ์ใบนับเงิน
+              </Button>
               <Button
                 type="primary" size="large" block
                 loading={busy}
-                className="mt-5"
+                className="mt-3"
                 style={{ height: 60, fontSize: 20, fontWeight: 700 }}
                 onClick={() => void submit()}
               >
@@ -286,7 +312,7 @@ export function OpenShiftPanel({ onOpened }: { onOpened: () => void }) {
       <CashCountModal
         open={counting}
         onClose={() => setCounting(false)}
-        onDone={(total) => { setCounted(total); setCounting(false); }}
+        onDone={(total, lines) => { setCounted(total); setCountLines(lines); setCounting(false); }}
       />
     </>
   );
