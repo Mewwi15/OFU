@@ -41,39 +41,41 @@ function useChatUnread(): number {
 export type NavItem = { to: string; label: string; Icon: typeof RiCashLine; ownerOnly?: boolean };
 export type NavGroup = { title: string; items: NavItem[] };
 
-/** Sidebar grouped into zones: on-site, online, catalog/app, overview. */
+/* เมนูแบ่งสองโซนตามที่เจ้าของสั่ง 30 ส.ค. 2026: หน้าร้าน กับ หลังร้าน
+ *
+ * เส้นแบ่งคือ "ตอนนี้มีลูกค้ายืนรออยู่ไหม" ไม่ใช่ "ออนไลน์หรือออฟไลน์" แบบเดิม
+ * งานหน้าร้านคืองานที่ทำตอนเปิดร้านและมีคนรอ — ต้องกดถึงเร็ว อยู่บนสุดเสมอ
+ * งานหลังร้านคืองานที่นั่งทำตอนว่างหรือปิดร้าน ช้าได้ ไม่ต้องแย่งที่ข้างบน
+ *
+ * ออเดอร์กับแชตลูกค้าอยู่หน้าร้าน ทั้งที่มาจากออนไลน์ เพราะคนทำคือคนเดียวกับที่
+ * ยืนหน้าเคาน์เตอร์ และมีลูกค้ารออยู่จริงเหมือนกัน — เดิมแยกไปกลุ่ม "ออนไลน์"
+ * ซึ่งเป็นการแบ่งตามช่องทาง ไม่ใช่ตามงานที่คนต้องทำ
+ *
+ * สต๊อกกับรับของเข้าย้ายลงหลังร้าน เพราะเป็นงานที่ทำตอนของมาส่งหรือตอนปิดร้าน
+ * ไม่ใช่งานที่ทำตอนลูกค้ายืนรอ
+ */
 // eslint-disable-next-line react/only-export-components -- nav data lives beside its component
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'หน้าร้าน',
     items: [
       { to: '/pos', label: 'ขายหน้าร้าน', Icon: RiCashLine },
-      { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
-      { to: '/stock', label: 'สต๊อก', Icon: RiInboxArchiveLine },
-      { to: '/receive', label: 'รับของเข้า', Icon: RiInboxUnarchiveLine },
       { to: '/shift', label: 'เปิด-ปิดรอบ', Icon: RiSafe2Line },
-    ],
-  },
-  {
-    title: 'ออนไลน์',
-    items: [
+      { to: '/pos-sales', label: 'บิลขาย', Icon: RiFileList3Line },
       { to: '/orders', label: 'ออเดอร์', Icon: RiShoppingBag3Line },
       { to: '/chat', label: 'แชตลูกค้า', Icon: RiChat1Line },
     ],
   },
   {
-    title: 'จัดการแอป',
+    title: 'หลังร้าน',
     items: [
+      { to: '/stock', label: 'สต๊อก', Icon: RiInboxArchiveLine },
+      { to: '/receive', label: 'รับของเข้า', Icon: RiInboxUnarchiveLine },
       { to: '/products', label: 'สินค้า', Icon: RiStore2Line },
       { to: '/categories', label: 'หมวดหมู่', Icon: RiPriceTag3Line },
       { to: '/promotions', label: 'โปรโมชั่น', Icon: RiCouponLine, ownerOnly: true },
       { to: '/banners', label: 'แบนเนอร์', Icon: RiImageLine },
       { to: '/broadcast', label: 'ประกาศ', Icon: RiMegaphoneLine },
-    ],
-  },
-  {
-    title: 'ภาพรวม',
-    items: [
       { to: '/reports', label: 'รายงาน', Icon: RiBarChart2Line },
       { to: '/store-credit', label: 'เครดิตร้าน', Icon: RiWallet3Line },
       { to: '/audit-log', label: 'ประวัติแก้ไข', Icon: RiHistoryLine, ownerOnly: true },
