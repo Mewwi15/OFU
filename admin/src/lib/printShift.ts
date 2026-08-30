@@ -11,7 +11,7 @@
  */
 
 
-import type { CashLine, CashSummary } from './api';
+import type { CashLine, CashSummary, ShiftSalesReport } from './api';
 import { BASE_CSS, printHtml } from './printOrder';
 import { d } from './time';
 
@@ -39,6 +39,8 @@ export type ShiftReport = {
   /* บรรทัดกระทบยอดจาก shift_cash_summary (0089) — ใบนี้ต้องพิมพ์สูตรทีละบรรทัด
      ไม่ใช่โชว์แค่ "ขาด 140" ไม่งั้นเวลาไม่ตรงก็ไม่รู้จะไปเพ่งตรงไหน */
   recon: CashSummary | null;
+  /* รายงานการขายของรอบ (0091) — ขายอะไรไปบ้าง สต๊อกขยับเท่าไหร่ กำไรเท่าไหร่ */
+  sales: ShiftSalesReport | null;
   openingBreakdown: CashLine[] | null;
   closingBreakdown: CashLine[] | null;
   top: { name: string; qty: number; amount: number }[];
@@ -81,6 +83,17 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
       </td>
     </tr>`;
   }).join('');
+
+  /* รายการสินค้าที่ขายทั้งหมด ไม่ตัดที่ 5 อันดับเหมือนเดิม — เจ้าของถามว่า "ขายอะไร
+   * ออกไปบ้าง" ซึ่ง 5 อันดับตอบไม่ได้ถ้ารอบนั้นขายของ 40 ชนิด
+   * ใช้ของจาก shift_sales_report ถ้ามี ไม่มีค่อยถอยไปใช้ top เดิม (ใบเก่าที่พิมพ์ซ้ำ) */
+  const soldRows = (r.sales?.items ?? []).map((t, i) => `
+    <tr>
+      <td class="no">${i + 1}</td>
+      <td>${esc(t.name)}</td>
+      <td class="num">${t.qty}</td>
+      <td class="num">${baht(t.amount)}</td>
+    </tr>`).join('');
 
   const topRows = r.top.slice(0, 10).map((t, i) => `
     <tr>
@@ -172,7 +185,32 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
       ติดลบมาก = ชนิดนั้นร่อยหรอ ควรเตรียมเพิ่มสำหรับรอบหน้า
     </p>` : ''}
 
-    ${topRows ? `<h2>สินค้าขายดีในรอบ</h2>
+    ${r.sales ? `<h2>กำไรในรอบ</h2>
+    <table class="kv">
+      ${line('ยอดขาย (หักคืนแล้ว)', baht(r.sales.revenue))}
+      ${line('ต้นทุนสินค้า', `- ${baht(r.sales.cost)}`)}
+      ${line('กำไรขั้นต้น', baht(r.sales.gross), true)}
+    </table>
+    ${r.sales.cost_missing ? `<p style="font-size:12px;color:#B3261E;margin-top:5px">
+      มีสินค้าบางรายการไม่ได้บันทึกต้นทุนไว้ กำไรที่แสดงจึงสูงกว่าความจริง
+    </p>` : ''}
+
+    <h2>สต๊อกที่ขยับในรอบ</h2>
+    <table class="kv">
+      ${line('ตัดออกจากการขาย', `- ${r.sales.stock.sold} ชิ้น`)}
+      ${r.sales.stock.returned ? line('คืนเข้าจากการคืนเงิน', `+ ${r.sales.stock.returned} ชิ้น`) : ''}
+      ${r.sales.stock.received ? line('รับของเข้า', `+ ${r.sales.stock.received} ชิ้น`) : ''}
+      ${r.sales.stock.adjusted ? line('ปรับสต๊อกด้วยมือ', `${r.sales.stock.adjusted > 0 ? '+' : ''}${r.sales.stock.adjusted} ชิ้น`) : ''}
+      ${line('สต๊อกเปลี่ยนสุทธิ',
+        `${(-r.sales.stock.sold + r.sales.stock.returned + r.sales.stock.received + r.sales.stock.adjusted) > 0 ? '+' : ''}${
+          -r.sales.stock.sold + r.sales.stock.returned + r.sales.stock.received + r.sales.stock.adjusted} ชิ้น`, true)}
+    </table>` : ''}
+
+    ${soldRows ? `<h2>สินค้าที่ขายในรอบ (ทั้งหมด ${r.sales?.items.length} รายการ)</h2>
+    <table class="top">
+      <thead><tr><th>#</th><th>สินค้า</th><th>จำนวน</th><th>ยอด</th></tr></thead>
+      <tbody>${soldRows}</tbody>
+    </table>` : topRows ? `<h2>สินค้าขายดีในรอบ</h2>
     <table class="top">
       <thead><tr><th>#</th><th>สินค้า</th><th>จำนวน</th><th>ยอด</th></tr></thead>
       <tbody>${topRows}</tbody>

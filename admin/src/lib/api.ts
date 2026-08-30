@@ -832,6 +832,15 @@ export async function listDrawerOpens(shiftId: string): Promise<DrawerOpen[]> {
   return (data ?? []) as DrawerOpen[];
 }
 
+/* ── รายงานการขายของรอบ สำหรับใบปิดรอบ (0091) ───────────────────────────────── */
+export type ShiftSalesReport = {
+  items: { name: string; qty: number; amount: number }[];
+  stock: { sold: number; returned: number; received: number; adjusted: number };
+  revenue: number; cost: number; gross: number; cost_missing: boolean;
+};
+export const shiftSalesReport = (shiftId: string) =>
+  rpc<ShiftSalesReport>('shift_sales_report', { p_shift_id: shiftId });
+
 /* ── กระทบยอดเงินสดในลิ้นชัก (0089) ────────────────────────────────────────────
  * สูตรเดียวใช้ทั้งจอระหว่างวัน ตอนปิดรอบ และใบที่ปริ้น — เดิมจอกับตอนปิดคำนวณ
  * คนละที่ด้วยคนละสูตร เลยเพี้ยนกันได้เงียบ ๆ */
