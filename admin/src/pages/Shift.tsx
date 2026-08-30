@@ -17,7 +17,7 @@
  * ตั้งแต่ 0021) — รอบมีไว้เพื่อการนับเงินอย่างเดียว
  */
 
-import { RiCalculatorLine, RiPrinterLine } from '@remixicon/react';
+import { RiCalculatorLine, RiInboxUnarchiveLine, RiPrinterLine } from '@remixicon/react';
 import { Alert, Button, Card, InputNumber, Modal, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,17 +26,20 @@ import {
   apiError,
   closeShift,
   getOpenShift,
+  listDrawerOpens,
   listShifts,
+  logDrawerOpen,
   openShift,
   posDashboard,
   type Dashboard,
+  type DrawerOpen,
   type Shift as ShiftRow,
 } from '../lib/api';
 import { getShopName } from '../lib/orders';
-import { printShiftOpenSlip } from '../lib/printDrawer';
+import { printNoSaleSlip, printShiftOpenSlip } from '../lib/printDrawer';
+import { printShiftReport } from '../lib/printShift';
 import { getReceiptConfig } from '../lib/receiptConfig';
 import { d, since } from '../lib/time';
-import { printShiftReport } from '../lib/printShift';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -56,6 +59,11 @@ function overShort(n: number) {
 }
 
 const num = { fontVariantNumeric: 'tabular-nums' } as const;
+
+/* เหตุผลที่เกิดจริงหน้าร้าน เรียงตามความถี่ — กดปุ่มเดียวจบ ไม่ต้องพิมพ์
+ * "อื่น ๆ" ไม่มีในลิสต์ตั้งใจ: ถ้าเลือกได้มันจะกลายเป็นปุ่มที่ทุกคนกด แล้ว log
+ * ก็ไร้ความหมายเหมือนไม่ได้บันทึก */
+const NO_SALE_REASONS = ['แลกแบงก์ให้ลูกค้า', 'เติมเงินทอน', 'เก็บเงินออกจากลิ้นชัก', 'ตรวจนับเงินระหว่างรอบ'] as const;
 
 function ShiftHistory({ rows }: { rows: ShiftRow[] }) {
   const closed = rows.filter((r) => r.closed_at);
@@ -118,13 +126,21 @@ export function Shift() {
   const [closing, setClosing] = useState(false);           // เปิดหน้าต่างนับเงินปิดรอบ
   const [counter, setCounter] = useState(false);           // เปิดตัวนับเงินทีละใบ
   const [done, setDone] = useState<{ row: ShiftRow; dash: Dashboard | null } | null>(null);
+  const [noSale, setNoSale] = useState(false);             // หน้าต่างถามเหตุผลเปิดลิ้นชักเปล่า
+  const [drawerLog, setDrawerLog] = useState(false);       // หน้าต่างดูประวัติเปิดเปล่าของรอบ
+  const [drawerOpens, setDrawerOpens] = useState<DrawerOpen[]>([]);
 
   const lastClosed = history.find((r) => r.closed_at);
 
   const refresh = useCallback(async () => {
     const s = await getOpenShift().catch(() => null);
     setShift(s);
-    if (s) setDash(await posDashboard(s.opened_at, new Date().toISOString()).catch(() => null));
+    if (s) {
+      setDash(await posDashboard(s.opened_at, new Date().toISOString()).catch(() => null));
+      setDrawerOpens(await listDrawerOpens(s.id).catch(() => []));
+    } else {
+      setDrawerOpens([]);
+    }
     listShifts().then(setHistory).catch(() => {});
   }, []);
 
@@ -243,6 +259,54 @@ export function Shift() {
     />
   );
 
+  /* ── เปิดลิ้นชักเปล่า ────────────────────────────────────────────────────────
+   * ถามเหตุผลก่อนเสมอ ไม่ใช่เพื่อกันคนขโมย (คนจะโกงก็พิมพ์อะไรก็ได้) แต่เพื่อให้
+   * แถวใน log อ่านแล้วมีความหมายตอนย้อนดูทีหลัง "เปิดเปล่า 6 ครั้ง" บอกอะไรไม่ได้
+   * แต่ "แลกแบงก์ 5 · ตรวจเงิน 1" บอกได้ทันทีว่าปกติหรือผิดปกติ
+   * ปุ่มสำเร็จรูปมาก่อนช่องพิมพ์ เพราะแคชเชียร์มีลูกค้ายืนรออยู่ตรงหน้า */
+  const doNoSale = async (reason: string) => {
+    setBusy(true);
+    try {
+      const res = await logDrawerOpen(reason);
+      setNoSale(false);
+      printNoSaleSlip({
+        shopName: await getShopName().catch(() => 'ร้านอู้ฟู่'),
+        at: new Date().toISOString(),
+        cashier: getReceiptConfig().cashierName,
+        reason,
+        seq: res.count,
+      });
+      if (shift) listDrawerOpens(shift.id).then(setDrawerOpens).catch(() => {});
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const noSaleModal = (
+    <Modal
+      open={noSale}
+      title="เปิดลิ้นชัก — ไม่มีการขาย"
+      onCancel={() => setNoSale(false)}
+      footer={<Button onClick={() => setNoSale(false)}>ยกเลิก</Button>}
+      destroyOnHidden
+      width={420}
+    >
+      <div style={{ fontSize: T.body, color: INK.body, marginBottom: 14 }}>
+        เลือกเหตุผล — ระบบจะบันทึกว่าใครกด ตอนไหน แล้วพิมพ์สลิปให้ลิ้นชักเด้ง
+      </div>
+      <div className="flex flex-col gap-2">
+        {NO_SALE_REASONS.map((r) => (
+          <Button key={r} size="large" block loading={busy} onClick={() => void doNoSale(r)}
+            style={{ textAlign: 'left', justifyContent: 'flex-start' }}>
+            {r}
+          </Button>
+        ))}
+      </div>
+    </Modal>
+  );
+
   /* ── ปิดรอบไปแล้ว: ผลลัพธ์ + เอกสาร ─────────────────────────────────────── */
   const doneCard = done && (
     <Card styles={{ body: { padding: 0 } }}>
@@ -350,12 +414,76 @@ export function Shift() {
           </span>
         </div>
 
-        <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
-          <Button danger type="primary" size="large" block onClick={() => { setAmount(''); setClosing(true); }}>
+        {/* เปิดเปล่าไปกี่ครั้งแล้วในรอบนี้ — โผล่เฉพาะตอนมีจริง ไม่งั้นเป็นบรรทัด
+            เปล่าที่ไม่ได้บอกอะไร กดดูรายละเอียดว่าใครกด เพราะอะไร ได้ */}
+        {drawerOpens.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setDrawerLog(true)}
+            className="flex w-full items-center justify-between px-6 py-3 text-left"
+            style={{ borderTop: `1px solid ${INK.hair}`, background: INK.wash, cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: T.lbl, color: INK.body }}>
+              เปิดลิ้นชักเปล่าในรอบนี้ <b style={{ color: INK.strong, ...num }}>{drawerOpens.length}</b> ครั้ง
+            </span>
+            <span style={{ fontSize: T.lbl, color: C.brand }}>ดูรายละเอียด</span>
+          </button>
+        )}
+
+        <div
+          className="flex gap-3 px-6 py-4"
+          style={{ borderTop: `1px solid ${INK.hair}` }}
+        >
+          <Button size="large" icon={<RiInboxUnarchiveLine className="w-4 h-4" />} onClick={() => setNoSale(true)}>
+            เปิดลิ้นชัก
+          </Button>
+          <Button
+            danger type="primary" size="large" className="flex-1"
+            onClick={() => { setAmount(''); setClosing(true); }}
+          >
             ปิดรอบ
           </Button>
         </div>
       </Card>
+
+      {noSaleModal}
+      <Modal
+        open={drawerLog}
+        title="เปิดลิ้นชักเปล่าในรอบนี้"
+        onCancel={() => setDrawerLog(false)}
+        footer={<Button onClick={() => setDrawerLog(false)}>ปิด</Button>}
+        destroyOnHidden
+      >
+        <Table
+          rowKey="at"
+          size="small"
+          pagination={false}
+          dataSource={drawerOpens}
+          scroll={{ y: 300 }}
+          columns={[
+            {
+              title: 'เวลา', width: 84,
+              render: (_: unknown, r: DrawerOpen) => (
+                <span style={{ fontSize: T.body, color: INK.strong, ...num }}>{d(r.at).format('HH:mm')}</span>
+              ),
+            },
+            {
+              title: 'ใครกด', width: 130,
+              render: (_: unknown, r: DrawerOpen) => (
+                <span style={{ fontSize: T.body, color: INK.strong }}>{r.who}</span>
+              ),
+            },
+            {
+              title: 'เหตุผล',
+              render: (_: unknown, r: DrawerOpen) => (
+                <span style={{ fontSize: T.body, color: INK.body }}>
+                  {(r.note ?? '').replace(/^เปิดลิ้นชักเปล่า(\s—\s)?/, '') || '—'}
+                </span>
+              ),
+            },
+          ]}
+        />
+      </Modal>
 
       <ShiftHistory rows={history} />
 

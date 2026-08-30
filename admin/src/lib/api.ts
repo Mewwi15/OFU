@@ -791,6 +791,24 @@ export async function listShifts(): Promise<Shift[]> {
   return (data ?? []) as Shift[];
 }
 
+/* ── เปิดลิ้นชักเปล่า (no-sale) ───────────────────────────────────────────────
+ * จังหวะเดียวที่ลิ้นชักเปิดโดยไม่มีรายการขายผูกอยู่ จึงเป็นจุดเดียวที่เงินหายแล้ว
+ * ไล่ไม่ได้ถ้าไม่บันทึก — log ลง audit_log ตัวเดิม (ดู 0084_no_sale_drawer.sql) */
+export type DrawerOpen = { at: string; who: string; note: string | null };
+
+/** คืนจำนวนครั้งสะสมในรอบที่เปิดอยู่ เพื่อให้จอแสดงได้เลยโดยไม่ต้องอ่านซ้ำ */
+export async function logDrawerOpen(reason?: string): Promise<{ shift_id: string | null; count: number | null }> {
+  const { data, error } = await supabase.rpc('log_drawer_open', { p_reason: reason ?? null });
+  if (error) throw error;
+  return data as { shift_id: string | null; count: number | null };
+}
+
+export async function listDrawerOpens(shiftId: string): Promise<DrawerOpen[]> {
+  const { data, error } = await supabase.rpc('list_drawer_opens', { p_shift_id: shiftId });
+  if (error) throw error;
+  return (data ?? []) as DrawerOpen[];
+}
+
 /* ── store credit ────────────────────────────────────────────────────────────── */
 export type Customer = { user_id: string; display_name: string | null; phone: string | null; balance: number };
 export const findCustomerByPhone = (phone: string) =>

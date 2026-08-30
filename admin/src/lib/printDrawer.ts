@@ -23,26 +23,11 @@ const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-export type OpenSlip = {
-  shopName: string;
-  openedAt: string;
-  openingFloat: number;
-  cashier: string;
-};
-
-export function printShiftOpenSlip(s: OpenSlip) {
-  const cfg = getReceiptConfig();
-  const cw = contentMm(cfg.paperWidth);
-
-  const row = (label: string, value: string) =>
-    `<div class="r"><span>${label}</span><span class="v">${value}</span></div>`;
-
-  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
-  <title>ใบเปิดรอบ</title>
-  <style>
+/** สไตล์ร่วมของสลิปทั้งสองใบ — ตัวเดียวกันเป๊ะ เพราะมันคือกระดาษม้วนเดียวกัน */
+const slipCss = (paperWidth: number, cw: number) => `
     /* ต้องเป็นความยาวสองค่าเสมอ — "48mm auto" ไม่ถูกต้องตามสเปก Chrome จะถอย
        ไปใช้ Letter เงียบ ๆ แล้วได้กระดาษเปล่ายาวมาก (บทเรียนเดียวกับ Receipt.tsx) */
-    @page { size: ${cfg.paperWidth}mm 210mm; margin: 0; }
+    @page { size: ${paperWidth}mm 210mm; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: ${cw}mm; margin: 0 auto; padding: 2mm 0 6mm;
@@ -55,13 +40,31 @@ export function printShiftOpenSlip(s: OpenSlip) {
            border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2px 0; }
     .r { display: flex; justify-content: space-between; gap: 4mm; margin-top: 3px; }
     .r .v { font-weight: 700; text-align: right; white-space: nowrap; }
+    .note { margin-top: 6px; text-align: center; font-size: 8px; }
+    .sign { margin-top: 9mm; border-top: 1px dotted #000; padding-top: 3px;
+            text-align: center; font-size: 8px; }`;
+
+const row = (label: string, value: string) =>
+  `<div class="r"><span>${label}</span><span class="v">${value}</span></div>`;
+
+export type OpenSlip = {
+  shopName: string;
+  openedAt: string;
+  openingFloat: number;
+  cashier: string;
+};
+
+export function printShiftOpenSlip(s: OpenSlip) {
+  const cfg = getReceiptConfig();
+  const cw = contentMm(cfg.paperWidth);
+
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  <title>ใบเปิดรอบ</title>
+  <style>${slipCss(cfg.paperWidth, cw)}
     .float { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px;
              display: flex; justify-content: space-between; align-items: baseline; }
     .float .t { font-size: 10px; font-weight: 700; }
     .float .n { font-size: 15px; font-weight: 700; }
-    .note { margin-top: 6px; text-align: center; font-size: 8px; }
-    .sign { margin-top: 9mm; border-top: 1px dotted #000; padding-top: 3px;
-            text-align: center; font-size: 8px; }
   </style></head><body>
     <div class="shop">${esc(s.shopName)}</div>
     <div class="doc">เปิดรอบขาย</div>
@@ -74,5 +77,44 @@ export function printShiftOpenSlip(s: OpenSlip) {
     </div>
     <div class="note">เก็บใบนี้ไว้กับม้วนใบเสร็จของรอบ</div>
     <div class="sign">ผู้เปิดรอบ</div>
+  </body></html>`);
+}
+
+export type NoSaleSlip = {
+  shopName: string;
+  at: string;
+  cashier: string;
+  reason: string;
+  /** เปิดเปล่าเป็นครั้งที่เท่าไหร่ของรอบนี้ — null ถ้ากดตอนไม่มีรอบเปิดอยู่ */
+  seq: number | null;
+};
+
+/**
+ * สลิปเปิดลิ้นชักเปล่า — พิมพ์เพื่อให้ลิ้นชักเด้ง และเพื่อให้มีกระดาษคาอยู่ในม้วน
+ *
+ * ตั้งใจให้พิมพ์ครั้งที่เท่าไหร่ลงไปด้วย เพราะม้วนใบเสร็จคือหลักฐานที่แก้ย้อนหลัง
+ * ไม่ได้ ต่างจากในฐานข้อมูลที่แอดมินมีสิทธิ์ยุ่งได้ ถ้าสองที่ไม่ตรงกันแปลว่ามีคน
+ * ไปยุ่ง — เป็นการตรวจสอบไขว้ที่ได้มาฟรีจากการที่ต้องพิมพ์อยู่แล้ว
+ */
+export function printNoSaleSlip(s: NoSaleSlip) {
+  const cfg = getReceiptConfig();
+  const cw = contentMm(cfg.paperWidth);
+
+  printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
+  <title>เปิดลิ้นชัก</title>
+  <style>${slipCss(cfg.paperWidth, cw)}
+    .why { margin-top: 5px; border-top: 1px solid #000; padding-top: 4px;
+           font-size: 10px; font-weight: 700; text-align: center;
+           overflow-wrap: anywhere; }
+  </style></head><body>
+    <div class="shop">${esc(s.shopName)}</div>
+    <div class="doc">เปิดลิ้นชัก (ไม่มีการขาย)</div>
+    ${row('วันที่', d(s.at).format('DD/MM/YYYY'))}
+    ${row('เวลา', `${d(s.at).format('HH:mm')} น.`)}
+    ${s.cashier ? row('ผู้เปิด', esc(s.cashier)) : ''}
+    ${s.seq != null ? row('ครั้งที่', `${s.seq} ของรอบนี้`) : ''}
+    <div class="why">${esc(s.reason) || 'ไม่ระบุเหตุผล'}</div>
+    <div class="note">บันทึกไว้ในระบบแล้ว</div>
+    <div class="sign">ผู้เปิดลิ้นชัก</div>
   </body></html>`);
 }
