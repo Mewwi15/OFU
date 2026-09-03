@@ -361,13 +361,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   modeCard: {
-    // จัตุรัสจริง แต่คุมความกว้างไว้ ไม่ให้ยืดเต็มแถวจนใหญ่เกิน (เจ้าของสั่งให้เล็กลง)
+    // ผืนผ้าแนวนอน (เจ้าของสั่งเปลี่ยนจากจัตุรัส 3 ก.ย. 2026) — กว้างเต็มครึ่งแถว
+    // เตี้ยลง เอาโลโก้กับป้ายมาเรียงข้างกันแทนซ้อนบนล่าง จะได้ไม่มีที่ว่างเหลือกลางการ์ด
     flex: 1,
-    maxWidth: 132,
-    aspectRatio: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    gap: Spacing.sm,
     borderRadius: Radius.lg,
     // การ์ดขาวล้วน ไม่มีเส้นขอบเลย (เจ้าของสั่ง 3 ก.ย. 2026) — ตัวที่เลือกอยู่บอกด้วย
     // สีวงโลโก้กับสีตัวหนังสือแทน ไม่ใช่กรอบหรือถมสีพื้น
@@ -381,8 +382,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   modeLogo: {
-    width: 54,
-    height: 54,
+    width: 44,
+    height: 44,
     borderRadius: 999,
     backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
@@ -393,8 +394,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
   },
   modeLogoImg: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
   },
   modeLabel: {
     fontFamily: 'Mitr_500Medium',
