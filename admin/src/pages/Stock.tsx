@@ -428,8 +428,13 @@ export function Stock() {
   }, [items]);
 
   /* ต้นทุนแยกตามหมวด — โดนัทใบที่สองตอบว่า "เงินจมอยู่ที่หมวดไหน" ซึ่งการ์ดตัวเลข
-   * เดี่ยว ๆ ตอบไม่ได้ · รวมหมวดที่เล็กกว่า 3% เป็น "อื่น ๆ" ไม่งั้นวงแตกเป็นเสี้ยว
-   * บาง ๆ สิบกว่าเสี้ยวจนอ่านไม่ออก (บทเรียนเดียวกับตอนทำแถบสัดส่วนแล้วโดนตีกลับ) */
+   * เดี่ยว ๆ ตอบไม่ได้ · รวมหมวดที่เล็กกว่า 3% เป็นก้อนเดียว ไม่งั้นวงแตกเป็นเสี้ยว
+   * บาง ๆ สิบกว่าเสี้ยวจนอ่านไม่ออก (บทเรียนเดียวกับตอนทำแถบสัดส่วนแล้วโดนตีกลับ)
+   *
+   * ก้อนรวมต้องบอกชื่อหมวดที่อยู่ข้างในเสมอ — เดิมเขียนแค่ "อื่น ๆ" แล้วเจ้าของถาม
+   * ว่ามันคือหมวดอะไร ซึ่งถูก ป้ายที่ไม่บอกว่าข้างในคืออะไรก็คือป้ายที่ซ่อนข้อมูล
+   * (ปัญหาเดียวกับ "ยังไม่ใส่ต้นทุน 1 รายการ คืออะไร") · เกินสามหมวดค่อยย่อเป็น
+   * จำนวน แล้วให้ไปอ่านชื่อครบใน tooltip ตอนชี้ */
   const costByCategory = useMemo(() => {
     const acc = new Map<string, number>();
     for (const i of items) {
@@ -440,8 +445,18 @@ export function Stock() {
     const total = rows.reduce((s2, r) => s2 + r.value, 0);
     if (total === 0) return [];
     const big = rows.filter((r) => r.value / total >= 0.03).sort((a, b) => b.value - a.value);
-    const rest = total - big.reduce((s2, r) => s2 + r.value, 0);
-    return rest > 0 ? [...big, { name: 'อื่น ๆ', value: rest }] : big;
+    const small = rows.filter((r) => r.value / total < 0.03).sort((a, b) => b.value - a.value);
+    if (small.length === 0) return big;
+    const names = small.map((r) => r.name);
+    return [
+      ...big,
+      {
+        name: names.length <= 3 ? `อื่น ๆ: ${names.join(' · ')}` : `อื่น ๆ ${names.length} หมวด`,
+        // ชื่อครบไว้โชว์ตอนชี้ ต่อให้ป้ายในวงย่อไปแล้ว
+        full: names.join(' · '),
+        value: small.reduce((s2, r) => s2 + r.value, 0),
+      },
+    ];
   }, [items]);
 
 
@@ -998,7 +1013,10 @@ export function Stock() {
                       <ResponsiveContainer width="100%" height={158}>
                         <PieChart>
                           <RcTooltip
-                            formatter={(v: number, n: string) => [baht(v), n]}
+                            formatter={(v: number, n: string, p: { payload?: { full?: string } }) => [
+                              baht(v),
+                              p?.payload?.full ? `อื่น ๆ: ${p.payload.full}` : n,
+                            ]}
                             contentStyle={{ fontSize: 12, borderRadius: 8 }}
                           />
                           <Pie
