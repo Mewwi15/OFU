@@ -30,6 +30,8 @@ import { selectedAddress, useAddress } from '@/store/address';
 import { MODE_META } from '@/store/mode';
 
 const TAB_BAR_CLEARANCE = 110;
+/** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง */
+const SEARCH_H = 54;
 
 export default function DeliveryHome() {
   const insets = useSafeAreaInsets();
@@ -37,6 +39,9 @@ export default function DeliveryHome() {
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
   const [query, setQuery] = useState('');
+  /* ต้องรู้ความสูงหัวจอจริงถึงจะวางช่องค้นหาให้คร่อมรอยต่อสีส้ม/ขาวได้พอดี
+   * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
+  const [headH, setHeadH] = useState(0);
 
   const catList = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 
@@ -54,7 +59,9 @@ export default function DeliveryHome() {
     <View style={styles.screen}>
       {/* หัวจอสีแบรนด์ — ที่อยู่กับเวลาส่งเป็นพระเอก เพราะคนเปิดโหมดนี้ถามสองอย่างนี้
           ก่อนถามเรื่องของ */}
-      <View style={[styles.head, { paddingTop: insets.top + Spacing.sm }]}>
+      <View
+        style={[styles.head, { paddingTop: insets.top + Spacing.sm }]}
+        onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
         {/* รูปประกอบวางเป็นลูกคนแรก จะได้อยู่ชั้นล่างสุด — ตอนแรกวางไว้ท้ายสุดแล้วมัน
             ไปทับปุ่มตะกร้ามุมขวาบนจนกดไม่เห็น ของประดับต้องอยู่ใต้ปุ่มเสมอ */}
         <Image
@@ -99,24 +106,18 @@ export default function DeliveryHome() {
             <Ionicons name="chevron-down" size={20} color="#fff" />
           </View>
         </Pressable>
-
-        {/* ช่องค้นหาอยู่ในหัวจอ ไม่ใช่ดึงขึ้นมาคร่อมขอบ — ตอนแรกวางไว้ใน ScrollView
-            แล้วใช้ marginTop ลบ ผลคือครึ่งบนโดน ScrollView คลิปหายไป
-            อยู่ในหัวจอแบบนี้ยังได้ผลเหมือนกันและไม่มีอะไรโดนตัด */}
-        <View style={styles.searchWrap}>
-          <SearchBar
-            value={query}
-            onChangeText={setQuery}
-            placeholder="ค้นหาสินค้าที่อยากได้"
-            containerStyle={styles.search}
-          />
-        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: TAB_BAR_CLEARANCE + insets.bottom }}>
+        /* พื้นของ ScrollView เป็นสีส้ม เพื่อให้มุมโค้งของแผ่นขาวมีสีส้มโผล่ให้เห็น
+           ถ้าพื้นหลังมุมเป็นสีเดียวกับแผ่น มุมโค้งก็มองไม่ออกว่าโค้ง */
+        style={styles.scroll}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_CLEARANCE + insets.bottom }}>
+        {/* แผ่นขาวมุมบนโค้ง (เจ้าของสั่ง 3 ก.ย. 2026) — เว้นบนไว้ให้ครึ่งล่างของช่อง
+            ค้นหาที่ลอยคร่อมรอยต่ออยู่ ไม่งั้นหัวข้อแรกจะไปมุดใต้ช่องค้นหา */}
+        <View style={styles.sheet}>
         <View style={styles.body}>
           <ScrollView
             horizontal
@@ -146,7 +147,22 @@ export default function DeliveryHome() {
 
         <ProductRail title="สั่งซ้ำได้เลย" data={rails.quick} />
         <ProductRail title="คนแถวนี้ชอบสั่ง" data={rails.popular} />
+        </View>
       </ScrollView>
+
+      {/* ช่องค้นหาลอยคร่อมรอยต่อสีส้มกับขาว — วางเป็นชั้นบนสุดนอก ScrollView จึงไม่
+          โดนคลิปเหมือนตอนใส่ margin ลบไว้ข้างใน และคร่อมได้จริงทั้งสองฝั่ง
+          ขอบมนนิดเดียวตามที่สั่ง ไม่ใช่ทรงแคปซูล */}
+      {headH > 0 ? (
+        <View style={[styles.searchFloat, { top: headH - SEARCH_H / 2 }]}>
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            placeholder="ค้นหาสินค้าที่อยากได้"
+            containerStyle={styles.search}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -156,7 +172,7 @@ const styles = StyleSheet.create({
   head: {
     backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.x2,
   },
   headRow: { flexDirection: 'row', alignItems: 'center' },
   cartWrap: { position: 'relative' },
@@ -175,16 +191,30 @@ const styles = StyleSheet.create({
   headMascot: {
     position: 'absolute',
     right: Spacing.lg,
-    /* ยกให้พ้นช่องค้นหาที่อยู่ล่างสุดของหัวจอ — เดิม bottom 0 ทำให้มาสคอตไปอยู่
-       หลังช่องค้นหาแล้วโดนบังครึ่งตัว (สูงช่องค้นหา ~54 + ระยะห่าง 16 + ขอบล่าง 16) */
-    bottom: 88,
+    /* ช่องค้นหาย้ายออกไปลอยนอกหัวจอแล้ว มาสคอตจึงลงมาชิดขอบล่างได้ เว้นไว้นิดเดียว
+       ไม่ให้ชนช่องค้นหาที่คร่อมอยู่ */
+    bottom: 34,
     width: 96,
     height: 96,
   },
   /* ต้องเป็นแถวและให้ SearchBar ยืดเต็ม — containerStyle ของมันใช้ flex 1 ตามแบบที่
      หน้าอื่นเรียก ถ้าพ่อแม่ไม่ใช่ row ตัวมันจะยุบจนเหลือแต่ไอคอนแว่นขยาย */
-  searchWrap: { flexDirection: 'row', marginTop: Spacing.lg },
-  search: { flex: 1 },
+  searchFloat: {
+    position: 'absolute',
+    left: Spacing.lg,
+    right: Spacing.lg,
+    flexDirection: 'row',
+  },
+  search: { flex: 1, height: SEARCH_H, borderRadius: Radius.sm },
+  scroll: { backgroundColor: Colors.primary },
+  sheet: {
+    // flexGrow ให้แผ่นยืดเต็มจอเสมอ ไม่งั้นเนื้อหาสั้น ๆ จะเห็นสีส้มโผล่ข้างล่างด้วย
+    flexGrow: 1,
+    backgroundColor: '#F4F1EF',
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: SEARCH_H / 2 + Spacing.md,
+  },
   body: { paddingHorizontal: Spacing.lg },
   catRow: { gap: Spacing.lg, paddingVertical: Spacing.lg, paddingRight: Spacing.lg },
   catCard: { alignItems: 'center', width: 74, gap: Spacing.xs },
