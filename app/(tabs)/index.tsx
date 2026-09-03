@@ -24,15 +24,13 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
+import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { loadIfStale, useCatalog } from '@/store/catalog';
 import { useShop } from '@/store/shop';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
-/** สัดส่วนแบนเนอร์หน้าแรก — เลขเล็กลง = สูงขึ้น (2 = สี่เหลี่ยมกว้างสองเท่าสูง) */
-const HOME_HERO_ASPECT = 1.55;
-
 const TAB_BAR_CLEARANCE = 110;
 /**
  * Fallback slide shown until the owner publishes home banners (admin แบนเนอร์
@@ -290,11 +288,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
   },
   hero: {
-    /* สูงกว่าสัดส่วนที่แอดมินครอปไว้ (BANNER_ASPECT.home = 2:1) เพราะตอนนี้แบนเนอร์
-     * ไหลใต้แถบสถานะ ส่วนบนของภาพจึงถูกกินไปราว 60pt ถ้าใช้ 2:1 ตรง ๆ ส่วนที่มองเห็น
-     * จริงจะเตี้ยกว่าที่ออกแบบไว้ · เจ้าของสั่งขอให้ใหญ่ลงมาด้านล่างอีก (3 ก.ย. 2026)
-     * ภาพยังเป็น cover เหมือนเดิม กล่องสูงขึ้นจึงครอปด้านซ้าย-ขวาเล็กน้อยแทน */
-    aspectRatio: HOME_HERO_ASPECT,
+    // สัดส่วนเดียวกับที่แอดมินครอปไว้ (BANNER_ASPECT.home) — ครอปเท่าไหร่ก็เห็นเท่านั้น
+    // ไม่มีค่าของตัวเอง ไม่งั้นสองฝั่งเพี้ยนกันแล้วภาพโดนครอปซ้ำโดยไม่มีใครรู้
+    aspectRatio: BANNER_ASPECT.home,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
   },

@@ -33,7 +33,7 @@ const PLACEMENTS: PlacementMeta[] = [
  * equals what shows in the app. Keep the two maps in sync.
  */
 const BANNER_ASPECT: Record<BannerPlacement, number> = {
-  home: 2,
+  home: 1.55,   // ต้องตรงกับ lib/data/catalog.ts เสมอ (แก้ 3 ก.ย. 2026)
   search_hero: 2.35,
   search_trending: 2.8,
   search_promo: 2.8,

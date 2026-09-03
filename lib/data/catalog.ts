@@ -85,7 +85,9 @@ export type HomeBanner = { id: string; image: string; title: string | null; plac
  * "what you crop is what you get". Keep the two maps in sync.
  */
 export const BANNER_ASPECT: Record<BannerPlacement, number> = {
-  home: 2, // หน้าแรก · สไลด์บนสุด
+  // หน้าแรก · สไลด์บนสุด — 1.55 ไม่ใช่ 2 เพราะแบนเนอร์ไหลใต้แถบสถานะแล้ว (3 ก.ย. 2026)
+  // ส่วนบนของภาพถูกแถบสถานะกินไปราว 60pt ถ้าครอป 2:1 ส่วนที่เห็นจริงจะเตี้ยกว่าที่ออกแบบ
+  home: 1.55,
   search_hero: 2.35, // หน้าค้นหา · แบนเนอร์บนสุด (เต็มความกว้าง)
   search_trending: 2.8, // แถบ promo เหนือแถวสินค้า
   search_promo: 2.8,
