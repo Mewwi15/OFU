@@ -89,18 +89,21 @@ export default function DeliveryCheckScreen() {
     void scan();
   }, [scan]);
 
-  /* เข้าเขตแล้วไม่ต้องให้กดต่อ — หน่วงให้อ่านข้อความจบก่อนแล้วพากลับเอง
-   * ถ้าให้กดปุ่มอีกทีคือเพิ่มขั้นตอนโดยไม่ได้อะไร เพราะไม่มีทางเลือกอื่นให้เลือก */
+  /* เข้าเขตแล้วไม่ต้องให้กดต่อ — หน่วงให้อ่านข้อความจบแล้วพาไปหน้าสินค้าเลย
+   * (เจ้าของสั่ง 3 ก.ย. 2026: กด Delivery แล้วเปลี่ยนหน้าไปหน้าสินค้าไปเลย)
+   * คนกดเลือกโหมดเพราะอยากซื้อของ ไม่ใช่อยากกลับมาดูหน้าแรกอีกรอบ
+   * ใช้ replace ไม่ใช่ push — จอเช็คตำแหน่งไม่ควรค้างอยู่ในประวัติให้กดย้อนกลับมาเจอ */
   useEffect(() => {
     if (phase.k !== 'inside') return;
     setMode('delivery');
-    const t = setTimeout(() => router.back(), 900);
+    const t = setTimeout(() => router.replace('/delivery'), 900);
     return () => clearTimeout(t);
   }, [phase.k, setMode]);
 
   const goOnline = () => {
     setMode('online');
-    router.back();
+    // โหมดออนไลน์ยังใช้หน้ารวมอยู่ก่อน — หน้าร้านของโหมดนี้ยังไม่ได้ทำ
+    router.replace('/(tabs)/search');
   };
 
   const ring = (delay: number) => ({
