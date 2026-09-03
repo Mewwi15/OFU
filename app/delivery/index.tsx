@@ -18,7 +18,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CategoryIcon } from '@/components/shop/CategoryIcon';
+import { CategoryBubble } from '@/components/shop/CategoryBubble';
 import { ProductRail } from '@/components/product/ProductRail';
 import { CartBadge } from '@/components/navigation/CartBadge';
 import { IconButton } from '@/components/ui/IconButton';
@@ -32,6 +32,10 @@ import { selectedAddress, useAddress } from '@/store/address';
 const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
 const TAB_BAR_CLEARANCE = 110;
+/* สีพื้นแผ่นเนื้อหา — วงกลมหมวดหมู่ต้องใช้สีเดียวกันเป๊ะเพื่อให้กลืนหายไปกับพื้น
+   (เจ้าของสั่ง 3 ก.ย. 2026 "วงกลมมันดูขาว เอาให้กลืนกับสีพื้นหลังเลย") จึงต้องเป็น
+   ค่าเดียวกัน ประกาศที่เดียว ไม่ใช่พิมพ์ซ้ำสองที่แล้วเพี้ยนกันทีหลัง */
+const SHEET_BG = '#F4F1EF';
 /** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง (เจ้าของว่าใหญ่ไป
  *  3 ก.ย. 2026 ลดจาก 54) */
 const SEARCH_H = 46;
@@ -172,22 +176,23 @@ export default function DeliveryHome() {
             ไม่งั้นหัวข้อแรกจะไปมุดใต้ช่องค้นหา */}
         <View style={styles.sheet}>
           <View style={styles.body}>
+            {/* หัวข้อกำกับ + วงกลมกระดิกได้ (เจ้าของสั่ง 3 ก.ย. 2026) — หมวดหมู่ยังเป็น
+                ชุดเดิมจากฐานข้อมูล เปลี่ยนแค่หน้าตาตามที่สั่ง */}
+            <Text variant="subtitle" style={styles.catHead}>
+              หมวดหมู่สินค้า
+            </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.catRow}>
-              {catList.map((cat) => (
-                <Pressable
+              {catList.map((cat, i) => (
+                <CategoryBubble
                   key={cat}
-                  accessibilityRole="button"
-                  accessibilityLabel={cat}
-                  style={styles.catCard}
-                  onPress={() => router.push({ pathname: '/(tabs)/search', params: { cat } })}>
-                  <CategoryIcon category={cat} size={58} />
-                  <Text numberOfLines={1} style={styles.catLabel}>
-                    {cat}
-                  </Text>
-                </Pressable>
+                  category={cat}
+                  index={i}
+                  plateColor={SHEET_BG}
+                  onPress={() => router.push({ pathname: '/(tabs)/search', params: { cat } })}
+                />
               ))}
             </ScrollView>
 
@@ -309,7 +314,7 @@ export default function DeliveryHome() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F4F1EF' },
+  screen: { flex: 1, backgroundColor: SHEET_BG },
   /* หัวจอปักหมุดทับเนื้อหา ไม่ได้อยู่ในสายการวางปกติ เนื้อหาจึงเลื่อนลอดใต้มันได้
      ซึ่งเป็นเงื่อนไขเดียวที่ทำให้ "สีส้มเล็กลงตอนเลื่อน" เกิดขึ้นได้จริง */
   head: {
@@ -370,15 +375,15 @@ const styles = StyleSheet.create({
   sheet: {
     // flexGrow ให้แผ่นยืดเต็มจอเสมอ ไม่งั้นเนื้อหาสั้น ๆ จะเห็นสีส้มโผล่ข้างล่างด้วย
     flexGrow: 1,
-    backgroundColor: '#F4F1EF',
+    backgroundColor: SHEET_BG,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     paddingTop: SEARCH_H / 2 + Spacing.md,
   },
   body: { paddingHorizontal: Spacing.lg },
-  catRow: { gap: Spacing.lg, paddingVertical: Spacing.lg, paddingRight: Spacing.lg },
-  catCard: { alignItems: 'center', width: 74, gap: Spacing.xs },
-  catLabel: { fontSize: 12, color: Colors.text, textAlign: 'center' },
+  catHead: { marginTop: Spacing.lg },
+  /* เว้นบน/ล่างเผื่อให้วงกลมเด้งขึ้นลงได้โดยไม่โดนขอบ ScrollView ครอบตัดหัวหรือเงา */
+  catRow: { gap: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
   promise: {
     flexDirection: 'row',
     alignItems: 'center',
