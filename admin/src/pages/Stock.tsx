@@ -61,7 +61,10 @@ import {
   setStockQty,
   type Product,
 } from '../lib/api';
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip as RcTooltip } from 'recharts';
+import {
+  Bar, BarChart, Cell, LabelList, Pie, PieChart, ResponsiveContainer,
+  Tooltip as RcTooltip, XAxis, YAxis,
+} from 'recharts';
 
 import { productThumb } from '../lib/image';
 import { getShopName } from '../lib/orders';
@@ -991,70 +994,57 @@ export function Stock() {
               </Col>
 
               <Col xs={24} sm={12}>
-                {/* ต้นทุนของบนชั้น ทำเป็นโดนัทใบที่สองตามที่เจ้าของสั่ง (3 ก.ย. 2026)
-                    การ์ดตัวเลขเดี่ยวบอกได้แค่ยอดรวม โดนัทบอกต่อได้ว่าเงินจมอยู่
-                    หมวดไหน ซึ่งเป็นคำถามที่ตามมาทันทีหลังเห็นยอดรวม
-                    ใช้ภาษาภาพเดียวกับวงบน — วงเดียวกัน ยอดรวมอยู่กลางวงเหมือนกัน */}
+                {/* ต้นทุนของบนชั้น — เจ้าของเปลี่ยนใจจากโดนัทมาเป็นแท่งแนวตั้ง (3 ก.ย. 2026)
+                    และเหมาะกว่าจริง: โดนัทอ่านสัดส่วนได้แต่เทียบหมวดต่อหมวดยาก
+                    โดยเฉพาะหมวดเล็กที่เป็นเสี้ยวบาง ๆ แท่งเทียบความสูงได้ในสายตาเดียว
+                    และหมวดเล็กก็ยังมีแท่งของตัวเองให้เห็น
+
+                    interval={0} บังคับไว้ ไม่งั้น recharts ตัดป้ายชื่อทิ้งเองเมื่อที่
+                    ไม่พอ (เคยเจอตอนทำกราฟยอดขาย ป้ายหาย 4 จาก 7 แท่ง) */}
                 {costByCategory.length > 0 && (
                   <div>
-                    {/* หัวข้อวงขวา จัดให้อยู่ระดับเดียวกับหัวข้อ "สภาพสต๊อกทั้งร้าน"
-                        ของวงซ้าย สองวงจะได้เริ่มที่บรรทัดเดียวกัน */}
                     <div style={{ fontSize: 13, color: '#6B625C', textAlign: 'center', marginBottom: 2 }}>
-                      ต้นทุนของบนชั้น
+                      ต้นทุนของบนชั้น{' '}
+                      <b style={{ color: '#2B2320' }}>{baht(Math.round(totals.costValue))}</b>
                     </div>
-                    <div style={{ position: 'relative' }}>
-                      <ResponsiveContainer width="100%" height={158}>
-                        <PieChart>
-                          <RcTooltip
-                            formatter={(v: number, n: string) => [baht(v), n]}
-                            contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                          />
-                          <Pie
-                            data={costByCategory}
+                    <ResponsiveContainer width="100%" height={196}>
+                      <BarChart data={costByCategory} margin={{ top: 18, right: 4, bottom: 4, left: 4 }}>
+                        <XAxis
+                          dataKey="name"
+                          interval={0}
+                          tick={{ fontSize: 10, fill: '#6E625C' }}
+                          axisLine={{ stroke: '#E8E4E0' }}
+                          tickLine={false}
+                          angle={-25}
+                          textAnchor="end"
+                          height={54}
+                        />
+                        <YAxis hide />
+                        <RcTooltip
+                          formatter={(v: number) => [baht(v), 'ต้นทุน']}
+                          contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                          cursor={{ fill: '#F5F2EF' }}
+                        />
+                        <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={38}>
+                          {costByCategory.map((c, i) => (
+                            <Cell key={c.name} fill={COST_FILL[i % COST_FILL.length]} />
+                          ))}
+                          {/* ยอดบนหัวแท่ง — หมวดเล็กแท่งเตี้ยจนเทียบด้วยตาไม่ได้
+                              ตัวเลขกำกับจึงยังจำเป็นเหมือนตอนเป็นโดนัท */}
+                          <LabelList
                             dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={46}
-                            outerRadius={72}
-                            paddingAngle={2}
-                            stroke="none"
-                          >
-                            {costByCategory.map((c, i) => (
-                              <Cell key={c.name} fill={COST_FILL[i % COST_FILL.length]} />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div
-                        style={{
-                          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                          alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
-                        }}
-                      >
-                        <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1, color: '#2B2320' }}>
-                          {baht(Math.round(totals.costValue))}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#8C837D' }}>ต้นทุนรวม</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
-                      {/* เขียนยอดกำกับทุกหมวด — หมวดเล็กอย่างของสดเป็นเสี้ยวบางจนมอง
-                          แทบไม่เห็นในวง ป้ายจึงต้องบอกตัวเลขแทน ไม่ใช่ให้ไปชี้ทีละอัน */}
-                      {costByCategory.map((c, i) => (
-                        <span key={c.name} className="inline-flex items-center gap-1.5">
-                          <i style={{ width: 9, height: 9, borderRadius: 999, background: COST_FILL[i % COST_FILL.length] }} />
-                          <span style={{ fontSize: 12, color: '#6E625C' }}>
-                            {c.name} <b style={{ color: '#2B2320' }}>{baht(c.value)}</b>
-                          </span>
-                        </span>
-                      ))}
-                    </div>
+                            position="top"
+                            formatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                            style={{ fontSize: 10, fill: '#5C534E' }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                     {totals.noCostCount > 0 && (
                       <button
                         type="button"
                         onClick={() => setNoCostOpen(true)}
-                        className="mt-2 w-full"
+                        className="w-full"
                         style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer',
                                  fontSize: 12, color: '#8C6D46', textAlign: 'center' }}
                       >
