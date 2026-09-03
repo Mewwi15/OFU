@@ -161,22 +161,28 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 const styles = StyleSheet.create({
   wrap: {
+    // ชิดขอบล่างเต็มความกว้าง ไม่ลอยแล้ว (เจ้าของสั่ง 3 ก.ย. 2026)
+    //
+    // พื้นขาวกับเส้นคั่นอยู่ที่ชั้นนี้ ไม่ใช่ชั้น bar — เพราะ paddingBottom เผื่อ
+    // ขอบล่างของเครื่องถูกใส่ไว้ที่ชั้นนี้ ถ้าทาสีที่ bar ช่องเผื่อนั้นจะโปร่ง
+    // แล้วเนื้อหาที่เลื่อนอยู่ข้างหลังจะโผล่ออกมาใต้แถบ
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: Spacing.lg,
     alignItems: 'center',
+    backgroundColor: Colors.surface,
+    // ไม่มีมุมโค้งและไม่มีเงารอบตัวแล้ว — แถบที่ติดขอบจอไม่ใช่การ์ดที่ลอยอยู่
+    // เหลือเส้นคั่นบางบนหัวแถบไว้แยกจากเนื้อหาที่เลื่อนผ่านข้างหลัง
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
   bar: {
     alignSelf: 'stretch',
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
     paddingHorizontal: Spacing.sm,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xs,
-    ...Shadow.card,
   },
   item: {
     flex: 1,
