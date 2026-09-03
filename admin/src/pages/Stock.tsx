@@ -388,7 +388,17 @@ export function Stock() {
   const totals = useMemo(() => {
     const pieces = items.reduce((s, i) => s + i.stock, 0);
     const outCount = items.filter((i) => i.stock === 0).length;
-    return { pieces, outCount };
+    /* ต้นทุนของที่นอนอยู่บนชั้น (เจ้าของสั่งเพิ่ม 3 ก.ย. 2026)
+     *
+     * นับเฉพาะรายการที่มีต้นทุนบันทึกไว้ และบอกจำนวนที่ยังไม่ได้ใส่ต้นทุนกำกับด้วย
+     * ไม่งั้นตัวเลขจะดูน้อยกว่าความจริงโดยไม่มีใครรู้ — ของ 4,800 SKU ถ้าใส่ต้นทุน
+     * ไว้ครึ่งเดียว ตัวเลขก็ผิดไปครึ่งหนึ่งแบบเงียบ ๆ
+     *
+     * นับเฉพาะของที่ยังอยู่ในสต๊อกจริง (stock > 0) ของที่หมดแล้วต้นทุนเป็นศูนย์อยู่แล้ว */
+    const withCost = items.filter((i) => i.stock > 0 && i.cost != null);
+    const noCost = items.filter((i) => i.stock > 0 && i.cost == null);
+    const costValue = withCost.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
+    return { pieces, outCount, costValue, noCostCount: noCost.length };
   }, [items]);
 
   /** Every category, split by state. Stacked rather than "items to buy only":
@@ -831,6 +841,21 @@ export function Stock() {
                 label={`ไม่ขยับ ${SALES_WINDOW_DAYS} วัน`}
                 value={`${buckets.idle} รายการ`}
                 hint="มีของค้างแต่ไม่มียอดขาย"
+              />
+              {/* ต้นทุนของบนชั้น — เจ้าของสั่งเพิ่มเอง 3 ก.ย. 2026
+                  (เคยสั่งเอาเรื่องเงินออกจากหน้านี้เมื่อ 29 ส.ค. แล้วเปลี่ยนใจ
+                  เฉพาะตัวนี้ ที่เหลือยังไม่กลับมา)
+                  บอกจำนวนที่ยังไม่ได้ใส่ต้นทุนกำกับ ไม่งั้นเลขจะน้อยกว่าจริงเงียบ ๆ */}
+              <StatTile
+                label="ต้นทุนของบนชั้น"
+                value={baht(Math.round(totals.costValue))}
+                hint={
+                  totals.noCostCount > 0
+                    ? `ยังไม่ใส่ต้นทุน ${totals.noCostCount} รายการ`
+                    : 'ใส่ต้นทุนครบทุกรายการ'
+                }
+                accent={totals.noCostCount > 0 ? '#8C6D46' : undefined}
+                span2
               />
             </div>
           </Col>
