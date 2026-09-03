@@ -855,22 +855,6 @@ export function Stock() {
                 value={`${buckets.idle} รายการ`}
                 hint="มีของค้างแต่ไม่มียอดขาย"
               />
-              {/* ต้นทุนของบนชั้น — เจ้าของสั่งเพิ่มเอง 3 ก.ย. 2026
-                  (เคยสั่งเอาเรื่องเงินออกจากหน้านี้เมื่อ 29 ส.ค. แล้วเปลี่ยนใจ
-                  เฉพาะตัวนี้ ที่เหลือยังไม่กลับมา)
-                  บอกจำนวนที่ยังไม่ได้ใส่ต้นทุนกำกับ ไม่งั้นเลขจะน้อยกว่าจริงเงียบ ๆ */}
-              <StatTile
-                label="ต้นทุนของบนชั้น"
-                value={baht(Math.round(totals.costValue))}
-                hint={
-                  totals.noCostCount > 0
-                    ? `ยังไม่ใส่ต้นทุน ${totals.noCostCount} รายการ`
-                    : 'ใส่ต้นทุนครบทุกรายการ'
-                }
-                accent={totals.noCostCount > 0 ? '#8C6D46' : undefined}
-                span2
-                onClick={totals.noCostCount > 0 ? () => setNoCostOpen(true) : undefined}
-              />
             </div>
           </Col>
 
@@ -958,6 +942,25 @@ export function Stock() {
                       </span>
                     </button>
                   ))}
+                </div>
+
+                {/* ต้นทุนของบนชั้น — เจ้าของสั่งย้ายมาไว้ข้างวงกลม (3 ก.ย. 2026)
+                    เดิมอยู่คอลัมน์ซ้ายปนกับตัวนับ "กี่รายการ" ซึ่งเป็นคนละหน่วย
+                    ตรงนี้อยู่ใต้วงกลมที่ตอบภาพรวมทั้งร้านเหมือนกัน อ่านต่อกันได้
+                    (เคยสั่งเอาเรื่องเงินออกจากหน้านี้เมื่อ 29 ส.ค. แล้วเปลี่ยนใจ
+                    เฉพาะตัวนี้ ที่เหลือยังไม่กลับมา) */}
+                <div className="mt-3">
+                  <StatTile
+                    label="ต้นทุนของบนชั้น"
+                    value={baht(Math.round(totals.costValue))}
+                    hint={
+                      totals.noCostCount > 0
+                        ? `ยังไม่ใส่ต้นทุน ${totals.noCostCount} รายการ`
+                        : 'ใส่ต้นทุนครบทุกรายการ'
+                    }
+                    accent={totals.noCostCount > 0 ? '#8C6D46' : undefined}
+                    onClick={totals.noCostCount > 0 ? () => setNoCostOpen(true) : undefined}
+                  />
                 </div>
               </Col>
 
