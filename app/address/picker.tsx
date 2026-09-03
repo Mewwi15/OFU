@@ -40,6 +40,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { formatAddressLine } from '@/lib/address';
 import { useT } from '@/lib/i18n';
 import { showAlert } from '@/lib/showAlert';
 import { osmReverseGeocode, osmSearch } from '@/lib/osm';
@@ -80,29 +81,6 @@ const DEFAULT_ZOOM = 16;
 const MIN_QUERY = 2;
 const LABEL_KEYS = ['address.labelHome', 'address.labelWork', 'address.labelOther'] as const;
 
-/** Build a readable Thai address line from a reverse-geocode result. */
-function formatLine(a: Location.LocationGeocodedAddress): string {
-  const raw = [
-    a.name,
-    a.streetNumber,
-    a.street,
-    a.district,
-    a.subregion,
-    a.city,
-    a.region,
-    a.postalCode,
-  ]
-    .map((p) => p?.trim())
-    .filter((p): p is string => !!p);
-
-  // Drop any part already represented in what we've collected — Apple often
-  // returns `name` as "<streetNumber> <street>", duplicating the next two parts.
-  const out: string[] = [];
-  for (const p of raw) {
-    if (!out.join(' ').includes(p)) out.push(p);
-  }
-  return out.join(' ');
-}
 
 export default function AddressPickerScreen() {
   const t = useT();
@@ -193,7 +171,7 @@ export default function AddressPickerScreen() {
         if (res[0]) {
           lastGeo.current = { latitude, longitude };
           setGeoFailed(false);
-          if (!keepLine) setLine(formatLine(res[0]));
+          if (!keepLine) setLine(formatAddressLine(res[0]));
           // Fill any BLANK parcel field from the geocode — never clobber a value
           // the user has already typed/corrected.
           const parts = parcelPartsFrom(res[0]);
@@ -317,7 +295,7 @@ export default function AddressPickerScreen() {
         let label = q;
         try {
           const rev = await Location.reverseGeocodeAsync(coords);
-          const formatted = rev[0] && formatLine(rev[0]);
+          const formatted = rev[0] && formatAddressLine(rev[0]);
           if (formatted) label = formatted;
         } catch {
           // fall back to the raw query
