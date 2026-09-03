@@ -12,6 +12,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -32,6 +33,10 @@ import { MODE_META } from '@/store/mode';
 const TAB_BAR_CLEARANCE = 110;
 /** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง */
 const SEARCH_H = 54;
+/* ปลายเฉดล่างต้องเลยขอบหัวจอลงไปให้พ้นรอยหยักมุมของแผ่นขาว (มุมโค้ง 26) เผื่อไว้
+   หน่อยกันตอนดึงจอลงเกินขอบแล้วเห็นพื้นเทาโผล่ */
+const BACKDROP_BLEED = 96;
+const HEAD_RAMP = ['#FF9455', '#F15929', '#D8402A'] as const;
 
 export default function DeliveryHome() {
   const insets = useSafeAreaInsets();
@@ -59,6 +64,19 @@ export default function DeliveryHome() {
     <View style={styles.screen}>
       {/* หัวจอสีแบรนด์ — ที่อยู่กับเวลาส่งเป็นพระเอก เพราะคนเปิดโหมดนี้ถามสองอย่างนี้
           ก่อนถามเรื่องของ */}
+      {/* ไล่เฉดแทนสีส้มแบนตัวเดียว (เจ้าของทัก 3 ก.ย. 2026 ว่า "สีมันส้มไป") — ส้มล้วน
+          โทนเดียวเต็มพื้นที่ใหญ่ ๆ อ่านแล้วแบนและแรง ไล่จากส้มอมพีชมุมบนซ้ายไปหาแดงอิฐ
+          มุมล่างขวา สีแบรนด์ยังอยู่ตรงกลางเฉด
+          วาดเป็นพื้นหลังลอยสูงกว่าหัวจอ ไม่ใช่พื้นของหัวจอเอง เพราะรอยหยักมุมบนของ
+          แผ่นขาวอยู่ ต่ำกว่า หัวจอ ถ้าเฉดจบตรงขอบหัวจอ มุมทั้งสองจะต้องเดาสีมาแปะเอง
+          แล้วไม่มีวันตรงกับปลายเฉด — ลากพื้นหลังเลยลงไปคลุมมุมซะเลยจบ */}
+      <LinearGradient
+        colors={HEAD_RAMP}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+        style={[styles.backdrop, { height: headH + BACKDROP_BLEED }]}
+      />
       <View
         style={[styles.head, { paddingTop: insets.top + Spacing.sm }]}
         onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
@@ -111,8 +129,8 @@ export default function DeliveryHome() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        /* พื้นของ ScrollView เป็นสีส้ม เพื่อให้มุมโค้งของแผ่นขาวมีสีส้มโผล่ให้เห็น
-           ถ้าพื้นหลังมุมเป็นสีเดียวกับแผ่น มุมโค้งก็มองไม่ออกว่าโค้ง */
+        /* โปร่งใส ปล่อยให้เฉดที่ลอยอยู่ข้างหลังโผล่ตรงรอยหยักมุมของแผ่นขาว —
+           มุมโค้งจะเห็นว่าโค้งก็ต่อเมื่อมีสีอื่นโผล่ตรงมุมเท่านั้น */
         style={styles.scroll}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: TAB_BAR_CLEARANCE + insets.bottom }}>
         {/* แผ่นขาวมุมบนโค้ง (เจ้าของสั่ง 3 ก.ย. 2026) — เว้นบนไว้ให้ครึ่งล่างของช่อง
@@ -170,7 +188,6 @@ export default function DeliveryHome() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F1EF' },
   head: {
-    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.x2,
   },
@@ -199,6 +216,7 @@ const styles = StyleSheet.create({
   },
   /* ต้องเป็นแถวและให้ SearchBar ยืดเต็ม — containerStyle ของมันใช้ flex 1 ตามแบบที่
      หน้าอื่นเรียก ถ้าพ่อแม่ไม่ใช่ row ตัวมันจะยุบจนเหลือแต่ไอคอนแว่นขยาย */
+  backdrop: { position: 'absolute', left: 0, right: 0, top: 0 },
   searchFloat: {
     position: 'absolute',
     left: Spacing.lg,
@@ -206,7 +224,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   search: { flex: 1, height: SEARCH_H, borderRadius: Radius.sm },
-  scroll: { backgroundColor: Colors.primary },
+  scroll: { backgroundColor: 'transparent' },
   sheet: {
     // flexGrow ให้แผ่นยืดเต็มจอเสมอ ไม่งั้นเนื้อหาสั้น ๆ จะเห็นสีส้มโผล่ข้างล่างด้วย
     flexGrow: 1,
