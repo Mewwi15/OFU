@@ -39,10 +39,16 @@ const BACKDROP_BLEED = 96;
 /* หัวจอตอนย่อ = แถวปุ่ม + บล็อกที่อยู่ที่ยกขึ้นมาอยู่แถวเดียวกัน + เว้นล่างนิดหน่อย
    ต้องคิดจากขนาดจริงของสองอย่างนี้ ไม่ใช่จากเปอร์เซ็นต์ของหัวจอเต็ม เพราะหัวจอเต็ม
    สูงไม่เท่ากันในแต่ละเครื่อง (safe area) แต่แถบย่อควรสูงเท่ากันทุกเครื่อง */
-const NAV_H = 40;
-const ADDR_LIFT = 46; // ยกบล็อกที่อยู่ขึ้นไปเสมอแถวปุ่ม
+const NAV_H = 34; // ปุ่มเล็กลงตามที่สั่ง 3 ก.ย. 2026
+const ADDR_LIFT = 44; // ยกบล็อกที่อยู่ขึ้นไปเสมอแถวปุ่ม
+const ADDR_MARGIN = -2; // ที่อยู่ขยับขึ้นชิดแถวปุ่ม (เจ้าของสั่ง 3 ก.ย. 2026)
 const ADDR_SHIFT = 52; // แล้วเลื่อนขวาให้พ้นปุ่มย้อนกลับ
 const BAR_PAD_BOTTOM = 14;
+const HEAD_PAD_TOP = 2; // ปุ่มชิดขอบบนกว่าเดิม
+/* มาสคอต: กล่อง 96 แต่ตัวรูปจริงกินแค่ y 11%–88% ของกล่อง (ที่เหลือเป็นพื้นใส)
+   ตำแหน่งจึงต้องคิดจากขอบรูปจริง ไม่ใช่ขอบกล่อง ไม่งั้นจะดูเหมือนยังลอยอยู่สูง */
+const MASCOT = 96;
+const MASCOT_TOP_FROM_HEAD = -82; // ให้ท้ายรถมุดหลังช่องค้นหาราว 40% ของตัวรูป
 /* ไล่เฉดแทนส้มโทนเดียว (เจ้าของทัก 3 ก.ย. 2026 "สีมันส้มไป") — ส้มอมพีชมุมบนซ้าย
    ไปหาแดงอิฐมุมล่างขวา สีแบรนด์อยู่ตรงกลาง ปลายล่างยังเข้มพอให้ตัวหนังสือขาวอ่านออก */
 const HEAD_RAMP = ['#FF9455', '#F15929', '#D8402A'] as const;
@@ -56,6 +62,7 @@ export default function DeliveryHome() {
   /* ต้องรู้ความสูงหัวจอจริงถึงจะวางช่องค้นหาให้คร่อมรอยต่อสีส้ม/ขาวได้พอดี
    * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
   const [headH, setHeadH] = useState(0);
+  const [addrH, setAddrH] = useState(52);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   /* ก่อนวัดจริงเสร็จ ใช้ค่าประมาณไปพลางแทนที่จะเป็น 0 ไม่งั้นเฟรมแรกเนื้อหาจะเด้ง
@@ -63,7 +70,16 @@ export default function DeliveryHome() {
   const headEff = headH || insets.top + 124;
   /* ความสูงของ "ผ้าใบ" ที่ใช้วาดเฉด ทั้งสองชั้นต้องใช้ค่านี้เท่ากัน องศาไล่สีจึงตรงกัน */
   const rampH = headEff + BACKDROP_BLEED;
-  const barMin = insets.top + Spacing.sm + NAV_H + BAR_PAD_BOTTOM;
+  /* บล็อกที่อยู่สูงกว่าปุ่ม พอยกขึ้นไปอยู่แถวเดียวกันมันจึงล้นขึ้นไปข้างบน ต้องกันไม่ให้
+     ล้ำเข้าไปในแถบสถานะ — เครื่องที่ขอบบนบาง (แอนดรอยด์ ~24) ยก 44 เท่ากันจะไปทับนาฬิกา
+     พอดี ยอมให้ล้ำขึ้นไปได้ไม่เกิน 20% ของขอบบน เครื่องจอบากจึงยกได้เต็ม */
+  const addrTop = HEAD_PAD_TOP + NAV_H + ADDR_MARGIN;
+  const addrLift = Math.min(ADDR_LIFT, addrTop + Math.min(10, insets.top * 0.2));
+  /* ความสูงแถบตอนย่อคิดจากของที่สูงที่สุดในแถบ ซึ่งคือบล็อกที่อยู่ ไม่ใช่ปุ่ม */
+  const barMin = Math.max(
+    insets.top + addrTop - addrLift + addrH + BAR_PAD_BOTTOM,
+    insets.top + HEAD_PAD_TOP + NAV_H + BAR_PAD_BOTTOM,
+  );
   /* ระยะที่ยุบได้ อย่างน้อย 1 กัน interpolate ที่ inputRange ซ้ำกันแล้วพัง */
   const shrink = Math.max(1, headEff - barMin);
   const ramp = (to: number, at = shrink) =>
@@ -75,10 +91,10 @@ export default function DeliveryHome() {
     extrapolate: 'clamp',
   });
   const addrX = ramp(ADDR_SHIFT);
-  const addrY = ramp(-ADDR_LIFT);
+  const addrY = ramp(-addrLift);
   /* มาสคอตต้องจางหมดก่อนที่ที่อยู่จะเลื่อนมาถึง ไม่งั้นตัวหนังสือทับรูปอยู่พักหนึ่ง */
   const mascotO = scrollY.interpolate({
-    inputRange: [0, shrink * 0.55],
+    inputRange: [0, shrink * 0.45],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
@@ -178,6 +194,22 @@ export default function DeliveryHome() {
         />
       </Animated.View>
 
+      {/* มาสคอตเป็นชั้นของตัวเอง วาด ก่อน ช่องค้นหา จึงมุดอยู่หลังช่องค้นหาตามที่สั่ง
+          (3 ก.ย. 2026) — ถ้ายังอยู่ในหัวจอเหมือนเดิมมันจะถูกวาดทีหลังแล้วไปทับช่องค้นหา
+          แต่ต้องวาด หลัง ชั้นเฉดที่ครอบตัด ไม่งั้นแถบสีจะกลืนมันหายไปแทน */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.mascot,
+          {
+            top: headEff + MASCOT_TOP_FROM_HEAD,
+            opacity: mascotO,
+            transform: [{ translateY: searchY }],
+          },
+        ]}>
+        <Image source={MODE_META.delivery.image} style={styles.mascotImg} contentFit="contain" />
+      </Animated.View>
+
       {/* ช่องค้นหาเลื่อนหนีขึ้นตามเนื้อหา 1:1 แล้วจางหายไป — เจ้าของบอกว่าตอนย่อให้เหลือ
           แค่ "ส่งทันที" กับที่อยู่ ช่องค้นหาจึงไม่ปักหมุด
           ต้องวาดทับแถบหัวจอ ไม่ใช่มุดใต้แถบ เพราะตอนยังไม่เลื่อนมันคร่อมรอยต่ออยู่
@@ -199,29 +231,30 @@ export default function DeliveryHome() {
       </Animated.View>
 
       <View
-        style={[styles.head, { paddingTop: insets.top + Spacing.sm }]}
+        style={[styles.head, { paddingTop: insets.top + HEAD_PAD_TOP }]}
         onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
-        {/* รูปประกอบวางเป็นลูกคนแรก จะได้อยู่ชั้นล่างสุด — ตอนแรกวางไว้ท้ายสุดแล้วมัน
-            ไปทับปุ่มตะกร้ามุมขวาบนจนกดไม่เห็น ของประดับต้องอยู่ใต้ปุ่มเสมอ */}
-        <Animated.View style={[styles.headMascot, { opacity: mascotO }]} pointerEvents="none">
-          <Image source={MODE_META.delivery.image} style={styles.headMascotImg} contentFit="contain" />
-        </Animated.View>
         <View style={styles.headRow}>
           <IconButton
             icon="chevron-back"
-            variant="surface"
+            variant="tint"
             shape="circle"
-            size={40}
+            size={NAV_H}
+            color="#fff"
+            style={styles.glassBtn}
             accessibilityLabel="ย้อนกลับ"
             onPress={() => router.back()}
           />
           <View style={{ flex: 1 }} />
+          {/* ปุ่มตะกร้าอยู่ในแถวเดียวกับปุ่มย้อนกลับ ระดับเดียวกันเป๊ะ (เจ้าของสั่ง
+              3 ก.ย. 2026) — เคยลองหย่อนลงไปนั่งบนหัวมาสคอตแล้วมันหลุดแนวกับปุ่มซ้าย */}
           <View style={styles.cartWrap}>
             <IconButton
               icon="bag-outline"
-              variant="surface"
+              variant="tint"
               shape="circle"
-              size={40}
+              size={NAV_H}
+              color="#fff"
+              style={styles.glassBtn}
               accessibilityLabel="ตะกร้า"
               onPress={() => router.push('/cart')}
             />
@@ -233,6 +266,7 @@ export default function DeliveryHome() {
             เหลือสองบรรทัดตามที่สั่ง: ส่งทันที / ที่อยู่ — ที่เว้นขวา 110 ไว้กันมาสคอต
             พอเลื่อนขวา 52 ยังเหลือ 58 ซึ่งพอให้พ้นปุ่มตะกร้า (40 + ระยะห่าง 12) */}
         <Animated.View
+          onLayout={(e) => setAddrH(e.nativeEvent.layout.height)}
           style={[styles.addrBlock, { transform: [{ translateX: addrX }, { translateY: addrY }] }]}>
           <Pressable
             accessibilityRole="button"
@@ -266,25 +300,29 @@ const styles = StyleSheet.create({
   },
   headRow: { flexDirection: 'row', alignItems: 'center' },
   cartWrap: { position: 'relative' },
-  addrBlock: { marginTop: Spacing.xs, paddingRight: 110 },
+  addrBlock: { marginTop: ADDR_MARGIN, paddingRight: 110 },
   headKicker: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 17,
+    lineHeight: 24,
+    color: '#fff',
   },
   addrRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   addrText: {
     flex: 1,
     fontFamily: 'Mitr_500Medium',
     fontSize: 19,
-    color: '#fff',
+    lineHeight: 28,
+    color: 'rgba(255,255,255,0.94)',
   },
-  headMascotImg: { width: 96, height: 96 },
-  headMascot: {
-    position: 'absolute',
-    right: Spacing.lg,
-    /* ช่องค้นหาย้ายออกไปลอยนอกหัวจอแล้ว มาสคอตจึงลงมาชิดขอบล่างได้ เว้นไว้นิดเดียว
-       ไม่ให้ชนช่องค้นหาที่คร่อมอยู่ */
-    bottom: 34,
+  mascotImg: { width: MASCOT, height: MASCOT },
+  mascot: { position: 'absolute', right: Spacing.lg },
+  /* ปุ่มใสแทนวงกลมขาวทึบ (เจ้าของสั่ง 3 ก.ย. 2026) — ใช้ variant tint เพราะ surface
+     ใส่เงาให้ด้วย ซึ่งเงาใต้ปุ่มใสจะดูเลอะ ขอบขาวจาง ๆ ช่วยให้เห็นขอบปุ่มบนพื้นส้ม */
+  glassBtn: {
+    backgroundColor: 'rgba(255,255,255,0.26)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
   },
   /* ต้องเป็นแถวและให้ SearchBar ยืดเต็ม — containerStyle ของมันใช้ flex 1 ตามแบบที่
      หน้าอื่นเรียก ถ้าพ่อแม่ไม่ใช่ row ตัวมันจะยุบจนเหลือแต่ไอคอนแว่นขยาย */
