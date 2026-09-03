@@ -226,6 +226,7 @@ export default function RootLayout() {
             <Stack.Protected guard={showApp}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="product/[id]" />
+              <Stack.Screen name="delivery-check" options={{ presentation: 'modal' }} />
               <Stack.Screen name="address/index" />
               <Stack.Screen name="address/picker" />
               <Stack.Screen name="checkout/index" />

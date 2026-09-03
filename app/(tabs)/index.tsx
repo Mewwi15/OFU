@@ -287,7 +287,12 @@ export default function HomeScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
                   accessibilityLabel={MODE_LABEL[m.key]}
-                  onPress={() => setMode(m.key)}
+                  /* Delivery ต้องรู้ก่อนว่าบ้านลูกค้าอยู่ในเขตส่งไหม จึงพาไปจอสแกน
+                     ตำแหน่งก่อน (จอนั้นเป็นคนตั้งโหมดให้เอง) ส่วน ONLINE ส่งทั่วไทย
+                     ไม่มีเขต กดแล้วเปลี่ยนได้เลย */
+                  onPress={() =>
+                    m.key === 'delivery' ? router.push('/delivery-check') : setMode(m.key)
+                  }
                   style={styles.modeCard}>
                   <View style={[styles.modeLogo, on && styles.modeLogoOn]}>
                     <Image source={m.image} style={styles.modeLogoImg} contentFit="contain" />
