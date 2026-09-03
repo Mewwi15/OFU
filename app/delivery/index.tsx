@@ -26,7 +26,13 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
-import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
+import {
+  DELIVERY_INK,
+  DELIVERY_INK_SHADOW,
+  DELIVERY_RAMP,
+  DELIVERY_SHEET_BG,
+} from '@/constants/delivery';
+import { ALL_CATEGORY, BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
 import { MODE_META } from '@/store/mode';
@@ -35,9 +41,8 @@ const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
 const TAB_BAR_CLEARANCE = 110;
 /* สีพื้นแผ่นเนื้อหา — วงกลมหมวดหมู่ต้องใช้สีเดียวกันเป๊ะเพื่อให้กลืนหายไปกับพื้น
-   (เจ้าของสั่ง 3 ก.ย. 2026 "วงกลมมันดูขาว เอาให้กลืนกับสีพื้นหลังเลย") จึงต้องเป็น
-   ค่าเดียวกัน ประกาศที่เดียว ไม่ใช่พิมพ์ซ้ำสองที่แล้วเพี้ยนกันทีหลัง */
-const SHEET_BG = '#F4F1EF';
+   (เจ้าของสั่ง 3 ก.ย. 2026 "วงกลมมันดูขาว เอาให้กลืนกับสีพื้นหลังเลย") */
+const SHEET_BG = DELIVERY_SHEET_BG;
 /** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง (เจ้าของว่าใหญ่ไป
  *  3 ก.ย. 2026 ลดจาก 54) */
 const SEARCH_H = 46;
@@ -63,18 +68,10 @@ const MASCOT_TOP_FROM_HEAD = -107; // ก้นเสือมุดหลัง
 /* เยื้องซ้ายจากขอบขวา ไม่ใช่ชิดขอบเหมือนรูปเดิม — หมวก OFU กว้างเกือบเต็มความกว้างรูป
    ถ้าชิดขอบ ปุ่มตะกร้าจะไปคร่อมทับตัวอักษร OFU พอดี ซึ่งเป็นจุดขายของมาสคอตตัวนี้ */
 const MASCOT_RIGHT = 48;
-/* เลิกใช้ส้มแบรนด์เดิม ย้ายมาใช้เฉดของแบนเนอร์ภาพที่ 2 (เจ้าของสั่ง 3 ก.ย. 2026)
-   ดูดสีจากไฟล์แบนเนอร์จริงบน production ไม่ได้กะเอาเอง — ไล่จากบนลงล่างตรง ๆ
-   ไม่ใช่ทแยงเหมือนเดิม เพราะของเดิมในภาพก็ไล่แนวตั้ง ถ้าทำทแยงจะไม่เข้าคู่กับแบนเนอร์
-   ครีมอ่อนถูกดันลงไปอยู่ใต้ขอบหัวจอ (ดู HEAD_RAMP_STOPS) เพราะเจ้าของขอตัวหนังสือ
-   สีขาวกลับมา ถ้าปล่อยให้ไล่ถึงครีมในเขตที่มีตัวหนังสือ ขาวจะจมหายไปกับพื้น
-   ส่วนที่มองเห็นจึงเป็นช่วงบนของเฉดแบนเนอร์ ครีมโผล่แค่ตรงรอยหยักมุมกับตอนดึงจอ */
-const HEAD_RAMP = ['#FC5738', '#FD7A50', '#FCDEB4'] as const;
-/* กลับมาใช้ตัวหนังสือขาวตามที่เจ้าของสั่ง 3 ก.ย. 2026 — ต้องจับคู่กับการหยุดเฉดไว้
-   ที่โทนเข้มตลอดเขตหัวจอ ไม่งั้นขาวจะจมหายไปกับพื้น
-   ใส่เงาจาง ๆ ใต้ตัวอักษรด้วย ขาวบนส้มสว่างมีค่าต่างสีราว 2.8 ซึ่งบางกว่าที่ควร
-   เงาช่วยตรึงขอบตัวอักษรให้อ่านออกโดยไม่ต้องเปลี่ยนสีที่เจ้าของเลือก */
-const HEAD_INK = '#FFFFFF';
+/* เฉดกับสีตัวหนังสือย้ายไปอยู่ constants/delivery.ts เพราะหน้าหมวดต้องใช้ชุดเดียวกัน
+   ถ้าปล่อยให้ต่างคนต่างประกาศ กดจากหน้าร้านไปหน้าหมวดแล้วสีจะเพี้ยนกันให้เห็น */
+const HEAD_RAMP = DELIVERY_RAMP;
+const HEAD_INK = DELIVERY_INK;
 
 export default function DeliveryHome() {
   const insets = useSafeAreaInsets();
@@ -140,13 +137,22 @@ export default function DeliveryHome() {
    * ไม่ได้ไปดึงข้อมูลชุดใหม่มา ของที่ขายก็คือของเดียวกันทั้งร้าน */
   const deliveryBanner = bannerFor(banners, 'delivery_promo');
 
-  const rails = useMemo(() => {
-    const inStock = products.filter((p) => (p.variants?.[0]?.available ?? 1) > 0);
-    return {
-      quick: inStock.slice(0, 10),
-      popular: [...inStock].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 10),
-    };
-  }, [products]);
+  /* หมวดละไม่กี่ชิ้นพอ หน้านี้เป็นหน้าร้าน ไม่ใช่แคตตาล็อก — เอาเฉพาะของที่ยังมีของ
+     เพราะแถวสั้น ๆ ที่มีแต่ป้าย "สินค้าหมด" ไม่ช่วยให้ใครซื้ออะไรได้
+     หมวดที่ไม่เหลือของเลยก็ตัดทั้งแถวทิ้ง ดีกว่าโชว์หัวข้อลอยแล้วว่างเปล่าข้างล่าง */
+  const catSections = useMemo(() => {
+    const names = dbCategories.length
+      ? dbCategories
+      : categories.filter((c) => c !== ALL_CATEGORY);
+    return names
+      .map((name) => ({
+        name,
+        items: products
+          .filter((p) => p.category === name && (p.variants?.[0]?.available ?? 1) > 0)
+          .slice(0, 12),
+      }))
+      .filter((sec) => sec.items.length > 0);
+  }, [products, dbCategories]);
 
   return (
     <View style={styles.screen}>
@@ -195,7 +201,7 @@ export default function DeliveryHome() {
                   key={cat}
                   category={cat}
                   plateColor={SHEET_BG}
-                  onPress={() => router.push({ pathname: '/(tabs)/search', params: { cat } })}
+                  onPress={() => router.push({ pathname: '/delivery/[cat]', params: { cat } })}
                 />
               ))}
             </ScrollView>
@@ -236,8 +242,17 @@ export default function DeliveryHome() {
             )}
           </View>
 
-          <ProductRail title="สั่งซ้ำได้เลย" data={rails.quick} />
-          <ProductRail title="คนแถวนี้ชอบสั่ง" data={rails.popular} />
+          {/* สินค้าเรียงตามหมวด ไม่ใช่แถวคัดเองแบบเดิม — เจ้าของย้ายเส้นทางการซื้อให้
+              "สินค้าไปอยู่ในแต่ละหมวด" (3 ก.ย. 2026) หน้านี้จึงเป็นตัวอย่างหมวดละไม่กี่
+              ชิ้น ใครอยากดูครบกด "ดูทั้งหมด" ไปหน้าหมวด ไม่ยัดทั้ง 775 ชิ้นมาไว้หน้าเดียว */}
+          {catSections.map((sec) => (
+            <ProductRail
+              key={sec.name}
+              title={sec.name}
+              data={sec.items}
+              onSeeAll={() => router.push({ pathname: '/delivery/[cat]', params: { cat: sec.name } })}
+            />
+          ))}
         </View>
       </Animated.ScrollView>
 
@@ -367,9 +382,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 24,
     color: HEAD_INK,
-    textShadowColor: 'rgba(120,40,16,0.30)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    ...DELIVERY_INK_SHADOW,
   },
   addrRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   addrText: {
@@ -378,9 +391,7 @@ const styles = StyleSheet.create({
     fontSize: 19,
     lineHeight: 28,
     color: HEAD_INK,
-    textShadowColor: 'rgba(120,40,16,0.30)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    ...DELIVERY_INK_SHADOW,
   },
   mascotImg: { width: MASCOT_W, height: MASCOT_H },
   mascot: { position: 'absolute', right: MASCOT_RIGHT },

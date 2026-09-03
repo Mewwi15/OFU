@@ -227,6 +227,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="product/[id]" />
               <Stack.Screen name="delivery/index" />
+              <Stack.Screen name="delivery/[cat]" />
               <Stack.Screen name="delivery-check" options={{ presentation: 'modal' }} />
               <Stack.Screen name="address/index" />
               <Stack.Screen name="address/picker" />

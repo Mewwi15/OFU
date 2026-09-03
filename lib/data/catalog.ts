@@ -151,6 +151,10 @@ export async function loadFeatured(): Promise<FeaturedRow[]> {
   }));
 }
 
+/** ป้ายหมวด "ทุกอย่าง" — ใช้เป็นตัวเทียบในหลายหน้า ประกาศไว้ที่เดียวจะได้ไม่พิมพ์
+ *  สตริงไทยซ้ำแล้วสะกดเพี้ยนกันเงียบ ๆ */
+export const ALL_CATEGORY = 'ทั้งหมด';
+
 /** The category filter list (static UI labels; 'ทั้งหมด' = All). */
 export const CATEGORY_FILTERS: readonly Category[] = [
   'ทั้งหมด',
