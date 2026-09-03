@@ -49,9 +49,17 @@ const HEAD_PAD_TOP = 2; // ปุ่มชิดขอบบนกว่าเ�
    ตำแหน่งจึงต้องคิดจากขอบรูปจริง ไม่ใช่ขอบกล่อง ไม่งั้นจะดูเหมือนยังลอยอยู่สูง */
 const MASCOT = 96;
 const MASCOT_TOP_FROM_HEAD = -82; // ให้ท้ายรถมุดหลังช่องค้นหาราว 40% ของตัวรูป
-/* ไล่เฉดแทนส้มโทนเดียว (เจ้าของทัก 3 ก.ย. 2026 "สีมันส้มไป") — ส้มอมพีชมุมบนซ้าย
-   ไปหาแดงอิฐมุมล่างขวา สีแบรนด์อยู่ตรงกลาง ปลายล่างยังเข้มพอให้ตัวหนังสือขาวอ่านออก */
-const HEAD_RAMP = ['#FF9455', '#F15929', '#D8402A'] as const;
+/* เลิกใช้ส้มแบรนด์เดิม ย้ายมาใช้เฉดของแบนเนอร์ภาพที่ 2 (เจ้าของสั่ง 3 ก.ย. 2026)
+   ดูดสีจากไฟล์แบนเนอร์จริงบน production ไม่ได้กะเอาเอง — ไล่จากบนลงล่างตรง ๆ
+   ไม่ใช่ทแยงเหมือนเดิม เพราะของเดิมในภาพก็ไล่แนวตั้ง ถ้าทำทแยงจะไม่เข้าคู่กับแบนเนอร์
+   ปลายล่างเป็นครีมอ่อน กลืนกับแผ่นเนื้อหาสีอ่อนพอดี แต่แลกมาด้วยการที่ตัวหนังสือขาว
+   ใช้ไม่ได้อีกต่อไป ต้องเปลี่ยนเป็นสีเข้ม */
+const HEAD_RAMP = ['#FC5738', '#FD8D61', '#FCDEB4'] as const;
+/* สีตัวหนังสือบนหัวจอ — น้ำตาลอมแดงเข้ม ไม่ใช่ขาวและไม่ใช่เทาดำ
+   ขาวใช้ไม่ได้เพราะครึ่งล่างของเฉดสว่างเกิน · สีแบรนด์ (#B83C18) ก็ใช้ไม่ได้ ลองแล้ว
+   ทับกับพื้นส้มอ่อนจนแทบอ่านไม่ออก (อัตราต่างสีราว 1.9 ต่ำกว่าเกณฑ์มาก)
+   เทาดำอ่านออกแต่ดูจืดบนพื้นโทนอุ่น น้ำตาลเข้มได้ทั้งอ่านออกและเข้ากับโทน */
+const HEAD_INK = '#5A2410';
 
 export default function DeliveryHome() {
   const insets = useSafeAreaInsets();
@@ -130,7 +138,7 @@ export default function DeliveryHome() {
       <LinearGradient
         colors={HEAD_RAMP}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         pointerEvents="none"
         style={[styles.backdrop, { height: rampH }]}
       />
@@ -189,7 +197,7 @@ export default function DeliveryHome() {
         <LinearGradient
           colors={HEAD_RAMP}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 1 }}
           style={{ height: rampH }}
         />
       </Animated.View>
@@ -239,7 +247,7 @@ export default function DeliveryHome() {
             variant="tint"
             shape="circle"
             size={NAV_H}
-            color="#fff"
+            color={HEAD_INK}
             style={styles.glassBtn}
             accessibilityLabel="ย้อนกลับ"
             onPress={() => router.back()}
@@ -253,7 +261,7 @@ export default function DeliveryHome() {
               variant="tint"
               shape="circle"
               size={NAV_H}
-              color="#fff"
+              color={HEAD_INK}
               style={styles.glassBtn}
               accessibilityLabel="ตะกร้า"
               onPress={() => router.push('/cart')}
@@ -277,7 +285,7 @@ export default function DeliveryHome() {
               <Text numberOfLines={1} style={styles.addrText}>
                 {address ? address.line : 'เลือกที่อยู่จัดส่ง'}
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#fff" />
+              <Ionicons name="chevron-down" size={20} color={HEAD_INK} />
             </View>
           </Pressable>
         </Animated.View>
@@ -305,7 +313,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 17,
     lineHeight: 24,
-    color: '#fff',
+    color: HEAD_INK,
   },
   addrRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   addrText: {
@@ -313,16 +321,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Mitr_500Medium',
     fontSize: 19,
     lineHeight: 28,
-    color: 'rgba(255,255,255,0.94)',
+    color: HEAD_INK,
   },
   mascotImg: { width: MASCOT, height: MASCOT },
   mascot: { position: 'absolute', right: Spacing.lg },
   /* ปุ่มใสแทนวงกลมขาวทึบ (เจ้าของสั่ง 3 ก.ย. 2026) — ใช้ variant tint เพราะ surface
      ใส่เงาให้ด้วย ซึ่งเงาใต้ปุ่มใสจะดูเลอะ ขอบขาวจาง ๆ ช่วยให้เห็นขอบปุ่มบนพื้นส้ม */
   glassBtn: {
-    backgroundColor: 'rgba(255,255,255,0.26)',
+    backgroundColor: 'rgba(255,255,255,0.32)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   /* ต้องเป็นแถวและให้ SearchBar ยืดเต็ม — containerStyle ของมันใช้ flex 1 ตามแบบที่
      หน้าอื่นเรียก ถ้าพ่อแม่ไม่ใช่ row ตัวมันจะยุบจนเหลือแต่ไอคอนแว่นขยาย */
