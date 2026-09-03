@@ -167,7 +167,12 @@ const URGENCY_COLOR: Record<Urgency, string> = {
  *  colours above stay for text and the single-figure callouts. */
 /* จานสีโดนัทต้นทุน — ไล่โทนอุ่นคุมความอิ่มสีให้ต่ำเท่ากันทั้งชุด ไม่ใช้สีสถานะ
  * (แดง/ส้ม/เขียว) เพราะวงนี้ไม่ได้บอกว่าดีหรือแย่ แค่บอกว่าเงินอยู่ตรงไหน */
-const COST_FILL = ['#8A6A4F', '#B08968', '#C9A227', '#7D8C6E', '#6E8CA0', '#9C7A8A', '#B4ADA8'];
+/* เผื่อไว้ 11 สี ร้านมี 7 หมวดที่มีต้นทุน พอเพิ่มหมวดที่ 8 สีจะได้ไม่วนกลับมาซ้ำ
+ * หมวดแรกจนอ่านวงไม่ออก */
+const COST_FILL = [
+  '#8A6A4F', '#B08968', '#C9A227', '#7D8C6E', '#6E8CA0', '#9C7A8A',
+  '#5F7A6B', '#A88B6A', '#7E6E8C', '#8C7A5F', '#B4ADA8',
+];
 
 const URGENCY_FILL: Record<Urgency, string> = {
   buy: '#E5484D',
@@ -428,35 +433,23 @@ export function Stock() {
   }, [items]);
 
   /* ต้นทุนแยกตามหมวด — โดนัทใบที่สองตอบว่า "เงินจมอยู่ที่หมวดไหน" ซึ่งการ์ดตัวเลข
-   * เดี่ยว ๆ ตอบไม่ได้ · รวมหมวดที่เล็กกว่า 3% เป็นก้อนเดียว ไม่งั้นวงแตกเป็นเสี้ยว
-   * บาง ๆ สิบกว่าเสี้ยวจนอ่านไม่ออก (บทเรียนเดียวกับตอนทำแถบสัดส่วนแล้วโดนตีกลับ)
+   * เดี่ยว ๆ ตอบไม่ได้
    *
-   * ก้อนรวมต้องบอกชื่อหมวดที่อยู่ข้างในเสมอ — เดิมเขียนแค่ "อื่น ๆ" แล้วเจ้าของถาม
-   * ว่ามันคือหมวดอะไร ซึ่งถูก ป้ายที่ไม่บอกว่าข้างในคืออะไรก็คือป้ายที่ซ่อนข้อมูล
-   * (ปัญหาเดียวกับ "ยังไม่ใส่ต้นทุน 1 รายการ คืออะไร") · เกินสามหมวดค่อยย่อเป็น
-   * จำนวน แล้วให้ไปอ่านชื่อครบใน tooltip ตอนชี้ */
+   * ทุกหมวดมีช่องของตัวเอง ไม่ยุบเป็น "อื่น ๆ" — ตอนแรกผมยุบหมวดที่เล็กกว่า 3%
+   * เพื่อกันวงแตกเป็นเสี้ยวบาง ๆ เจ้าของตีกลับว่า "ยา ของสด ก็ต้องมีช่องของมัน
+   * มันต้องรู้ที่ไปที่มา" ซึ่งถูก — ตัวเลขที่ยุบแล้วตามรอยไม่ได้ก็ไม่ใช่ตัวเลขที่
+   * ใช้ทำงานได้ เสี้ยวบางอ่านยากแก้ด้วยการเขียนยอดกำกับไว้ที่ป้ายข้างล่าง
+   * ไม่ใช่ด้วยการซ่อนหมวดนั้นทิ้ง */
   const costByCategory = useMemo(() => {
     const acc = new Map<string, number>();
     for (const i of items) {
       if (i.stock <= 0 || i.cost == null) continue;
       acc.set(i.category, (acc.get(i.category) ?? 0) + i.cost * i.stock);
     }
-    const rows = [...acc.entries()].map(([name, value]) => ({ name, value: Math.round(value) }));
-    const total = rows.reduce((s2, r) => s2 + r.value, 0);
-    if (total === 0) return [];
-    const big = rows.filter((r) => r.value / total >= 0.03).sort((a, b) => b.value - a.value);
-    const small = rows.filter((r) => r.value / total < 0.03).sort((a, b) => b.value - a.value);
-    if (small.length === 0) return big;
-    const names = small.map((r) => r.name);
-    return [
-      ...big,
-      {
-        name: names.length <= 3 ? `อื่น ๆ: ${names.join(' · ')}` : `อื่น ๆ ${names.length} หมวด`,
-        // ชื่อครบไว้โชว์ตอนชี้ ต่อให้ป้ายในวงย่อไปแล้ว
-        full: names.join(' · '),
-        value: small.reduce((s2, r) => s2 + r.value, 0),
-      },
-    ];
+    return [...acc.entries()]
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .filter((r) => r.value > 0)
+      .sort((a2, b2) => b2.value - a2.value);
   }, [items]);
 
 
@@ -1013,10 +1006,7 @@ export function Stock() {
                       <ResponsiveContainer width="100%" height={158}>
                         <PieChart>
                           <RcTooltip
-                            formatter={(v: number, n: string, p: { payload?: { full?: string } }) => [
-                              baht(v),
-                              p?.payload?.full ? `อื่น ๆ: ${p.payload.full}` : n,
-                            ]}
+                            formatter={(v: number, n: string) => [baht(v), n]}
                             contentStyle={{ fontSize: 12, borderRadius: 8 }}
                           />
                           <Pie
@@ -1049,10 +1039,14 @@ export function Stock() {
                       </div>
                     </div>
                     <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                      {/* เขียนยอดกำกับทุกหมวด — หมวดเล็กอย่างของสดเป็นเสี้ยวบางจนมอง
+                          แทบไม่เห็นในวง ป้ายจึงต้องบอกตัวเลขแทน ไม่ใช่ให้ไปชี้ทีละอัน */}
                       {costByCategory.map((c, i) => (
                         <span key={c.name} className="inline-flex items-center gap-1.5">
                           <i style={{ width: 9, height: 9, borderRadius: 999, background: COST_FILL[i % COST_FILL.length] }} />
-                          <span style={{ fontSize: 12, color: '#6E625C' }}>{c.name}</span>
+                          <span style={{ fontSize: 12, color: '#6E625C' }}>
+                            {c.name} <b style={{ color: '#2B2320' }}>{baht(c.value)}</b>
+                          </span>
                         </span>
                       ))}
                     </div>
