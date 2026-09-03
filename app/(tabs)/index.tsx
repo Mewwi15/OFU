@@ -20,7 +20,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { DesktopHome } from '@/components/web/DesktopHome';
-import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
@@ -247,7 +247,7 @@ export default function HomeScreen() {
                   accessibilityState={{ selected: on }}
                   accessibilityLabel={MODE_LABEL[m.key]}
                   onPress={() => setMode(m.key)}
-                  style={[styles.modeCard, on && styles.modeCardOn]}>
+                  style={styles.modeCard}>
                   <View style={[styles.modeLogo, on && styles.modeLogoOn]}>
                     <Image source={m.image} style={styles.modeLogoImg} contentFit="contain" />
                   </View>
@@ -315,7 +315,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.background,
+    /* เทาอ่อนมาก ๆ แทนพื้นพีชเดิม (เจ้าของสั่ง 3 ก.ย. 2026) — การ์ดขาวไม่มีเส้นขอบแล้ว
+     * ถ้าพื้นยังเกือบขาวก็แยกไม่ออกว่าการ์ดจบตรงไหน เหลือแค่เงาที่ต้องแบกงานทั้งหมด
+     * เลือกเทาอมอุ่นเล็กน้อย ไม่ใช่เทากลาง เพราะทั้งแอปเป็นโทนอุ่น เทากลางจะดูเย็นแปลกแยก
+     * ตอนนี้ตั้งเฉพาะหน้าแรก ยังไม่แตะโทเคนกลางที่ใช้ทุกหน้า */
+    backgroundColor: '#F4F1EF',
   },
   body: {
     paddingHorizontal: Spacing.lg,
@@ -365,15 +369,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.xs,
     borderRadius: Radius.lg,
-    // การ์ดขาวเสมอ ไม่ว่าจะเลือกอยู่หรือไม่ (เจ้าของสั่ง) — บอกตัวที่เลือกด้วยกรอบ
-    // กับสีตัวหนังสือแทน ไม่ใช่ถมสีพื้น
+    // การ์ดขาวล้วน ไม่มีเส้นขอบเลย (เจ้าของสั่ง 3 ก.ย. 2026) — ตัวที่เลือกอยู่บอกด้วย
+    // สีวงโลโก้กับสีตัวหนังสือแทน ไม่ใช่กรอบหรือถมสีพื้น
     backgroundColor: Colors.surface,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    ...Shadow.card,
-  },
-  modeCardOn: {
-    borderColor: Colors.primary,
+    // เงาฟุ้ง กระจายกว้างและจางกว่า Shadow.card ปกติ — การ์ดลอยอยู่บนภาพสีส้ม
+    // ถ้าเงาคมจะเห็นเป็นเส้นขอบมืด ๆ แทนที่จะเป็นการลอย
+    shadowColor: '#7A4A2E',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 8,
   },
   modeLogo: {
     width: 54,
