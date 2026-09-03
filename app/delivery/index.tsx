@@ -185,11 +185,10 @@ export default function DeliveryHome() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.catRow}>
-              {catList.map((cat, i) => (
+              {catList.map((cat) => (
                 <CategoryBubble
                   key={cat}
                   category={cat}
-                  index={i}
                   plateColor={SHEET_BG}
                   onPress={() => router.push({ pathname: '/(tabs)/search', params: { cat } })}
                 />
@@ -382,8 +381,7 @@ const styles = StyleSheet.create({
   },
   body: { paddingHorizontal: Spacing.lg },
   catHead: { marginTop: Spacing.lg },
-  /* เว้นบน/ล่างเผื่อให้วงกลมเด้งขึ้นลงได้โดยไม่โดนขอบ ScrollView ครอบตัดหัวหรือเงา */
-  catRow: { gap: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
+  catRow: { gap: Spacing.xs, paddingTop: Spacing.sm, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
   promise: {
     flexDirection: 'row',
     alignItems: 'center',

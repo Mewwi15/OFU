@@ -8,11 +8,10 @@
  * วางทับ — รูปที่ไม่มีพื้นหลังจึงใช้ได้ทันที ส่วนไทล์เดิมที่ยังมีพื้นติดมาก็ยังใช้ได้
  * เพราะถูกครอบตัดเป็นวงกลมพอดี (ยังไม่มีภาพชุดใหม่ ใช้ของเดิมไปพลางก่อน)
  *
- * กระดิก: วงกลมเป็นกรอบอยู่กับที่ ไม่ขยับ — ตัวที่ขยับคือรูปข้างใน และขยับอยู่ในวง
- * (เจ้าของย้ำ 3 ก.ย. 2026 "เหมือนเรา template วงกลมเอาไว้แล้วเอารูปมาใส่ วงกลมไม่ได้
- *  ขยับ ให้รูปขยับ แต่ขยับในวงกลมนั้น") ตอนแรกทำผิดเป็นขยับทั้งวง
- * หมุนเล็กน้อยสลับกับเด้งขึ้นลง วนไม่รู้จบ และ หน่วงตามลำดับของแต่ละอันให้เป็นคลื่นไล่
- * ไปตามแถว ถ้าเริ่มพร้อมกันหมดจะดูเหมือนจอสั่น ไม่ใช่กรูฟ
+ * การเคลื่อนไหว: เดิมกระดิกทุกอัน เจ้าของสั่งตัดออกตอนภาพชุดจริงมา แล้วสั่งใหม่ให้
+ * เอียงซ้ายขวาเฉพาะ "เครื่องดื่ม" กับ "ขนม" (3 ก.ย. 2026) — สองหมวดนี้เป็นของกินเล่น
+ * ที่ควรดูมีชีวิต ส่วนหมวดอื่นอยู่นิ่ง ถ้าขยับหมดทั้งแถวจะกลายเป็นจอสั่นเหมือนเดิม
+ * ที่เหลือมีแค่ย่อตอนกด ซึ่งเป็นการตอบสนองปกติของปุ่ม ไม่ใช่ขยับเอง
  */
 
 import { Image } from 'expo-image';
@@ -22,73 +21,79 @@ import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from
 import { Text } from '@/components/ui/text';
 import { Colors, Spacing } from '@/constants/theme';
 
-/** รูปประจำหมวด — ยังเป็นชุดเดิมอยู่ รอภาพใหม่จากเจ้าของ ตัวไหนไม่รู้จักใช้ตะกร้ารวม */
+/** ภาพชุดพื้นใสที่เจ้าของส่งมา 3 ก.ย. 2026 — คนละชุดกับไทล์สี่เหลี่ยมพื้นเขียวที่หน้าอื่น
+ *  ใช้อยู่ (assets/images/categories/*.png) จึงแยกโฟลเดอร์ไว้ ไม่ทับของเดิม
+ *  ตัวไหนไม่รู้จัก (หมวดที่แอดมินเพิ่มทีหลัง) ใช้ตะกร้ารวมแทน */
 const ART: Record<string, ReturnType<typeof require>> = {
-  ทั้งหมด: require('@/assets/images/categories/cat-all.png'),
-  ของสด: require('@/assets/images/categories/cat-fresh.png'),
-  เครื่องดื่ม: require('@/assets/images/categories/cat-drinks.png'),
-  ของแห้ง: require('@/assets/images/categories/cat-dry.png'),
-  ของใช้ในบ้าน: require('@/assets/images/categories/cat-home.png'),
-  ขนม: require('@/assets/images/categories/cat-snacks.png'),
-  ยา: require('@/assets/images/categories/cat-medicine.png'),
+  ทั้งหมด: require('@/assets/images/categories/circle/cat-all.png'),
+  ของสด: require('@/assets/images/categories/circle/cat-fresh.png'),
+  เครื่องดื่ม: require('@/assets/images/categories/circle/cat-drinks.png'),
+  ของแห้ง: require('@/assets/images/categories/circle/cat-dry.png'),
+  ของใช้ในบ้าน: require('@/assets/images/categories/circle/cat-home.png'),
+  ขนม: require('@/assets/images/categories/circle/cat-snacks.png'),
+  ยา: require('@/assets/images/categories/circle/cat-medicine.png'),
 };
 
-/** หน่วงของแต่ละอันในแถว — ทำให้เป็นคลื่นไล่ ไม่ใช่สั่นพร้อมกัน */
-const GROOVE_STEP_MS = 170;
-const GROOVE_MS = 1400;
-/* รูปกินพื้นที่กี่ส่วนของวง — ต้องเหลือขอบไว้ให้รูปขยับได้โดยไม่ชนขอบวงตลอดเวลา
-   ถ้าให้เต็มวง พอเอียงทีไรมุมรูปจะโดนขอบตัดทุกที */
-const ART_FILL = 0.76;
+/* รูปกินพื้นที่กี่ส่วนของวง — ต้องเหลือขอบไว้บ้างเพราะสองหมวดที่เอียงจะหมุนมุมรูป
+   เข้าไปหาขอบวง ถ้าเต็มวงจะเห็นเป็นรอยตัดตอนเอียงสุด */
+const ART_FILL = 0.92;
+/** หมวดที่ให้เอียงซ้ายขวาไปเรื่อย ๆ — เจ้าของเลือกมาสองตัวนี้ ไม่ใช่ทั้งแถว */
+const TILTING = new Set(['เครื่องดื่ม', 'ขนม']);
+const TILT_DEG = 5;
+const TILT_MS = 950;
 
 type Props = {
   category: string;
-  /** ลำดับในแถว ใช้หน่วงจังหวะให้ไล่กันเป็นคลื่น */
-  index: number;
   size?: number;
   /** สีพื้นในวง — ส่งสีพื้นของหน้ามาเพื่อให้วงกลมกลืนหายไป ไม่ใช่ดูเป็นจานสีขาว */
   plateColor?: string;
   onPress?: () => void;
 };
 
-export function CategoryBubble({ category, index, size = 66, plateColor, onPress }: Props) {
-  const groove = useRef(new Animated.Value(0)).current;
+export function CategoryBubble({ category, size = 76, plateColor, onPress }: Props) {
   const press = useRef(new Animated.Value(0)).current;
+  const tilt = useRef(new Animated.Value(0)).current;
+  const tilting = TILTING.has(category);
 
   useEffect(() => {
+    if (!tilting) return;
     let loop: Animated.CompositeAnimation | null = null;
     let cancelled = false;
-    /* เคารพการตั้งค่า "ลดการเคลื่อนไหว" ของเครื่อง — ภาพกระดิกตลอดเวลาเป็นตัวกระตุ้น
+    /* เคารพการตั้งค่า "ลดการเคลื่อนไหว" ของเครื่อง — ภาพขยับตลอดเวลาเป็นตัวกระตุ้น
        อาการเวียนหัวของคนที่แพ้การเคลื่อนไหว ปิดไปเลยดีกว่าทำให้ช้าลง */
     void AccessibilityInfo.isReduceMotionEnabled().then((reduced) => {
       if (reduced || cancelled) return;
-      loop = Animated.loop(
-        Animated.sequence([
-          Animated.delay(index * GROOVE_STEP_MS),
-          Animated.timing(groove, {
-            toValue: 1,
-            duration: GROOVE_MS,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(groove, {
-            toValue: 0,
-            duration: GROOVE_MS,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-      );
+      const leg = (to: number) =>
+        Animated.timing(tilt, {
+          toValue: to,
+          duration: TILT_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        });
+      /* resetBeforeIteration ต้องปิด — ค่าเริ่มต้นของมันคือ true ซึ่งจะดีดค่ากลับไปที่
+         ตำแหน่งตั้งต้นทุกครั้งที่วนรอบใหม่ รูปจึงกระโดดจากเอียงซ้ายสุดกลับมาตรงกลาง
+         ทันทีในเฟรมเดียว = อาการกระตุกทุกรอบที่เจ้าของเห็น (3 ก.ย. 2026)
+         ปิดแล้วมันวิ่งต่อจากที่ค้างไว้ ขวาสุด → ซ้ายสุด → ขวาสุด ไม่มีรอยต่อ */
+      loop = Animated.loop(Animated.sequence([leg(1), leg(-1)]), {
+        resetBeforeIteration: false,
+      });
       loop.start();
     });
     return () => {
       cancelled = true;
       loop?.stop();
     };
-  }, [groove, index]);
+  }, [tilt, tilting]);
 
-  const rotate = groove.interpolate({ inputRange: [0, 1], outputRange: ['-4deg', '4deg'] });
-  const lift = groove.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -4, 0] });
-  /* ย่อตอนกดก็ให้เกิดกับรูป ไม่ใช่ทั้งวง — วงต้องนิ่งสนิทตามที่สั่ง */
+  const rotate = tilt.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [`-${TILT_DEG}deg`, `${TILT_DEG}deg`],
+  });
+  /* หมุนรอบ "ฐาน" ของรูป ไม่ใช่รอบจุดกึ่งกลาง — หมุนรอบกึ่งกลางแล้วมันดูเหมือนสติกเกอร์
+     ที่ถูกจับหมุน ไม่ใช่ของที่ตั้งอยู่แล้วโยกไปมา ย้ายจุดหมุนลงไปที่ขอบล่างด้วยการ
+     เลื่อนลงครึ่งหนึ่ง หมุน แล้วเลื่อนกลับขึ้น (เรียงลำดับสำคัญ transform ทำจากท้ายไปหน้า) */
+  const pivot = (size * ART_FILL) / 2;
+
   const scale = press.interpolate({ inputRange: [0, 1], outputRange: [1, 0.88] });
 
   const to = (v: number) =>
@@ -108,12 +113,13 @@ export function CategoryBubble({ category, index, size = 66, plateColor, onPress
           { width: size, height: size, borderRadius: size / 2 },
           plateColor ? { backgroundColor: plateColor } : null,
         ]}>
-        {/* ชั้นครอบตัดต้องแยกจากชั้นที่ใส่เงา — บน iOS การครอบตัดจะตัดเงาไปด้วย
-            ใส่รวมวิวเดียวแล้วเงาหายทั้งดวง
-            และการเคลื่อนไหวต้องอยู่ ข้างใน ชั้นนี้ รูปจึงถูกขอบวงกลมกันไว้เสมอ */}
+        {/* ไม่ครอบตัดแล้ว — บน iOS การครอบตัดบังคับให้เนื้อหาที่หมุนถูกแรสเตอร์แล้วตัด
+            ขอบรูปที่เอียงเลยออกมาหยัก ๆ ไม่เนียน (เจ้าของทัก 3 ก.ย. 2026 "ให้เนียน ๆ
+            หน่อย อันนี้ไม่เนียน") ปล่อยให้วาดตรง ๆ ระบบจะลบรอยหยักให้เอง
+            รูปกินแค่ 92% ของวงและอยู่กึ่งกลาง จึงไม่มีอะไรล้นกรอบอยู่ดี */}
         <View style={[styles.clip, { borderRadius: size / 2 }]}>
           <Animated.View
-            style={{ transform: [{ translateY: lift }, { rotate }, { scale }] }}>
+            style={{ transform: [{ translateY: pivot }, { rotate }, { translateY: -pivot }, { scale }] }}>
             <Image
               source={ART[category] ?? ART['ทั้งหมด']}
               style={{ width: size * ART_FILL, height: size * ART_FILL }}
@@ -123,7 +129,7 @@ export function CategoryBubble({ category, index, size = 66, plateColor, onPress
           </Animated.View>
         </View>
       </View>
-      <Text numberOfLines={1} style={[styles.label, { width: size + 14 }]}>
+      <Text numberOfLines={1} style={[styles.label, { width: size }]}>
         {category}
       </Text>
     </Pressable>
@@ -131,7 +137,7 @@ export function CategoryBubble({ category, index, size = 66, plateColor, onPress
 }
 
 const styles = StyleSheet.create({
-  hit: { alignItems: 'center', gap: Spacing.sm },
+  hit: { alignItems: 'center', gap: Spacing.xs },
   /* "จาน" วงกลมมีพื้นของตัวเอง รูปที่ไม่มีพื้นหลังจึงมีที่ยืน · overflow hidden ทำให้
      ไทล์เดิมที่ยังเป็นสี่เหลี่ยมถูกครอบเป็นวงกลมไปด้วย ไม่ต้องรอภาพใหม่ถึงจะใช้ได้ */
   /* ไม่มีเงา ไม่มีขอบ — เจ้าของขอให้วงกลมกลืนไปกับพื้น เงาหรือขอบจะทำให้มันกลับมา
@@ -144,9 +150,9 @@ const styles = StyleSheet.create({
   clip: {
     width: '100%',
     height: '100%',
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontSize: 12, color: Colors.text, textAlign: 'center' },
+  /* ตัวหนาตามที่เจ้าของสั่ง — คำหมวดหมู่ต้องอ่านสะดุดตากว่าคำอธิบายทั่วไป */
+  label: { fontFamily: 'Mitr_500Medium', fontSize: 12, color: Colors.text, textAlign: 'center' },
 });
