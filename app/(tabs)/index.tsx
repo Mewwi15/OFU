@@ -53,7 +53,11 @@ const TAB_BAR_CLEARANCE = 110;
  * page) — the local brand art, same asset as the catalog hero. Never network
  * placeholders here: this is the first thing a customer sees.
  */
-const FALLBACK_SLIDES = [{ id: 'brand', image: require('../../assets/images/braner.jpg') }];
+/* รูปสำรองตอนยังไม่มีแบนเนอร์ในระบบ — ใส่ title: null ไว้ให้ชนิดข้อมูลตรงกับ
+ * แบนเนอร์จากหลังร้าน ไม่งั้น TypeScript แคบชนิดไม่ลงตอนเช็ค slide.title */
+const FALLBACK_SLIDES: { id: string; image: number | { uri: string }; title: string | null }[] = [
+  { id: 'brand', image: require('../../assets/images/braner.jpg') as number, title: null },
+];
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
 
@@ -89,7 +93,15 @@ export default function HomeScreen() {
   const homeBanners = useCatalog((s) => s.banners).filter((b) => b.placement === 'home');
   // Admin-managed home banners when present; otherwise the local brand slide.
   const slides = homeBanners.length
-    ? homeBanners.map((b) => ({ id: b.id, image: { uri: b.image } as number | { uri: string } }))
+    ? homeBanners.map((b) => ({
+        id: b.id,
+        image: { uri: b.image } as number | { uri: string },
+        /* หัวข้อจากหน้าแอดมิน — วาดเป็นข้อความจริงทับบนภาพ ไม่ใช่เผาไว้ในรูป
+         * (เจ้าของขอข้อความไทยที่ไม่เพี้ยน 3 ก.ย. 2026) ตัวสร้างภาพ AI เขียนไทย
+         * ผิดเกือบทุกครั้ง ส่วนทางนี้ได้ฟอนต์จริงของแอป แก้คำได้จากหลังร้านโดยไม่ต้อง
+         * ทำรูปใหม่ และคมทุกความละเอียดหน้าจอ */
+        title: b.title,
+      }))
     : FALLBACK_SLIDES;
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);
@@ -185,6 +197,21 @@ export default function HomeScreen() {
                     transition={300}
                     cachePolicy="memory-disk"
                   />
+                  {slide.title ? (
+                    <View style={styles.heroTextWrap} pointerEvents="none">
+                      {/* ม่านไล่สีจากซ้าย — ข้อความต้องอ่านออกบนรูปอะไรก็ได้ที่เจ้าของ
+                          อัปมา ไม่ใช่แค่รูปที่ฝั่งซ้ายบังเอิญเข้ม */}
+                      <LinearGradient
+                        colors={['rgba(0,0,0,0.42)', 'rgba(0,0,0,0.12)', 'transparent']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <Text numberOfLines={3} style={styles.heroTitle}>
+                        {slide.title}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </ScrollView>
@@ -354,6 +381,26 @@ const styles = StyleSheet.create({
     aspectRatio: BANNER_ASPECT.home,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
+  },
+  heroTextWrap: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    // เว้นบนให้พ้นแถบสถานะ เว้นล่างให้พ้นการ์ดโหมดที่ทับขอบล่างอยู่
+    paddingTop: 56,
+    paddingBottom: 34,
+    paddingLeft: Spacing.lg,
+    // ไม่ให้ข้อความยาวไปชนปุ่มหมุด/กระดิ่งมุมขวาบน
+    paddingRight: '32%',
+  },
+  heroTitle: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 26,
+    lineHeight: 36,
+    color: '#fff',
+    // เงาตัวอักษรเผื่อรูปที่สว่างมาก ม่านไล่สีอย่างเดียวอาจไม่พอ
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   heroScrim: {
     position: 'absolute',
