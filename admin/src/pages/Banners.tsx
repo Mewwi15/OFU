@@ -39,7 +39,7 @@ const BANNER_ASPECT: Record<BannerPlacement, number> = {
   search_trending: 2.8,
   search_promo: 2.8,
   search_hot: 2.8,
-  delivery_promo: 2.8,
+  delivery_promo: 2,
 };
 /** Human label for a ratio, e.g. 2 → "2 : 1", 2.35 → "2.35 : 1". */
 const ratioLabel = (a: number) => `${Number.isInteger(a) ? a : a.toFixed(2)} : 1`;

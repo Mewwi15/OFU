@@ -98,9 +98,11 @@ export const BANNER_ASPECT: Record<BannerPlacement, number> = {
   search_trending: 2.8, // แถบ promo เหนือแถวสินค้า
   search_promo: 2.8,
   search_hot: 2.8,
-  // เดลิเวอรี่ · แถบใต้หมวดหมู่ — อัตราส่วนเดียวกับแถบ promo ของหน้าค้นหา เจ้าของจะได้
-  // ครอปด้วยกรอบที่คุ้นอยู่แล้ว ไม่ต้องจำอีกค่า
-  delivery_promo: 2.8,
+  // เดลิเวอรี่ · แถบใต้หมวดหมู่ — เริ่มที่ 2.8 เท่าแถบ promo ของหน้าค้นหา แต่เจ้าของ
+  // ว่าเล็กไป (3 ก.ย. 2026) ลดเหลือ 2 = สูงขึ้นราว 40% กลายเป็นแบนเนอร์เต็มตัว
+  // ไม่ใช่แถบบาง ๆ · ต้องตรงกับ admin/src/pages/Banners.tsx เสมอ ไม่งั้นที่ครอปกับที่
+  // แสดงจริงจะคนละกรอบ
+  delivery_promo: 2,
 };
 
 /** Load ALL published banners (every placement), in admin display order. Screens

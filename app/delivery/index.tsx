@@ -429,18 +429,18 @@ const styles = StyleSheet.create({
   promoCopy: { flex: 1, gap: 2 },
   promoTitle: {
     fontFamily: 'Mitr_600SemiBold',
-    fontSize: 19,
+    fontSize: 22,
     color: '#fff',
     textShadowColor: 'rgba(120,40,16,0.30)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   promoSub: {
-    fontSize: 13,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.95)',
     textShadowColor: 'rgba(120,40,16,0.28)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  promoArt: { width: 104, height: 124, marginBottom: -18, marginRight: Spacing.sm },
+  promoArt: { width: 132, height: 158, marginBottom: -22, marginRight: Spacing.sm },
 });
