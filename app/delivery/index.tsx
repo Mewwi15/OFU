@@ -28,7 +28,8 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
-import { MODE_META } from '@/store/mode';
+
+const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
 const TAB_BAR_CLEARANCE = 110;
 /** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง */
@@ -45,10 +46,15 @@ const ADDR_MARGIN = -2; // ที่อยู่ขยับขึ้นชิ�
 const ADDR_SHIFT = 52; // แล้วเลื่อนขวาให้พ้นปุ่มย้อนกลับ
 const BAR_PAD_BOTTOM = 14;
 const HEAD_PAD_TOP = 2; // ปุ่มชิดขอบบนกว่าเดิม
-/* มาสคอต: กล่อง 96 แต่ตัวรูปจริงกินแค่ y 11%–88% ของกล่อง (ที่เหลือเป็นพื้นใส)
-   ตำแหน่งจึงต้องคิดจากขอบรูปจริง ไม่ใช่ขอบกล่อง ไม่งั้นจะดูเหมือนยังลอยอยู่สูง */
-const MASCOT = 96;
-const MASCOT_TOP_FROM_HEAD = -82; // ให้ท้ายรถมุดหลังช่องค้นหาราว 40% ของตัวรูป
+/* มาสคอตเสือ OFU (เจ้าของส่งมา 3 ก.ย. 2026) — ไฟล์ถูกครอบให้ชิดตัวรูปพอดีแล้ว
+   ไม่มีขอบใสเหลือ ตำแหน่งจึงคิดจากขอบกล่องได้ตรง ๆ ต่างจากรูปเดิมที่มีพื้นใสรอบ ๆ
+   สัดส่วน 409:488 เป็นแนวตั้ง ต้องกำหนดกว้าง/สูงแยกกัน ใส่กล่องจัตุรัสแล้วจะเล็กเกิน */
+const MASCOT_W = 92;
+const MASCOT_H = 110;
+const MASCOT_TOP_FROM_HEAD = -107; // ก้นเสือมุดหลังช่องค้นหาไปราวหนึ่งในสี่
+/* เยื้องซ้ายจากขอบขวา ไม่ใช่ชิดขอบเหมือนรูปเดิม — หมวก OFU กว้างเกือบเต็มความกว้างรูป
+   ถ้าชิดขอบ ปุ่มตะกร้าจะไปคร่อมทับตัวอักษร OFU พอดี ซึ่งเป็นจุดขายของมาสคอตตัวนี้ */
+const MASCOT_RIGHT = 48;
 /* เลิกใช้ส้มแบรนด์เดิม ย้ายมาใช้เฉดของแบนเนอร์ภาพที่ 2 (เจ้าของสั่ง 3 ก.ย. 2026)
    ดูดสีจากไฟล์แบนเนอร์จริงบน production ไม่ได้กะเอาเอง — ไล่จากบนลงล่างตรง ๆ
    ไม่ใช่ทแยงเหมือนเดิม เพราะของเดิมในภาพก็ไล่แนวตั้ง ถ้าทำทแยงจะไม่เข้าคู่กับแบนเนอร์
@@ -215,7 +221,7 @@ export default function DeliveryHome() {
             transform: [{ translateY: searchY }],
           },
         ]}>
-        <Image source={MODE_META.delivery.image} style={styles.mascotImg} contentFit="contain" />
+        <Image source={MASCOT_SRC} style={styles.mascotImg} contentFit="contain" />
       </Animated.View>
 
       {/* ช่องค้นหาเลื่อนหนีขึ้นตามเนื้อหา 1:1 แล้วจางหายไป — เจ้าของบอกว่าตอนย่อให้เหลือ
@@ -308,7 +314,8 @@ const styles = StyleSheet.create({
   },
   headRow: { flexDirection: 'row', alignItems: 'center' },
   cartWrap: { position: 'relative' },
-  addrBlock: { marginTop: ADDR_MARGIN, paddingRight: 110 },
+  /* เว้นขวาให้พ้นมาสคอตที่เยื้องเข้ามา 48 + กว้าง 92 = 140 เผื่ออีกนิด */
+  addrBlock: { marginTop: ADDR_MARGIN, paddingRight: 128 },
   headKicker: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 17,
@@ -323,8 +330,8 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     color: HEAD_INK,
   },
-  mascotImg: { width: MASCOT, height: MASCOT },
-  mascot: { position: 'absolute', right: Spacing.lg },
+  mascotImg: { width: MASCOT_W, height: MASCOT_H },
+  mascot: { position: 'absolute', right: MASCOT_RIGHT },
   /* ปุ่มใสแทนวงกลมขาวทึบ (เจ้าของสั่ง 3 ก.ย. 2026) — ใช้ variant tint เพราะ surface
      ใส่เงาให้ด้วย ซึ่งเงาใต้ปุ่มใสจะดูเลอะ ขอบขาวจาง ๆ ช่วยให้เห็นขอบปุ่มบนพื้นส้ม */
   glassBtn: {
