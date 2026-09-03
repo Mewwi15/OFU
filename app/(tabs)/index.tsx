@@ -38,6 +38,13 @@ const MODE_LABEL: Record<ShopMode, string> = {
   online: 'ONLINE',
 };
 
+/** คำอธิบายใต้ป้าย — ป้ายเป็นอังกฤษตามที่เจ้าของสั่ง บรรทัดนี้เป็นไทยไว้บอกว่าโหมดนั้น
+ *  คืออะไรจริง ๆ คนที่ไม่ได้อ่านอังกฤษก็เข้าใจ (เจ้าของสั่ง 3 ก.ย. 2026) */
+const MODE_SUB: Record<ShopMode, string> = {
+  delivery: 'สั่งเลย',
+  online: 'พร้อมส่งของ',
+};
+
 /** Bottom padding so the floating tab bar never covers the last row. */
 
 const TAB_BAR_CLEARANCE = 110;
@@ -251,9 +258,14 @@ export default function HomeScreen() {
                   <View style={[styles.modeLogo, on && styles.modeLogoOn]}>
                     <Image source={m.image} style={styles.modeLogoImg} contentFit="contain" />
                   </View>
-                  <Text style={[styles.modeLabel, on && styles.modeLabelOn]}>
-                    {MODE_LABEL[m.key]}
-                  </Text>
+                  <View style={styles.modeTexts}>
+                    <Text style={[styles.modeLabel, on && styles.modeLabelOn]}>
+                      {MODE_LABEL[m.key]}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.modeSub}>
+                      {MODE_SUB[m.key]}
+                    </Text>
+                  </View>
                 </PressableScale>
               );
             })}
@@ -367,7 +379,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
     gap: Spacing.sm,
     borderRadius: Radius.lg,
     // การ์ดขาวล้วน ไม่มีเส้นขอบเลย (เจ้าของสั่ง 3 ก.ย. 2026) — ตัวที่เลือกอยู่บอกด้วย
@@ -382,8 +395,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   modeLogo: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: 999,
     backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
@@ -394,13 +407,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
   },
   modeLogoImg: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
+  },
+  modeTexts: {
+    // ชิดซ้ายในกล่องข้อความ ไม่ใช่กลาง — สองบรรทัดที่ยาวไม่เท่ากันถ้าจัดกลางจะเหลื่อม
+    alignItems: 'flex-start',
   },
   modeLabel: {
     fontFamily: 'Mitr_500Medium',
-    fontSize: 13,
+    fontSize: 15,
     color: Colors.textMuted,
+  },
+  modeSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: -2,
   },
   modeLabelOn: {
     color: Colors.primaryStrong,
