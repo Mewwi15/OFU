@@ -25,12 +25,21 @@ import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
 import { BANNER_ASPECT } from '@/lib/data/catalog';
+import { MODE_META, useMode, type ShopMode } from '@/store/mode';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { loadIfStale, useCatalog } from '@/store/catalog';
 import { useShop } from '@/store/shop';
 
+/** ป้ายบนการ์ดเลือกโหมด — เจ้าของขอเป็นภาษาอังกฤษตามที่เขียนมา ไม่ใช้ label ภาษาไทย
+ *  ใน MODE_META ที่หน้าอื่นใช้อยู่ */
+const MODE_LABEL: Record<ShopMode, string> = {
+  delivery: 'Delivery',
+  online: 'ONLINE',
+};
+
 /** Bottom padding so the floating tab bar never covers the last row. */
+
 const TAB_BAR_CLEARANCE = 110;
 /**
  * Fallback slide shown until the owner publishes home banners (admin แบนเนอร์
@@ -44,6 +53,9 @@ const BANNER_INTERVAL = 5000;
 export default function HomeScreen() {
   const isDesktopWeb = useIsDesktopWeb();
   const insets = useSafeAreaInsets();
+  const modes = Object.values(MODE_META);
+  const mode = useMode((st) => st.mode);
+  const setMode = useMode((st) => st.setMode);
   const router = useRouter();
   const shopOpen = useShopOpen();
   const shop = useShop((s) => s.info);
@@ -221,6 +233,32 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
+          {/* เลือกวิธีรับของ — เจ้าของสั่งเพิ่ม 3 ก.ย. 2026: การ์ดสี่เหลี่ยมจัตุรัสสองใบ
+              โลโก้กลมข้างใน ป้ายอยู่ข้างล่าง
+              ผูกกับ useMode ตัวเดียวกับที่ตะกร้าและหน้าชำระเงินใช้ ไม่ได้เป็นแค่รูป
+              ประดับ — กดแล้วเปลี่ยนโหมดจริง และค่าส่งกับข้อความในตะกร้าเปลี่ยนตาม */}
+          <View style={styles.modeRow}>
+            {modes.map((m) => {
+              const on = mode === m.key;
+              return (
+                <PressableScale
+                  key={m.key}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={MODE_LABEL[m.key]}
+                  onPress={() => setMode(m.key)}
+                  style={[styles.modeCard, on && styles.modeCardOn]}>
+                  <View style={[styles.modeLogo, on && styles.modeLogoOn]}>
+                    <Image source={m.image} style={styles.modeLogoImg} contentFit="contain" />
+                  </View>
+                  <Text style={[styles.modeLabel, on && styles.modeLabelOn]}>
+                    {MODE_LABEL[m.key]}
+                  </Text>
+                </PressableScale>
+              );
+            })}
+          </View>
+
           {/* Category shortcuts → catalog */}
           <ScrollView
             horizontal
@@ -307,6 +345,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
+  },
+  modeCard: {
+    // จัตุรัสจริง — flex 1 คู่กับ aspectRatio 1 ทำให้สองใบกว้างเท่ากันและสูงเท่าความกว้าง
+    flex: 1,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  modeCardOn: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryTint,
+  },
+  modeLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 999,
+    backgroundColor: Colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modeLogoOn: {
+    backgroundColor: Colors.surface,
+  },
+  modeLogoImg: {
+    width: 54,
+    height: 54,
+  },
+  modeLabel: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    color: Colors.textMuted,
+  },
+  modeLabelOn: {
+    color: Colors.primaryStrong,
   },
   closedBanner: {
     flexDirection: 'row',
