@@ -29,6 +29,7 @@ import { categories } from '@/data/products';
 import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
+import { MODE_META } from '@/store/mode';
 
 const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
@@ -200,8 +201,12 @@ export default function DeliveryHome() {
             </ScrollView>
 
             {/* แบนเนอร์ประจำหน้าเดลิเวอรี่ (เจ้าของสั่ง 3 ก.ย. 2026 แทนแถบ "สั่งตอนนี้
-                ได้ของวันนี้" ที่ให้เอาออก) — ยังไม่ได้อัปรูปก็ไม่ต้องมีช่องว่างค้างไว้
-                วาดต่อเมื่อมีรูปจริงเท่านั้น */}
+                ได้ของวันนี้" ที่ให้เอาออก)
+                ยังไม่ได้อัปรูปก็มีของสำรองวาดไว้ในขนาดเดียวกันเป๊ะ เจ้าของจะได้เห็นว่า
+                ช่องอยู่ตรงไหนและกว้างยาวเท่าไหร่ก่อนทำรูปจริง — และเพราะร้านเปิดขายอยู่
+                จริง ของสำรองจึงต้องเป็นแบนเนอร์ที่ดูตั้งใจทำ ใช้คำที่แอปพูดอยู่แล้ว
+                ไม่ใช่กล่องเทาเขียนว่า "ยังไม่มีรูป" ให้ลูกค้าเห็น
+                และไม่ไปสัญญาตัวเลขอะไรใหม่ที่ยังไม่ได้ตกลงกัน */}
             {deliveryBanner ? (
               <Image
                 source={{ uri: deliveryBanner.image }}
@@ -211,7 +216,24 @@ export default function DeliveryHome() {
                 accessibilityIgnoresInvertColors
                 accessibilityLabel={deliveryBanner.title ?? 'โปรโมชั่น'}
               />
-            ) : null}
+            ) : (
+              <LinearGradient
+                colors={HEAD_RAMP}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.promo, { aspectRatio: BANNER_ASPECT.delivery_promo }]}>
+                <View style={styles.promoCopy}>
+                  <Text style={styles.promoTitle}>อู้ฟู่ เดลิเวอรี่</Text>
+                  <Text style={styles.promoSub}>{MODE_META.delivery.tagline}</Text>
+                </View>
+                <Image
+                  source={MASCOT_SRC}
+                  style={styles.promoArt}
+                  contentFit="contain"
+                  pointerEvents="none"
+                />
+              </LinearGradient>
+            )}
           </View>
 
           <ProductRail title="สั่งซ้ำได้เลย" data={rails.quick} />
@@ -394,5 +416,31 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: Spacing.lg },
   catHead: { marginTop: Spacing.lg },
   catRow: { gap: Spacing.xs, paddingTop: Spacing.sm, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
-  promo: { width: '100%', borderRadius: Radius.md, backgroundColor: Colors.surfaceMuted },
+  promo: {
+    width: '100%',
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+    /* ครอบตัดไว้ เพราะมาสคอตในตัวสำรองถูกวางให้ล้นขอบล่างเพื่อให้ดูโผล่ออกมาจากแบนเนอร์ */
+    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: Spacing.lg,
+  },
+  promoCopy: { flex: 1, gap: 2 },
+  promoTitle: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 19,
+    color: '#fff',
+    textShadowColor: 'rgba(120,40,16,0.30)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  promoSub: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.95)',
+    textShadowColor: 'rgba(120,40,16,0.28)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  promoArt: { width: 104, height: 124, marginBottom: -18, marginRight: Spacing.sm },
 });
