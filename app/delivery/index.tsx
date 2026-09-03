@@ -79,6 +79,7 @@ export default function DeliveryHome() {
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
   const banners = useCatalog((s) => s.banners);
+  const bestsellerIds = useCatalog((s) => s.bestsellerIds);
   const [query, setQuery] = useState('');
   /* ต้องรู้ความสูงหัวจอจริงถึงจะวางช่องค้นหาให้คร่อมรอยต่อสีส้ม/ขาวได้พอดี
    * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
@@ -137,22 +138,40 @@ export default function DeliveryHome() {
    * ไม่ได้ไปดึงข้อมูลชุดใหม่มา ของที่ขายก็คือของเดียวกันทั้งร้าน */
   const deliveryBanner = bannerFor(banners, 'delivery_promo');
 
-  /* หมวดละไม่กี่ชิ้นพอ หน้านี้เป็นหน้าร้าน ไม่ใช่แคตตาล็อก — เอาเฉพาะของที่ยังมีของ
-     เพราะแถวสั้น ๆ ที่มีแต่ป้าย "สินค้าหมด" ไม่ช่วยให้ใครซื้ออะไรได้
-     หมวดที่ไม่เหลือของเลยก็ตัดทั้งแถวทิ้ง ดีกว่าโชว์หัวข้อลอยแล้วว่างเปล่าข้างล่าง */
-  const catSections = useMemo(() => {
-    const names = dbCategories.length
-      ? dbCategories
-      : categories.filter((c) => c !== ALL_CATEGORY);
-    return names
-      .map((name) => ({
-        name,
-        items: products
-          .filter((p) => p.category === name && (p.variants?.[0]?.available ?? 1) > 0)
-          .slice(0, 12),
-      }))
-      .filter((sec) => sec.items.length > 0);
-  }, [products, dbCategories]);
+  /* สามแถวคัดสรร (เจ้าของสั่ง 3 ก.ย. 2026 "นำสินค้าขายดีมา สินค้าแนะนำ สินค้ายอดฮิต")
+     แทนที่แถวไล่ทีละหมวดเดิม — การไล่ทีละหมวดครบทุกหมวดทำให้หน้ายาวและซ้ำกับสิ่งที่
+     วงกลมหมวดหมู่ด้านบนทำอยู่แล้ว (กดเข้าไปดูเต็มหมวดได้ที่นั่น) หน้านี้จึงเน้นแนะนำแทน
+
+     สัญญาณจริงที่มีอยู่มีแค่สองอย่าง: ยอดขายจริง (bestsellerIds จาก POS+ออนไลน์) กับ
+     คะแนนรีวิว — "ขายดี" กับ "แนะนำ" ใช้สองอย่างนี้ตรง ๆ เหมือนที่หน้าแรกทำอยู่แล้ว
+     ส่วน "ยอดฮิต" ไม่มีสัญญาณของตัวเองจริง ๆ (ยังไม่มีการนับยอดวิว/ยอดกดดู) จึงใช้
+     คะแนนรีวิวเหมือนกันแต่เลื่อนช่วงไปอีกชุด ไม่เอาซ้ำกับที่ "แนะนำ" โชว์ไปแล้ว ไม่งั้น
+     สามแถวจะกลายเป็นแถวเดียวกันวนสามรอบ — ถ้าจะมีสัญญาณของแท้ในอนาคต (เช่นยอดวิว)
+     ค่อยเปลี่ยนตรงนี้ */
+  const available = useMemo(
+    () => products.filter((p) => (p.variants?.[0]?.available ?? 1) > 0),
+    [products],
+  );
+  const bestSellers = useMemo(() => {
+    const rank = new Map(bestsellerIds.map((id, i) => [id, i]));
+    return [...available]
+      .sort((a, b) => {
+        const ra = rank.get(a.id) ?? Infinity;
+        const rb = rank.get(b.id) ?? Infinity;
+        return ra !== rb ? ra - rb : b.rating - a.rating;
+      })
+      .slice(0, 10);
+  }, [available, bestsellerIds]);
+  const recommended = useMemo(
+    () => [...available].sort((a, b) => b.rating - a.rating).slice(0, 10),
+    [available],
+  );
+  const popular = useMemo(
+    () => [...available].sort((a, b) => b.rating - a.rating).slice(10, 20),
+    [available],
+  );
+  const seeAllProducts = () =>
+    router.push({ pathname: '/delivery/[cat]', params: { cat: ALL_CATEGORY } });
 
   return (
     <View style={styles.screen}>
@@ -240,19 +259,17 @@ export default function DeliveryHome() {
                 />
               </LinearGradient>
             )}
-          </View>
 
-          {/* สินค้าเรียงตามหมวด ไม่ใช่แถวคัดเองแบบเดิม — เจ้าของย้ายเส้นทางการซื้อให้
-              "สินค้าไปอยู่ในแต่ละหมวด" (3 ก.ย. 2026) หน้านี้จึงเป็นตัวอย่างหมวดละไม่กี่
-              ชิ้น ใครอยากดูครบกด "ดูทั้งหมด" ไปหน้าหมวด ไม่ยัดทั้ง 775 ชิ้นมาไว้หน้าเดียว */}
-          {catSections.map((sec) => (
-            <ProductRail
-              key={sec.name}
-              title={sec.name}
-              data={sec.items}
-              onSeeAll={() => router.push({ pathname: '/delivery/[cat]', params: { cat: sec.name } })}
-            />
-          ))}
+            {/* สามแถวคัดสรร วางในกรอบเดียวกับหมวดหมู่/แบนเนอร์ (styles.body มี
+                paddingHorizontal ของหน้า) — เดิม ProductRail ถูกวางไว้นอกกรอบนี้ การ์ด
+                กับหัวข้อจึงชิดขอบจอซ้ายพอดี (เจ้าของทัก 3 ก.ย. 2026 "การ์ดมันดูชิดขอบ
+                มากๆ") ProductRail เว้นระยะขวาให้ตัวเองอยู่แล้วเพื่อกันเลื่อนสุดแล้วชน
+                ขอบ แต่ไม่ได้เว้นซ้าย เพราะหน้าอื่นทุกหน้าที่ใช้ ProductRail ครอบด้วยกรอบ
+                ที่มี padding อยู่แล้วเหมือนกันหมด */}
+            <ProductRail title="สินค้าขายดี" data={bestSellers} onSeeAll={seeAllProducts} />
+            <ProductRail title="สินค้าแนะนำ" data={recommended} onSeeAll={seeAllProducts} />
+            <ProductRail title="สินค้ายอดฮิต" data={popular} onSeeAll={seeAllProducts} />
+          </View>
         </View>
       </Animated.ScrollView>
 
