@@ -20,7 +20,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { DesktopHome } from '@/components/web/DesktopHome';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
@@ -348,28 +348,36 @@ const styles = StyleSheet.create({
   },
   modeRow: {
     flexDirection: 'row',
+    justifyContent: 'center',
     gap: Spacing.md,
-    marginTop: Spacing.lg,
+    // ดึงขึ้นไปทับขอบล่างแบนเนอร์นิดเดียวตามที่เจ้าของสั่ง — การ์ดจึงคาบเกี่ยวสองส่วน
+    // แทนที่จะลอยอยู่ใต้แบนเนอร์เฉย ๆ  body อยู่หลัง heroWrap ในลำดับ จึงทับได้เอง
+    // ไม่ต้องใช้ zIndex
+    marginTop: -22,
+    marginBottom: Spacing.xs,
   },
   modeCard: {
-    // จัตุรัสจริง — flex 1 คู่กับ aspectRatio 1 ทำให้สองใบกว้างเท่ากันและสูงเท่าความกว้าง
+    // จัตุรัสจริง แต่คุมความกว้างไว้ ไม่ให้ยืดเต็มแถวจนใหญ่เกิน (เจ้าของสั่งให้เล็กลง)
     flex: 1,
+    maxWidth: 132,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
     borderRadius: Radius.lg,
+    // การ์ดขาวเสมอ ไม่ว่าจะเลือกอยู่หรือไม่ (เจ้าของสั่ง) — บอกตัวที่เลือกด้วยกรอบ
+    // กับสีตัวหนังสือแทน ไม่ใช่ถมสีพื้น
     backgroundColor: Colors.surface,
     borderWidth: 2,
     borderColor: Colors.border,
+    ...Shadow.card,
   },
   modeCardOn: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primaryTint,
   },
   modeLogo: {
-    width: 72,
-    height: 72,
+    width: 54,
+    height: 54,
     borderRadius: 999,
     backgroundColor: Colors.surfaceMuted,
     alignItems: 'center',
@@ -377,15 +385,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modeLogoOn: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primaryTint,
   },
   modeLogoImg: {
-    width: 54,
-    height: 54,
+    width: 40,
+    height: 40,
   },
   modeLabel: {
     fontFamily: 'Mitr_500Medium',
-    fontSize: 15,
+    fontSize: 13,
     color: Colors.textMuted,
   },
   modeLabelOn: {
