@@ -24,7 +24,7 @@ import { CartBadge } from '@/components/navigation/CartBadge';
 import { IconButton } from '@/components/ui/IconButton';
 import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
@@ -32,8 +32,9 @@ import { selectedAddress, useAddress } from '@/store/address';
 const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
 const TAB_BAR_CLEARANCE = 110;
-/** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง */
-const SEARCH_H = 54;
+/** ความสูงช่องค้นหา — ใช้คำนวณให้มันคร่อมรอยต่อพอดีครึ่งบนครึ่งล่าง (เจ้าของว่าใหญ่ไป
+ *  3 ก.ย. 2026 ลดจาก 54) */
+const SEARCH_H = 46;
 /* ปลายเฉดล่างต้องเลยขอบหัวจอลงไปให้พ้นรอยหยักมุมของแผ่นขาว (มุมโค้ง 26) เผื่อไว้
    หน่อยกันตอนดึงจอลงเกินขอบแล้วเห็นพื้นเทาโผล่ */
 const BACKDROP_BLEED = 96;
@@ -349,7 +350,9 @@ const styles = StyleSheet.create({
     right: Spacing.lg,
     flexDirection: 'row',
   },
-  search: { flex: 1, height: SEARCH_H, borderRadius: Radius.sm },
+  /* เงาต้องอยู่ที่ตัวช่องค้นหาเอง ไม่ใช่ที่กรอบนอกที่ครอบมันอยู่ — กรอบนอกพื้นใส
+     iOS จะไม่วาดเงาให้วิวที่ไม่มีพื้น */
+  search: { flex: 1, height: SEARCH_H, borderRadius: Radius.sm, ...Shadow.float },
   scroll: { backgroundColor: 'transparent' },
   sheet: {
     // flexGrow ให้แผ่นยืดเต็มจอเสมอ ไม่งั้นเนื้อหาสั้น ๆ จะเห็นสีส้มโผล่ข้างล่างด้วย
