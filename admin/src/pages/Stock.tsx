@@ -901,7 +901,11 @@ export function Stock() {
                 glance, and the list beside it keeps the per-category detail at
                 one line each instead of one bar each. */}
             <Row gutter={16} align="middle">
-              <Col xs={24} sm={10}>
+              {/* สองวงวางข้างกัน (เจ้าของสั่ง 3 ก.ย. 2026) — วงซ้ายบอกสภาพของ
+                  วงขวาบอกว่าของกองนั้นเป็นเงินเท่าไหร่ อ่านคู่กันได้ในสายตาเดียว
+                  เดิมวางซ้อนกันในคอลัมน์เดียว ต้องกวาดสายตาลงล่างถึงจะเจอวงที่สอง
+                  รายการหมวดย้ายลงมาไว้ข้างล่างเต็มความกว้าง ได้ที่อ่านมากกว่าเดิมด้วย */}
+              <Col xs={24} sm={12}>
                 <div style={{ position: 'relative' }}>
                   <ResponsiveContainer width="100%" height={176}>
                     <PieChart>
@@ -965,13 +969,18 @@ export function Stock() {
                   ))}
                 </div>
 
+              </Col>
+
+              <Col xs={24} sm={12}>
                 {/* ต้นทุนของบนชั้น ทำเป็นโดนัทใบที่สองตามที่เจ้าของสั่ง (3 ก.ย. 2026)
                     การ์ดตัวเลขเดี่ยวบอกได้แค่ยอดรวม โดนัทบอกต่อได้ว่าเงินจมอยู่
                     หมวดไหน ซึ่งเป็นคำถามที่ตามมาทันทีหลังเห็นยอดรวม
                     ใช้ภาษาภาพเดียวกับวงบน — วงเดียวกัน ยอดรวมอยู่กลางวงเหมือนกัน */}
                 {costByCategory.length > 0 && (
-                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid #EDEAE7' }}>
-                    <div style={{ fontSize: 13, color: '#6B625C', textAlign: 'center' }}>
+                  <div>
+                    {/* หัวข้อวงขวา จัดให้อยู่ระดับเดียวกับหัวข้อ "สภาพสต๊อกทั้งร้าน"
+                        ของวงซ้าย สองวงจะได้เริ่มที่บรรทัดเดียวกัน */}
+                    <div style={{ fontSize: 13, color: '#6B625C', textAlign: 'center', marginBottom: 2 }}>
                       ต้นทุนของบนชั้น
                     </div>
                     <div style={{ position: 'relative' }}>
@@ -1033,14 +1042,14 @@ export function Stock() {
                 )}
               </Col>
 
-              <Col xs={24} sm={14}>
+              <Col xs={24}>
                 {/* ความสูงตามคอลัมน์ซ้ายที่มีสองวง — เดิมตรึงไว้ 206px ตั้งแต่ตอนมี
                     วงเดียว พอเพิ่มวงต้นทุนเข้ามา สองฝั่งเลยสูงไม่เท่ากัน และแถวล่าง
                     ถูกตัดครึ่งพอดีจนดูเหมือนจอเสีย (เจ้าของทักว่า "ตรงนี้มันจม")
                     เงาจาง ๆ ด้านล่างบอกว่ายังเลื่อนดูต่อได้ ไม่ใช่แค่โดนตัด */}
                 <div
-                  className="pos-scroll-fade"
-                  style={{ maxHeight: 430, overflowY: 'auto', position: 'relative' }}
+                  className="pos-scroll-fade mt-2"
+                  style={{ maxHeight: 300, overflowY: 'auto', position: 'relative' }}
                 >
                   {byCategory.map((c) => {
                     const active = categoryFilter === c.category;
