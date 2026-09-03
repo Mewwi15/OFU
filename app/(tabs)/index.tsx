@@ -7,7 +7,6 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -21,14 +20,13 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { DesktopHome } from '@/components/web/DesktopHome';
-import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { useT } from '@/lib/i18n';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
-import { selectedAddress, useAddress } from '@/store/address';
 import { loadIfStale, useCatalog } from '@/store/catalog';
 import { useShop } from '@/store/shop';
 
@@ -47,7 +45,6 @@ export default function HomeScreen() {
   const isDesktopWeb = useIsDesktopWeb();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const address = useAddress(selectedAddress);
   const shopOpen = useShopOpen();
   const shop = useShop((s) => s.info);
   const t = useT();
@@ -148,40 +145,9 @@ export default function HomeScreen() {
         contentContainerStyle={{
           paddingBottom: TAB_BAR_CLEARANCE + insets.bottom,
         }}>
-        {/* Location + notifications bar — on the app background, above the banner */}
-        <View style={[styles.topBar, { paddingTop: insets.top + Spacing.md }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('home.changeAddress')}
-            style={styles.locLeft}
-            onPress={() => router.push('/address')}>
-            <View style={styles.locPin}>
-              <Ionicons name="location-sharp" size={18} color={Colors.primary} />
-            </View>
-            <View style={styles.locText}>
-              <Text variant="caption" style={{ color: Colors.textMuted }}>
-                {t('home.deliverTo')}
-                {address ? ` · ${address.label}` : ''}
-              </Text>
-              <View style={styles.locAddrRow}>
-                <Text numberOfLines={1} style={styles.locAddr}>
-                  {address ? address.line : t('home.addAddress')}
-                </Text>
-                <Ionicons name="chevron-down" size={16} color={Colors.text} />
-              </View>
-            </View>
-          </Pressable>
-          <IconButton
-            icon="notifications-outline"
-            variant="tint"
-            shape="rounded"
-            size={40}
-            accessibilityLabel={t('home.notifications')}
-            onPress={() => router.push('/notifications')}
-          />
-        </View>
-
-        {/* Hero banner carousel — rounded, inset, with a soft shadow */}
+        {/* Hero banner — ชิดขอบบนสุด เต็มความกว้าง ไหลใต้แถบสถานะ (เจ้าของสั่ง 3 ก.ย. 2026)
+            เดิมมีแถบที่อยู่คั่นอยู่ข้างบนแล้วแบนเนอร์เว้นขอบทั้งสี่ด้าน ภาพเลยดูเป็นการ์ด
+            ใบหนึ่งกลางจอ ไม่ใช่หน้าปกของร้าน */}
         <View style={styles.heroWrap}>
           <View style={styles.hero} onLayout={onBannerLayout}>
             <ScrollView
@@ -203,6 +169,28 @@ export default function HomeScreen() {
                 </View>
               ))}
             </ScrollView>
+
+      {/* หมุดที่อยู่ + กระดิ่ง ลอยมุมขวาบนทับแบนเนอร์ (เจ้าของสั่งให้ที่อยู่เหลือแค่
+          ไอคอนหมุดชิดขวา) — อยู่นอก ScrollView เพื่อให้ค้างอยู่ตอนเลื่อนหน้า ไม่งั้น
+          เลื่อนลงไปนิดเดียวก็กดเปลี่ยนที่อยู่หรือดูแจ้งเตือนไม่ได้แล้ว */}
+      <View style={[styles.topRight, { top: insets.top + Spacing.sm }]} pointerEvents="box-none">
+        <IconButton
+          icon="location-sharp"
+          variant="tint"
+          shape="rounded"
+          size={40}
+          accessibilityLabel={t('home.changeAddress')}
+          onPress={() => router.push('/address')}
+        />
+        <IconButton
+          icon="notifications-outline"
+          variant="tint"
+          shape="rounded"
+          size={40}
+          accessibilityLabel={t('home.notifications')}
+          onPress={() => router.push('/notifications')}
+        />
+      </View>
             {/* Bottom scrim so the dots stay readable over any image */}
             {slides.length > 1 ? (
               <LinearGradient
@@ -295,17 +283,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   heroWrap: {
-    marginTop: Spacing.md,
-    marginHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
+    // เต็มความกว้าง ไม่เว้นขอบ ไม่มีมุมโค้งและเงา — แบนเนอร์เป็นหน้าปกของหน้า
+    // ไม่ใช่การ์ดใบหนึ่งที่วางอยู่บนหน้า
     backgroundColor: Colors.primaryTint,
-    ...Shadow.card,
   },
   hero: {
     // Same aspect the admin crops home slides to (BANNER_ASPECT.home = 2:1),
     // so cropped banners fill the slide with no letterboxing or over-crop.
     aspectRatio: BANNER_ASPECT.home,
-    borderRadius: Radius.lg,
     overflow: 'hidden',
     backgroundColor: Colors.primaryTint,
   },
@@ -316,41 +301,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 56,
   },
-  topBar: {
-    backgroundColor: Colors.background,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  locLeft: {
-    flex: 1,
+  topRight: {
+    position: 'absolute',
+    right: Spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-  },
-  locPin: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locText: {
-    flex: 1,
-  },
-  locAddrRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  locAddr: {
-    fontFamily: 'Mitr_500Medium',
-    fontSize: 15,
-    color: Colors.text,
   },
   closedBanner: {
     flexDirection: 'row',
