@@ -50,7 +50,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { ACTION_COLOR } from '../lib/actionColors';
 import {
@@ -170,24 +170,34 @@ const URGENCY_LABEL: Record<Urgency, string> = {
  *  and value size, so the block scans as a set instead of loose text; `hint`
  *  carries what the number means, which is the part that was missing. */
 function StatTile({
-  label, value, hint, accent, span2,
+  label, value, hint, accent, span2, onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
   accent?: string;
   span2?: boolean;
+  /** กดได้เมื่อมีอะไรให้ดูต่อ — ตัวเลขที่บอกว่ามีปัญหาต้องพาไปดูว่าปัญหาคืออะไรได้ */
+  onClick?: () => void;
 }) {
   return (
     <div
-      className={`rounded-lg px-3 py-2.5 ${span2 ? 'col-span-2' : ''}`}
-      style={{ background: '#FAFAF9', border: '1px solid #EDEAE7' }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
+      className={`rounded-lg px-3 py-2.5 ${span2 ? 'col-span-2' : ''} ${onClick ? 'transition-shadow hover:shadow-md' : ''}`}
+      style={{ background: '#FAFAF9', border: '1px solid #EDEAE7', cursor: onClick ? 'pointer' : undefined }}
     >
       <div style={{ fontSize: 12, color: '#6B625C', lineHeight: 1.4 }}>{label}</div>
       <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.25, color: accent ?? '#2B2320' }}>
         {value}
       </div>
-      {hint && <div style={{ fontSize: 11, color: '#8C837D', lineHeight: 1.4 }}>{hint}</div>}
+      {hint && (
+        <div style={{ fontSize: 11, color: onClick ? accent ?? '#8C837D' : '#8C837D', lineHeight: 1.4 }}>
+          {hint}{onClick ? ' →' : ''}
+        </div>
+      )}
     </div>
   );
 }
@@ -397,8 +407,9 @@ export function Stock() {
      * นับเฉพาะของที่ยังอยู่ในสต๊อกจริง (stock > 0) ของที่หมดแล้วต้นทุนเป็นศูนย์อยู่แล้ว */
     const withCost = items.filter((i) => i.stock > 0 && i.cost != null);
     const noCost = items.filter((i) => i.stock > 0 && i.cost == null);
+    // เก็บตัวรายการไว้ด้วย ไม่ใช่แค่จำนวน — เจ้าของต้องกดดูได้ว่าตัวไหนบ้าง
     const costValue = withCost.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
-    return { pieces, outCount, costValue, noCostCount: noCost.length };
+    return { pieces, outCount, costValue, noCostCount: noCost.length, noCost };
   }, [items]);
 
   /** Every category, split by state. Stacked rather than "items to buy only":
@@ -419,7 +430,9 @@ export function Stock() {
   }, [items]);
 
   /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
+  const nav = useNavigate();
   const [buyListOpen, setBuyListOpen] = useState(false);
+  const [noCostOpen, setNoCostOpen] = useState(false);   // รายการที่ยังไม่ใส่ต้นทุน
   const [printing, setPrinting] = useState(false);
 
   /** Everything due this run, soonest to run out first — the sheet's contents.
@@ -856,6 +869,7 @@ export function Stock() {
                 }
                 accent={totals.noCostCount > 0 ? '#8C6D46' : undefined}
                 span2
+                onClick={totals.noCostCount > 0 ? () => setNoCostOpen(true) : undefined}
               />
             </div>
           </Col>
@@ -1042,6 +1056,60 @@ export function Stock() {
             />
           </Space>
         </Card>
+
+      {/* รายการที่ยังไม่ใส่ต้นทุน — เจ้าของถามว่า "ยังไม่ใส่ต้นทุน 1 รายการ คืออะไร"
+          ตัวเลขที่บอกว่ามีปัญหาต้องพาไปดูได้ว่าปัญหาคือตัวไหน ไม่งั้นก็เป็นแค่
+          ตัวเลขกวนใจที่แก้ไม่ได้ · กดที่แถวเพื่อไปแก้ต้นทุนที่หน้าสินค้าได้เลย */}
+      <Modal
+        open={noCostOpen}
+        title={`ยังไม่ใส่ต้นทุน ${totals.noCostCount} รายการ`}
+        onCancel={() => setNoCostOpen(false)}
+        footer={<Button onClick={() => setNoCostOpen(false)}>ปิด</Button>}
+        width={640}
+        destroyOnHidden
+      >
+        <div style={{ fontSize: 13, color: '#6B625C', marginBottom: 12 }}>
+          สินค้าพวกนี้มีของอยู่บนชั้นแต่ไม่ได้บันทึกราคาทุนไว้ —{' '}
+          <b>ยอด &quot;ต้นทุนของบนชั้น&quot; จึงน้อยกว่าความจริง</b> และรายงานกำไรจะสูงเกินจริงด้วย
+        </div>
+        <Table
+          rowKey="variantId"
+          size="small"
+          pagination={false}
+          scroll={{ y: 360 }}
+          dataSource={totals.noCost}
+          onRow={(i) => ({
+            onClick: () => nav(`/products?q=${encodeURIComponent(i.productName)}`),
+            style: { cursor: 'pointer' },
+          })}
+          columns={[
+            {
+              title: 'สินค้า',
+              render: (_: unknown, i: Item) => (
+                <span style={{ fontSize: 14, color: '#2B2320' }}>{itemLabel(i)}</span>
+              ),
+            },
+            {
+              title: 'หมวด', width: 150,
+              render: (_: unknown, i: Item) => (
+                <span style={{ fontSize: 13, color: '#8C837D' }}>{i.category || '—'}</span>
+              ),
+            },
+            {
+              title: 'คงเหลือ', width: 90, align: 'right' as const,
+              render: (_: unknown, i: Item) => (
+                <span style={{ fontSize: 14, color: '#2B2320', fontVariantNumeric: 'tabular-nums' }}>
+                  {i.stock}
+                </span>
+              ),
+            },
+            {
+              title: '', width: 90, align: 'right' as const,
+              render: () => <span style={{ fontSize: 13, color: '#5B8C6E' }}>ไปใส่ทุน →</span>,
+            },
+          ]}
+        />
+      </Modal>
 
       {/* ใบสั่งซื้อของ — on screen for checking, printable for the trip.
           The browser print dialog's "Save as PDF" covers the PDF ask, so there

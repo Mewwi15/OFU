@@ -30,7 +30,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import ImgCrop from 'antd-img-crop';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   apiError,
@@ -72,7 +72,10 @@ export function Products() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
-  const [query, setQuery] = useState('');
+  /* รับคำค้นจาก URL (?q=) — หน้าสต๊อกลิงก์มาที่นี่เพื่อให้ไปแก้ต้นทุนสินค้าตัวที่
+     ยังไม่ได้ใส่ ถ้าไม่รับคำค้นก็จะเด้งมาเจอสินค้าทั้งร้านแล้วต้องหาเองอีกที */
+  const [params] = useSearchParams();
+  const [query, setQuery] = useState(() => params.get('q') ?? '');
   const [catFilter, setCatFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   // Barcode to prefill when opening the Add modal via a scan (goods intake).
@@ -346,7 +349,7 @@ export function Products() {
 
       {/* filters */}
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <Input.Search allowClear placeholder="ค้นหาชื่อ / บาร์โค้ด…" autoComplete="off" onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
+        <Input.Search allowClear placeholder="ค้นหาชื่อ / บาร์โค้ด…" autoComplete="off" defaultValue={query} onChange={(e) => setQuery(e.target.value)} style={{ width: 220 }} />
         <Select
           allowClear
           placeholder="ทุกหมวดหมู่"
