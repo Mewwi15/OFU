@@ -193,19 +193,26 @@ export default function HomeScreen() {
           ไอคอนหมุดชิดขวา) — อยู่นอก ScrollView เพื่อให้ค้างอยู่ตอนเลื่อนหน้า ไม่งั้น
           เลื่อนลงไปนิดเดียวก็กดเปลี่ยนที่อยู่หรือดูแจ้งเตือนไม่ได้แล้ว */}
       <View style={[styles.topRight, { top: insets.top + Spacing.sm }]} pointerEvents="box-none">
+        {/* วงกลมขาวมีเงา (เจ้าของสั่ง 3 ก.ย. 2026) — variant surface ให้พื้นขาว
+            shape circle ให้เป็นวงกลม · เงาฟุ้งกว่าค่าเริ่มต้นเพราะปุ่มลอยอยู่บน
+            ภาพสีส้ม เงาคมจะอ่านเป็นเส้นขอบมืดแทนที่จะเป็นการลอย (เหมือนการ์ดโหมด)
+            เปลี่ยนหมุดจาก location-sharp (ทรงหยดน้ำทึบ ดูหนัก) เป็นแบบเส้น
+            ให้น้ำหนักเส้นเท่ากระดิ่งที่อยู่ข้างกัน */}
         <IconButton
-          icon="location-sharp"
-          variant="tint"
-          shape="rounded"
-          size={40}
+          icon="location-outline"
+          variant="surface"
+          shape="circle"
+          size={44}
+          style={styles.floatBtn}
           accessibilityLabel={t('home.changeAddress')}
           onPress={() => router.push('/address')}
         />
         <IconButton
           icon="notifications-outline"
-          variant="tint"
-          shape="rounded"
-          size={40}
+          variant="surface"
+          shape="circle"
+          size={44}
+          style={styles.floatBtn}
           accessibilityLabel={t('home.notifications')}
           onPress={() => router.push('/notifications')}
         />
@@ -361,6 +368,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  floatBtn: {
+    // เงาฟุ้งชุดเดียวกับการ์ดโหมด — ปุ่มลอยบนภาพสีส้มเหมือนกัน
+    shadowColor: '#7A4A2E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 7,
   },
   modeRow: {
     flexDirection: 'row',
