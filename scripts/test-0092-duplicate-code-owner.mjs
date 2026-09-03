@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * พิสูจน์ไมเกรชัน 0092 — บาร์โค้ด/SKU ซ้ำต้องบอกว่าไปซ้ำกับตัวไหน
+ * พิสูจน์ไมเกรชัน 0092 + 0093 — เรื่องบาร์โค้ด/SKU ซ้ำ
  *
  * ที่มา: เจ้าของแก้บาร์โค้ดแล้วระบบบอก "บาร์โค้ดนี้ถูกใช้แล้ว" แต่หาในหน้าสินค้าไม่เจอ
- * เพราะตัวที่ถือบาร์โค้ดอยู่เป็นสินค้า/ขนาดที่เลิกขายแล้ว ซึ่งหน้าสินค้ากรองทิ้ง
- * เทสต์นี้จำลองทั้งสามสถานะที่หาไม่เจอหรือหายาก แล้วเช็คว่า detail บอกชื่อ+สถานะจริง
+ * เพราะโค้ดนั้นค้างอยู่กับสินค้า/ขนาดที่เลิกขายแล้ว ซึ่งหน้าสินค้ากรองทิ้ง
+ *
+ * กติกาใหม่:
+ *   - เลิกขายแล้ว = คืนโค้ดให้ใช้ซ้ำได้ (0093) ทั้งดัชนี unique และการเช็คในโค้ด
+ *   - ที่ยังใช้อยู่จริง (รวมสินค้าร่าง) = ยังบล็อก แต่ต้องบอกว่าไปซ้ำกับตัวไหน (0092)
  *
  * รัน (เครื่องตัวเองเท่านั้น — สร้าง/แก้ข้อมูลจริง):
  *   SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=<anon> \
@@ -34,7 +37,7 @@ const admin = createClient(URL, ANON, { auth: { persistSession: false, autoRefre
 const STAMP = Date.now();
 const code = (tag) => `T${STAMP}${tag}`;
 
-/** เรียก upsert_variant แล้วคืน { ok, code, detail } แทนที่จะโยน */
+/** เรียก upsert_variant แล้วคืนผลแทนที่จะโยน — เทสต์นี้สนใจโค้ดกับ detail */
 async function tryVariant(args) {
   const { error } = await admin.rpc('upsert_variant', args);
   if (!error) return { ok: true };
@@ -62,69 +65,70 @@ async function main() {
   if (signIn.error) throw new Error(`admin signIn: ${signIn.error.message}`);
   console.log(`  admin ${au.id}`);
 
-  /* ── A. บาร์โค้ดค้างกับสินค้าที่เลิกขายแล้ว (เคสของเจ้าของ) ─────────────────── */
-  console.log('\nA — บาร์โค้ดค้างกับสินค้าที่เลิกขายแล้ว');
+  const target = await newProduct(`สินค้าที่จะรับโค้ดต่อ ${STAMP}`);
+
+  /* ── A. เลิกขายทั้งสินค้า → โค้ดต้องว่างให้ใช้ต่อได้ (เคสของเจ้าของ) ──────── */
+  console.log('\nA — เลิกขายทั้งสินค้า แล้วเอาบาร์โค้ดไปใช้ต่อ');
   const BC_A = code('A');
   const holderA = await newProduct(`ตัวถือบาร์โค้ด เลิกขาย ${STAMP}`);
   await tryVariant({ p_product_id: holderA, p_price: 10, p_barcode: BC_A });
-  await db.from('products').update({ archived_at: new Date().toISOString() }).eq('id', holderA);
+  const del = await admin.rpc('delete_product', { p_id: holderA });
+  check('A1', !del.error, 'เลิกขายสินค้าได้', del.error?.message);
 
-  const seen = await admin
-    .from('products')
-    .select('id')
-    .eq('id', holderA)
-    .is('archived_at', null);
-  check('A1', (seen.data ?? []).length === 0, 'ตัวที่ถือบาร์โค้ดหายไปจากรายการที่หน้าสินค้าดึง (กรอง archived_at)');
+  const vA = (await db.from('product_variants').select('archived_at').eq('product_id', holderA)).data ?? [];
+  check('A2', vA.length > 0 && vA.every((v) => v.archived_at), 'เลิกขายสินค้าแล้วขนาดของมันถูกเลิกขายตามด้วย', JSON.stringify(vA));
 
-  const other = await newProduct(`สินค้าที่จะแก้บาร์โค้ด ${STAMP}`);
-  const rA = await tryVariant({ p_product_id: other, p_price: 20, p_barcode: BC_A });
-  check('A2', !rA.ok && rA.code === 'DUPLICATE_BARCODE', 'ยังบล็อกบาร์โค้ดซ้ำเหมือนเดิม', `${rA.code}`);
-  check('A3', !!rA.detail && rA.detail.includes('เลิกขาย'), 'ข้อความบอกว่าตัวที่ถืออยู่เลิกขายแล้ว', rA.detail);
-  check('A4', !!rA.detail && rA.detail.includes(String(STAMP)), 'ข้อความบอกชื่อสินค้าที่ถือบาร์โค้ดอยู่', rA.detail);
+  const rA = await tryVariant({ p_product_id: target, p_price: 20, p_barcode: BC_A });
+  check('A3', rA.ok, 'เอาบาร์โค้ดของสินค้าที่เลิกขายแล้วมาใช้ต่อได้ (ทั้งโค้ดเช็คและดัชนี unique)', `${rA.code} ${rA.detail ?? ''}`);
 
-  /* ── B. บาร์โค้ดค้างกับ "ขนาด" ที่เลิกขาย ทั้งที่สินค้ายังขายอยู่ ───────────── */
-  console.log('\nB — บาร์โค้ดค้างกับขนาดที่เลิกขาย (สินค้ายังอยู่)');
+  /* ── B. เลิกขายเฉพาะ "ขนาด" ทั้งที่สินค้ายังอยู่ → โค้ดต้องว่างเหมือนกัน ──── */
+  console.log('\nB — เลิกขายเฉพาะขนาด (สินค้ายังอยู่)');
   const BC_B = code('B');
   const holderB = await newProduct(`สินค้ายังขายอยู่ ขนาดเลิกขาย ${STAMP}`);
   await tryVariant({ p_product_id: holderB, p_price: 30, p_barcode: BC_B, p_size: 'เลิกทำ' });
-  await db
-    .from('product_variants')
-    .update({ archived_at: new Date().toISOString() })
-    .eq('barcode', BC_B);
-  const rB = await tryVariant({ p_product_id: other, p_price: 40, p_barcode: BC_B });
-  check('B1', !rB.ok && rB.code === 'DUPLICATE_BARCODE', 'บล็อกบาร์โค้ดที่ค้างกับขนาดที่เลิกขาย', `${rB.code}`);
-  check('B2', !!rB.detail && rB.detail.includes('ขนาดนี้เลิกขายแล้ว'), 'ข้อความชี้ว่าเป็นขนาดที่เลิกขาย ไม่ใช่ทั้งสินค้า', rB.detail);
-  check('B3', !!rB.detail && rB.detail.includes('เลิกทำ'), 'ข้อความบอกชื่อขนาดด้วย จะได้รู้ว่าแถวไหน', rB.detail);
+  await db.from('product_variants').update({ archived_at: new Date().toISOString() }).eq('barcode', BC_B);
+  const target2 = await newProduct(`สินค้าที่จะรับโค้ด B ${STAMP}`);
+  const rB = await tryVariant({ p_product_id: target2, p_price: 40, p_barcode: BC_B });
+  check('B1', rB.ok, 'เอาบาร์โค้ดของขนาดที่เลิกขายมาใช้ต่อได้', `${rB.code} ${rB.detail ?? ''}`);
 
-  /* ── C. สินค้าร่าง — เห็นในหน้าสินค้าได้ แต่ต้องบอกสถานะให้ชัด ───────────── */
-  console.log('\nC — บาร์โค้ดค้างกับสินค้าร่าง');
+  /* ── C. ยังขายอยู่จริง (สินค้าร่าง) → ต้องบล็อก และบอกว่าซ้ำกับตัวไหน ────── */
+  console.log('\nC — บาร์โค้ดที่ยังถูกใช้อยู่จริง (สินค้าร่าง)');
   const BC_C = code('C');
   const holderC = await newProduct(`สินค้าร่างถือบาร์โค้ด ${STAMP}`);
   await tryVariant({ p_product_id: holderC, p_price: 50, p_barcode: BC_C });
-  const rC = await tryVariant({ p_product_id: other, p_price: 60, p_barcode: BC_C });
-  check('C1', !rC.ok && rC.code === 'DUPLICATE_BARCODE', 'บล็อกบาร์โค้ดที่ค้างกับสินค้าร่าง', `${rC.code}`);
-  check('C2', !!rC.detail && rC.detail.includes('ร่าง'), 'ข้อความบอกว่าเป็นสินค้าร่าง', rC.detail);
+  const target3 = await newProduct(`สินค้าที่จะรับโค้ด C ${STAMP}`);
+  const rC = await tryVariant({ p_product_id: target3, p_price: 60, p_barcode: BC_C });
+  check('C1', !rC.ok && rC.code === 'DUPLICATE_BARCODE', 'ยังบล็อกบาร์โค้ดที่ของยังใช้อยู่', `${rC.code}`);
+  check('C2', !!rC.detail && rC.detail.includes(String(STAMP)), 'ข้อความบอกชื่อสินค้าที่ถือบาร์โค้ดอยู่', rC.detail);
+  check('C3', !!rC.detail && rC.detail.includes('ร่าง'), 'ข้อความบอกสถานะว่าเป็นสินค้าร่าง', rC.detail);
 
   /* ── D. SKU ก็ต้องบอกเจ้าของเหมือนกัน ──────────────────────────────────── */
   console.log('\nD — SKU ซ้ำ');
   const SKU_D = code('D');
   const holderD = await newProduct(`สินค้าถือ SKU ${STAMP}`);
   await tryVariant({ p_product_id: holderD, p_price: 70, p_sku: SKU_D });
-  const rD = await tryVariant({ p_product_id: other, p_price: 80, p_sku: SKU_D });
-  check('D1', !rD.ok && rD.code === 'DUPLICATE_SKU', 'บล็อก SKU ซ้ำ', `${rD.code}`);
+  const target4 = await newProduct(`สินค้าที่จะรับ SKU ${STAMP}`);
+  const rD = await tryVariant({ p_product_id: target4, p_price: 80, p_sku: SKU_D });
+  check('D1', !rD.ok && rD.code === 'DUPLICATE_SKU', 'บล็อก SKU ซ้ำที่ยังใช้อยู่', `${rD.code}`);
   check('D2', !!rD.detail && rD.detail.includes(String(STAMP)), 'ข้อความบอกชื่อสินค้าที่ถือ SKU อยู่', rD.detail);
 
-  /* ── E. แก้ของตัวเองโดยไม่เปลี่ยนบาร์โค้ด ต้องไม่โดนบล็อก ─────────────────── */
-  console.log('\nE — แก้แถวตัวเองต้องไม่ติดว่าซ้ำกับตัวเอง');
+  /* ── E. แก้แถวตัวเองโดยคงบาร์โค้ดเดิม ต้องไม่ติดว่าซ้ำกับตัวเอง ──────────── */
+  console.log('\nE — แก้แถวตัวเอง');
   const BC_E = code('E');
   const holderE = await newProduct(`แก้ตัวเอง ${STAMP}`);
   await tryVariant({ p_product_id: holderE, p_price: 90, p_barcode: BC_E });
-  const own = (await db.from('product_variants').select('id').eq('barcode', BC_E).single()).data;
+  const own = (await db.from('product_variants').select('id').eq('barcode', BC_E).is('archived_at', null).single()).data;
   const rE = await tryVariant({ p_id: own.id, p_product_id: holderE, p_price: 95, p_barcode: BC_E });
   check('E1', rE.ok, 'แก้ราคาโดยคงบาร์โค้ดเดิมไว้ยังทำได้', `${rE.code} ${rE.detail ?? ''}`);
 
+  /* ── F. ประวัติต้องไม่หาย — แถวที่เลิกขายยังอยู่ครบ ─────────────────────── */
+  console.log('\nF — แถวที่เลิกขายยังอยู่ ประวัติไม่หาย');
+  const kept = (await db.from('product_variants').select('id, barcode').eq('product_id', holderA)).data ?? [];
+  check('F1', kept.length > 0, 'แถวของสินค้าที่เลิกขายยังอยู่ในตาราง ไม่ได้ถูกลบทิ้ง', `${kept.length} แถว`);
+  check('F2', kept.some((v) => v.barcode === BC_A), 'บาร์โค้ดเดิมยังติดอยู่กับแถวเก่า บิลเก่ายังสาวกลับได้', JSON.stringify(kept));
+
   /* ── ล้างของที่สร้างไว้ ─────────────────────────────────────────────────── */
-  const ids = [holderA, holderB, holderC, holderD, holderE, other];
+  const ids = [holderA, holderB, holderC, holderD, holderE, target, target2, target3, target4];
   await db.from('product_variants').delete().in('product_id', ids);
   await db.from('products').delete().in('id', ids);
 
