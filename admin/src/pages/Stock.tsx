@@ -127,6 +127,17 @@ function flatten(products: Product[], perDay: Record<string, number>): Item[] {
   });
 }
 
+/** ชิปเลือกหมวดในใบสั่งซื้อ — ตัวที่เลือกอยู่ทึบ ที่เหลือเป็นเส้นขอบ */
+const chipStyle = (active: boolean): React.CSSProperties => ({
+  border: `1px solid ${active ? '#5B8C6E' : '#E0DCD8'}`,
+  background: active ? '#5B8C6E' : '#fff',
+  color: active ? '#fff' : '#5C534E',
+  borderRadius: 999,
+  padding: '3px 11px',
+  fontSize: 12,
+  cursor: 'pointer',
+});
+
 const itemLabel = (i: { productName: string; size: string | null }) =>
   i.productName + (i.size ? ` (${i.size})` : '');
 
@@ -416,11 +427,6 @@ export function Stock() {
     return { pieces, outCount, costValue, noCostCount: noCost.length, noCost };
   }, [items]);
 
-  /** Every category, split by state. Stacked rather than "items to buy only":
-   *  the buy count alone says what to fetch but not how each part of the shop
-   *  is doing — ของใช้ในบ้าน having 121 to buy reads very differently once you
-   *  see it also has 132 sitting untouched. Counts, not money: value questions
-   *  belong on รายงาน, which owns them with a date range. */
   /* ต้นทุนแยกตามหมวด — โดนัทใบที่สองตอบว่า "เงินจมอยู่ที่หมวดไหน" ซึ่งการ์ดตัวเลข
    * เดี่ยว ๆ ตอบไม่ได้ · รวมหมวดที่เล็กกว่า 3% เป็น "อื่น ๆ" ไม่งั้นวงแตกเป็นเสี้ยว
    * บาง ๆ สิบกว่าเสี้ยวจนอ่านไม่ออก (บทเรียนเดียวกับตอนทำแถบสัดส่วนแล้วโดนตีกลับ) */
@@ -438,22 +444,12 @@ export function Stock() {
     return rest > 0 ? [...big, { name: 'อื่น ๆ', value: rest }] : big;
   }, [items]);
 
-  const byCategory = useMemo(() => {
-    type Row = { category: string; buy: number; idle: number; ok: number; count: number };
-    const acc = new Map<string, Row>();
-    for (const i of items) {
-      const row = acc.get(i.category) ?? { category: i.category, buy: 0, idle: 0, ok: 0, count: 0 };
-      row[urgencyOf(i)] += 1;
-      row.count += 1;
-      acc.set(i.category, row);
-    }
-    return [...acc.values()].sort((a, b) => b.buy - a.buy || b.count - a.count);
-  }, [items]);
 
   /* ── ใบสั่งซื้อของ ──────────────────────────────────────────────────────── */
   const nav = useNavigate();
   const [buyListOpen, setBuyListOpen] = useState(false);
   const [noCostOpen, setNoCostOpen] = useState(false);   // รายการที่ยังไม่ใส่ต้นทุน
+  const [buyCat, setBuyCat] = useState<string | null>(null);   // กรองใบสั่งซื้อตามหมวด
   const [printing, setPrinting] = useState(false);
 
   /** Everything due this run, soonest to run out first — the sheet's contents.
@@ -465,6 +461,21 @@ export function Stock() {
         .filter((i) => urgencyOf(i) === 'buy')
         .sort((a, b) => a.stock - b.stock || b.perDay - a.perDay),
     [items],
+  );
+
+  /* หมวดของ "ที่ต้องซื้อ" — ย้ายมาจากรายการหมวดบนหน้าหลัก เรียงจากหมวดที่ต้องซื้อ
+   * เยอะสุดก่อน เพราะเวลาไปร้านส่งคนเดินซื้อทีละโซน โซนที่ของเยอะสุดคือโซนแรกที่ไป */
+  const buyByCategory = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const i of buyRows) acc.set(i.category, (acc.get(i.category) ?? 0) + 1);
+    return [...acc.entries()]
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [buyRows]);
+
+  const buyShown = useMemo(
+    () => (buyCat ? buyRows.filter((i) => i.category === buyCat) : buyRows),
+    [buyRows, buyCat],
   );
 
   const buyTotals = useMemo(() => {
@@ -1042,46 +1053,6 @@ export function Stock() {
                 )}
               </Col>
 
-              <Col xs={24}>
-                {/* ความสูงตามคอลัมน์ซ้ายที่มีสองวง — เดิมตรึงไว้ 206px ตั้งแต่ตอนมี
-                    วงเดียว พอเพิ่มวงต้นทุนเข้ามา สองฝั่งเลยสูงไม่เท่ากัน และแถวล่าง
-                    ถูกตัดครึ่งพอดีจนดูเหมือนจอเสีย (เจ้าของทักว่า "ตรงนี้มันจม")
-                    เงาจาง ๆ ด้านล่างบอกว่ายังเลื่อนดูต่อได้ ไม่ใช่แค่โดนตัด */}
-                <div
-                  className="pos-scroll-fade mt-2"
-                  style={{ maxHeight: 300, overflowY: 'auto', position: 'relative' }}
-                >
-                  {byCategory.map((c) => {
-                    const active = categoryFilter === c.category;
-                    return (
-                      <button
-                        key={c.category}
-                        type="button"
-                        onClick={() => setCategoryFilter(active ? null : c.category)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left"
-                        style={{
-                          background: active ? '#F2F5F3' : 'transparent',
-                          border: 0,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span className="flex-1 truncate" style={{ fontSize: 13, color: '#2B2320' }}>
-                          {c.category}
-                        </span>
-                        <span style={{ fontSize: 12, color: '#A8A099' }}>{c.count}</span>
-                        <span
-                          style={{
-                            minWidth: 52, textAlign: 'right', fontSize: 13, fontWeight: 700,
-                            color: c.buy > 0 ? URGENCY_COLOR.buy : '#C9C3BE',
-                          }}
-                        >
-                          {c.buy > 0 ? `ซื้อ ${c.buy}` : '—'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </Col>
             </Row>
           </Col>
         </Row>
@@ -1220,6 +1191,9 @@ export function Stock() {
           </Button>,
         ]}
       >
+        {/* หมวดของ "ที่ต้องซื้อ" ย้ายมาจากหน้าหลัก (เจ้าของสั่ง 3 ก.ย. 2026) —
+            มันคือข้อมูลตอนไปซื้อของ ไม่ใช่ข้อมูลตอนกวาดตาดูภาพรวม อยู่ในใบสั่งซื้อ
+            ถูกที่กว่า และกดเลือกหมวดเพื่อเดินซื้อทีละโซนในร้านส่งได้ด้วย */}
         <Row gutter={16} className="mb-3">
           <Col span={8}>
             <Text type="secondary" style={{ fontSize: 12 }}>ต้องซื้อ</Text>
@@ -1238,10 +1212,28 @@ export function Stock() {
           </Col>
         </Row>
 
+        {/* ชิปหมวด — ย้ายมาจากรายการหมวดบนหน้าหลัก กดเลือกเพื่อเดินซื้อทีละโซน
+            ในร้านส่งได้ ไม่ต้องกวาดทั้งใบหาว่าหมวดนี้มีอะไรบ้าง */}
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => setBuyCat(null)} style={chipStyle(buyCat === null)}>
+            ทุกหมวด {buyRows.length}
+          </button>
+          {buyByCategory.map((c) => (
+            <button
+              key={c.category}
+              type="button"
+              onClick={() => setBuyCat(buyCat === c.category ? null : c.category)}
+              style={chipStyle(buyCat === c.category)}
+            >
+              {c.category} {c.count}
+            </button>
+          ))}
+        </div>
+
         <Table
           rowKey="variantId"
           size="small"
-          dataSource={buyRows}
+          dataSource={buyShown}
           pagination={false}
           scroll={{ y: 380 }}
           columns={[
