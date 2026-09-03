@@ -31,6 +31,13 @@ export function apiError(e: unknown): string {
   if (msg === 'VALIDATION' && err?.details && VALIDATION_DETAIL_TH[err.details]) {
     return VALIDATION_DETAIL_TH[err.details];
   }
+  /* บาร์โค้ด/SKU ซ้ำ: ต้องบอกด้วยว่าไปซ้ำกับตัวไหน ไม่งั้นถ้าตัวที่ถืออยู่เป็นสินค้าที่
+     เลิกขายแล้ว มันจะไม่โผล่ในหน้าสินค้า (กรอง archived_at ออก) เจ้าของก็จะหาไม่เจอ
+     แล้วแก้อะไรไม่ได้เลย — เจอปัญหานี้จริง 3 ก.ย. 2026 */
+  if ((msg === 'DUPLICATE_BARCODE' || msg === 'DUPLICATE_SKU') && err?.details) {
+    const what = msg === 'DUPLICATE_BARCODE' ? 'บาร์โค้ด' : 'รหัส SKU';
+    return `${what}นี้ถูกใช้แล้วกับ ${err.details}`;
+  }
   const th: Record<string, string> = {
     FORBIDDEN: 'ไม่มีสิทธิ์ทำรายการนี้',
     DUPLICATE_CATEGORY: 'มีหมวดหมู่ชื่อนี้แล้ว',
