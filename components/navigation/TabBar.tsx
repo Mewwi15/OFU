@@ -96,7 +96,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 <View style={[styles.raisedDisc, isFocused && styles.raisedDiscActive]}>
                   <Ionicons
                     name={isFocused ? meta.active : meta.inactive}
-                    size={28}
+                    size={32}
                     color={Colors.textOnPrimary}
                   />
                 </View>
@@ -138,7 +138,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               <View style={styles.iconWrap}>
                 <Ionicons
                   name={isFocused ? meta.active : meta.inactive}
-                  size={24}
+                  size={28}
                   color={tint}
                 />
                 {route.name === 'cart' ? <CartBadge /> : null}
@@ -221,10 +221,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   raisedDisc: {
-    width: 60,
-    height: 60,
+    // วงกลมใหญ่ขึ้นตามที่เจ้าของสั่ง 3 ก.ย. 2026 (60 → 68)
+    // marginTop เป็นลบครึ่งหนึ่งของขนาดเสมอ วงจึงโผล่พ้นขอบบนแถบพอดีครึ่งวง
+    width: 68,
+    height: 68,
     borderRadius: Radius.pill,
-    marginTop: -30,
+    marginTop: -34,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primary,
@@ -236,6 +238,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryStrong,
   },
   raisedLabel: {
-    marginTop: 4,
+    /* ให้ป้าย "คำสั่งซื้อ" อยู่แนวเดียวกับป้ายอื่น (เจ้าของทัก 3 ก.ย. 2026)
+     *
+     * ป้ายแท็บปกติเริ่มที่ 41 จากขอบบนของช่อง = paddingVertical 4 + แถบขีด 3
+     * + ระยะใต้ขีด 4 + ไอคอน 28 + ช่องไฟ 2
+     * ฝั่งวงกลมไม่มี paddingVertical และวงจบที่ -34 + 68 = 34 จึงต้องเว้นอีก
+     * ค่าที่คำนวณได้คือ 7 แต่วัดจากภาพจริงแล้วยังสูงกว่าอยู่ราว 3pt (เส้นฐานตัวอักษร
+     * ไม่ได้เริ่มที่ขอบบนกล่องข้อความพอดี) จึงใช้ 10 ตามที่วัดได้จริง
+     * ถ้าเปลี่ยนขนาดวงหรือขนาดไอคอน ต้องวัดใหม่ ไม่งั้นป้ายจะเหลื่อมอีก */
+    marginTop: 10,
   },
 });
