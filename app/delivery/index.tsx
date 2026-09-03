@@ -42,11 +42,12 @@ const BACKDROP_BLEED = 96;
    ต้องคิดจากขนาดจริงของสองอย่างนี้ ไม่ใช่จากเปอร์เซ็นต์ของหัวจอเต็ม เพราะหัวจอเต็ม
    สูงไม่เท่ากันในแต่ละเครื่อง (safe area) แต่แถบย่อควรสูงเท่ากันทุกเครื่อง */
 const NAV_H = 34; // ปุ่มเล็กลงตามที่สั่ง 3 ก.ย. 2026
-const ADDR_LIFT = 44; // ยกบล็อกที่อยู่ขึ้นไปเสมอแถวปุ่ม
-const ADDR_MARGIN = -2; // ที่อยู่ขยับขึ้นชิดแถวปุ่ม (เจ้าของสั่ง 3 ก.ย. 2026)
+const ADDR_LIFT = 48; // ยกบล็อกที่อยู่ขึ้นไปเสมอแถวปุ่ม
+const ADDR_MARGIN = 12; // ช่องไฟใต้แถวปุ่ม (เจ้าของว่า -2 อัดแน่นเกินไป)
 const ADDR_SHIFT = 52; // แล้วเลื่อนขวาให้พ้นปุ่มย้อนกลับ
 const BAR_PAD_BOTTOM = 14;
 const HEAD_PAD_TOP = 2; // ปุ่มชิดขอบบนกว่าเดิม
+const HEAD_PAD_BOTTOM = 40; // เว้นล่างให้ที่อยู่ไม่ไปชนช่องค้นหาที่คร่อมขอบอยู่
 /* มาสคอตเสือ OFU (เจ้าของส่งมา 3 ก.ย. 2026) — ไฟล์ถูกครอบให้ชิดตัวรูปพอดีแล้ว
    ไม่มีขอบใสเหลือ ตำแหน่งจึงคิดจากขอบกล่องได้ตรง ๆ ต่างจากรูปเดิมที่มีพื้นใสรอบ ๆ
    สัดส่วน 409:488 เป็นแนวตั้ง ต้องกำหนดกว้าง/สูงแยกกัน ใส่กล่องจัตุรัสแล้วจะเล็กเกิน */
@@ -59,14 +60,15 @@ const MASCOT_RIGHT = 48;
 /* เลิกใช้ส้มแบรนด์เดิม ย้ายมาใช้เฉดของแบนเนอร์ภาพที่ 2 (เจ้าของสั่ง 3 ก.ย. 2026)
    ดูดสีจากไฟล์แบนเนอร์จริงบน production ไม่ได้กะเอาเอง — ไล่จากบนลงล่างตรง ๆ
    ไม่ใช่ทแยงเหมือนเดิม เพราะของเดิมในภาพก็ไล่แนวตั้ง ถ้าทำทแยงจะไม่เข้าคู่กับแบนเนอร์
-   ปลายล่างเป็นครีมอ่อน กลืนกับแผ่นเนื้อหาสีอ่อนพอดี แต่แลกมาด้วยการที่ตัวหนังสือขาว
-   ใช้ไม่ได้อีกต่อไป ต้องเปลี่ยนเป็นสีเข้ม */
-const HEAD_RAMP = ['#FC5738', '#FD8D61', '#FCDEB4'] as const;
-/* สีตัวหนังสือบนหัวจอ — น้ำตาลอมแดงเข้ม ไม่ใช่ขาวและไม่ใช่เทาดำ
-   ขาวใช้ไม่ได้เพราะครึ่งล่างของเฉดสว่างเกิน · สีแบรนด์ (#B83C18) ก็ใช้ไม่ได้ ลองแล้ว
-   ทับกับพื้นส้มอ่อนจนแทบอ่านไม่ออก (อัตราต่างสีราว 1.9 ต่ำกว่าเกณฑ์มาก)
-   เทาดำอ่านออกแต่ดูจืดบนพื้นโทนอุ่น น้ำตาลเข้มได้ทั้งอ่านออกและเข้ากับโทน */
-const HEAD_INK = '#5A2410';
+   ครีมอ่อนถูกดันลงไปอยู่ใต้ขอบหัวจอ (ดู HEAD_RAMP_STOPS) เพราะเจ้าของขอตัวหนังสือ
+   สีขาวกลับมา ถ้าปล่อยให้ไล่ถึงครีมในเขตที่มีตัวหนังสือ ขาวจะจมหายไปกับพื้น
+   ส่วนที่มองเห็นจึงเป็นช่วงบนของเฉดแบนเนอร์ ครีมโผล่แค่ตรงรอยหยักมุมกับตอนดึงจอ */
+const HEAD_RAMP = ['#FC5738', '#FD7A50', '#FCDEB4'] as const;
+/* กลับมาใช้ตัวหนังสือขาวตามที่เจ้าของสั่ง 3 ก.ย. 2026 — ต้องจับคู่กับการหยุดเฉดไว้
+   ที่โทนเข้มตลอดเขตหัวจอ ไม่งั้นขาวจะจมหายไปกับพื้น
+   ใส่เงาจาง ๆ ใต้ตัวอักษรด้วย ขาวบนส้มสว่างมีค่าต่างสีราว 2.8 ซึ่งบางกว่าที่ควร
+   เงาช่วยตรึงขอบตัวอักษรให้อ่านออกโดยไม่ต้องเปลี่ยนสีที่เจ้าของเลือก */
+const HEAD_INK = '#FFFFFF';
 
 export default function DeliveryHome() {
   const insets = useSafeAreaInsets();
@@ -85,6 +87,9 @@ export default function DeliveryHome() {
   const headEff = headH || insets.top + 124;
   /* ความสูงของ "ผ้าใบ" ที่ใช้วาดเฉด ทั้งสองชั้นต้องใช้ค่านี้เท่ากัน องศาไล่สีจึงตรงกัน */
   const rampH = headEff + BACKDROP_BLEED;
+  /* จุดพักเฉด: สีที่สองไปตกที่ขอบล่างหัวจอพอดี ครีมจึงอยู่ใต้ขอบทั้งหมด
+     ถ้าปล่อยให้กระจายเท่า ๆ กันทั้งผ้าใบ ครีมจะไต่ขึ้นมาถึงบรรทัดที่อยู่ */
+  const rampStops: readonly [number, number, number] = [0, headEff / rampH, 1];
   /* บล็อกที่อยู่สูงกว่าปุ่ม พอยกขึ้นไปอยู่แถวเดียวกันมันจึงล้นขึ้นไปข้างบน ต้องกันไม่ให้
      ล้ำเข้าไปในแถบสถานะ — เครื่องที่ขอบบนบาง (แอนดรอยด์ ~24) ยก 44 เท่ากันจะไปทับนาฬิกา
      พอดี ยอมให้ล้ำขึ้นไปได้ไม่เกิน 20% ของขอบบน เครื่องจอบากจึงยกได้เต็ม */
@@ -146,6 +151,7 @@ export default function DeliveryHome() {
         colors={HEAD_RAMP}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
+        locations={rampStops}
         pointerEvents="none"
         style={[styles.backdrop, { height: rampH }]}
       />
@@ -205,6 +211,7 @@ export default function DeliveryHome() {
           colors={HEAD_RAMP}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
+          locations={rampStops}
           style={{ height: rampH }}
         />
       </Animated.View>
@@ -311,7 +318,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.x2,
+    paddingBottom: HEAD_PAD_BOTTOM,
   },
   headRow: { flexDirection: 'row', alignItems: 'center' },
   cartWrap: { position: 'relative' },
@@ -322,6 +329,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 24,
     color: HEAD_INK,
+    textShadowColor: 'rgba(120,40,16,0.30)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   addrRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   addrText: {
@@ -330,6 +340,9 @@ const styles = StyleSheet.create({
     fontSize: 19,
     lineHeight: 28,
     color: HEAD_INK,
+    textShadowColor: 'rgba(120,40,16,0.30)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   mascotImg: { width: MASCOT_W, height: MASCOT_H },
   mascot: { position: 'absolute', right: MASCOT_RIGHT },
