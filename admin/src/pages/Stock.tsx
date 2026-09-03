@@ -1003,9 +1003,19 @@ export function Stock() {
                     ไม่พอ (เคยเจอตอนทำกราฟยอดขาย ป้ายหาย 4 จาก 7 แท่ง) */}
                 {costByCategory.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 13, color: '#6B625C', textAlign: 'center', marginBottom: 2 }}>
-                      ต้นทุนของบนชั้น{' '}
-                      <b style={{ color: '#2B2320' }}>{baht(Math.round(totals.costValue))}</b>
+                    {/* ยอดรวมเป็นพระเอกของกราฟนี้ ให้ใหญ่เท่าตัวเลขกลางวงโดนัทฝั่งซ้าย
+                        สองฝั่งจะได้มีตัวเลขนำสายตาน้ำหนักเท่ากัน ไม่ใช่ฝั่งหนึ่งเด่น
+                        อีกฝั่งเป็นบรรทัดเล็ก ๆ */}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, color: '#6B625C' }}>ต้นทุนของบนชั้น</div>
+                      <div
+                        style={{
+                          fontSize: 30, fontWeight: 700, lineHeight: 1.15, color: '#2B2320',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {baht(Math.round(totals.costValue))}
+                      </div>
                     </div>
                     <ResponsiveContainer width="100%" height={196}>
                       <BarChart data={costByCategory} margin={{ top: 18, right: 4, bottom: 4, left: 4 }}>
