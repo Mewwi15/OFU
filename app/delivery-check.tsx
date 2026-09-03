@@ -17,18 +17,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { DELIVERY_INK, DELIVERY_INK_SHADOW, DELIVERY_RAMP } from '@/constants/delivery';
 import { formatAddressLine } from '@/lib/address';
 import { kmBetween } from '@/lib/geo';
 import { osmReverseGeocode } from '@/lib/osm';
 import { useLocale } from '@/store/locale';
 import { MODE_META, useFees, useMode } from '@/store/mode';
+
+/* ไล่สีสองสต็อปแรกของ DELIVERY_RAMP เท่านั้น ตัดสต็อปครีมท้ายทิ้ง — จอนั้นใช้ครีมได้
+   เพราะสีจางลงตรงขอบล่างของหัวจอสั้น ๆ ก่อนถึงแผ่นเนื้อหาสีขาว แต่จอนี้เนื้อหาลอย
+   กึ่งกลางเต็มความสูงจอ ถ้าไล่ถึงครีมด้วยจุดที่ตัวหนังสือสีขาวลอยอยู่จะตกอยู่ในโซนที่
+   จางเกินจนอ่านไม่ออกพอดี ตัดสต็อปสุดท้ายทิ้งให้พื้นเป็นส้มสดตลอดทั้งจอแทน */
+const SCREEN_RAMP = DELIVERY_RAMP.slice(0, 2) as [string, string];
 
 type Phase =
   | { k: 'scanning' }
@@ -140,14 +149,21 @@ export default function DeliveryCheckScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <Pressable
-        accessibilityRole="button"
+    <LinearGradient
+      colors={SCREEN_RAMP}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={[styles.screen, { paddingTop: insets.top }]}>
+      <IconButton
+        icon="close"
+        variant="tint"
+        shape="circle"
+        size={34}
+        color={DELIVERY_INK}
+        style={[styles.close, styles.glassBtn, { top: insets.top + Spacing.sm }]}
         accessibilityLabel="ปิด"
-        style={styles.close}
-        onPress={() => router.back()}>
-        <Ionicons name="close" size={24} color={Colors.text} />
-      </Pressable>
+        onPress={() => router.back()}
+      />
 
       <View style={styles.center}>
         <View style={styles.stage}>
@@ -157,6 +173,8 @@ export default function DeliveryCheckScreen() {
               <Ionicons name="location" size={56} color={Colors.primaryStrong} />
             </View>
           ) : (
+            /* รูปไอคอนยุบพองรอโหลด (เจ้าของสั่ง 3 ก.ย. 2026) — ทั้งวงกลมขาวและรูป
+               มาสคอตขยับไปด้วยกันในสเกลเดียว ไม่ใช่แค่รูปข้างในขยับเฉย ๆ */
             <Animated.View style={[styles.disc, { transform: [{ scale: breatheScale }] }]}>
               <Image
                 source={MODE_META.delivery.image}
@@ -171,7 +189,7 @@ export default function DeliveryCheckScreen() {
           <>
             <Text style={styles.title}>กำลังหาตำแหน่งของคุณ</Text>
             <Text style={styles.body}>ขอสักครู่นะ กำลังดูว่าส่งถึงบ้านคุณได้ไหม</Text>
-            <ActivityIndicator style={{ marginTop: Spacing.lg }} color={Colors.primary} />
+            <ActivityIndicator style={{ marginTop: Spacing.lg }} color={DELIVERY_INK} />
           </>
         ) : null}
 
@@ -181,7 +199,7 @@ export default function DeliveryCheckScreen() {
             {/* หมุด + ที่อยู่ที่เจอ — เจ้าของสั่ง 3 ก.ย. 2026 ให้ขึ้นแทนตัวเลขระยะทาง
                 ถอดรหัสที่อยู่ล้มเหลวได้ (เน็ตไม่ดี ๆ) จึงมีข้อความสำรองไว้ ไม่ปล่อยว่าง */}
             <View style={styles.addrRow}>
-              <Ionicons name="location" size={16} color={Colors.primaryStrong} style={styles.addrPin} />
+              <Ionicons name="location" size={16} color={DELIVERY_INK} style={styles.addrPin} />
               <Text style={styles.addrText} numberOfLines={2}>
                 {phase.address ?? `ห่างจากร้าน ${phase.km.toFixed(1)} กม.`}
               </Text>
@@ -234,24 +252,35 @@ export default function DeliveryCheckScreen() {
           </>
         ) : null}
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  // จอสีพีช (เจ้าของสั่ง 3 ก.ย. 2026) — primaryTint คือโทนพีชอ่อนที่ระบบมีอยู่แล้ว
-  // ใช้ทำพื้นแบนเนอร์/รูปสินค้าที่ยังโหลดไม่เสร็จ เอามาเป็นพื้นทั้งจอได้พอดี
-  screen: { flex: 1, backgroundColor: Colors.primaryTint },
+  // ไล่สีส้มเต็มจอ (เจ้าของสั่ง 3 ก.ย. 2026 "ขอสีส้มกาเดียน") — สีจริงมาจาก SCREEN_RAMP
+  // ที่ผูกกับ LinearGradient ค่านี้เป็นแค่พื้นสำรองกันกระพริบเฟรมแรกก่อนไล่สีวาดเสร็จ
+  screen: { flex: 1, backgroundColor: Colors.primary },
+  // top จริงมาจาก insets.top + Spacing.sm ที่ผูกตรงจุดเรียกใช้ — paddingTop ของ
+  // LinearGradient ที่ครอบอยู่ไม่ไหลลงมาถึงลูกที่ position: absolute ต้องบวก
+  // insets.top เข้าไปเองตรง ๆ ไม่งั้นปุ่มจะไปทับแถบสถานะ (ลองแล้วเห็นจริง)
   close: {
-    alignSelf: 'flex-end',
-    padding: Spacing.lg,
+    position: 'absolute',
+    right: Spacing.lg,
+    zIndex: 1,
+  },
+  // ปุ่มใส แบบเดียวกับปุ่มบนหัวจอเดลิเวอรี่ (delivery/index.tsx) — ให้ทั้งขบวนการ
+  // ก่อนเข้าโหมดเดลิเวอรี่หน้าตาเข้าชุดกัน
+  glassBtn: {
+    backgroundColor: 'rgba(255,255,255,0.32)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
   },
   center: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: Spacing.x2,
-    /* ดันขึ้นเล็กน้อยเฉย ๆ ไม่ถึง 22% — จอนี้เปิดเป็นโมดัลซึ่งเตี้ยกว่าเต็มจอ
-     * เว้นล่างเยอะไปแล้วเนื้อหาจะไปกองครึ่งล่าง เหลือช่องว่างโล่งข้างบน */
+    /* ดันขึ้นเล็กน้อยเฉย ๆ ไม่ถึง 22% — เผื่อระยะเดิมไว้ตอนยังเป็นโมดัลที่เตี้ยกว่า
+     * เต็มจอ ตอนนี้เต็มจอแล้วแต่ระยะนี้ยังใช้ได้ดี เนื้อหาไม่กองอยู่ครึ่งล่างพอดี */
     paddingBottom: Spacing.x3,
     justifyContent: 'center',
   },
@@ -274,18 +303,22 @@ const styles = StyleSheet.create({
     ...Shadow.float,
   },
   mascot: { width: 92, height: 92 },
+  // ตัวหนังสือขาวทั้งจอ + เงาจาง ๆ ตรึงขอบ (ชุดเดียวกับ DELIVERY_INK_SHADOW ที่หัวจอ
+  // เดลิเวอรี่ใช้) — ข้อความสีเข้มแบบเดิมอ่านไม่ออกบนพื้นส้มสดแล้ว
   title: {
     fontFamily: 'Mitr_500Medium',
     fontSize: 22,
-    color: Colors.text,
+    color: DELIVERY_INK,
     textAlign: 'center',
+    ...DELIVERY_INK_SHADOW,
   },
   body: {
     fontSize: 15,
-    color: Colors.textMuted,
+    color: DELIVERY_INK,
     textAlign: 'center',
     marginTop: Spacing.xs,
     lineHeight: 24,
+    ...DELIVERY_INK_SHADOW,
   },
   addrRow: {
     flexDirection: 'row',
@@ -300,29 +333,34 @@ const styles = StyleSheet.create({
   addrText: {
     flexShrink: 1,
     fontSize: 15,
-    color: Colors.textMuted,
+    color: DELIVERY_INK,
     lineHeight: 22,
+    ...DELIVERY_INK_SHADOW,
   },
   lead: {
     fontFamily: 'Mitr_500Medium',
     fontSize: 17,
-    color: Colors.text,
+    color: DELIVERY_INK,
     textAlign: 'center',
     marginTop: Spacing.lg,
+    ...DELIVERY_INK_SHADOW,
   },
+  // ปุ่มหลักพลิกเป็นพื้นขาวตัวหนังสือส้ม (เดิมพื้นส้มตัวหนังสือขาว) — บนพื้นจอที่เป็น
+  // ส้มไล่สีอยู่แล้ว ปุ่มพื้นส้มเดิมจะจมหายไปกับพื้นแทบมองไม่เห็นขอบปุ่ม
   primaryBtn: {
     alignSelf: 'stretch',
     marginTop: Spacing.md,
     height: 54,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadow.float,
   },
   primaryLabel: {
     fontFamily: 'Mitr_500Medium',
     fontSize: 17,
-    color: Colors.textOnPrimary,
+    color: Colors.primaryStrong,
   },
   ghostBtn: {
     alignSelf: 'stretch',
@@ -331,5 +369,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ghostLabel: { fontSize: 15, color: Colors.textMuted },
+  ghostLabel: { fontSize: 15, color: DELIVERY_INK, ...DELIVERY_INK_SHADOW },
 });
