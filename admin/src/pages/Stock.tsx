@@ -154,6 +154,10 @@ const URGENCY_COLOR: Record<Urgency, string> = {
 
 /** Softer fills for the chart so seven stacked rows don't vibrate; the solid
  *  colours above stay for text and the single-figure callouts. */
+/* จานสีโดนัทต้นทุน — ไล่โทนอุ่นคุมความอิ่มสีให้ต่ำเท่ากันทั้งชุด ไม่ใช้สีสถานะ
+ * (แดง/ส้ม/เขียว) เพราะวงนี้ไม่ได้บอกว่าดีหรือแย่ แค่บอกว่าเงินอยู่ตรงไหน */
+const COST_FILL = ['#8A6A4F', '#B08968', '#C9A227', '#7D8C6E', '#6E8CA0', '#9C7A8A', '#B4ADA8'];
+
 const URGENCY_FILL: Record<Urgency, string> = {
   buy: '#E5484D',
   ok: '#8FB3A0',
@@ -417,6 +421,23 @@ export function Stock() {
    *  is doing — ของใช้ในบ้าน having 121 to buy reads very differently once you
    *  see it also has 132 sitting untouched. Counts, not money: value questions
    *  belong on รายงาน, which owns them with a date range. */
+  /* ต้นทุนแยกตามหมวด — โดนัทใบที่สองตอบว่า "เงินจมอยู่ที่หมวดไหน" ซึ่งการ์ดตัวเลข
+   * เดี่ยว ๆ ตอบไม่ได้ · รวมหมวดที่เล็กกว่า 3% เป็น "อื่น ๆ" ไม่งั้นวงแตกเป็นเสี้ยว
+   * บาง ๆ สิบกว่าเสี้ยวจนอ่านไม่ออก (บทเรียนเดียวกับตอนทำแถบสัดส่วนแล้วโดนตีกลับ) */
+  const costByCategory = useMemo(() => {
+    const acc = new Map<string, number>();
+    for (const i of items) {
+      if (i.stock <= 0 || i.cost == null) continue;
+      acc.set(i.category, (acc.get(i.category) ?? 0) + i.cost * i.stock);
+    }
+    const rows = [...acc.entries()].map(([name, value]) => ({ name, value: Math.round(value) }));
+    const total = rows.reduce((s2, r) => s2 + r.value, 0);
+    if (total === 0) return [];
+    const big = rows.filter((r) => r.value / total >= 0.03).sort((a, b) => b.value - a.value);
+    const rest = total - big.reduce((s2, r) => s2 + r.value, 0);
+    return rest > 0 ? [...big, { name: 'อื่น ๆ', value: rest }] : big;
+  }, [items]);
+
   const byCategory = useMemo(() => {
     type Row = { category: string; buy: number; idle: number; ok: number; count: number };
     const acc = new Map<string, Row>();
@@ -944,28 +965,83 @@ export function Stock() {
                   ))}
                 </div>
 
-                {/* ต้นทุนของบนชั้น — เจ้าของสั่งย้ายมาไว้ข้างวงกลม (3 ก.ย. 2026)
-                    เดิมอยู่คอลัมน์ซ้ายปนกับตัวนับ "กี่รายการ" ซึ่งเป็นคนละหน่วย
-                    ตรงนี้อยู่ใต้วงกลมที่ตอบภาพรวมทั้งร้านเหมือนกัน อ่านต่อกันได้
-                    (เคยสั่งเอาเรื่องเงินออกจากหน้านี้เมื่อ 29 ส.ค. แล้วเปลี่ยนใจ
-                    เฉพาะตัวนี้ ที่เหลือยังไม่กลับมา) */}
-                <div className="mt-3">
-                  <StatTile
-                    label="ต้นทุนของบนชั้น"
-                    value={baht(Math.round(totals.costValue))}
-                    hint={
-                      totals.noCostCount > 0
-                        ? `ยังไม่ใส่ต้นทุน ${totals.noCostCount} รายการ`
-                        : 'ใส่ต้นทุนครบทุกรายการ'
-                    }
-                    accent={totals.noCostCount > 0 ? '#8C6D46' : undefined}
-                    onClick={totals.noCostCount > 0 ? () => setNoCostOpen(true) : undefined}
-                  />
-                </div>
+                {/* ต้นทุนของบนชั้น ทำเป็นโดนัทใบที่สองตามที่เจ้าของสั่ง (3 ก.ย. 2026)
+                    การ์ดตัวเลขเดี่ยวบอกได้แค่ยอดรวม โดนัทบอกต่อได้ว่าเงินจมอยู่
+                    หมวดไหน ซึ่งเป็นคำถามที่ตามมาทันทีหลังเห็นยอดรวม
+                    ใช้ภาษาภาพเดียวกับวงบน — วงเดียวกัน ยอดรวมอยู่กลางวงเหมือนกัน */}
+                {costByCategory.length > 0 && (
+                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid #EDEAE7' }}>
+                    <div style={{ fontSize: 13, color: '#6B625C', textAlign: 'center' }}>
+                      ต้นทุนของบนชั้น
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <ResponsiveContainer width="100%" height={158}>
+                        <PieChart>
+                          <RcTooltip
+                            formatter={(v: number, n: string) => [baht(v), n]}
+                            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                          />
+                          <Pie
+                            data={costByCategory}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={46}
+                            outerRadius={72}
+                            paddingAngle={2}
+                            stroke="none"
+                          >
+                            {costByCategory.map((c, i) => (
+                              <Cell key={c.name} fill={COST_FILL[i % COST_FILL.length]} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div
+                        style={{
+                          position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                          alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+                        }}
+                      >
+                        <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.1, color: '#2B2320' }}>
+                          {baht(Math.round(totals.costValue))}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#8C837D' }}>ต้นทุนรวม</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                      {costByCategory.map((c, i) => (
+                        <span key={c.name} className="inline-flex items-center gap-1.5">
+                          <i style={{ width: 9, height: 9, borderRadius: 999, background: COST_FILL[i % COST_FILL.length] }} />
+                          <span style={{ fontSize: 12, color: '#6E625C' }}>{c.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                    {totals.noCostCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setNoCostOpen(true)}
+                        className="mt-2 w-full"
+                        style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer',
+                                 fontSize: 12, color: '#8C6D46', textAlign: 'center' }}
+                      >
+                        ยังไม่ใส่ต้นทุน {totals.noCostCount} รายการ →
+                      </button>
+                    )}
+                  </div>
+                )}
               </Col>
 
               <Col xs={24} sm={14}>
-                <div style={{ maxHeight: 206, overflowY: 'auto' }}>
+                {/* ความสูงตามคอลัมน์ซ้ายที่มีสองวง — เดิมตรึงไว้ 206px ตั้งแต่ตอนมี
+                    วงเดียว พอเพิ่มวงต้นทุนเข้ามา สองฝั่งเลยสูงไม่เท่ากัน และแถวล่าง
+                    ถูกตัดครึ่งพอดีจนดูเหมือนจอเสีย (เจ้าของทักว่า "ตรงนี้มันจม")
+                    เงาจาง ๆ ด้านล่างบอกว่ายังเลื่อนดูต่อได้ ไม่ใช่แค่โดนตัด */}
+                <div
+                  className="pos-scroll-fade"
+                  style={{ maxHeight: 430, overflowY: 'auto', position: 'relative' }}
+                >
                   {byCategory.map((c) => {
                     const active = categoryFilter === c.category;
                     return (

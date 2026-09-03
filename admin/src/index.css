@@ -138,3 +138,16 @@ body {
   font-weight: 600;
   color: #2B2320;
 }
+
+/* รายการหมวดในหน้าสต๊อก: เงาจางด้านล่างบอกว่ายังเลื่อนดูต่อได้
+   เดิมแถวสุดท้ายถูกตัดครึ่งเฉย ๆ อ่านได้ว่าจอเสียมากกว่าว่ามีของต่อ
+   (เจ้าของทัก 3 ก.ย. 2026 ว่า "ตรงนี้มันจม") */
+.pos-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+}
+/* เลื่อนถึงล่างสุดแล้วไม่ต้องจางอีก — ไม่งั้นแถวสุดท้ายจริง ๆ จะจางค้างตลอด */
+.pos-scroll-fade:has(> :last-child:hover) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
