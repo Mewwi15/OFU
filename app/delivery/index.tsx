@@ -26,6 +26,7 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
+import { BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
 
@@ -79,6 +80,7 @@ export default function DeliveryHome() {
   const address = useAddress(selectedAddress);
   const products = useCatalog((s) => s.products);
   const dbCategories = useCatalog((s) => s.categories);
+  const banners = useCatalog((s) => s.banners);
   const [query, setQuery] = useState('');
   /* ต้องรู้ความสูงหัวจอจริงถึงจะวางช่องค้นหาให้คร่อมรอยต่อสีส้ม/ขาวได้พอดี
    * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
@@ -135,6 +137,8 @@ export default function DeliveryHome() {
 
   /* คัดสินค้าให้แต่ละแถวจากคลังเดียวกับหน้าอื่น — ต่างกันแค่วิธีจัดเรียงบนจอ
    * ไม่ได้ไปดึงข้อมูลชุดใหม่มา ของที่ขายก็คือของเดียวกันทั้งร้าน */
+  const deliveryBanner = bannerFor(banners, 'delivery_promo');
+
   const rails = useMemo(() => {
     const inStock = products.filter((p) => (p.variants?.[0]?.available ?? 1) > 0);
     return {
@@ -195,11 +199,19 @@ export default function DeliveryHome() {
               ))}
             </ScrollView>
 
-            {/* แถบสัญญาเวลา — ของที่โหมดนี้ขายจริง ๆ คือความเร็ว ไม่ใช่ราคา */}
-            <View style={styles.promise}>
-              <Ionicons name="bicycle" size={22} color={Colors.primary} />
-              <Text style={styles.promiseText}>สั่งตอนนี้ ได้ของวันนี้ · ส่งฟรีเมื่อครบ 200 บาท</Text>
-            </View>
+            {/* แบนเนอร์ประจำหน้าเดลิเวอรี่ (เจ้าของสั่ง 3 ก.ย. 2026 แทนแถบ "สั่งตอนนี้
+                ได้ของวันนี้" ที่ให้เอาออก) — ยังไม่ได้อัปรูปก็ไม่ต้องมีช่องว่างค้างไว้
+                วาดต่อเมื่อมีรูปจริงเท่านั้น */}
+            {deliveryBanner ? (
+              <Image
+                source={{ uri: deliveryBanner.image }}
+                style={[styles.promo, { aspectRatio: BANNER_ASPECT.delivery_promo }]}
+                contentFit="cover"
+                transition={180}
+                accessibilityIgnoresInvertColors
+                accessibilityLabel={deliveryBanner.title ?? 'โปรโมชั่น'}
+              />
+            ) : null}
           </View>
 
           <ProductRail title="สั่งซ้ำได้เลย" data={rails.quick} />
@@ -382,13 +394,5 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: Spacing.lg },
   catHead: { marginTop: Spacing.lg },
   catRow: { gap: Spacing.xs, paddingTop: Spacing.sm, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
-  promise: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryTint,
-  },
-  promiseText: { flex: 1, fontSize: 13, color: Colors.text },
+  promo: { width: '100%', borderRadius: Radius.md, backgroundColor: Colors.surfaceMuted },
 });

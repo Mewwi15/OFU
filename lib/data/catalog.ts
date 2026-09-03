@@ -75,7 +75,13 @@ export async function loadCatalog(): Promise<Product[]> {
 }
 
 /** A published home-hero banner (managed by the admin web's Banners page). */
-export type BannerPlacement = 'home' | 'search_hero' | 'search_trending' | 'search_promo' | 'search_hot';
+export type BannerPlacement =
+  | 'home'
+  | 'search_hero'
+  | 'search_trending'
+  | 'search_promo'
+  | 'search_hot'
+  | 'delivery_promo';
 export type HomeBanner = { id: string; image: string; title: string | null; placement: BannerPlacement };
 
 /**
@@ -92,6 +98,9 @@ export const BANNER_ASPECT: Record<BannerPlacement, number> = {
   search_trending: 2.8, // แถบ promo เหนือแถวสินค้า
   search_promo: 2.8,
   search_hot: 2.8,
+  // เดลิเวอรี่ · แถบใต้หมวดหมู่ — อัตราส่วนเดียวกับแถบ promo ของหน้าค้นหา เจ้าของจะได้
+  // ครอปด้วยกรอบที่คุ้นอยู่แล้ว ไม่ต้องจำอีกค่า
+  delivery_promo: 2.8,
 };
 
 /** Load ALL published banners (every placement), in admin display order. Screens

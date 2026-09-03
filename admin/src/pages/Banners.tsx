@@ -25,6 +25,7 @@ const PLACEMENTS: PlacementMeta[] = [
   { value: 'search_trending', label: 'หน้าค้นหา · แถบ “กำลังมาแรง”', hint: 'แถบเหนือแถว “สินค้าติดกระแส” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
   { value: 'search_promo', label: 'หน้าค้นหา · แถบ “ลดสูงสุด 40%”', hint: 'แถบเหนือแถว “โปรโมชั่น” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
   { value: 'search_hot', label: 'หน้าค้นหา · แถบ “เรตติ้งสูงสุด”', hint: 'แถบเหนือแถว “มาแรงประจำสัปดาห์” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
+  { value: 'delivery_promo', label: 'เดลิเวอรี่ · แถบใต้หมวดหมู่', hint: 'แถบในหน้าเดลิเวอรี่ ใต้แถวหมวดหมู่สินค้า — ใช้รูปเดียว ไม่ใส่ก็ได้ (ช่องจะหายไปเลย)', multi: false },
 ];
 
 /**
@@ -38,6 +39,7 @@ const BANNER_ASPECT: Record<BannerPlacement, number> = {
   search_trending: 2.8,
   search_promo: 2.8,
   search_hot: 2.8,
+  delivery_promo: 2.8,
 };
 /** Human label for a ratio, e.g. 2 → "2 : 1", 2.35 → "2.35 : 1". */
 const ratioLabel = (a: number) => `${Number.isInteger(a) ? a : a.toFixed(2)} : 1`;

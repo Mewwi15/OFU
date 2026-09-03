@@ -284,7 +284,13 @@ export async function getFeaturedItems(sectionId: string): Promise<string[]> {
 }
 
 /* ── banners (app: every slot that shows a banner) ──────────────────────────── */
-export type BannerPlacement = 'home' | 'search_hero' | 'search_trending' | 'search_promo' | 'search_hot';
+export type BannerPlacement =
+  | 'home'
+  | 'search_hero'
+  | 'search_trending'
+  | 'search_promo'
+  | 'search_hot'
+  | 'delivery_promo';
 export type Banner = {
   id: string;
   image_path: string | null;
