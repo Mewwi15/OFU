@@ -9,15 +9,22 @@
  *     <Toast message="เพิ่มลงตะกร้าแล้ว" actionLabel="ดูตะกร้า"
  *            onAction={...} onHide={() => setShowToast(false)} />
  *   )}
+ *
+ * ★ ครอบด้วย Modal ★ ไม่ใช่ View ที่กาง absoluteFill เฉย ๆ — absoluteFill กางเต็ม
+ * "กล่องแม่ที่ใกล้ที่สุด" ไม่ใช่เต็มจอ ตอนเอาไปวางในบล็อกคูปองของหน้าแรก (ซึ่งอยู่ใน
+ * ScrollView อีกที) การ์ดเลยโดนตัดครึ่ง ปุ่มขาดหาย และฉากหลังมืดแค่เฉพาะช่วงบล็อกนั้น
+ * (เจ้าของทัก 4 ก.ย. 2026 "มัน modal ไม่ดีอะครับลองกดดูสิ")
+ * Modal วาดที่ชั้นบนสุดของหน้าจอเสมอ ไม่ว่าถูกเรียกจากตรงไหนของต้นไม้คอมโพเนนต์
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
 
@@ -37,6 +44,8 @@ export type ToastProps = {
   /** Visible duration in ms before auto-dismiss. Defaults to 2800 — or 4500
    *  when there's an action button, so the user has time to decide to tap it. */
   duration?: number;
+  /** สีเน้นของหน้าที่เรียกใช้ — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
 };
 
 export function Toast({
@@ -47,6 +56,7 @@ export function Toast({
   onAction,
   onHide,
   duration,
+  accent = BRAND_ACCENT,
 }: ToastProps) {
   const t = useT();
   const visibleMs = duration ?? (actionLabel ? 4500 : 2800);
@@ -56,50 +66,60 @@ export function Toast({
   }, [onHide, visibleMs]);
 
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
-      <AnimatedPressable
-        entering={FadeIn.duration(180)}
-        exiting={FadeOut.duration(200)}
-        accessibilityLabel={t('ui.close')}
-        onPress={onHide}
-        style={styles.backdrop}
-      />
-
-      <Animated.View
-        entering={ZoomIn.springify().damping(15).stiffness(200)}
-        exiting={FadeOut.duration(180)}
-        style={styles.card}>
-        <Pressable
-          accessibilityRole="button"
+    <Modal
+      transparent
+      visible
+      /* แอนิเมชันเข้า/ออกทำเองด้วย reanimated ข้างใน ไม่ให้ Modal เล่นซ้อน */
+      animationType="none"
+      /* แอนดรอยด์: ให้ฉากหลังมืดคลุมถึงแถบสถานะด้วย ไม่งั้นจะเหลือแถบสว่างค้างข้างบน */
+      statusBarTranslucent
+      /* ปุ่มย้อนกลับของแอนดรอยด์ต้องปิดได้ ไม่ใช่เด้งออกจากหน้า */
+      onRequestClose={onHide}>
+      <View pointerEvents="box-none" style={styles.wrap}>
+        <AnimatedPressable
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(200)}
           accessibilityLabel={t('ui.close')}
-          hitSlop={10}
           onPress={onHide}
-          style={styles.close}>
-          <Ionicons name="close" size={20} color={Colors.textMuted} />
-        </Pressable>
+          style={styles.backdrop}
+        />
 
-        <View style={styles.iconCircle}>
-          <Ionicons name={icon} size={32} color={Colors.textOnPrimary} />
-        </View>
-
-        <Text style={styles.title}>{message}</Text>
-        {subtitle ? (
-          <Text variant="caption" style={styles.subtitle}>
-            {subtitle}
-          </Text>
-        ) : null}
-
-        {actionLabel ? (
-          <PressableScale
+        <Animated.View
+          entering={ZoomIn.springify().damping(15).stiffness(200)}
+          exiting={FadeOut.duration(180)}
+          style={styles.card}>
+          <Pressable
             accessibilityRole="button"
-            onPress={onAction}
-            scaleTo={0.97}
-            style={styles.actionBtn}>
-            <Text style={styles.actionText}>{actionLabel}</Text>
-          </PressableScale>
-        ) : null}
-      </Animated.View>
-    </View>
+            accessibilityLabel={t('ui.close')}
+            hitSlop={10}
+            onPress={onHide}
+            style={styles.close}>
+            <Ionicons name="close" size={20} color={Colors.textMuted} />
+          </Pressable>
+
+          <View style={[styles.iconCircle, { backgroundColor: accent.solid }]}>
+            <Ionicons name={icon} size={32} color={Colors.textOnPrimary} />
+          </View>
+
+          <Text style={styles.title}>{message}</Text>
+          {subtitle ? (
+            <Text variant="caption" style={styles.subtitle}>
+              {subtitle}
+            </Text>
+          ) : null}
+
+          {actionLabel ? (
+            <PressableScale
+              accessibilityRole="button"
+              onPress={onAction}
+              scaleTo={0.97}
+              style={[styles.actionBtn, { backgroundColor: accent.strong }]}>
+              <Text style={styles.actionText}>{actionLabel}</Text>
+            </PressableScale>
+          ) : null}
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
@@ -139,6 +159,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: Radius.pill,
+    // สีจริงมาจาก accent ที่จุดเรียกใช้
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',

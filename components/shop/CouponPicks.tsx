@@ -159,6 +159,7 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
               : undefined
           }
           onHide={() => setToast(null)}
+          accent={accent}
         />
       ) : null}
     </View>
