@@ -26,3 +26,16 @@ export const BRAND_ACCENT: Accent = {
   strong: Colors.primaryStrong,
   tint: Colors.primaryTint,
 };
+
+/**
+ * เขียว — ธีมของหน้าแรก (เจ้าของสั่ง 4 ก.ย. 2026 "หน้าแรกธีมสีเขียวหน่อยครับ")
+ *
+ * ใช้โทเคนเขียวที่ดีไซน์ซิสเต็มมีอยู่แล้ว ไม่ตั้งเลขสีใหม่ — ชุดนี้ผ่านการวัดความคมชัด
+ * มาแล้ว (accentStrong 5.46:1 บนขาว) และหมวดหมู่สินค้าบนหน้าแรกก็เป็นเขียวอยู่ก่อนแล้ว
+ * สีจึงเข้าชุดกับของที่วางอยู่ ไม่ใช่เขียวคนละเฉดมากองรวมกัน
+ */
+export const GREEN_ACCENT: Accent = {
+  solid: Colors.accent,
+  strong: Colors.accentStrong,
+  tint: Colors.accentTint,
+};

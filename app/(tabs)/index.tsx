@@ -25,7 +25,7 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
-import { BRAND_ACCENT } from '@/constants/accent';
+import { BRAND_ACCENT, GREEN_ACCENT } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
 import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
@@ -183,7 +183,7 @@ export default function HomeScreen() {
     <View style={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GREEN_ACCENT.solid} />}
         contentContainerStyle={{
           paddingBottom: TAB_BAR_CLEARANCE + insets.bottom,
         }}>
@@ -356,6 +356,7 @@ export default function HomeScreen() {
             if (rowProducts.length === 0) return null;
             return (
               <ProductRail
+              accent={GREEN_ACCENT}
                 key={row.id}
                 title={row.title}
                 data={rowProducts}
@@ -367,16 +368,18 @@ export default function HomeScreen() {
 
           {/* แถวคูปองแทนแถว "ขายดี" เดิม (เจ้าของสั่ง 4 ก.ย. 2026) — เลื่อนแนวนอน
               ให้ลูกค้าเก็บโค้ด ซ่อนทั้งแถวเองถ้าไม่มีคูปองที่เปิดให้เห็นในแอป */}
-          <CouponRail notchColor={SCREEN_BG} />
+          <CouponRail notchColor={SCREEN_BG} accent={GREEN_ACCENT} />
 
           {/* Curated rails */}
           <ProductRail
+              accent={GREEN_ACCENT}
             title={t('home.recommended')}
             data={recommended}
             onSeeAll={() => openCatalog()}
             loading={!catalogLoaded}
           />
           <ProductRail
+              accent={GREEN_ACCENT}
             title={t('home.newArrivals')}
             data={newArrivals}
             onSeeAll={() => openCatalog()}

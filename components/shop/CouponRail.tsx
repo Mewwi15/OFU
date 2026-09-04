@@ -21,6 +21,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { claimCoupon, listCoupons, type Coupon } from '@/lib/data/coupons';
 import { money } from '@/lib/format';
@@ -50,9 +51,11 @@ export type CouponRailProps = {
    * ส่งผิดสีเมื่อไหร่รอยบากจะกลายเป็นจุดสีแปลกปลอมทันที ให้ตรงกับพื้นจริงเสมอ
    */
   notchColor: string;
+  /** สีเน้นของหน้าที่แถวนี้ไปวางอยู่ — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
 };
 
-export function CouponRail({ notchColor }: CouponRailProps) {
+export function CouponRail({ notchColor, accent = BRAND_ACCENT }: CouponRailProps) {
   const router = useRouter();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -110,7 +113,7 @@ export function CouponRail({ notchColor }: CouponRailProps) {
           accessibilityRole="button"
           onPress={() => router.push('/coupons')}
           hitSlop={8}>
-          <Text style={styles.seeAll}>ดูทั้งหมด</Text>
+          <Text style={[styles.seeAll, { color: accent.strong }]}>ดูทั้งหมด</Text>
         </PressableScale>
       </View>
 
@@ -131,7 +134,9 @@ export function CouponRail({ notchColor }: CouponRailProps) {
           : coupons.map((c) => (
               <View key={c.id} style={styles.card}>
                 <View style={styles.cardTop}>
-                  <Text style={styles.headline}>{headline(c)}</Text>
+                  <Text style={[styles.headline, { color: accent.strong }]}>
+                    {headline(c)}
+                  </Text>
                   <Text numberOfLines={1} style={styles.cond}>
                     {condition(c)}
                   </Text>
@@ -159,13 +164,16 @@ export function CouponRail({ notchColor }: CouponRailProps) {
                   accessibilityState={{ disabled: c.claimed }}
                   disabled={c.claimed || busyId === c.id}
                   onPress={() => void collect(c)}
-                  style={[styles.collectBtn, c.claimed && styles.collectBtnDone]}>
+                  style={[
+                    styles.collectBtn,
+                    { backgroundColor: c.claimed ? accent.tint : accent.solid },
+                  ]}>
                   <Ionicons
                     name={c.claimed ? 'checkmark' : 'add'}
                     size={16}
-                    color={c.claimed ? Colors.primaryStrong : Colors.textOnPrimary}
+                    color={c.claimed ? accent.strong : Colors.textOnPrimary}
                   />
-                  <Text style={[styles.collectText, c.claimed && styles.collectTextDone]}>
+                  <Text style={[styles.collectText, c.claimed && { color: accent.strong }]}>
                     {c.claimed ? 'เก็บแล้ว' : 'เก็บคูปอง'}
                   </Text>
                 </PressableScale>
@@ -207,6 +215,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontFamily: 'Mitr_400Regular',
     fontSize: 13,
+    // สีจริงมาจาก accent ที่จุดเรียกใช้ — ค่านี้เป็นแค่ตัวสำรอง
     color: Colors.primaryStrong,
   },
   row: { gap: Spacing.md, paddingRight: Spacing.lg },
@@ -222,6 +231,7 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 20,
+    // สีจริงมาจาก accent ที่จุดเรียกใช้
     color: Colors.primaryStrong,
   },
   cond: { fontSize: 12, color: Colors.textMuted },
@@ -257,6 +267,7 @@ const styles = StyleSheet.create({
     margin: Spacing.md,
     height: 38,
     borderRadius: Radius.md,
+    // สีจริงมาจาก accent ที่จุดเรียกใช้
     backgroundColor: Colors.primary,
   },
   collectText: {
@@ -264,7 +275,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textOnPrimary,
   },
-  collectBtnDone: { backgroundColor: Colors.primaryTint },
-  collectTextDone: { color: Colors.primaryStrong },
   skLine: { marginTop: Spacing.sm },
 });
