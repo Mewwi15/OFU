@@ -23,6 +23,7 @@ import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import {
+  ONLINE_ACCENT,
   ONLINE_INK,
   ONLINE_INK_SHADOW,
   ONLINE_RAMP,
@@ -118,7 +119,7 @@ export default function DeliveryCategory() {
         renderItem={({ item, index }) =>
           catalogLoaded ? (
             <View style={styles.cell}>
-              <ProductCard product={item} index={index} />
+              <ProductCard product={item} index={index} accent={ONLINE_ACCENT} />
             </View>
           ) : (
             <View style={styles.cell}>

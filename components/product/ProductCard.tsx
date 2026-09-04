@@ -34,6 +34,7 @@ import Animated, {
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
@@ -45,9 +46,11 @@ export type ProductCardProps = {
   style?: StyleProp<ViewStyle>;
   /** Position in its list — staggers the entrance fade. */
   index?: number;
+  /** สีเน้นของโหมดที่การ์ดนี้ไปโผล่ — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
 };
 
-export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
+export function ProductCard({ product, style, index = 0, accent = BRAND_ACCENT }: ProductCardProps) {
   const router = useRouter();
   const add = useCart((s) => s.add);
   const bump = useSharedValue(1);
@@ -70,7 +73,7 @@ export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
         <View>
           <Image
             source={{ uri: productThumb(product.images[0], 400) }}
-            style={[styles.image, soldOut && styles.imageDimmed]}
+            style={[styles.image, { backgroundColor: accent.tint }, soldOut && styles.imageDimmed]}
             contentFit="cover"
             transition={250}
             cachePolicy="memory-disk"
@@ -85,7 +88,7 @@ export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
                 accessibilityRole="button"
                 accessibilityLabel={`เพิ่ม ${product.name} ลงตะกร้า`}
                 onPress={quickAdd}
-                style={styles.addBtn}
+                style={[styles.addBtn, { backgroundColor: accent.solid }]}
                 hitSlop={8}>
                 <Ionicons name="add" size={20} color={Colors.textOnPrimary} />
               </PressableScale>
@@ -98,7 +101,7 @@ export function ProductCard({ product, style, index = 0 }: ProductCardProps) {
             {product.name}
           </Text>
 
-          <Text style={styles.price}>{money(product.price)}</Text>
+          <Text style={[styles.price, { color: accent.strong }]}>{money(product.price)}</Text>
         </View>
       </PressableScale>
     </Animated.View>
@@ -123,6 +126,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
+    // ค่าตั้งต้นสีแบรนด์ — ถูกทับด้วย accent.tint ที่จุดเรียกใช้ (โหมดออนไลน์ส่งน้ำเงินมา)
     backgroundColor: Colors.primaryTint,
   },
   imageDimmed: {

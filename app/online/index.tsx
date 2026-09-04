@@ -38,6 +38,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { categories } from '@/data/products';
 import {
+  ONLINE_ACCENT,
   ONLINE_INK,
   ONLINE_INK_SHADOW,
   ONLINE_RAMP,
@@ -340,18 +341,21 @@ export default function DeliveryHome() {
                 ขอบ แต่ไม่ได้เว้นซ้าย เพราะหน้าอื่นทุกหน้าที่ใช้ ProductRail ครอบด้วยกรอบ
                 ที่มี padding อยู่แล้วเหมือนกันหมด */}
             <ProductRail
+              accent={ONLINE_ACCENT}
               title="สินค้าขายดี"
               data={bestSellers}
               onSeeAll={seeAllProducts}
               loading={!catalogLoaded}
             />
             <ProductRail
+              accent={ONLINE_ACCENT}
               title="สินค้าแนะนำ"
               data={recommended}
               onSeeAll={seeAllProducts}
               loading={!catalogLoaded}
             />
             <ProductRail
+              accent={ONLINE_ACCENT}
               title="สินค้ายอดฮิต"
               data={popular}
               onSeeAll={seeAllProducts}

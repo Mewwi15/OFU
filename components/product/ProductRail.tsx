@@ -8,6 +8,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { useT } from '@/lib/i18n';
@@ -20,6 +21,8 @@ export type ProductRailProps = {
   onSeeAll?: () => void;
   /** โชว์โครงการ์ดรอแทนของจริง ระหว่างคลังสินค้ายังโหลดไม่เสร็จ */
   loading?: boolean;
+  /** สีเน้นของโหมดที่แถวนี้ไปโผล่ — ส่งต่อให้การ์ดด้วย ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
 };
 
 /** Fixed card width inside a horizontal rail. */
@@ -28,7 +31,13 @@ const CARD_WIDTH = 168;
    มากกว่านี้ไม่มีประโยชน์เพราะมองไม่เห็นอยู่ดี แต่กินแรงวาดเพิ่มฟรี ๆ */
 const SKELETON_COUNT = 3;
 
-export function ProductRail({ title, data, onSeeAll, loading = false }: ProductRailProps) {
+export function ProductRail({
+  title,
+  data,
+  onSeeAll,
+  loading = false,
+  accent = BRAND_ACCENT,
+}: ProductRailProps) {
   const t = useT();
   const showHead = !!title || !!onSeeAll;
   return (
@@ -38,7 +47,7 @@ export function ProductRail({ title, data, onSeeAll, loading = false }: ProductR
           <Text variant="subtitle">{title}</Text>
           {onSeeAll ? (
             <Pressable onPress={onSeeAll} hitSlop={8} accessibilityRole="button">
-              <Text style={styles.seeAll}>{t('widget.seeAll')}</Text>
+              <Text style={[styles.seeAll, { color: accent.strong }]}>{t('widget.seeAll')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -57,7 +66,7 @@ export function ProductRail({ title, data, onSeeAll, loading = false }: ProductR
             ))
           : data.map((product, i) => (
               <View key={product.id} style={styles.card}>
-                <ProductCard product={product} index={i} />
+                <ProductCard product={product} index={i} accent={accent} />
               </View>
             ))}
       </ScrollView>
@@ -82,6 +91,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontFamily: 'Mitr_400Regular',
     fontSize: 13,
+    // ค่าตั้งต้นสีแบรนด์ — ถูกทับด้วย accent.strong ที่จุดเรียกใช้
     color: Colors.primaryStrong,
   },
   row: {
