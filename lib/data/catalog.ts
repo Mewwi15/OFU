@@ -81,7 +81,8 @@ export type BannerPlacement =
   | 'search_trending'
   | 'search_promo'
   | 'search_hot'
-  | 'delivery_promo';
+  | 'delivery_promo'
+  | 'online_promo';
 export type HomeBanner = { id: string; image: string; title: string | null; placement: BannerPlacement };
 
 /**
@@ -103,6 +104,8 @@ export const BANNER_ASPECT: Record<BannerPlacement, number> = {
   // ไม่ใช่แถบบาง ๆ · ต้องตรงกับ admin/src/pages/Banners.tsx เสมอ ไม่งั้นที่ครอปกับที่
   // แสดงจริงจะคนละกรอบ
   delivery_promo: 2,
+  // ออนไลน์ · แถบใต้หมวดหมู่ — สัดส่วนเดียวกับเดลิเวอรี่ เจ้าของจะได้ครอปกรอบเดียว
+  online_promo: 2,
 };
 
 /** Load ALL published banners (every placement), in admin display order. Screens

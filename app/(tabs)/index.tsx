@@ -72,7 +72,6 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const modes = Object.values(MODE_META);
   const mode = useMode((st) => st.mode);
-  const setMode = useMode((st) => st.setMode);
   const router = useRouter();
   const shopOpen = useShopOpen();
   const shop = useShop((s) => s.info);
@@ -288,7 +287,10 @@ export default function HomeScreen() {
                      ตำแหน่งก่อน (จอนั้นเป็นคนตั้งโหมดให้เอง) ส่วน ONLINE ส่งทั่วไทย
                      ไม่มีเขต กดแล้วเปลี่ยนได้เลย */
                   onPress={() =>
-                    m.key === 'delivery' ? router.push('/delivery-check') : setMode(m.key)
+                    /* ทั้งสองโหมดมีจอเตรียมพร้อมของตัวเองแล้ว (เจ้าของสั่ง 4 ก.ย. 2026
+                       ให้หน้าออนไลน์ขึ้นจอโหลดเหมือนเดลิเวอรี่) — เดิมฝั่งออนไลน์แค่
+                       สลับโหมดค้างอยู่หน้าแรก ไม่พาไปไหน */
+                    router.push(m.key === 'delivery' ? '/delivery-check' : '/online-check')
                   }
                   style={styles.modeCard}>
                   <View style={[styles.modeLogo, on && styles.modeLogoOn]}>

@@ -290,7 +290,8 @@ export type BannerPlacement =
   | 'search_trending'
   | 'search_promo'
   | 'search_hot'
-  | 'delivery_promo';
+  | 'delivery_promo'
+  | 'online_promo';
 export type Banner = {
   id: string;
   image_path: string | null;

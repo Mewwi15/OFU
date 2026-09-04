@@ -228,10 +228,13 @@ export default function RootLayout() {
               <Stack.Screen name="product/[id]" />
               <Stack.Screen name="delivery/index" />
               <Stack.Screen name="delivery/[cat]" />
+              <Stack.Screen name="online/index" />
+              <Stack.Screen name="online/[cat]" />
               {/* เต็มจอ ไม่ใช่โมดัลอีกต่อไป (เจ้าของสั่ง 3 ก.ย. 2026 "ทำให้หน้าเต็มจอไปเลย")
                   โมดัลเดิมเผยให้เห็นขอบจอด้านหลังโปร่งแสง ซึ่งขัดกับพื้นไล่สีส้มเต็มจอ
                   ที่เพิ่มเข้ามาพร้อมกัน — ไล่สีจะดูมีกรอบขาวแทรกอยู่รอบขอบถ้ายังเป็นโมดัล */}
               <Stack.Screen name="delivery-check" />
+              <Stack.Screen name="online-check" />
               <Stack.Screen name="address/index" />
               <Stack.Screen name="address/picker" />
               <Stack.Screen name="checkout/index" />

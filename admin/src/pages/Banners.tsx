@@ -40,6 +40,7 @@ type PlacementMeta = {
 const PLACEMENTS: PlacementMeta[] = [
   { value: 'home', screen: 'หน้าแรก', label: 'สไลด์บนสุด', where: 'ภาพใหญ่บนสุดที่เลื่อนสไลด์ได้ เห็นทันทีที่เปิดแอป', multi: true },
   { value: 'delivery_promo', screen: 'หน้าเดลิเวอรี่', label: 'แถบใต้หมวดหมู่', where: 'ใต้แถววงกลมหมวดหมู่สินค้า เหนือแถวสินค้าขายดี — ใส่หลายรูปได้ เลื่อนสไลด์เอง', multi: true },
+  { value: 'online_promo', screen: 'หน้าออนไลน์ (ส่งพัสดุ)', label: 'แถบใต้หมวดหมู่', where: 'ใต้แถววงกลมหมวดหมู่สินค้า เหนือแถวสินค้าขายดี — ใส่หลายรูปได้ เลื่อนสไลด์เอง', multi: true },
   /* หน้าสินค้าไม่ได้อยู่ในแถบล่างแล้วตั้งแต่ 4 ก.ย. 2026 (เปลี่ยนเป็นแท็บคูปอง) แต่หน้า
      ยังอยู่และยังเข้าได้ — บอกทางเข้าไว้ด้วย ไม่งั้นเจ้าของจะหาไม่เจอว่ารูปไปโผล่ตรงไหน */
   { value: 'search_hero', screen: 'หน้าสินค้า (กดหมวดหมู่จากหน้าแรก)', label: 'แบนเนอร์บนสุด', where: 'ภาพใหญ่บนสุดของหน้า เหนือช่องค้นหา', multi: false },
@@ -63,6 +64,7 @@ const BANNER_ASPECT: Record<BannerPlacement, number> = {
   search_promo: 2.8,
   search_hot: 2.8,
   delivery_promo: 2,
+  online_promo: 2,
 };
 /** Human label for a ratio, e.g. 2 → "2 : 1", 2.35 → "2.35 : 1". */
 const ratioLabel = (a: number) => `${Number.isInteger(a) ? a : a.toFixed(2)} : 1`;
