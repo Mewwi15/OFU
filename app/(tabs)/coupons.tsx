@@ -7,9 +7,11 @@
  * คูปองที่โชว์คือใบที่เจ้าของติ๊ก "แสดงในแอป" ในหน้าโปรโมชั่นของแอดมินเท่านั้น ไม่ใช่
  * ทุกใบที่เปิดใช้งานอยู่ — โค้ดลับ/ยิงเฉพาะรายต้องไม่หลุดมาที่นี่ (ดู 0095)
  *
- * กดคูปองแล้วคัดลอกโค้ด ไม่ได้ใส่ให้ในตะกร้าเอง เพราะส่วนลดคิดจากยอดในตะกร้า ณ
- * ตอนนั้น (ยอดขั้นต่ำ/เพดานส่วนลด) การใส่ล่วงหน้าตอนตะกร้ายังว่างจะกลายเป็นสัญญาที่
- * อาจใช้ไม่ได้จริงตอนไปถึงหน้าจ่ายเงิน — คัดลอกแล้ววางเองในตะกร้าซื่อตรงกว่า
+ * แบ่งสองส่วน: "คูปองของฉัน" (เก็บแล้ว) กับ "เก็บเพิ่ม" (ยังไม่เก็บ) — ชื่อหน้าคือ
+ * คูปองของฉัน ถ้าเอาทุกใบมากองรวมกันคำว่า "ของฉัน" จะไม่จริง
+ *
+ * ใบที่เก็บแล้วกดเพื่อคัดลอกโค้ดได้ (เผื่อใครถนัดพิมพ์เอง) แต่ทางหลักคือไปเลือกที่ตะกร้า
+ * ซึ่งดึงใบที่เก็บไว้มาให้กดใช้ได้เลย ไม่ต้องจำโค้ด
  *
  * รูปทรงตั๋วฉีก (เจ้าของส่งหน้าคูปองของ 7-Eleven มาเป็นตัวอย่าง 4 ก.ย. 2026) — ต้นขั้ว
  * สีแบรนด์ซ้าย + รอยปรุประกลาง + รอยบากครึ่งวงกลมบนล่าง รอยบากทำด้วยวงกลมสีพื้นหน้าจอ
@@ -32,7 +34,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
-import { listCoupons, type Coupon } from '@/lib/data/coupons';
+import { claimCoupon, listCoupons, type Coupon } from '@/lib/data/coupons';
 import { money } from '@/lib/format';
 
 /** เว้นล่างให้พ้นแถบแท็บที่ลอยอยู่ */
@@ -80,6 +82,7 @@ export default function CouponsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -111,6 +114,78 @@ export default function CouponsScreen() {
     await Clipboard.setStringAsync(code);
     setCopied(code);
   };
+
+  const claim = async (c: Coupon) => {
+    if (busyId) return;
+    setBusyId(c.id);
+    try {
+      const res = await claimCoupon(c.id);
+      if (res.ok) {
+        // ย้ายใบนั้นไปกลุ่ม "ของฉัน" ทันที ไม่ต้องรอโหลดใหม่ทั้งหน้า
+        setCoupons((cur) => cur.map((x) => (x.id === c.id ? { ...x, claimed: true } : x)));
+      }
+    } catch {
+      /* เงียบไว้ — ปุ่มยังกดใหม่ได้ และดึงหน้าจอลงรีเฟรชได้ */
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const mine = coupons.filter((c) => c.claimed);
+  const more = coupons.filter((c) => !c.claimed);
+
+  /* การ์ดใบเดียว ใช้ซ้ำทั้งสองกลุ่ม — ต่างกันแค่ปุ่มท้ายใบ: เก็บแล้วให้คัดลอกโค้ด
+     ยังไม่เก็บให้กดเก็บ */
+  const renderTicket = (c: Coupon) => (
+    <PressableScale
+      key={c.id}
+      accessibilityRole="button"
+      accessibilityLabel={c.claimed ? `คัดลอกโค้ด ${c.code}` : `เก็บคูปอง ${c.code}`}
+      disabled={busyId === c.id}
+      onPress={() => (c.claimed ? void copy(c.code) : void claim(c))}
+      style={styles.ticket}>
+              {/* ต้นขั้วซ้าย — มาสคอต + วันหมดอายุ เหมือนตัวอย่างที่เจ้าของส่งมา */}
+              <View style={styles.stub}>
+                <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" />
+                <Text style={styles.stubLabel}>คูปอง</Text>
+                <Text style={styles.stubExpiry}>
+                  {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
+                </Text>
+              </View>
+
+              {/* รอยปรุ + รอยบากบนล่าง */}
+              <View style={styles.perf} pointerEvents="none">
+                {PERF_DASHES.map((k) => (
+                  <View key={k} style={styles.perfDash} />
+                ))}
+              </View>
+              <View style={[styles.notch, styles.notchTop]} />
+              <View style={[styles.notch, styles.notchBottom]} />
+
+              <View style={styles.ticketBody}>
+                <Text style={styles.headline}>{headline(c)}</Text>
+                <Text style={styles.conds}>{conditions(c).join(' · ')}</Text>
+                <View style={styles.codeRow}>
+                  {/* เก็บแล้วโชว์โค้ดให้คัดลอก · ยังไม่เก็บซ่อนโค้ดไว้ก่อน ให้กดเก็บ —
+                      ถ้าโชว์โค้ดตั้งแต่ยังไม่เก็บ ปุ่มเก็บก็ไม่มีความหมาย ใครก็จดไปใช้ได้ */}
+                  {c.claimed ? (
+                    <>
+                      <Text style={styles.code}>{c.code}</Text>
+                      <View style={styles.copyHint}>
+                        <Ionicons name="copy-outline" size={13} color={Colors.primaryStrong} />
+                        <Text style={styles.copyText}>คัดลอก</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.claimBtn}>
+                      <Ionicons name="add" size={15} color={Colors.textOnPrimary} />
+                      <Text style={styles.claimText}>เก็บคูปอง</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+    </PressableScale>
+  );
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top + Spacing.sm }]}>
@@ -161,45 +236,21 @@ export default function CouponsScreen() {
             <Text style={styles.emptyBody}>มีโปรใหม่เมื่อไหร่จะขึ้นตรงนี้ กลับมาดูได้เรื่อย ๆ</Text>
           </View>
         ) : (
-          coupons.map((c) => (
-            /* ทั้งใบกดได้ ไม่ใช่แค่ปุ่มเล็ก ๆ — เป้าหมายเดียวของการ์ดนี้คือเอาโค้ดไปใช้ */
-            <PressableScale
-              key={c.id}
-              accessibilityRole="button"
-              accessibilityLabel={`คัดลอกโค้ด ${c.code}`}
-              onPress={() => void copy(c.code)}
-              style={styles.ticket}>
-              {/* ต้นขั้วซ้าย — มาสคอต + วันหมดอายุ เหมือนตัวอย่างที่เจ้าของส่งมา */}
-              <View style={styles.stub}>
-                <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" />
-                <Text style={styles.stubLabel}>คูปอง</Text>
-                <Text style={styles.stubExpiry}>
-                  {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
-                </Text>
-              </View>
+          <>
+            {mine.length > 0 ? (
+              <Text variant="subtitle" style={styles.groupHead}>
+                คูปองของฉัน ({mine.length})
+              </Text>
+            ) : null}
+            {mine.map((c) => renderTicket(c))}
 
-              {/* รอยปรุ + รอยบากบนล่าง */}
-              <View style={styles.perf} pointerEvents="none">
-                {PERF_DASHES.map((k) => (
-                  <View key={k} style={styles.perfDash} />
-                ))}
-              </View>
-              <View style={[styles.notch, styles.notchTop]} />
-              <View style={[styles.notch, styles.notchBottom]} />
-
-              <View style={styles.ticketBody}>
-                <Text style={styles.headline}>{headline(c)}</Text>
-                <Text style={styles.conds}>{conditions(c).join(' · ')}</Text>
-                <View style={styles.codeRow}>
-                  <Text style={styles.code}>{c.code}</Text>
-                  <View style={styles.copyHint}>
-                    <Ionicons name="copy-outline" size={13} color={Colors.primaryStrong} />
-                    <Text style={styles.copyText}>คัดลอก</Text>
-                  </View>
-                </View>
-              </View>
-            </PressableScale>
-          ))
+            {more.length > 0 ? (
+              <Text variant="subtitle" style={styles.groupHead}>
+                เก็บเพิ่มได้
+              </Text>
+            ) : null}
+            {more.map((c) => renderTicket(c))}
+          </>
         )}
       </ScrollView>
 
@@ -308,6 +359,23 @@ const styles = StyleSheet.create({
   copyHint: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   copyText: { fontSize: 13, color: Colors.primaryStrong },
   skLine: { marginTop: Spacing.sm },
+  /* หัวกลุ่ม — เว้นบนมากกว่าระยะห่างระหว่างใบ (gap ของ body) ให้เห็นว่าขึ้นกลุ่มใหม่
+     ไม่ใช่แค่ใบถัดไป */
+  groupHead: { marginTop: Spacing.sm },
+  claimBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primary,
+  },
+  claimText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13,
+    color: Colors.textOnPrimary,
+  },
   empty: { alignItems: 'center', paddingTop: Spacing.x3 * 2 },
   emptyIcon: {
     width: 84,

@@ -14,8 +14,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   FadeInUp,
@@ -36,6 +36,7 @@ import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography, tokens } from '@/constants/theme';
 import { type Product } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
+import { listClaimedCoupons, type Coupon } from '@/lib/data/coupons';
 import { validatePromo } from '@/lib/data/order';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -199,6 +200,11 @@ export default function CartScreen() {
   const [promo, setPromo] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
   const [promoBusy, setPromoBusy] = useState(false);
+  /* คูปองที่ลูกค้ากดเก็บไว้ (0096) — เอามาให้กดเลือกแทนการพิมพ์โค้ดเอง ซึ่งเป็นเหตุผล
+     ทั้งหมดของการมีปุ่ม "เก็บ" ตั้งแต่แรก ถ้าเก็บแล้วยังต้องพิมพ์อยู่ดีก็ไม่ต่างจากเดิม
+     ช่องพิมพ์โค้ดยังอยู่ ไม่ได้เอาออก — โค้ดลับที่ร้านส่งให้เฉพาะรายไม่มีทางโผล่ใน
+     รายการที่เก็บได้ ต้องพิมพ์เองเท่านั้น */
+  const [myCoupons, setMyCoupons] = useState<Coupon[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const chosen = selectedItems(items, selectedIds);
@@ -235,6 +241,41 @@ export default function CartScreen() {
   const onAddSuggestion = (product: Product) => {
     if (Platform.OS !== 'web') Haptics.selectionAsync();
     add(product);
+  };
+
+  /* โหลดทุกครั้งที่เข้าหน้า ไม่แคช — ลูกค้าอาจเพิ่งไปเก็บคูปองมาจากหน้าแรกหรือแท็บคูปอง
+     แล้วกลับมาที่นี่ทันที ถ้าแคชไว้จะไม่เห็นใบที่เพิ่งเก็บ */
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void listClaimedCoupons()
+        .then((cs) => alive && setMyCoupons(cs))
+        .catch(() => alive && setMyCoupons([]));
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
+
+  /* กดเลือกจากคูปองที่เก็บไว้ = เติมโค้ดลงช่องแล้วตรวจให้เลย ไม่ใช่ตั้งส่วนลดเอง —
+     ต้องผ่าน validate_promo เหมือนพิมพ์เองทุกประการ เพราะยอดขั้นต่ำ/โควตาตัดสินตอนนี้
+     ไม่ใช่ตอนเก็บ ถ้าลัดขั้นตอนจะได้ส่วนลดที่ place_order ปฏิเสธทีหลัง */
+  const applyCoupon = async (c: Coupon) => {
+    setPromo(c.code);
+    setPromoBusy(true);
+    try {
+      const res = await validatePromo(c.code, subtotal, mode);
+      if (res.valid) {
+        setAppliedPromo({ code: c.code, discount: res.discount });
+      } else {
+        setAppliedPromo(null);
+        Alert.alert(t('cart.promoInvalidTitle'), res.messageTh || t('cart.promoInvalidBody'));
+      }
+    } catch {
+      Alert.alert(t('cart.promoErrorTitle'), t('cart.promoErrorBody'));
+    } finally {
+      setPromoBusy(false);
+    }
   };
 
   const onApply = async () => {
@@ -525,6 +566,40 @@ export default function CartScreen() {
             {/* Summary */}
             <Text style={[styles.eyebrow, styles.eyebrowTop]}>{t('cart.summaryEyebrow')}</Text>
             <View style={styles.summaryCard}>
+              {/* คูปองที่เก็บไว้ — กดเลือกได้เลยไม่ต้องพิมพ์ ซ่อนทั้งแถวถ้ายังไม่เคยเก็บ */}
+              {myCoupons.length > 0 ? (
+                <View style={styles.myCoupons}>
+                  <Text style={styles.myCouponsHead}>คูปองที่เก็บไว้</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.myCouponsRow}>
+                    {myCoupons.map((c) => {
+                      const on = appliedPromo?.code === c.code;
+                      return (
+                        <PressableScale
+                          key={c.id}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: on }}
+                          accessibilityLabel={`ใช้คูปอง ${c.code}`}
+                          disabled={promoBusy}
+                          onPress={() => void applyCoupon(c)}
+                          style={[styles.couponChip, on && styles.couponChipOn]}>
+                          <Ionicons
+                            name={on ? 'checkmark-circle' : 'pricetag'}
+                            size={14}
+                            color={on ? Colors.textOnPrimary : Colors.primaryStrong}
+                          />
+                          <Text style={[styles.couponChipText, on && styles.couponChipTextOn]}>
+                            {c.type === 'percent' ? `ลด ${c.value}%` : `ลด ${money(c.value)}`}
+                          </Text>
+                        </PressableScale>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
+
               {/* Promo field (inset) */}
               <View style={styles.promoField}>
                 <Ionicons name="pricetag-outline" size={18} color={Colors.textMuted} />
@@ -871,6 +946,29 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     ...Shadow.card,
   },
+  myCoupons: { marginBottom: Spacing.md },
+  myCouponsHead: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginBottom: Spacing.xs,
+  },
+  myCouponsRow: { gap: Spacing.sm },
+  couponChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 7,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.primaryTint,
+  },
+  couponChipOn: { backgroundColor: Colors.primary },
+  couponChipText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13,
+    color: Colors.primaryStrong,
+  },
+  couponChipTextOn: { color: Colors.textOnPrimary },
   promoField: {
     flexDirection: 'row',
     alignItems: 'center',
