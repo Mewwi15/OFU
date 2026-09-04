@@ -286,6 +286,7 @@ export async function getFeaturedItems(sectionId: string): Promise<string[]> {
 /* ── banners (app: every slot that shows a banner) ──────────────────────────── */
 export type BannerPlacement =
   | 'home'
+  | 'home_promo'
   | 'search_hero'
   | 'search_trending'
   | 'search_promo'

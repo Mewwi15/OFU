@@ -39,6 +39,7 @@ type PlacementMeta = {
 
 const PLACEMENTS: PlacementMeta[] = [
   { value: 'home', screen: 'หน้าแรก', label: 'สไลด์บนสุด', where: 'ภาพใหญ่บนสุดที่เลื่อนสไลด์ได้ เห็นทันทีที่เปิดแอป', multi: true },
+  { value: 'home_promo', screen: 'หน้าแรก', label: 'แถบใต้คูปอง', where: 'ใต้คูปองใบใหญ่ ช่วงกลางหน้าแรก — ใส่หลายรูปได้ เลื่อนสไลด์เอง', multi: true },
   { value: 'delivery_promo', screen: 'หน้าเดลิเวอรี่', label: 'แถบใต้หมวดหมู่', where: 'ใต้แถววงกลมหมวดหมู่สินค้า เหนือแถวสินค้าขายดี — ใส่หลายรูปได้ เลื่อนสไลด์เอง', multi: true },
   { value: 'online_promo', screen: 'หน้าออนไลน์ (ส่งพัสดุ)', label: 'แถบใต้หมวดหมู่', where: 'ใต้แถววงกลมหมวดหมู่สินค้า เหนือแถวสินค้าขายดี — ใส่หลายรูปได้ เลื่อนสไลด์เอง', multi: true },
   /* หน้าสินค้าไม่ได้อยู่ในแถบล่างแล้วตั้งแต่ 4 ก.ย. 2026 (เปลี่ยนเป็นแท็บคูปอง) แต่หน้า
@@ -59,6 +60,7 @@ const SCREENS = [...new Set(PLACEMENTS.map((p) => p.screen))];
  */
 const BANNER_ASPECT: Record<BannerPlacement, number> = {
   home: 1.55,   // ต้องตรงกับ lib/data/catalog.ts เสมอ (แก้ 3 ก.ย. 2026)
+  home_promo: 2,
   search_hero: 2.35,
   search_trending: 2.8,
   search_promo: 2.8,

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -14,20 +14,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ProductRail } from '@/components/product/ProductRail';
-import { CouponRail } from '@/components/shop/CouponRail';
-import { CategoryIcon } from '@/components/shop/CategoryIcon';
+import { CouponPicks } from '@/components/shop/CouponPicks';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { DesktopHome } from '@/components/web/DesktopHome';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
 import { BRAND_ACCENT, GREEN_ACCENT } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
-import { BANNER_ASPECT } from '@/lib/data/catalog';
+import { BANNER_ASPECT, bannersFor } from '@/lib/data/catalog';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
@@ -81,6 +78,11 @@ const FALLBACK_SLIDES: { id: string; image: number | { uri: string }; title: str
 ];
 /** Auto-advance interval for the hero banner (ms). Thai reading time + WCAG 2.2.2. */
 const BANNER_INTERVAL = 5000;
+/** รูปมาสคอตของแบนเนอร์สำรอง — ไฟล์เดียวกับที่หน้าเดลิเวอรี่/ออนไลน์ใช้ */
+const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
+/* เฉดของแบนเนอร์สำรองใต้คูปอง — เขียวตามธีมหน้าแรก ไม่ใช่ส้มแบบหัวจอเดลิเวอรี่
+   ใช้โทเคนเขียวชุดเดียวกับ GREEN_ACCENT ไม่ได้ตั้งเลขสีใหม่ */
+const PROMO_FALLBACK_RAMP = [GREEN_ACCENT.strong, GREEN_ACCENT.solid] as const;
 
 export default function HomeScreen() {
   const isDesktopWeb = useIsDesktopWeb();
@@ -93,7 +95,6 @@ export default function HomeScreen() {
   const t = useT();
 
   /* ----- Catalog (from Supabase) ----- */
-  const products = useCatalog((s) => s.products);
   const reloadCatalog = useCatalog((s) => s.load);
   const [refreshing, setRefreshing] = useState(false);
   // Re-fetch on focus only if the catalog is stale (loadIfStale), so admin
@@ -123,25 +124,6 @@ export default function HomeScreen() {
         title: b.title,
       }))
     : FALLBACK_SLIDES;
-  const dbCategories = useCatalog((s) => s.categories);
-  const featuredRows = useCatalog((s) => s.featured);
-  /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มโหลดและตอนเสร็จแล้ว
-     ถ้าดูแค่ loading หน้าแรกจะโล่งอยู่ดีในช่วงก่อนคำขอแรกจะยิงออกไป */
-  const catalogLoaded = useCatalog((s) => s.loaded);
-  // Admin categories (in their display order) when available; else the static list.
-  const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
-
-  // แนะนำ — highest rated.
-  const recommended = useMemo(
-    () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
-    [products],
-  );
-  // มาใหม่ — most recently added.
-  const newArrivals = useMemo(
-    () => [...products].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')).slice(0, 8),
-    [products],
-  );
-
   /* ----- Auto-rotating hero banner ----- */
   const bannerRef = useRef<ScrollView>(null);
   const [bannerWidth, setBannerWidth] = useState(0);
@@ -160,6 +142,25 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [bannerWidth, slides.length]);
 
+  /* ----- แบนเนอร์ใต้คูปอง (ช่อง home_promo) ----- */
+  const promoBanners = bannersFor(useCatalog((st) => st.banners), 'home_promo');
+  const promoRef = useRef<ScrollView>(null);
+  const [promoW, setPromoW] = useState(0);
+  const [promoIdx, setPromoIdx] = useState(0);
+  /* เก็บดัชนีไว้ใน ref ด้วย — ตัวจับเวลาอ่านค่าเก่าค้างถ้าอ่านจาก state ตรง ๆ */
+  const promoIdxRef = useRef(0);
+  promoIdxRef.current = promoIdx;
+
+  useEffect(() => {
+    if (promoW === 0 || promoBanners.length < 2) return;
+    const timer = setInterval(() => {
+      const next = (promoIdxRef.current + 1) % promoBanners.length;
+      promoRef.current?.scrollTo({ x: next * promoW, animated: true });
+      setPromoIdx(next);
+    }, BANNER_INTERVAL);
+    return () => clearInterval(timer);
+  }, [promoW, promoBanners.length]);
+
   const onBannerLayout = (e: LayoutChangeEvent) =>
     setBannerWidth(e.nativeEvent.layout.width);
 
@@ -167,14 +168,6 @@ export default function HomeScreen() {
     if (bannerWidth === 0) return;
     setActiveSlide(Math.round(e.nativeEvent.contentOffset.x / bannerWidth));
   };
-
-  /** Open the full catalog tab, optionally pre-filtered by category. */
-  const openCatalog = (category?: string) =>
-    router.push(
-      category && category !== 'ทั้งหมด'
-        ? `/search?category=${encodeURIComponent(category)}`
-        : '/search',
-    );
 
   // Desktop web renders the full storefront landing instead (after all hooks).
   if (isDesktopWeb) return <DesktopHome />;
@@ -328,63 +321,77 @@ export default function HomeScreen() {
             })}
           </View>
 
-          {/* Category shortcuts → catalog */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.catRow}>
-            {catList.map((cat) => (
-              <PressableScale
-                key={cat}
-                accessibilityRole="button"
-                accessibilityLabel={cat}
-                onPress={() => openCatalog(cat)}
-                style={styles.catCard}>
-                <CategoryIcon category={cat} size={64} />
-                <Text numberOfLines={1} style={styles.catLabel}>
-                  {cat}
-                </Text>
-              </PressableScale>
-            ))}
-          </ScrollView>
+          {/* ★ หน้าแรกไม่โชว์สินค้าแล้ว ★ (เจ้าของสั่ง 4 ก.ย. 2026 "หน้าแรกเราจะไม่โชว์
+              สินค้าละครับ ... เอาเป็นคูปอง แบบใหญ่เต็มจอเลย ... ตามด้วยแบรนเนอร์")
+              เดิมมีหมวดหมู่ + แถวสินค้าแนะนำ/มาใหม่ ซึ่งพาไปหน้าสินค้ารวมที่ถอดออกจาก
+              แถบแท็บไปแล้ว ตอนนี้ทางเข้าสินค้าคือการ์ดสองโหมดข้างบนทางเดียว สินค้าอยู่
+              ในหมวดหมู่ของแต่ละโหมด ไม่มีหน้ารวมที่ไม่รู้ว่าจะส่งแบบไหนอีกต่อไป
+              เหลือสองอย่างตามที่สั่ง: คูปองใบใหญ่ แล้วต่อด้วยแบนเนอร์ */}
+          <CouponPicks notchColor={SCREEN_BG} accent={GREEN_ACCENT} />
 
-          {/* Admin-managed featured rows (จัดหน้าแอป) */}
-          {featuredRows.map((row) => {
-            const rowProducts = row.productIds
-              .map((id) => products.find((p) => p.id === id))
-              .filter((p): p is (typeof products)[number] => !!p);
-            if (rowProducts.length === 0) return null;
-            return (
-              <ProductRail
-              accent={GREEN_ACCENT}
-                key={row.id}
-                title={row.title}
-                data={rowProducts}
-                onSeeAll={() => openCatalog()}
-                loading={!catalogLoaded}
-              />
-            );
-          })}
-
-          {/* แถวคูปองแทนแถว "ขายดี" เดิม (เจ้าของสั่ง 4 ก.ย. 2026) — เลื่อนแนวนอน
-              ให้ลูกค้าเก็บโค้ด ซ่อนทั้งแถวเองถ้าไม่มีคูปองที่เปิดให้เห็นในแอป */}
-          <CouponRail notchColor={SCREEN_BG} accent={GREEN_ACCENT} />
-
-          {/* Curated rails */}
-          <ProductRail
-              accent={GREEN_ACCENT}
-            title={t('home.recommended')}
-            data={recommended}
-            onSeeAll={() => openCatalog()}
-            loading={!catalogLoaded}
-          />
-          <ProductRail
-              accent={GREEN_ACCENT}
-            title={t('home.newArrivals')}
-            data={newArrivals}
-            onSeeAll={() => openCatalog()}
-            loading={!catalogLoaded}
-          />
+          {/* แบนเนอร์ใต้คูปอง — ช่อง home_promo (คนละใบกับสไลด์บนสุด ดู 0098)
+              ยังไม่ได้อัปรูปก็มีของสำรองวาดไว้ในขนาดเดียวกันเป๊ะ เจ้าของจะได้เห็นว่าช่อง
+              อยู่ตรงไหนและกว้างยาวเท่าไหร่ก่อนทำรูปจริง — และเพราะร้านเปิดขายอยู่จริง
+              ของสำรองต้องเป็นแบนเนอร์ที่ดูตั้งใจทำ ไม่ใช่กล่องเทาเขียนว่า "ยังไม่มีรูป" */}
+          <View style={styles.promoSection}>
+            {promoBanners.length > 0 ? (
+              <View
+                style={[styles.promoPager, { aspectRatio: BANNER_ASPECT.home_promo }]}
+                onLayout={(e: LayoutChangeEvent) => setPromoW(e.nativeEvent.layout.width)}>
+                <ScrollView
+                  ref={promoRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  /* ปิดการปัดเองตอนมีรูปเดียว ไม่งั้นปัดแล้วเด้งไปมาโดยไม่มีอะไรให้ดู */
+                  scrollEnabled={promoBanners.length > 1}
+                  onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                    if (promoW === 0) return;
+                    setPromoIdx(Math.round(e.nativeEvent.contentOffset.x / promoW));
+                  }}
+                  style={StyleSheet.absoluteFill}>
+                  {promoBanners.map((b) => (
+                    <Image
+                      key={b.id}
+                      source={{ uri: b.image }}
+                      style={{ width: promoW, height: '100%' }}
+                      contentFit="cover"
+                      transition={180}
+                      accessibilityIgnoresInvertColors
+                      accessibilityLabel={b.title ?? 'โปรโมชั่น'}
+                    />
+                  ))}
+                </ScrollView>
+                {promoBanners.length > 1 ? (
+                  <View style={styles.promoDots} pointerEvents="none">
+                    {promoBanners.map((b, i) => (
+                      <View
+                        key={b.id}
+                        style={[styles.promoDot, i === promoIdx && styles.promoDotOn]}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              <LinearGradient
+                colors={PROMO_FALLBACK_RAMP}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.promoFallback, { aspectRatio: BANNER_ASPECT.home_promo }]}>
+                <View style={styles.promoCopy}>
+                  <Text style={styles.promoTitle}>ร้านอู้ฟู่</Text>
+                  <Text style={styles.promoSub}>ของครบ ราคาร้านชำ</Text>
+                </View>
+                <Image
+                  source={MASCOT_SRC}
+                  style={styles.promoArt}
+                  contentFit="contain"
+                  pointerEvents="none"
+                />
+              </LinearGradient>
+            )}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -392,6 +399,48 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  promoSection: { marginTop: Spacing.lg },
+  /* กรอบสไลด์ — ต้องเป็นสไตล์ของตัวเอง ห้ามใช้ร่วมกับตัวสำรองที่จัด row + เว้นขอบใน
+     (บทเรียนจากหน้าเดลิเวอรี่: ใช้ร่วมกันแล้วความกว้างที่วัดได้ไม่ตรงกับความกว้างหน้า
+     รูปเลยเลื่อนไม่พอดีหน้า) */
+  promoPager: {
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    backgroundColor: Colors.surfaceMuted,
+  },
+  promoDots: {
+    position: 'absolute',
+    bottom: Spacing.sm,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  promoDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  promoDotOn: { width: 18, backgroundColor: '#FFFFFF' },
+  promoFallback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    paddingLeft: Spacing.lg,
+  },
+  promoCopy: { flex: 1 },
+  promoTitle: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 22,
+    color: '#FFFFFF',
+  },
+  promoSub: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.92)',
+    marginTop: 2,
+  },
+  promoArt: { width: 130, height: '100%' },
   screen: {
     flex: 1,
     /* เทาอ่อนมาก ๆ แทนพื้นพีชเดิม (เจ้าของสั่ง 3 ก.ย. 2026) — การ์ดขาวไม่มีเส้นขอบแล้ว

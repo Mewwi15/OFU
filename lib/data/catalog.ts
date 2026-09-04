@@ -77,6 +77,7 @@ export async function loadCatalog(): Promise<Product[]> {
 /** A published home-hero banner (managed by the admin web's Banners page). */
 export type BannerPlacement =
   | 'home'
+  | 'home_promo'
   | 'search_hero'
   | 'search_trending'
   | 'search_promo'
@@ -95,6 +96,10 @@ export const BANNER_ASPECT: Record<BannerPlacement, number> = {
   // หน้าแรก · สไลด์บนสุด — 1.55 ไม่ใช่ 2 เพราะแบนเนอร์ไหลใต้แถบสถานะแล้ว (3 ก.ย. 2026)
   // ส่วนบนของภาพถูกแถบสถานะกินไปราว 60pt ถ้าครอป 2:1 ส่วนที่เห็นจริงจะเตี้ยกว่าที่ออกแบบ
   home: 1.55,
+  // หน้าแรก · แถบใต้คูปอง (เจ้าของสั่ง 4 ก.ย. 2026 ให้หน้าแรกเหลือคูปอง + แบนเนอร์)
+  // 2:1 เท่าแถบของเดลิเวอรี่/ออนไลน์ ไม่ใช่ 1.55 แบบสไลด์บนสุด — ช่องนี้อยู่กลางหน้า
+  // ไม่มีแถบสถานะหรือการ์ดโหมดมาทับ ที่ครอปคือที่เห็นทั้งใบ
+  home_promo: 2,
   search_hero: 2.35, // หน้าค้นหา · แบนเนอร์บนสุด (เต็มความกว้าง)
   search_trending: 2.8, // แถบ promo เหนือแถวสินค้า
   search_promo: 2.8,
