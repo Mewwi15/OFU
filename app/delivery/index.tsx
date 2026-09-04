@@ -15,7 +15,15 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CategoryBubble } from '@/components/shop/CategoryBubble';
@@ -85,7 +93,14 @@ export default function DeliveryHome() {
    * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
   const [headH, setHeadH] = useState(0);
   const [addrH, setAddrH] = useState(52);
+  /* สองค่านี้อ่านตำแหน่งสกอลล์ตัวเดียวกัน แต่ขับกันคนละเธรด — แยกไว้เพราะ transform/
+     opacity ขับบนเธรดเนทีฟได้ (addrX/addrY/mascotO/searchY/searchO ใช้ scrollY)
+     ส่วน height ขับบนเนทีฟไม่ได้ (barH ต้องใช้ barScrollY) เดิมรวมเป็นค่าเดียวแล้วบังคับ
+     useNativeDriver: false ทั้งชุด ทุกอินเตอร์โพเลตเลยต้องคำนวณบนเธรด JS ทุกเฟรมสกอลล์
+     พร้อมกันหมด 6 ตัว — เจ้าของทัก 4 ก.ย. 2026 "หน้า delivery กระตุกแบบมากๆ" ตรงนี้แหละ
+     ตัวต้นเหตุ แยกแล้วเหลือแค่ barH ตัวเดียวที่ยังต้องคำนวณบน JS ทุกเฟรม */
   const scrollY = useRef(new Animated.Value(0)).current;
+  const barScrollY = useRef(new Animated.Value(0)).current;
 
   /* ก่อนวัดจริงเสร็จ ใช้ค่าประมาณไปพลางแทนที่จะเป็น 0 ไม่งั้นเฟรมแรกเนื้อหาจะเด้ง
      ขึ้นไปชนขอบบนแล้วค่อยกระตุกลงมา */
@@ -110,7 +125,7 @@ export default function DeliveryHome() {
   const ramp = (to: number, at = shrink) =>
     scrollY.interpolate({ inputRange: [0, at], outputRange: [0, to], extrapolate: 'clamp' });
 
-  const barH = scrollY.interpolate({
+  const barH = barScrollY.interpolate({
     inputRange: [0, shrink],
     outputRange: [headEff, barMin],
     extrapolate: 'clamp',
@@ -195,10 +210,13 @@ export default function DeliveryHome() {
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          /* ย่อหัวจอคือการเปลี่ยน "ความสูง" ซึ่ง native driver ทำไม่ได้ (ได้แค่ transform
-             กับ opacity) จะเลี่ยงไปใช้ scaleY ก็ไม่ได้เพราะเฉดจะโดนบีบจนองศาเพี้ยน
-             ยอมขับด้วย JS ทั้งชุด ให้ทุกชั้นขยับพร้อมกันในเฟรมเดียว */
-          useNativeDriver: false,
+          /* addrX/addrY/mascotO/searchY/searchO ล้วนเป็น transform/opacity ขับบนเธรด
+             เนทีฟได้ทั้งหมด จึงตั้ง true ตรงนี้ — barH ที่ขับบนเนทีฟไม่ได้ (เปลี่ยน
+             ความสูงจริง ไม่ใช่ transform) แยกออกไปใช้ barScrollY กับ listener ข้างล่าง
+             แทน ให้มันเป็นตัวเดียวที่ยังกินเธรด JS ต่อเฟรม ไม่ใช่ทั้งหกตัว */
+          useNativeDriver: true,
+          listener: (e: NativeSyntheticEvent<NativeScrollEvent>) =>
+            barScrollY.setValue(e.nativeEvent.contentOffset.y),
         })}
         style={styles.scroll}
         contentContainerStyle={{ flexGrow: 1, paddingTop: headEff, paddingBottom: TAB_BAR_CLEARANCE + insets.bottom }}>
