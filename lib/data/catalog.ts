@@ -124,6 +124,11 @@ export function bannerFor(banners: HomeBanner[], placement: BannerPlacement): Ho
   return banners.find((b) => b.placement === placement) ?? null;
 }
 
+/** ทุกแบนเนอร์ของช่องนั้น เรียงตามลำดับที่แอดมินจัดไว้ — ใช้กับช่องที่ใส่ได้หลายรูป */
+export function bannersFor(banners: HomeBanner[], placement: BannerPlacement): HomeBanner[] {
+  return banners.filter((b) => b.placement === placement);
+}
+
 /** Category names in the admin's display order (drives the app's filter chips). */
 export async function loadCategoryNames(): Promise<string[]> {
   const { data, error } = await supabase.from('categories').select('name, display_order').order('display_order');

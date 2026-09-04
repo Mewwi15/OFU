@@ -14,9 +14,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -40,7 +41,7 @@ import {
   DELIVERY_RAMP,
   DELIVERY_SHEET_BG,
 } from '@/constants/delivery';
-import { ALL_CATEGORY, BANNER_ASPECT, bannerFor } from '@/lib/data/catalog';
+import { ALL_CATEGORY, BANNER_ASPECT, bannersFor } from '@/lib/data/catalog';
 import { useCatalog } from '@/store/catalog';
 import { selectedAddress, useAddress } from '@/store/address';
 import { MODE_META } from '@/store/mode';
@@ -48,6 +49,8 @@ import { MODE_META } from '@/store/mode';
 const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 
 const TAB_BAR_CLEARANCE = 110;
+/** จังหวะเลื่อนสไลด์แบนเนอร์เอง (มิลลิวินาที) — เท่าหน้าแรก อ่านทันพอดีสำหรับข้อความไทย */
+const PROMO_INTERVAL = 5000;
 /* สีพื้นแผ่นเนื้อหา — วงกลมหมวดหมู่ต้องใช้สีเดียวกันเป๊ะเพื่อให้กลืนหายไปกับพื้น
    (เจ้าของสั่ง 3 ก.ย. 2026 "วงกลมมันดูขาว เอาให้กลืนกับสีพื้นหลังเลย") */
 const SHEET_BG = DELIVERY_SHEET_BG;
@@ -155,7 +158,26 @@ export default function DeliveryHome() {
 
   /* คัดสินค้าให้แต่ละแถวจากคลังเดียวกับหน้าอื่น — ต่างกันแค่วิธีจัดเรียงบนจอ
    * ไม่ได้ไปดึงข้อมูลชุดใหม่มา ของที่ขายก็คือของเดียวกันทั้งร้าน */
-  const deliveryBanner = bannerFor(banners, 'delivery_promo');
+  /* ช่องนี้ใส่ได้หลายรูปแล้ว (เจ้าของสั่ง 4 ก.ย. 2026 "ต้องเพิ่มได้หลายภาพสิ") —
+     เลื่อนเองอัตโนมัติเหมือนสไลด์หน้าแรก และปัดเองได้ */
+  const deliveryBanners = bannersFor(banners, 'delivery_promo');
+  const [promoW, setPromoW] = useState(0);
+  const [promoIdx, setPromoIdx] = useState(0);
+  const promoRef = useRef<ScrollView>(null);
+  /* เก็บดัชนีไว้ใน ref ด้วย — callback ของ setInterval ถูกสร้างครั้งเดียว ถ้าอ่านจาก
+     state ตรง ๆ จะเห็นค่าเก่าค้างตลอด (แพทเทิร์นเดียวกับสไลด์หน้าแรก) */
+  const promoIdxRef = useRef(0);
+  promoIdxRef.current = promoIdx;
+
+  useEffect(() => {
+    if (promoW === 0 || deliveryBanners.length < 2) return;
+    const t = setInterval(() => {
+      const next = (promoIdxRef.current + 1) % deliveryBanners.length;
+      promoRef.current?.scrollTo({ x: next * promoW, animated: true });
+      setPromoIdx(next);
+    }, PROMO_INTERVAL);
+    return () => clearInterval(t);
+  }, [promoW, deliveryBanners.length]);
 
   /* สามแถวคัดสรร (เจ้าของสั่ง 3 ก.ย. 2026 "นำสินค้าขายดีมา สินค้าแนะนำ สินค้ายอดฮิต")
      แทนที่แถวไล่ทีละหมวดเดิม — การไล่ทีละหมวดครบทุกหมวดทำให้หน้ายาวและซ้ำกับสิ่งที่
@@ -254,15 +276,42 @@ export default function DeliveryHome() {
                 จริง ของสำรองจึงต้องเป็นแบนเนอร์ที่ดูตั้งใจทำ ใช้คำที่แอปพูดอยู่แล้ว
                 ไม่ใช่กล่องเทาเขียนว่า "ยังไม่มีรูป" ให้ลูกค้าเห็น
                 และไม่ไปสัญญาตัวเลขอะไรใหม่ที่ยังไม่ได้ตกลงกัน */}
-            {deliveryBanner ? (
-              <Image
-                source={{ uri: deliveryBanner.image }}
-                style={[styles.promo, { aspectRatio: BANNER_ASPECT.delivery_promo }]}
-                contentFit="cover"
-                transition={180}
-                accessibilityIgnoresInvertColors
-                accessibilityLabel={deliveryBanner.title ?? 'โปรโมชั่น'}
-              />
+            {deliveryBanners.length > 0 ? (
+              <View
+                style={[styles.promoPager, { aspectRatio: BANNER_ASPECT.delivery_promo }]}
+                onLayout={(e: LayoutChangeEvent) => setPromoW(e.nativeEvent.layout.width)}>
+                <ScrollView
+                  ref={promoRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  /* ปิดการปัดเองตอนมีรูปเดียว ไม่งั้นปัดแล้วเด้งไปมาโดยไม่มีอะไรให้ดู */
+                  scrollEnabled={deliveryBanners.length > 1}
+                  onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                    if (promoW === 0) return;
+                    setPromoIdx(Math.round(e.nativeEvent.contentOffset.x / promoW));
+                  }}
+                  style={StyleSheet.absoluteFill}>
+                  {deliveryBanners.map((b) => (
+                    <Image
+                      key={b.id}
+                      source={{ uri: b.image }}
+                      style={{ width: promoW, height: '100%' }}
+                      contentFit="cover"
+                      transition={180}
+                      accessibilityIgnoresInvertColors
+                      accessibilityLabel={b.title ?? 'โปรโมชั่น'}
+                    />
+                  ))}
+                </ScrollView>
+                {deliveryBanners.length > 1 ? (
+                  <View style={styles.promoDots} pointerEvents="none">
+                    {deliveryBanners.map((b, i) => (
+                      <View key={b.id} style={[styles.promoDot, i === promoIdx && styles.promoDotOn]} />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
             ) : (
               <LinearGradient
                 colors={HEAD_RAMP}
@@ -481,6 +530,16 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: Spacing.lg },
   catHead: { marginTop: Spacing.lg },
   catRow: { gap: Spacing.xs, paddingTop: Spacing.sm, paddingBottom: Spacing.lg, paddingRight: Spacing.lg },
+  /* กรอบสไลด์แบนเนอร์ — ต้องเป็นสไตล์ของตัวเอง ห้ามใช้ styles.promo ร่วมกับตัวสำรอง
+     เพราะตัวสำรองเป็นเลย์เอาต์แถว (flexDirection + paddingLeft) สำหรับวางข้อความคู่
+     มาสคอต ถ้าเอามาครอบ ScrollView ที่ absoluteFill ระยะเว้นซ้ายจะไปหดความกว้างของ
+     ช่องเลื่อน แต่ onLayout วัดจากกรอบนอกได้ค่าเต็ม สองค่าไม่ตรงกัน สไลด์เลยหยุดไม่ตรงรูป */
+  promoPager: {
+    width: '100%',
+    borderRadius: Radius.md,
+    backgroundColor: Colors.surfaceMuted,
+    overflow: 'hidden',
+  },
   promo: {
     width: '100%',
     borderRadius: Radius.md,
@@ -491,6 +550,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingLeft: Spacing.lg,
   },
+  /* จุดบอกสไลด์ วางลอยมุมล่างขวาในกรอบแบนเนอร์ — ไม่วางกลางเพราะข้อความบนแบนเนอร์
+     ส่วนใหญ่อยู่ซ้าย จุดกลางจะไปทับพอดี */
+  promoDots: {
+    position: 'absolute',
+    right: Spacing.md,
+    bottom: Spacing.sm,
+    flexDirection: 'row',
+    gap: 5,
+  },
+  promoDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  promoDotOn: { backgroundColor: '#fff', width: 16 },
   promoCopy: { flex: 1, gap: 2 },
   promoTitle: {
     fontFamily: 'Mitr_600SemiBold',
