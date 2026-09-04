@@ -42,7 +42,7 @@ import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { productThumb } from '@/lib/image';
 import { useShopOpen } from '@/lib/useShopOpen';
-import { hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
+import { hasContactInfo, hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import { useCatalog } from '@/store/catalog';
 import { useShop } from '@/store/shop';
 import {
@@ -224,8 +224,13 @@ export default function CartScreen() {
   const belowMin = !nothingSelected && !meetsMinOrder(mode, subtotal);
   // Online (parcel) needs a parcel-ready address before checkout.
   const needsParcel = mode === 'online' && !hasParcelInfo(address);
+  /* เดลิเวอรี่ก็ต้องมีชื่อผู้รับ+เบอร์โทร — ที่อยู่ที่มาจากการสแกนพิกัด (0096/จอ
+     delivery-check) อาจยังว่างสองช่องนี้ถ้าโปรไฟล์ยังไม่ได้กรอก เจ้าของเลือกไว้ว่า
+     "ค่อยกรอกชื่อ/เบอร์ตอนสั่ง" จึงต้องกันที่นี่ — ปล่อยผ่านไปฐานข้อมูลจะปฏิเสธเอง
+     (recipient_name/recipient_phone เป็น not null) ซึ่งลูกค้าจะเจอเป็น error ดิบ ๆ */
+  const needsContact = mode === 'delivery' && !!address && !hasContactInfo(address);
   const canCheckout =
-    !nothingSelected && shopOpen && !belowMin && !needsParcel;
+    !nothingSelected && shopOpen && !belowMin && !needsParcel && !needsContact;
 
   const checkoutVerb = mode === 'delivery' ? t('cart.checkoutOrder') : t('cart.checkoutPay');
   const checkoutLabel =
@@ -698,7 +703,9 @@ export default function CartScreen() {
                       ? t('cart.nothingSelected')
                       : needsParcel
                         ? t('cart.needParcelAddress')
-                        : `${t('cart.selectedTotal')} · ${selectedCount} ${t('cart.unitPieces')}`}
+                        : needsContact
+                          ? t('cart.needContact')
+                          : `${t('cart.selectedTotal')} · ${selectedCount} ${t('cart.unitPieces')}`}
               </Text>
               <View style={styles.checkoutTotalRow}>
                 <Text style={styles.checkoutTotal}>

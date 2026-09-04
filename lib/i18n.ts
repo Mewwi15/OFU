@@ -257,6 +257,7 @@ const th: Dict = {
   'cart.shortBy': 'ขาดอีก',
   'cart.nothingSelected': 'ยังไม่ได้เลือกสินค้า',
   'cart.needParcelAddress': 'เพิ่มที่อยู่จัดส่งพัสดุก่อน',
+  'cart.needContact': 'กรอกชื่อผู้รับกับเบอร์โทรก่อน',
   'cart.selectedTotal': 'รวมที่เลือก',
   'cart.freeShip': 'ส่งฟรี',
 
@@ -850,6 +851,7 @@ const en: Dict = {
   'cart.shortBy': 'short by',
   'cart.nothingSelected': 'No items selected',
   'cart.needParcelAddress': 'Add a parcel address first',
+  'cart.needContact': 'Add a recipient name and phone first',
   'cart.selectedTotal': 'Selected total',
   'cart.freeShip': 'Free ship',
 

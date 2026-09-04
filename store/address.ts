@@ -121,6 +121,23 @@ export function selectedAddress(state: AddressState): Address | undefined {
 }
 
 /**
+ * ป้ายของที่อยู่ "ตำแหน่งที่สแกนได้" — จอสแกนก่อนเข้าโหมดเดลิเวอรี่เขียนทับใบนี้ใบเดิม
+ * ทุกครั้ง ไม่สร้างใบใหม่ ไม่งั้นสมุดที่อยู่จะรกด้วยที่อยู่ซ้ำ ๆ ทุกครั้งที่เปิดโหมด
+ */
+export const SCANNED_LABEL = 'ตำแหน่งปัจจุบัน';
+
+/**
+ * ที่อยู่พร้อมให้จัดส่งแบบไรเดอร์หรือยัง — ต้องมีชื่อผู้รับกับเบอร์โทร
+ *
+ * ที่อยู่ที่มาจากการสแกนพิกัดอาจยังไม่มีสองอย่างนี้ (ถ้าโปรไฟล์ยังไม่ได้กรอก) เจ้าของ
+ * เลือกไว้ว่า "ค่อยกรอกชื่อ/เบอร์ตอนสั่ง" — ตะกร้าจึงต้องกันไว้ตรงนี้ ไม่ใช่ปล่อยผ่าน
+ * ไปให้ฐานข้อมูลปฏิเสธเอง (สองคอลัมน์นี้เป็น not null)
+ */
+export function hasContactInfo(a?: Address): boolean {
+  return !!(a && a.recipient.trim() && a.phone.trim());
+}
+
+/**
  * Whether an address carries enough structured detail to ship a nationwide
  * parcel (online mode): recipient, phone, province and a 5-digit postcode.
  */

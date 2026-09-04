@@ -30,6 +30,8 @@ import { DELIVERY_INK, DELIVERY_INK_SHADOW, DELIVERY_RAMP } from '@/constants/de
 import { formatAddressLine } from '@/lib/address';
 import { kmBetween } from '@/lib/geo';
 import { osmReverseGeocode } from '@/lib/osm';
+import { SCANNED_LABEL, useAddress } from '@/store/address';
+import { useAuth } from '@/store/auth';
 import { useLocale } from '@/store/locale';
 import { MODE_META, useFees, useMode } from '@/store/mode';
 
@@ -41,7 +43,7 @@ const SCREEN_RAMP = DELIVERY_RAMP.slice(0, 2) as [string, string];
 
 type Phase =
   | { k: 'scanning' }
-  | { k: 'inside'; km: number; address: string | null }
+  | { k: 'inside'; km: number; address: string | null; lat: number; lng: number }
   | { k: 'outside'; km: number; radius: number }
   | { k: 'denied' }
   | { k: 'failed' };
@@ -51,6 +53,10 @@ export default function DeliveryCheckScreen() {
   const setMode = useMode((s) => s.setMode);
   const loadFees = useFees((s) => s.load);
   const lang = useLocale((s) => s.lang);
+  const profile = useAuth((s) => s.user);
+  /* ยังไม่ล็อกอิน = ชื่อใน store เป็นชื่อสำรอง ("คุณอู้ฟู่") ไม่ใช่ชื่อผู้รับจริง
+     อย่าเอาไปกรอกให้ ไม่งั้นไรเดอร์จะได้ชื่อปลอมไปส่งของ */
+  const signedIn = useAuth((s) => s.status === 'authenticated');
   const [phase, setPhase] = useState<Phase>({ k: 'scanning' });
 
   /* ไอคอนยุบพองวนไป (เจ้าของสั่ง 3 ก.ย. 2026 "ไอคอน ยุบพอง ตามหาพิกัด") แทนวงแหวน
@@ -112,13 +118,21 @@ export default function DeliveryCheckScreen() {
       // ร้านยังไม่ตั้งพิกัด = ยังไม่เปิดใช้เขต ฝั่งเซิร์ฟเวอร์ก็ปล่อยผ่าน (0073)
       if (shopLat == null || shopLng == null) {
         const rev = await geocodePromise;
-        setPhase({ k: 'inside', km: 0, address: rev[0] ? formatAddressLine(rev[0]) : null });
+        setPhase({
+          k: 'inside', km: 0,
+          address: rev[0] ? formatAddressLine(rev[0]) : null,
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+        });
         return;
       }
       const km = kmBetween(shopLat, shopLng, pos.coords.latitude, pos.coords.longitude);
       if (km <= deliveryRadiusKm) {
         const rev = await geocodePromise;
-        setPhase({ k: 'inside', km, address: rev[0] ? formatAddressLine(rev[0]) : null });
+        setPhase({
+          k: 'inside', km,
+          address: rev[0] ? formatAddressLine(rev[0]) : null,
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+        });
       } else {
         setPhase({ k: 'outside', km, radius: deliveryRadiusKm });
       }
@@ -135,12 +149,47 @@ export default function DeliveryCheckScreen() {
    * (เจ้าของสั่ง 3 ก.ย. 2026: "พอหาพิกัดได้ก็มีหมุดและที่อยู่ใต้จอ และก็เข้าไป")
    * หน่วงนานกว่าตอนโชว์แค่ระยะทางเดิม (900) เพราะที่อยู่เป็นประโยคยาว อ่านไม่ทัน
    * ใช้ replace ไม่ใช่ push — จอเช็คตำแหน่งไม่ควรค้างอยู่ในประวัติให้กดย้อนกลับมาเจอ */
+  /* บันทึกตำแหน่งที่สแกนได้เป็นที่อยู่จัดส่งแล้วเลือกใช้ทันที (เจ้าของสั่ง 4 ก.ย. 2026
+     "ตอนสแกนเข้ามา ที่อยู่ต้องตรงตามที่สแกนได้") — เดิมจอนี้หาที่อยู่มาโชว์แล้วทิ้งไป
+     หน้าร้านจึงยังโชว์ที่อยู่เก่าในสมุดที่อยู่ ไม่ตรงกับที่เพิ่งสแกน
+     เขียนทับใบเดิมที่ป้ายว่า "ตำแหน่งปัจจุบัน" ไม่สร้างใบใหม่ทุกครั้ง ไม่งั้นสมุดที่อยู่
+     จะรกด้วยที่อยู่ซ้ำ ๆ ทุกครั้งที่เปิดโหมดเดลิเวอรี่
+     ชื่อ/เบอร์เอาจากโปรไฟล์ที่ล็อกอินไว้ ถ้ายังไม่มีก็ปล่อยว่าง แล้วตะกร้าจะกันไม่ให้
+     สั่งจนกว่าจะกรอก (ตามที่เจ้าของเลือก: ค่อยกรอกตอนสั่ง) */
   useEffect(() => {
     if (phase.k !== 'inside') return;
     setMode('delivery');
+
+    let cancelled = false;
+    const save = async () => {
+      if (!phase.address) return; // ถอดรหัสที่อยู่ไม่ได้ ก็ไม่มีอะไรจะบันทึก
+      try {
+        const existing = useAddress
+          .getState()
+          .addresses.find((a) => a.label === SCANNED_LABEL);
+        const id = await useAddress.getState().upsert({
+          id: existing?.id,
+          label: SCANNED_LABEL,
+          recipient: existing?.recipient || (signedIn ? profile.name : '') || '',
+          phone: existing?.phone || (signedIn ? profile.phone : '') || '',
+          line: phase.address,
+          lat: phase.lat,
+          lng: phase.lng,
+        });
+        if (!cancelled) useAddress.getState().select(id);
+      } catch {
+        /* บันทึกไม่ได้ (ยังไม่ล็อกอิน/เน็ตหลุด) ก็ยังเข้าหน้าร้านได้ตามปกติ หัวจอจะโชว์
+           ที่อยู่เดิมหรือ "เลือกที่อยู่จัดส่ง" แทน ไม่บล็อกทางเดินของลูกค้า */
+      }
+    };
+    void save();
+
     const t = setTimeout(() => router.replace('/delivery'), 1500);
-    return () => clearTimeout(t);
-  }, [phase.k, setMode]);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [phase, setMode, signedIn, profile.name, profile.phone]);
 
   const goOnline = () => {
     setMode('online');
