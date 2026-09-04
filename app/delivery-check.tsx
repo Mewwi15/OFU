@@ -28,10 +28,11 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { DELIVERY_INK, DELIVERY_INK_SHADOW, DELIVERY_RAMP } from '@/constants/delivery';
-import { formatAddressLine } from '@/lib/address';
+import { formatAddressLine, parcelPartsFrom, type ParcelParts } from '@/lib/address';
 import { kmBetween } from '@/lib/geo';
 import { osmReverseGeocode } from '@/lib/osm';
-import { SCANNED_LABEL, useAddress } from '@/store/address';
+import { saveScannedAddress } from '@/lib/scannedAddress';
+import { useAddress } from '@/store/address';
 import { useAuth } from '@/store/auth';
 import { useLocale } from '@/store/locale';
 import { MODE_META, useFees, useMode } from '@/store/mode';
@@ -44,7 +45,19 @@ const SCREEN_RAMP = DELIVERY_RAMP.slice(0, 2) as [string, string];
 
 type Phase =
   | { k: 'scanning' }
-  | { k: 'inside'; km: number; address: string | null; lat: number; lng: number }
+  | {
+      k: 'inside';
+      km: number;
+      address: string | null;
+      /* ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์ ที่แกะได้จากการถอดรหัสพิกัดครั้งเดียวกัน — จอนี้
+         ไม่ได้ใช้เอง แต่บันทึกลงใบที่อยู่ให้โหมดออนไลน์ (ที่ต้องใช้จังหวัด+รหัสไปรษณีย์)
+         ★ ต้องเก็บด้วย ★ ไม่ใช่เก็บไว้เฉย ๆ: upsert เขียนทั้งแถวเสมอ (toRow ใส่ null ให้
+         ช่องที่ไม่ได้ส่งมา) ถ้าจอนี้บันทึกโดยไม่ใส่ส่วนพวกนี้ จะไปล้างจังหวัด/รหัสไปรษณีย์
+         ที่จอออนไลน์เพิ่งเติมไว้ทิ้งทุกครั้งที่เปิดโหมดเดลิเวอรี่ */
+      parts: ParcelParts | null;
+      lat: number;
+      lng: number;
+    }
   | { k: 'outside'; km: number; radius: number }
   | { k: 'denied' }
   | { k: 'failed' };
@@ -116,24 +129,24 @@ export default function DeliveryCheckScreen() {
             })
       ).catch(() => [] as Location.LocationGeocodedAddress[]);
 
+      const inside = async (km: number): Promise<Phase> => {
+        const rev = await geocodePromise;
+        return {
+          k: 'inside', km,
+          address: rev[0] ? formatAddressLine(rev[0]) : null,
+          parts: rev[0] ? parcelPartsFrom(rev[0]) : null,
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+        };
+      };
+
       // ร้านยังไม่ตั้งพิกัด = ยังไม่เปิดใช้เขต ฝั่งเซิร์ฟเวอร์ก็ปล่อยผ่าน (0073)
       if (shopLat == null || shopLng == null) {
-        const rev = await geocodePromise;
-        setPhase({
-          k: 'inside', km: 0,
-          address: rev[0] ? formatAddressLine(rev[0]) : null,
-          lat: pos.coords.latitude, lng: pos.coords.longitude,
-        });
+        setPhase(await inside(0));
         return;
       }
       const km = kmBetween(shopLat, shopLng, pos.coords.latitude, pos.coords.longitude);
       if (km <= deliveryRadiusKm) {
-        const rev = await geocodePromise;
-        setPhase({
-          k: 'inside', km,
-          address: rev[0] ? formatAddressLine(rev[0]) : null,
-          lat: pos.coords.latitude, lng: pos.coords.longitude,
-        });
+        setPhase(await inside(km));
       } else {
         setPhase({ k: 'outside', km, radius: deliveryRadiusKm });
       }
@@ -165,18 +178,13 @@ export default function DeliveryCheckScreen() {
     const save = async () => {
       if (!phase.address) return; // ถอดรหัสที่อยู่ไม่ได้ ก็ไม่มีอะไรจะบันทึก
       try {
-        const existing = useAddress
-          .getState()
-          .addresses.find((a) => a.label === SCANNED_LABEL);
-        const id = await useAddress.getState().upsert({
-          id: existing?.id,
-          label: SCANNED_LABEL,
-          recipient: existing?.recipient || (signedIn ? profile.name : '') || '',
-          phone: existing?.phone || (signedIn ? profile.phone : '') || '',
-          line: phase.address,
-          lat: phase.lat,
-          lng: phase.lng,
-        });
+        const id = await saveScannedAddress(
+          { line: phase.address, parts: phase.parts, lat: phase.lat, lng: phase.lng },
+          {
+            recipient: (signedIn ? profile.name : '') || '',
+            phone: (signedIn ? profile.phone : '') || '',
+          },
+        );
         if (!cancelled) useAddress.getState().select(id);
       } catch {
         /* บันทึกไม่ได้ (ยังไม่ล็อกอิน/เน็ตหลุด) ก็ยังเข้าหน้าร้านได้ตามปกติ หัวจอจะโชว์

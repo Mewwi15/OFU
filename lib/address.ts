@@ -1,7 +1,7 @@
 /**
- * Address formatting shared between the address picker and the delivery-zone
- * scan screen — both turn a reverse-geocode result into one readable Thai
- * line. Kept in one place so the two screens can't drift into showing the
+ * Address formatting shared between the address picker and the two mode-check
+ * screens — all turn a reverse-geocode result into a readable Thai line and
+ * Thai postal parts. Kept in one place so they can't drift into showing the
  * address differently for the same coordinates.
  */
 
@@ -29,4 +29,28 @@ export function formatAddressLine(a: Location.LocationGeocodedAddress): string {
     if (!out.join(' ').includes(p)) out.push(p);
   }
   return out.join(' ');
+}
+
+/** Best-effort map of a reverse-geocode result to Thai postal parts. */
+export type ParcelParts = {
+  subDistrict: string;
+  district: string;
+  province: string;
+  postalCode: string;
+};
+
+/**
+ * แปลงผลถอดรหัสพิกัดเป็นส่วนประกอบที่อยู่แบบไทย
+ *
+ * ชื่อฟิลด์ของ expo-location ไม่ตรงกับลำดับการปกครองไทย — `district` ของมันคือตำบล/แขวง
+ * ส่วนอำเภอ/เขตไปอยู่ที่ `subregion` และจังหวัดอยู่ที่ `region` (กรุงเทพฯ บางทีมาที่
+ * `city` แทน) จึงต้องแมปมือแบบนี้ อย่าเดาจากชื่อฟิลด์
+ */
+export function parcelPartsFrom(a: Location.LocationGeocodedAddress): ParcelParts {
+  return {
+    subDistrict: a.district?.trim() ?? '',
+    district: (a.subregion ?? a.city)?.trim() ?? '',
+    province: (a.region ?? a.city)?.trim() ?? '',
+    postalCode: a.postalCode?.trim() ?? '',
+  };
 }

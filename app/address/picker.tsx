@@ -40,7 +40,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { formatAddressLine } from '@/lib/address';
+import { formatAddressLine, parcelPartsFrom } from '@/lib/address';
 import { useT } from '@/lib/i18n';
 import { showAlert } from '@/lib/showAlert';
 import { osmReverseGeocode, osmSearch } from '@/lib/osm';
@@ -57,22 +57,6 @@ type LatLng = { latitude: number; longitude: number };
 type SearchResult =
   | { kind: 'place'; placeId: string; primary: string; secondary: string }
   | { kind: 'geo'; coords: LatLng; label: string };
-
-/** Best-effort map of a reverse-geocode result to Thai postal parts. */
-type ParcelParts = {
-  subDistrict: string;
-  district: string;
-  province: string;
-  postalCode: string;
-};
-function parcelPartsFrom(a: Location.LocationGeocodedAddress): ParcelParts {
-  return {
-    subDistrict: a.district?.trim() ?? '',
-    district: (a.subregion ?? a.city)?.trim() ?? '',
-    province: (a.region ?? a.city)?.trim() ?? '',
-    postalCode: a.postalCode?.trim() ?? '',
-  };
-}
 
 /** Bangkok (สุขุมวิท) — fallback centre when there's no address yet. */
 const DEFAULT_CENTER: LatLng = { latitude: 13.7236, longitude: 100.5686 };
