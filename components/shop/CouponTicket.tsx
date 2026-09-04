@@ -72,6 +72,14 @@ export type CouponTicketProps = {
   accent?: Accent;
   /** กำลังรอผลการเก็บใบนี้ — กันกดรัว */
   busy?: boolean;
+  /**
+   * ใบที่เก็บไปแล้ว โชว์แบบจาง ๆ พร้อมป้าย "ใช้แล้ว" (เจ้าของสั่ง 4 ก.ย. 2026)
+   *
+   * เป็นตัวเลือก ไม่ได้ผูกกับ claimed ตรง ๆ — แท็บคูปองเอาใบที่เก็บแล้วไปไว้กลุ่ม
+   * "คูปองของฉัน" ซึ่งเป็นของที่ลูกค้าตั้งใจมาดู ทำจางทั้งกลุ่มจะกลายเป็นหน้าที่ดูตายทั้งหน้า
+   * ส่วนหน้าแรกต้องการให้ใบที่เก็บแล้วถอยไปเป็นฉากหลัง เพราะของที่ควรสะดุดตาคือใบที่ยังไม่เก็บ
+   */
+  dimmed?: boolean;
   onPress: () => void;
 };
 
@@ -80,6 +88,7 @@ export function CouponTicket({
   notchColor,
   accent = BRAND_ACCENT,
   busy = false,
+  dimmed = false,
   onPress,
 }: CouponTicketProps) {
   return (
@@ -90,7 +99,7 @@ export function CouponTicket({
       onPress={onPress}
       style={styles.ticket}>
       {/* ต้นขั้วซ้าย — มาสคอต + วันหมดอายุ เหมือนตัวอย่างที่เจ้าของส่งมา */}
-      <View style={[styles.stub, { backgroundColor: accent.solid }]}>
+      <View style={[styles.stub, { backgroundColor: dimmed ? Colors.textMuted : accent.solid }]}>
         <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" />
         <Text style={styles.stubLabel}>คูปอง</Text>
         <Text style={styles.stubExpiry}>
@@ -108,12 +117,21 @@ export function CouponTicket({
       <View style={[styles.notch, styles.notchBottom, { backgroundColor: notchColor }]} />
 
       <View style={styles.ticketBody}>
-        <Text style={[styles.headline, { color: accent.strong }]}>{couponHeadline(c)}</Text>
+        <Text style={[styles.headline, { color: dimmed ? Colors.textMuted : accent.strong }]}>
+          {couponHeadline(c)}
+        </Text>
         <Text style={styles.conds}>{couponConditions(c).join(' · ')}</Text>
         <View style={styles.codeRow}>
           {/* เก็บแล้วโชว์โค้ดให้คัดลอก · ยังไม่เก็บซ่อนโค้ดไว้ก่อน ให้กดเก็บ —
-              ถ้าโชว์โค้ดตั้งแต่ยังไม่เก็บ ปุ่มเก็บก็ไม่มีความหมาย ใครก็จดไปใช้ได้ */}
-          {c.claimed ? (
+              ถ้าโชว์โค้ดตั้งแต่ยังไม่เก็บ ปุ่มเก็บก็ไม่มีความหมาย ใครก็จดไปใช้ได้
+              แบบจาง (หน้าแรก) ไม่โชว์โค้ด แค่ป้ายบอกสถานะ — ใบนี้ถอยไปเป็นฉากหลังแล้ว
+              คนที่อยากได้โค้ดไปกดที่แท็บคูปองซึ่งเป็นที่ของมันจริง ๆ */}
+          {dimmed ? (
+            <View style={styles.usedPill}>
+              <Ionicons name="checkmark" size={13} color={Colors.textMuted} />
+              <Text style={styles.usedText}>ใช้แล้ว</Text>
+            </View>
+          ) : c.claimed ? (
             <>
               <Text style={styles.code}>{c.code}</Text>
               <View style={styles.copyHint}>
@@ -226,6 +244,22 @@ const styles = StyleSheet.create({
   },
   copyHint: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   copyText: { fontSize: 13 },
+  /* ป้าย "ใช้แล้ว" — พื้นเทาอ่อนตัวหนังสือเทา ไม่ใช่ปุ่มสี ให้อ่านออกว่าเป็นสถานะ
+     ไม่ใช่ของที่กดได้ */
+  usedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  usedText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
   claimBtn: {
     flexDirection: 'row',
     alignItems: 'center',

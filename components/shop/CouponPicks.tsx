@@ -99,6 +99,10 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
     }
   };
 
+  /* เรียงใบที่ยังไม่เก็บขึ้นก่อน ใบที่เก็บแล้วไปท้ายสุด (เจ้าของสั่ง 4 ก.ย. 2026)
+     ของที่ควรสะดุดตาคือใบที่ยังกดเก็บได้ ใบที่เก็บไปแล้วไม่มีอะไรให้ทำต่อบนหน้านี้
+     ใช้ sort ที่คงลำดับเดิมภายในกลุ่ม (stable sort) ลำดับที่หลังร้านจัดไว้จึงไม่เพี้ยน */
+  const ordered = [...coupons].sort((a, b) => Number(a.claimed) - Number(b.claimed));
   const empty = loaded && coupons.length === 0;
 
   return (
@@ -130,7 +134,7 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
         ) : null}
         {!loaded
           ? [0, 1].map((i) => <CouponTicketSkeleton key={i} accent={accent} />)
-          : coupons
+          : ordered
               .slice(0, MAX)
               .map((c) => (
                 <CouponTicket
@@ -139,6 +143,7 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
                   notchColor={notchColor}
                   accent={accent}
                   busy={busyId === c.id}
+                  dimmed={c.claimed}
                   onPress={() => void press(c)}
                 />
               ))}
