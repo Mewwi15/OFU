@@ -76,7 +76,9 @@ export default function TabLayout() {
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
       <Tabs.Screen name="coupons" options={{ title: 'Coupons' }} />
       <Tabs.Screen name="orders" options={{ title: 'Orders' }} />
+      {/* ยังลงทะเบียนไว้แม้ถอดออกจากแถบแท็บแล้ว — ปุ่มตะกร้าบนหัวจอหน้าร้านยังลิงก์มา */}
       <Tabs.Screen name="cart" options={{ title: 'Cart' }} />
+      <Tabs.Screen name="member" options={{ title: 'Member' }} />
       <Tabs.Screen name="account" options={{ title: 'Account' }} />
     </Tabs>
   );

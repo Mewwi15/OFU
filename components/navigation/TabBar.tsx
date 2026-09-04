@@ -37,7 +37,10 @@ const TABS: Record<string, TabMeta> = {
      จึงแค่ถอดออกจากตาราง ไม่ต้องลบไฟล์หน้าจอทิ้ง (ถ้าลบ ลิงก์ทั้งหมดนั้นจะพังหมด) */
   coupons: { labelKey: 'tab.coupons', active: 'pricetag', inactive: 'pricetag-outline' },
   orders: { labelKey: 'tab.orders', active: 'receipt', inactive: 'receipt-outline', raised: true },
-  cart: { labelKey: 'tab.cart', active: 'cart', inactive: 'cart-outline' },
+  /* ช่องนี้เคยเป็นแท็บ "ตะกร้า" — เจ้าของสั่งเปลี่ยนเป็น OFU MEMBER 4 ก.ย. 2026
+     ตะกร้ายังเข้าได้จากปุ่มตะกร้าที่หัวจอของหน้าร้านทั้งสองโหมด ซึ่งตรงกว่าเดิมด้วย
+     เพราะตะกร้าผูกกับโหมดที่กำลังอยู่ · เส้นทาง /cart ยังอยู่ครบ ไม่ได้ลบไฟล์ทิ้ง */
+  member: { labelKey: 'tab.member', active: 'medal', inactive: 'medal-outline' },
   account: { labelKey: 'tab.account', active: 'person', inactive: 'person-outline' },
 };
 
