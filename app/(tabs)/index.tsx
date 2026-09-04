@@ -25,6 +25,8 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { categories } from '@/data/products';
 import { shopHoursLabel } from '@/data/shop';
 import { useT } from '@/lib/i18n';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { BANNER_ASPECT } from '@/lib/data/catalog';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
@@ -37,6 +39,19 @@ import { useShop } from '@/store/shop';
 const MODE_LABEL: Record<ShopMode, string> = {
   delivery: 'Delivery',
   online: 'ONLINE',
+};
+
+/**
+ * สีป้ายบนการ์ด — ผูกกับ "โหมด" ไม่ใช่กับ "อันไหนถูกเลือกอยู่"
+ *
+ * เจ้าของสั่ง 4 ก.ย. 2026: "การ์ด delivery ให้ตัวอักษรสีส้ม ONLINE สีน้ำเงิน" — เดิมป้าย
+ * เป็นเทาทั้งคู่แล้วอันที่เลือกอยู่ค่อยเปลี่ยนเป็นส้ม ผลคือ ONLINE ขึ้นเป็นสีส้มตอนถูกเลือก
+ * ทั้งที่ทั้งโหมดเป็นน้ำเงิน ตอนนี้สีบอก "นี่โหมดอะไร" ส่วนวงกลมที่ถูกไล่สีบอก
+ * "กำลังอยู่โหมดไหน" แยกหน้าที่กันชัด ไม่ใช่สีเดียวแบกสองความหมาย
+ */
+const MODE_COLOR: Record<ShopMode, { text: string; tint: string }> = {
+  delivery: { text: BRAND_ACCENT.strong, tint: BRAND_ACCENT.tint },
+  online: { text: ONLINE_ACCENT.strong, tint: ONLINE_ACCENT.tint },
 };
 
 /** คำอธิบายใต้ป้าย — ป้ายเป็นอังกฤษตามที่เจ้าของสั่ง บรรทัดนี้เป็นไทยไว้บอกว่าโหมดนั้น
@@ -293,11 +308,15 @@ export default function HomeScreen() {
                     router.push(m.key === 'delivery' ? '/delivery-check' : '/online-check')
                   }
                   style={styles.modeCard}>
-                  <View style={[styles.modeLogo, on && styles.modeLogoOn]}>
+                  <View
+                    style={[
+                      styles.modeLogo,
+                      on && { backgroundColor: MODE_COLOR[m.key].tint },
+                    ]}>
                     <Image source={m.image} style={styles.modeLogoImg} contentFit="contain" />
                   </View>
                   <View style={styles.modeTexts}>
-                    <Text style={[styles.modeLabel, on && styles.modeLabelOn]}>
+                    <Text style={[styles.modeLabel, { color: MODE_COLOR[m.key].text }]}>
                       {MODE_LABEL[m.key]}
                     </Text>
                     <Text numberOfLines={1} style={styles.modeSub}>
@@ -476,9 +495,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  modeLogoOn: {
-    backgroundColor: Colors.primaryTint,
-  },
   modeLogoImg: {
     width: 38,
     height: 38,
@@ -490,15 +506,13 @@ const styles = StyleSheet.create({
   modeLabel: {
     fontFamily: 'Mitr_500Medium',
     fontSize: 15,
+    // สีจริงมาจาก MODE_COLOR ที่จุดเรียกใช้ — ค่านี้เป็นแค่ตัวสำรอง
     color: Colors.textMuted,
   },
   modeSub: {
     fontSize: 12,
     color: Colors.textMuted,
     marginTop: -2,
-  },
-  modeLabelOn: {
-    color: Colors.primaryStrong,
   },
   closedBanner: {
     flexDirection: 'row',
