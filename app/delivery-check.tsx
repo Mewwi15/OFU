@@ -20,9 +20,10 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BouncingBoxes } from '@/components/shop/BouncingBoxes';
 import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -238,7 +239,11 @@ export default function DeliveryCheckScreen() {
           <>
             <Text style={styles.title}>กำลังหาตำแหน่งของคุณ</Text>
             <Text style={styles.body}>ขอสักครู่นะ กำลังดูว่าส่งถึงบ้านคุณได้ไหม</Text>
-            <ActivityIndicator style={{ marginTop: Spacing.lg }} color={DELIVERY_INK} />
+            {/* กล่องเด้งไล่กันแทนวงหมุน (เจ้าของสั่ง 4 ก.ย. 2026) — สื่อว่า "กำลังทำงาน"
+                ได้เหมือนกันแต่มีชีวิตกว่า และเป็นภาพของที่กำลังจะส่งถึงบ้านพอดี */}
+            <View style={styles.loader}>
+              <BouncingBoxes color={DELIVERY_INK} />
+            </View>
           </>
         ) : null}
 
@@ -324,6 +329,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.6)',
   },
+  loader: { marginTop: Spacing.lg },
   center: {
     flex: 1,
     alignItems: 'center',

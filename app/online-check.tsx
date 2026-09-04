@@ -22,9 +22,10 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BouncingBoxes } from '@/components/shop/BouncingBoxes';
 import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
@@ -134,7 +135,10 @@ export default function OnlineCheckScreen() {
           <>
             <Text style={styles.title}>กำลังเตรียมร้านให้คุณ</Text>
             <Text style={styles.body}>ขอสักครู่นะ เช็คที่อยู่สำหรับส่งพัสดุ</Text>
-            <ActivityIndicator style={{ marginTop: Spacing.lg }} color={ONLINE_INK} />
+            {/* กล่องเด้งไล่กันแทนวงหมุน — ชุดเดียวกับจอเดลิเวอรี่ ต่างแค่สี */}
+            <View style={styles.loader}>
+              <BouncingBoxes color={ONLINE_INK} />
+            </View>
           </>
         ) : null}
 
@@ -181,6 +185,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.6)',
   },
+  loader: { marginTop: Spacing.lg },
   center: {
     flex: 1,
     alignItems: 'center',
