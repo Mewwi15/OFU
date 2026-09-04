@@ -15,6 +15,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -27,7 +28,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { GREEN_ACCENT } from '@/constants/accent';
-import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
+import { Colors, Radius, Shadow, Spacing, tokens } from '@/constants/theme';
 import {
   BAHT_PER_POINT,
   listMyRedemptions,
@@ -133,49 +134,62 @@ export default function MemberScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ACCENT.solid} />
         }>
-        {/* ── บัตรสมาชิก ── */}
+        {/* ── บัตรสมาชิก ──
+            ★ เป็น "บัตร" จริง ๆ ไม่ใช่กล่องสีเขียว ★ ไล่สี + มาสคอตเป็นลายน้ำล้นขอบขวา +
+            คิวอาร์อยู่บนบัตรเลย เพราะของสองอย่างนี้ถูกใช้พร้อมกันเสมอ (ยื่นบัตรให้สแกน)
+            เวอร์ชันแรกแยกคิวอาร์เป็นกล่องขาวใหญ่ต่างหาก กินพื้นที่ครึ่งจอโดยที่บัตรก็ยัง
+            ว่างอยู่ครึ่งใบ (เจ้าของตีกลับ "design ไม่สวย") */}
         <View style={styles.card}>
-          <View style={styles.cardHead}>
-            <View>
+          <LinearGradient
+            /* สามสต็อป ไม่ใช่สองstop — เขียวเข้มกับเขียวสดของโทเคนอยู่ใกล้กันมาก
+               ไล่สองสต็อปเลยอ่านออกมาเป็นสีทึบเรียบ ๆ ไม่รู้ว่าไล่ไว้ */
+            colors={[ACCENT.strong, tokens.color.brand.accentDark, ACCENT.solid]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Text style={styles.cardBrand}>OFU MEMBER</Text>
+
+          <View style={[styles.cardBody, styles.cardBodyTop]}>
+            <View style={styles.cardLeft}>
               <Text style={styles.cardName} numberOfLines={1}>
                 {profile.name}
               </Text>
               <Text style={styles.cardPhone}>{profile.phone || 'ยังไม่ได้ผูกเบอร์โทร'}</Text>
+
+              <View style={styles.pointsRow}>
+                {loaded ? (
+                  <Text style={styles.pointsValue}>{points.toLocaleString('th-TH')}</Text>
+                ) : (
+                  <Skeleton width={72} height={38} />
+                )}
+                <Text style={styles.pointsUnit}>แต้ม</Text>
+              </View>
             </View>
-            <Image
-              source={require('@/assets/images/mascot-tiger.png')}
-              style={styles.cardArt}
-              contentFit="contain"
-            />
-          </View>
 
-          <View style={styles.pointsRow}>
-            {loaded ? (
-              <Text style={styles.pointsValue}>{points.toLocaleString('th-TH')}</Text>
+            {/* คิวอาร์บนแผ่นขาว — ต้องมีพื้นขาวรองเสมอ เครื่องสแกนอ่านคิวอาร์บนพื้นสีไม่ติด */}
+            {signedIn && profile.phone ? (
+              <View style={styles.qrTile}>
+                <QRCode value={profile.phone} size={82} backgroundColor="transparent" />
+              </View>
             ) : (
-              <Skeleton width={90} height={40} />
+              <View style={[styles.qrTile, styles.qrTileEmpty]}>
+                <Ionicons name="qr-code-outline" size={34} color={Colors.textMuted} />
+              </View>
             )}
-            <Text style={styles.pointsUnit}>แต้ม</Text>
           </View>
-          <Text style={styles.rate}>ซื้อครบ {BAHT_PER_POINT} บาท ได้ 1 แต้ม · ซื้อในแอปหรือที่ร้านก็ได้</Text>
-        </View>
 
-        {/* ── คิวอาร์ให้แคชเชียร์สแกน ── */}
-        {signedIn && profile.phone ? (
-          <View style={styles.qrCard}>
-            <QRCode value={profile.phone} size={132} backgroundColor="transparent" />
-            <Text style={styles.qrHint}>ยื่นให้พนักงานสแกนก่อนจ่ายเงิน เพื่อรับแต้ม</Text>
-          </View>
-        ) : (
-          <View style={styles.qrCard}>
-            <Ionicons name="qr-code-outline" size={44} color={Colors.textMuted} />
-            <Text style={styles.qrHint}>
-              {signedIn
-                ? 'เพิ่มเบอร์โทรในบัญชี แล้วคิวอาร์สมาชิกจะขึ้นตรงนี้'
-                : 'เข้าสู่ระบบเพื่อเริ่มสะสมแต้ม'}
+          <View style={styles.cardFoot}>
+            <Ionicons name="sparkles" size={13} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.rate}>
+              {signedIn && profile.phone
+                ? `ซื้อครบ ${BAHT_PER_POINT} บาท ได้ 1 แต้ม · ยื่นบัตรให้พนักงานสแกน`
+                : signedIn
+                  ? `เพิ่มเบอร์โทรในบัญชี แล้วคิวอาร์จะขึ้นบนบัตร`
+                  : 'เข้าสู่ระบบเพื่อเริ่มสะสมแต้ม'}
             </Text>
           </View>
-        )}
+        </View>
 
         {/* ── โค้ดที่รอไปรับของ ── */}
         {pending.length > 0 ? (
@@ -203,9 +217,14 @@ export default function MemberScreen() {
           {!loaded ? (
             [0, 1].map((i) => <Skeleton key={i} width={280} height={84} style={styles.skRow} />)
           ) : rewards.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="gift-outline" size={30} color={ACCENT.strong} />
-              <Text style={styles.emptyText}>ยังไม่มีของรางวัลตอนนี้ สะสมแต้มรอไว้ได้เลย</Text>
+            <View style={[styles.empty, { borderColor: ACCENT.tint }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: ACCENT.tint }]}>
+                <Ionicons name="gift" size={22} color={ACCENT.strong} />
+              </View>
+              <View style={styles.emptyCopy}>
+                <Text style={styles.emptyTitle}>ยังไม่มีของรางวัลตอนนี้</Text>
+                <Text style={styles.emptyText}>สะสมแต้มรอไว้ได้เลย มีของใหม่จะขึ้นตรงนี้</Text>
+              </View>
             </View>
           ) : (
             rewards.map((r) => {
@@ -301,41 +320,64 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: Spacing.lg },
   body: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.lg },
 
-  /* บัตรสมาชิก — เขียวเต็มใบ ให้เป็นของชิ้นเดียวที่สะดุดตาที่สุดบนหน้า */
+  /* บัตรสมาชิก — ไล่สีเขียว มุมโค้งลึก ครอบตัดให้มาสคอตที่ล้นขอบถูกตัดพอดีขอบบัตร */
   card: {
-    backgroundColor: ACCENT.strong,
     borderRadius: Radius.xl,
     padding: Spacing.lg,
+    overflow: 'hidden',
     ...Shadow.float,
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // ชื่อแบรนด์บนบัตร — ตัวเล็ก เว้นระยะตัวอักษร ให้อ่านเป็นบัตรจริงไม่ใช่กล่องข้อความ
+  cardBrand: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 11,
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  cardLeft: { flex: 1 },
   cardName: {
     fontFamily: 'Mitr_500Medium',
-    fontSize: 17,
+    fontSize: 18,
     color: Colors.textOnPrimary,
   },
   cardPhone: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
-  cardArt: { width: 54, height: 54 },
   pointsRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Spacing.md },
   pointsValue: {
     fontFamily: 'Mitr_600SemiBold',
-    fontSize: 40,
-    lineHeight: 50,
+    fontSize: 46,
+    lineHeight: 56,
     color: Colors.textOnPrimary,
   },
   pointsUnit: { fontSize: 15, color: 'rgba(255,255,255,0.9)' },
-  rate: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-
-  qrCard: {
+  /* แผ่นขาวรองคิวอาร์ — ต้องขาวเสมอ เครื่องสแกนอ่านคิวอาร์บนพื้นสีไม่ติด */
+  qrTile: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
     alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    ...Shadow.card,
+    justifyContent: 'center',
   },
-  qrHint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center' },
+  qrTileEmpty: { width: 98, height: 98, backgroundColor: 'rgba(255,255,255,0.75)' },
+  cardFoot: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.sm,
+    // เส้นคั่นจาง ๆ แยกบรรทัดกติกาออกจากตัวเลข ไม่ให้อ่านปนกัน
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.3)',
+  },
+  rate: { flex: 1, fontSize: 12, lineHeight: 18, color: 'rgba(255,255,255,0.9)' },
+  // คิวอาร์ชิดบนให้ตรงแนวกับชื่อ ไม่ใช่ลอยกลางบัตร
+  cardBodyTop: { alignItems: 'flex-start' },
 
   section: { gap: Spacing.sm },
   skRow: { borderRadius: Radius.lg },
@@ -409,10 +451,25 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: 12, color: Colors.textMuted },
   historyDelta: { fontFamily: 'Mitr_600SemiBold', fontSize: 15 },
 
+  /* เส้นประ = ช่องนี้รอของอยู่ ไม่ใช่การ์ดจริงที่กดได้ (ภาษาเดียวกับบล็อกคูปองหน้าแรก) */
   empty: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.x2,
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.surface,
   },
-  emptyText: { fontSize: 13, color: Colors.textMuted, textAlign: 'center' },
+  emptyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyCopy: { flex: 1 },
+  emptyTitle: { fontFamily: 'Mitr_500Medium', fontSize: 15, color: Colors.text },
+  emptyText: { fontSize: 13, color: Colors.textMuted, marginTop: 1 },
 });
