@@ -72,7 +72,9 @@ export default function TabLayout() {
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      {/* ยังลงทะเบียนไว้แม้ถอดออกจากแถบแท็บแล้ว — ยังมีลิงก์เข้ามาจากหลายที่ */}
       <Tabs.Screen name="search" options={{ title: 'Search' }} />
+      <Tabs.Screen name="coupons" options={{ title: 'Coupons' }} />
       <Tabs.Screen name="orders" options={{ title: 'Orders' }} />
       <Tabs.Screen name="cart" options={{ title: 'Cart' }} />
       <Tabs.Screen name="account" options={{ title: 'Account' }} />

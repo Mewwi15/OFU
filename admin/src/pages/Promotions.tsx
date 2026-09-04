@@ -252,6 +252,7 @@ function PromoModal({
         total_limit: v.total_limit ?? null,
         per_user_limit: v.per_user_limit ?? null,
         active: v.active,
+        visible_in_app: v.visible_in_app,
       });
       message.success(promo ? 'บันทึกโค้ดส่วนลดแล้ว' : 'เพิ่มโค้ดส่วนลดแล้ว');
       onSaved();
@@ -294,6 +295,7 @@ function PromoModal({
           total_limit: promo?.total_limit ?? undefined,
           per_user_limit: promo?.per_user_limit ?? undefined,
           active: promo?.active ?? true,
+          visible_in_app: promo?.visible_in_app ?? false,
         }}>
         <div className="grid grid-cols-2 gap-x-3">
           <Form.Item
@@ -357,6 +359,17 @@ function PromoModal({
           </Form.Item>
           <Form.Item name="active" label="เปิดใช้งานทันที" valuePropName="checked" className="col-span-2">
             <Switch checkedChildren="เปิด" unCheckedChildren="ปิด" />
+          </Form.Item>
+          {/* แยกจาก "เปิดใช้งาน" คนละเรื่องกัน — เปิดใช้งาน = โค้ดใช้ได้ไหม, อันนี้ =
+              ลูกค้าเห็นในแท็บคูปองของแอปไหม โค้ดลับที่ส่งให้ลูกค้าเฉพาะราย/ชดเชยเคส
+              มีปัญหา ต้องเปิดใช้งานได้แต่ไม่โผล่ในแอป ตั้งต้นปิดไว้เสมอ */}
+          <Form.Item
+            name="visible_in_app"
+            label="แสดงในแอปลูกค้า"
+            valuePropName="checked"
+            className="col-span-2"
+            extra="เปิด = โผล่ในแท็บ “คูปอง” ให้ลูกค้าทุกคนเห็น · ปิด = ใช้ได้เฉพาะคนที่รู้โค้ด">
+            <Switch checkedChildren="แสดง" unCheckedChildren="ซ่อน" />
           </Form.Item>
         </div>
       </Form>

@@ -31,7 +31,11 @@ type TabMeta = {
 /** Per-route icon pair + label key, keyed by the route file name. */
 const TABS: Record<string, TabMeta> = {
   index: { labelKey: 'tab.home', active: 'home', inactive: 'home-outline' },
-  search: { labelKey: 'tab.products', active: 'grid', inactive: 'grid-outline' },
+  /* ช่องนี้เคยเป็นแท็บ "สินค้า" — เจ้าของสั่งเปลี่ยนเป็นคูปอง 4 ก.ย. 2026
+     เส้นทาง /search ยังอยู่และยังเข้าได้จากหน้าแรก (ชิปหมวดหมู่ + ปุ่มดูทั้งหมด),
+     จอเลือกโหมด และเว็บเดสก์ท็อป — TabBar ข้ามเส้นทางที่ไม่มีข้อมูลในตารางนี้อยู่แล้ว
+     จึงแค่ถอดออกจากตาราง ไม่ต้องลบไฟล์หน้าจอทิ้ง (ถ้าลบ ลิงก์ทั้งหมดนั้นจะพังหมด) */
+  coupons: { labelKey: 'tab.coupons', active: 'pricetag', inactive: 'pricetag-outline' },
   orders: { labelKey: 'tab.orders', active: 'receipt', inactive: 'receipt-outline', raised: true },
   cart: { labelKey: 'tab.cart', active: 'cart', inactive: 'cart-outline' },
   account: { labelKey: 'tab.account', active: 'person', inactive: 'person-outline' },

@@ -667,6 +667,9 @@ export type PromoCode = {
   per_user_limit: number | null;
   total_redeemed: number;
   active: boolean;
+  /** โชว์คูปองใบนี้ในแท็บคูปองของแอปลูกค้าไหม (0095) — ตั้งต้น false เพื่อไม่ให้
+   *  โค้ดลับ/ยิงเฉพาะรายหลุดเป็นสาธารณะเอง */
+  visible_in_app: boolean;
   created_at: string;
 };
 
@@ -674,7 +677,7 @@ export async function listPromoCodes(): Promise<PromoCode[]> {
   const { data, error } = await supabase
     .from('promo_codes')
     .select(
-      'id, code, type, value, max_discount, min_spend, scope, active_from, active_to, total_limit, per_user_limit, total_redeemed, active, created_at',
+      'id, code, type, value, max_discount, min_spend, scope, active_from, active_to, total_limit, per_user_limit, total_redeemed, active, visible_in_app, created_at',
     )
     .order('created_at', { ascending: false });
   if (error) throw error;
@@ -694,6 +697,7 @@ export const upsertPromoCode = (p: {
   total_limit?: number | null;
   per_user_limit?: number | null;
   active?: boolean;
+  visible_in_app?: boolean;
 }) =>
   rpc<{ id: string }>('upsert_promo_code', {
     p_id: p.id ?? undefined,
@@ -708,6 +712,7 @@ export const upsertPromoCode = (p: {
     p_total_limit: p.total_limit ?? undefined,
     p_per_user_limit: p.per_user_limit ?? undefined,
     p_active: p.active ?? true,
+    p_visible_in_app: p.visible_in_app ?? false,
   });
 
 export const setPromoActive = (id: string, active: boolean) =>
