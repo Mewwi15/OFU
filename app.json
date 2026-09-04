@@ -44,7 +44,6 @@
     },
     "plugins": [
       "expo-apple-authentication",
-      "expo-video",
       [
         "expo-router",
         {

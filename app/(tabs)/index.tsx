@@ -15,7 +15,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CouponPicks } from '@/components/shop/CouponPicks';
-import { ReviewVideoRail } from '@/components/shop/ReviewVideoRail';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
@@ -393,12 +392,6 @@ export default function HomeScreen() {
               </LinearGradient>
             )}
           </View>
-
-          {/* แถบรีวิวสินค้าเป็นวิดีโอ ใต้แบนเนอร์ (เจ้าของสั่ง 4 ก.ย. 2026)
-              ซ่อนตัวเองถ้ายังไม่มีคลิปที่เผยแพร่ — ต่างจากบล็อกคูปองที่ต้องยึดตำแหน่งไว้
-              เพราะคูปองเป็นของที่เจ้าของสั่งให้อยู่ใต้การ์ดโหมดตายตัว ส่วนแถบนี้อยู่ท้ายหน้า
-              ไม่มีอะไรเลื่อนขึ้นมาแทนที่ */}
-          <ReviewVideoRail accent={GREEN_ACCENT} />
         </View>
       </ScrollView>
     </View>

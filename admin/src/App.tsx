@@ -22,7 +22,6 @@ import { Products } from './pages/Products';
 import { Receive } from './pages/Receive';
 import { Shift } from './pages/Shift';
 import { Promotions } from './pages/Promotions';
-import { ReviewVideos } from './pages/ReviewVideos';
 import { Reports } from './pages/Reports';
 import { Stock } from './pages/Stock';
 import { ScanLab } from './pages/ScanLab';
@@ -73,7 +72,6 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/promotions" element={<Promotions />} />
-          <Route path="/review-videos" element={<ReviewVideos />} />
           <Route path="/store-credit" element={<StoreCredit />} />
           <Route path="/broadcast" element={<Broadcast />} />
           <Route path="/banners" element={<Banners />} />
