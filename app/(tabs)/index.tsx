@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProductRail } from '@/components/product/ProductRail';
+import { CouponRail } from '@/components/shop/CouponRail';
 import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -44,6 +45,11 @@ const MODE_SUB: Record<ShopMode, string> = {
   delivery: 'สั่งเลย',
   online: 'พร้อมส่งของ',
 };
+
+/* สีพื้นหน้าแรก — เทาอ่อนอมอุ่น (เจ้าของสั่ง 3 ก.ย. 2026) ยกขึ้นมาเป็นค่าคงที่เพราะ
+   แถวคูปองต้องใช้สีเดียวกันเป๊ะไปวาดรอยบากครึ่งวงกลมของการ์ด ถ้าสองที่ไม่ตรงกัน
+   รอยบากจะกลายเป็นจุดสีแปลกปลอมทันที */
+const SCREEN_BG = '#F4F1EF';
 
 /** Bottom padding so the floating tab bar never covers the last row. */
 
@@ -105,24 +111,12 @@ export default function HomeScreen() {
     : FALLBACK_SLIDES;
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);
-  const bestsellerIds = useCatalog((s) => s.bestsellerIds);
   /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มโหลดและตอนเสร็จแล้ว
      ถ้าดูแค่ loading หน้าแรกจะโล่งอยู่ดีในช่วงก่อนคำขอแรกจะยิงออกไป */
   const catalogLoaded = useCatalog((s) => s.loaded);
   // Admin categories (in their display order) when available; else the static list.
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 
-  // ขายดี — real units sold (POS + online); products with sales first, then fill by rating.
-  const bestSellers = useMemo(() => {
-    const rank = new Map(bestsellerIds.map((id, i) => [id, i]));
-    return [...products]
-      .sort((a, b) => {
-        const ra = rank.get(a.id) ?? Infinity;
-        const rb = rank.get(b.id) ?? Infinity;
-        return ra !== rb ? ra - rb : b.rating - a.rating;
-      })
-      .slice(0, 8);
-  }, [products, bestsellerIds]);
   // แนะนำ — highest rated.
   const recommended = useMemo(
     () => [...products].sort((a, b) => b.rating - a.rating).slice(0, 8),
@@ -350,13 +344,11 @@ export default function HomeScreen() {
             );
           })}
 
+          {/* แถวคูปองแทนแถว "ขายดี" เดิม (เจ้าของสั่ง 4 ก.ย. 2026) — เลื่อนแนวนอน
+              ให้ลูกค้าเก็บโค้ด ซ่อนทั้งแถวเองถ้าไม่มีคูปองที่เปิดให้เห็นในแอป */}
+          <CouponRail notchColor={SCREEN_BG} />
+
           {/* Curated rails */}
-          <ProductRail
-            title={t('home.bestSellers')}
-            data={bestSellers}
-            onSeeAll={() => openCatalog()}
-            loading={!catalogLoaded}
-          />
           <ProductRail
             title={t('home.recommended')}
             data={recommended}
@@ -382,7 +374,7 @@ const styles = StyleSheet.create({
      * ถ้าพื้นยังเกือบขาวก็แยกไม่ออกว่าการ์ดจบตรงไหน เหลือแค่เงาที่ต้องแบกงานทั้งหมด
      * เลือกเทาอมอุ่นเล็กน้อย ไม่ใช่เทากลาง เพราะทั้งแอปเป็นโทนอุ่น เทากลางจะดูเย็นแปลกแยก
      * ตอนนี้ตั้งเฉพาะหน้าแรก ยังไม่แตะโทเคนกลางที่ใช้ทุกหน้า */
-    backgroundColor: '#F4F1EF',
+    backgroundColor: SCREEN_BG,
   },
   body: {
     paddingHorizontal: Spacing.lg,
