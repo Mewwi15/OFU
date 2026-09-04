@@ -106,6 +106,9 @@ export default function HomeScreen() {
   const dbCategories = useCatalog((s) => s.categories);
   const featuredRows = useCatalog((s) => s.featured);
   const bestsellerIds = useCatalog((s) => s.bestsellerIds);
+  /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มโหลดและตอนเสร็จแล้ว
+     ถ้าดูแค่ loading หน้าแรกจะโล่งอยู่ดีในช่วงก่อนคำขอแรกจะยิงออกไป */
+  const catalogLoaded = useCatalog((s) => s.loaded);
   // Admin categories (in their display order) when available; else the static list.
   const catList: string[] = dbCategories.length ? ['ทั้งหมด', ...dbCategories] : [...categories];
 
@@ -337,7 +340,13 @@ export default function HomeScreen() {
               .filter((p): p is (typeof products)[number] => !!p);
             if (rowProducts.length === 0) return null;
             return (
-              <ProductRail key={row.id} title={row.title} data={rowProducts} onSeeAll={() => openCatalog()} />
+              <ProductRail
+                key={row.id}
+                title={row.title}
+                data={rowProducts}
+                onSeeAll={() => openCatalog()}
+                loading={!catalogLoaded}
+              />
             );
           })}
 
@@ -346,16 +355,19 @@ export default function HomeScreen() {
             title={t('home.bestSellers')}
             data={bestSellers}
             onSeeAll={() => openCatalog()}
+            loading={!catalogLoaded}
           />
           <ProductRail
             title={t('home.recommended')}
             data={recommended}
             onSeeAll={() => openCatalog()}
+            loading={!catalogLoaded}
           />
           <ProductRail
             title={t('home.newArrivals')}
             data={newArrivals}
             onSeeAll={() => openCatalog()}
+            loading={!catalogLoaded}
           />
         </View>
       </ScrollView>

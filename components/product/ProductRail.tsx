@@ -6,6 +6,7 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ProductCard } from '@/components/product/ProductCard';
+import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { Text } from '@/components/ui/text';
 import { Colors, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
@@ -17,12 +18,17 @@ export type ProductRailProps = {
   data: Product[];
   /** Optional "ดูทั้งหมด" handler (omit to hide the action). */
   onSeeAll?: () => void;
+  /** โชว์โครงการ์ดรอแทนของจริง ระหว่างคลังสินค้ายังโหลดไม่เสร็จ */
+  loading?: boolean;
 };
 
 /** Fixed card width inside a horizontal rail. */
 const CARD_WIDTH = 168;
+/* จำนวนโครงการ์ดตอนรอ — พอให้เต็มความกว้างจอบวกโผล่ใบถัดไปนิดหน่อย ให้รู้ว่าเลื่อนได้
+   มากกว่านี้ไม่มีประโยชน์เพราะมองไม่เห็นอยู่ดี แต่กินแรงวาดเพิ่มฟรี ๆ */
+const SKELETON_COUNT = 3;
 
-export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
+export function ProductRail({ title, data, onSeeAll, loading = false }: ProductRailProps) {
   const t = useT();
   const showHead = !!title || !!onSeeAll;
   return (
@@ -40,12 +46,20 @@ export function ProductRail({ title, data, onSeeAll }: ProductRailProps) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        /* ปิดการเลื่อนตอนรอ — เลื่อนโครงเปล่าไปมาไม่ได้ให้อะไร แถมเผยว่ามีแค่ไม่กี่ใบ */
+        scrollEnabled={!loading}
         contentContainerStyle={styles.row}>
-        {data.map((product, i) => (
-          <View key={product.id} style={styles.card}>
-            <ProductCard product={product} index={i} />
-          </View>
-        ))}
+        {loading
+          ? Array.from({ length: SKELETON_COUNT }, (_, i) => (
+              <View key={`sk-${i}`} style={styles.card}>
+                <ProductCardSkeleton />
+              </View>
+            ))
+          : data.map((product, i) => (
+              <View key={product.id} style={styles.card}>
+                <ProductCard product={product} index={i} />
+              </View>
+            ))}
       </ScrollView>
     </View>
   );

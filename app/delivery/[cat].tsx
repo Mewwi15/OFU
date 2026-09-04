@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBadge } from '@/components/navigation/CartBadge';
 import { ProductCard } from '@/components/product/ProductCard';
+import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { IconButton } from '@/components/ui/IconButton';
 import { SearchBar } from '@/components/ui/searchbar';
 import { Text } from '@/components/ui/text';
@@ -31,12 +32,17 @@ import { ALL_CATEGORY } from '@/lib/data/catalog';
 import { useCatalog } from '@/store/catalog';
 
 const TAB_BAR_CLEARANCE = 110;
+/* จำนวนโครงการ์ดตอนรอ — 6 ใบ = 3 แถวสองคอลัมน์ เต็มจอพอดีบนเครื่องส่วนใหญ่
+   id ปลอมมีไว้ให้ keyExtractor ทำงานได้เหมือนของจริง ไม่ต้องแยกโค้ดสองทาง */
+const SKELETON_ROWS = Array.from({ length: 6 }, (_, i) => ({ id: `sk-${i}` }) as never);
 
 export default function DeliveryCategory() {
   const insets = useSafeAreaInsets();
   const { cat } = useLocalSearchParams<{ cat?: string }>();
   const category = cat ?? ALL_CATEGORY;
   const products = useCatalog((s) => s.products);
+  /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มและตอนเสร็จแล้ว */
+  const catalogLoaded = useCatalog((s) => s.loaded);
   const [query, setQuery] = useState('');
 
   const list = useMemo(() => {
@@ -98,7 +104,9 @@ export default function DeliveryCategory() {
       </LinearGradient>
 
       <FlatList
-        data={list}
+        /* ระหว่างรอ วาดโครงการ์ดตามจำนวนที่เต็มจอพอดี — ใช้ FlatList ตัวเดียวกันทั้งสอง
+           สถานะ เพื่อให้ระยะขอบ/คอลัมน์เป๊ะเหมือนกัน พอของจริงมาถึงจึงไม่มีการกระโดด */
+        data={catalogLoaded ? list : SKELETON_ROWS}
         keyExtractor={(p) => p.id}
         numColumns={2}
         contentContainerStyle={[
@@ -107,18 +115,27 @@ export default function DeliveryCategory() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item, index }) => (
-          <View style={styles.cell}>
-            <ProductCard product={item} index={index} />
-          </View>
-        )}
+        renderItem={({ item, index }) =>
+          catalogLoaded ? (
+            <View style={styles.cell}>
+              <ProductCard product={item} index={index} />
+            </View>
+          ) : (
+            <View style={styles.cell}>
+              <ProductCardSkeleton />
+            </View>
+          )
+        }
         ListEmptyComponent={
+          // ระหว่างยังไม่โหลดเสร็จไม่ขึ้น "ไม่มีสินค้า" — ตอนนั้นยังไม่รู้ว่ามีหรือไม่มี
+          !catalogLoaded ? null : (
           <View style={styles.empty}>
             <Ionicons name="basket-outline" size={40} color={Colors.textMuted} />
             <Text style={styles.emptyText}>
               {query ? 'ไม่เจอสินค้าที่ค้นหา' : 'หมวดนี้ยังไม่มีสินค้า'}
             </Text>
           </View>
+          )
         }
       />
     </View>

@@ -88,6 +88,10 @@ export default function DeliveryHome() {
   const dbCategories = useCatalog((s) => s.categories);
   const banners = useCatalog((s) => s.banners);
   const bestsellerIds = useCatalog((s) => s.bestsellerIds);
+  /* โครงการ์ดรอ (เจ้าของถาม 4 ก.ย. 2026 "ไม่มีหน้าโหลดรอหรอ") — เช็ค loaded ไม่ใช่
+     loading เพราะ loading เป็น false ทั้งตอน "ยังไม่เริ่มโหลด" และ "โหลดเสร็จแล้ว"
+     ถ้าดูแค่ loading จอจะโล่งอยู่ดีในช่วงก่อนคำขอแรกจะยิงออกไป */
+  const catalogLoaded = useCatalog((s) => s.loaded);
   const [query, setQuery] = useState('');
   /* ต้องรู้ความสูงหัวจอจริงถึงจะวางช่องค้นหาให้คร่อมรอยต่อสีส้ม/ขาวได้พอดี
    * คำนวณเอาไม่ได้เพราะความสูงขึ้นกับ safe area ของแต่ละเครื่องและความยาวที่อยู่ */
@@ -284,9 +288,24 @@ export default function DeliveryHome() {
                 มากๆ") ProductRail เว้นระยะขวาให้ตัวเองอยู่แล้วเพื่อกันเลื่อนสุดแล้วชน
                 ขอบ แต่ไม่ได้เว้นซ้าย เพราะหน้าอื่นทุกหน้าที่ใช้ ProductRail ครอบด้วยกรอบ
                 ที่มี padding อยู่แล้วเหมือนกันหมด */}
-            <ProductRail title="สินค้าขายดี" data={bestSellers} onSeeAll={seeAllProducts} />
-            <ProductRail title="สินค้าแนะนำ" data={recommended} onSeeAll={seeAllProducts} />
-            <ProductRail title="สินค้ายอดฮิต" data={popular} onSeeAll={seeAllProducts} />
+            <ProductRail
+              title="สินค้าขายดี"
+              data={bestSellers}
+              onSeeAll={seeAllProducts}
+              loading={!catalogLoaded}
+            />
+            <ProductRail
+              title="สินค้าแนะนำ"
+              data={recommended}
+              onSeeAll={seeAllProducts}
+              loading={!catalogLoaded}
+            />
+            <ProductRail
+              title="สินค้ายอดฮิต"
+              data={popular}
+              onSeeAll={seeAllProducts}
+              loading={!catalogLoaded}
+            />
           </View>
         </View>
       </Animated.ScrollView>

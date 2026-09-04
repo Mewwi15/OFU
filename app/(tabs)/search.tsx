@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBadge } from '@/components/navigation/CartBadge';
 import { ProductCard } from '@/components/product/ProductCard';
+import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
 import { ProductRail } from '@/components/product/ProductRail';
 import { CategoryIcon } from '@/components/shop/CategoryIcon';
 import { PromoBanner } from '@/components/shop/PromoBanner';
@@ -30,6 +31,9 @@ import { loadIfStale, useCatalog } from '@/store/catalog';
 
 /** Extra bottom padding so the floating tab bar never covers grid content. */
 const TAB_BAR_CLEARANCE = 96;
+/* โครงการ์ดรอตอนคลังสินค้ายังโหลดไม่เสร็จ (เจ้าของถาม 4 ก.ย. 2026) — 6 ใบพอเต็มจอ
+   id ปลอมมีไว้ให้ keyExtractor ใช้ได้เหมือนของจริง ไม่ต้องแยกโค้ดสองทาง */
+const SKELETON_ROWS = Array.from({ length: 6 }, (_, i) => ({ id: `sk-${i}` }) as never);
 
 /**
  * Catalog ("สินค้าทั้งหมด"): a search bar + category chips. By default it shows
@@ -61,6 +65,8 @@ export default function CatalogScreen() {
   }, [category]);
 
   const products = useCatalog((s) => s.products);
+  /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มและตอนเสร็จแล้ว */
+  const catalogLoaded = useCatalog((s) => s.loaded);
   const dbCategories = useCatalog((s) => s.categories);
   const banners = useCatalog((s) => s.banners);
   // Re-fetch on focus only if the catalog is stale — see loadIfStale's doc
@@ -105,7 +111,7 @@ export default function CatalogScreen() {
 
   // กริดใหญ่ที่สุดของทั้งแอป (ทุกสินค้าที่เผยแพร่ ~775 ชิ้นตอนเรียกดูแบบไม่กรอง) —
   // isBrowsing ใช้ products ทั้งก้อน ไม่งั้นใช้ results ที่กรองแล้ว
-  const gridData = isBrowsing ? products : results;
+  const gridData = catalogLoaded ? (isBrowsing ? products : results) : SKELETON_ROWS;
 
   // Desktop web renders the sidebar-filter catalog instead (after all hooks).
   if (isDesktopWeb) {
@@ -143,7 +149,11 @@ export default function CatalogScreen() {
         }}
         renderItem={({ item, index }) => (
           <View style={styles.gridCell}>
-            <ProductCard product={item} index={index} />
+            {catalogLoaded ? (
+              <ProductCard product={item} index={index} />
+            ) : (
+              <ProductCardSkeleton />
+            )}
           </View>
         )}
         ListHeaderComponent={
@@ -229,10 +239,10 @@ export default function CatalogScreen() {
                         subtitle={t('search.trendingBannerSub')}
                         image={trendingBanner.image}
                       />
-                      <ProductRail data={trending} />
+                      <ProductRail data={trending} loading={!catalogLoaded} />
                     </>
                   ) : (
-                    <ProductRail title={t('search.railTrending')} data={trending} />
+                    <ProductRail title={t('search.railTrending')} data={trending} loading={!catalogLoaded} />
                   )}
                   {promoBanner ? (
                     <>
@@ -241,10 +251,10 @@ export default function CatalogScreen() {
                         subtitle={t('search.promoBannerSub')}
                         image={promoBanner.image}
                       />
-                      <ProductRail data={promotions} />
+                      <ProductRail data={promotions} loading={!catalogLoaded} />
                     </>
                   ) : (
-                    <ProductRail title={t('search.railPromo')} data={promotions} />
+                    <ProductRail title={t('search.railPromo')} data={promotions} loading={!catalogLoaded} />
                   )}
                   {hotBanner ? (
                     <>
@@ -253,10 +263,10 @@ export default function CatalogScreen() {
                         subtitle={t('search.hotBannerSub')}
                         image={hotBanner.image}
                       />
-                      <ProductRail data={hotWeekly} />
+                      <ProductRail data={hotWeekly} loading={!catalogLoaded} />
                     </>
                   ) : (
-                    <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} />
+                    <ProductRail title={t('search.railHotWeekly')} data={hotWeekly} loading={!catalogLoaded} />
                   )}
 
                   <View style={styles.gridSection}>
@@ -273,7 +283,7 @@ export default function CatalogScreen() {
           // เดิมข้อความ "ไม่พบ" ขึ้นเฉพาะตอนกรองแล้วไม่เจอ — ตอนเรียกดูแบบไม่กรองแล้ว
           // products ยังว่าง (คลังยังโหลดไม่เสร็จ) ปล่อยว่างเงียบ ๆ เหมือนเดิม ไม่ขึ้น
           // ข้อความที่บอกว่า "ค้นหาไม่เจอ" ทั้งที่ยังไม่ได้ค้นหาอะไรเลย
-          !isBrowsing ? (
+          catalogLoaded && !isBrowsing ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
                 <Ionicons name="search" size={40} color={Colors.primary} />
