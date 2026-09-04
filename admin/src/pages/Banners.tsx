@@ -18,15 +18,38 @@ import {
 
 const { Text } = Typography;
 
-type PlacementMeta = { value: BannerPlacement; label: string; hint: string; multi: boolean };
+/**
+ * ทุกช่องแบนเนอร์ในแอป จัดกลุ่มตาม "หน้าจอ" ที่ลูกค้าเห็น
+ *
+ * เดิมเรียงเป็นการ์ด 6 ใบหน้าตาเหมือนกันหมด แต่ละใบมีตารางลากจัดลำดับ ทั้งที่ 5 ใน 6 ช่อง
+ * ใส่ได้รูปเดียว — เจ้าของบอกว่าเข้าใจยาก (4 ก.ย. 2026 "ทำระบบแบนเนอร์บน POS ใหม่
+ * เอาให้เข้าใจง่าย") จัดใหม่เป็นกลุ่มตามหน้าจอ + บอกตำแหน่งเป็นภาษาคน + โชว์รูปที่ใช้อยู่
+ * จริงให้เห็นเลยว่าช่องไหนมีแล้วช่องไหนยังว่าง
+ */
+type PlacementMeta = {
+  value: BannerPlacement;
+  /** หน้าจอในแอปที่ช่องนี้อยู่ — ใช้จัดกลุ่ม */
+  screen: string;
+  /** ชื่อช่องสั้น ๆ */
+  label: string;
+  /** อยู่ตรงไหนของหน้า พูดแบบที่เจ้าของนึกภาพออก */
+  where: string;
+  multi: boolean;
+};
+
 const PLACEMENTS: PlacementMeta[] = [
-  { value: 'home', label: 'หน้าแรก · สไลด์บนสุด', hint: 'สไลด์บนสุดของหน้าแรก — ใส่ได้หลายรูป ลากจัดลำดับได้', multi: true },
-  { value: 'search_hero', label: 'หน้าค้นหา · แบนเนอร์บนสุด', hint: 'แบนเนอร์ใหญ่บนสุดของหน้าค้นหา (รูปเสือ OFU) — ใช้รูปเดียว', multi: false },
-  { value: 'search_trending', label: 'หน้าค้นหา · แถบ “กำลังมาแรง”', hint: 'แถบเหนือแถว “สินค้าติดกระแส” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
-  { value: 'search_promo', label: 'หน้าค้นหา · แถบ “ลดสูงสุด 40%”', hint: 'แถบเหนือแถว “โปรโมชั่น” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
-  { value: 'search_hot', label: 'หน้าค้นหา · แถบ “เรตติ้งสูงสุด”', hint: 'แถบเหนือแถว “มาแรงประจำสัปดาห์” — ตั้งรูป + หัวข้อได้ (ใช้รูปเดียว)', multi: false },
-  { value: 'delivery_promo', label: 'เดลิเวอรี่ · แถบใต้หมวดหมู่', hint: 'แถบในหน้าเดลิเวอรี่ ใต้แถวหมวดหมู่สินค้า — ใช้รูปเดียว ไม่ใส่ก็ได้ (ช่องจะหายไปเลย)', multi: false },
+  { value: 'home', screen: 'หน้าแรก', label: 'สไลด์บนสุด', where: 'ภาพใหญ่บนสุดที่เลื่อนสไลด์ได้ เห็นทันทีที่เปิดแอป', multi: true },
+  { value: 'delivery_promo', screen: 'หน้าเดลิเวอรี่', label: 'แถบใต้หมวดหมู่', where: 'ใต้แถววงกลมหมวดหมู่สินค้า เหนือแถวสินค้าขายดี', multi: false },
+  /* หน้าสินค้าไม่ได้อยู่ในแถบล่างแล้วตั้งแต่ 4 ก.ย. 2026 (เปลี่ยนเป็นแท็บคูปอง) แต่หน้า
+     ยังอยู่และยังเข้าได้ — บอกทางเข้าไว้ด้วย ไม่งั้นเจ้าของจะหาไม่เจอว่ารูปไปโผล่ตรงไหน */
+  { value: 'search_hero', screen: 'หน้าสินค้า (กดหมวดหมู่จากหน้าแรก)', label: 'แบนเนอร์บนสุด', where: 'ภาพใหญ่บนสุดของหน้า เหนือช่องค้นหา', multi: false },
+  { value: 'search_trending', screen: 'หน้าสินค้า (กดหมวดหมู่จากหน้าแรก)', label: 'แถบเหนือแถว “สินค้าติดกระแส”', where: 'แถบยาวคั่นก่อนแถวสินค้าแถวแรก ตั้งหัวข้อเองได้', multi: false },
+  { value: 'search_promo', screen: 'หน้าสินค้า (กดหมวดหมู่จากหน้าแรก)', label: 'แถบเหนือแถว “โปรโมชั่น”', where: 'แถบยาวคั่นก่อนแถวสินค้าแถวที่สอง ตั้งหัวข้อเองได้', multi: false },
+  { value: 'search_hot', screen: 'หน้าสินค้า (กดหมวดหมู่จากหน้าแรก)', label: 'แถบเหนือแถว “มาแรงประจำสัปดาห์”', where: 'แถบยาวคั่นก่อนแถวสินค้าแถวที่สาม ตั้งหัวข้อเองได้', multi: false },
 ];
+
+/** ลำดับหน้าจอที่จะแสดง — เรียงตามที่ลูกค้าเจอจริงในแอป ไม่ใช่ตามชื่อตัวแปร */
+const SCREENS = [...new Set(PLACEMENTS.map((p) => p.screen))];
 
 /**
  * Crop aspect (width ÷ height) per placement — MUST match the app's render
@@ -144,51 +167,158 @@ export function Banners() {
     },
   ];
 
+  /* ช่องที่ใส่ได้รูปเดียว = การ์ดเดียวจบ ไม่ต้องมีตารางลากจัดลำดับให้รก
+     โชว์รูปที่ใช้อยู่จริงขนาดพอเห็น + สถานะ + ปุ่มเดียวที่ต้องกด */
+  const SingleSlot = ({ pm }: { pm: PlacementMeta }) => {
+    const rows = banners.filter((b) => b.placement === pm.value);
+    // เรียงตามลำดับที่แอปหยิบไปใช้ (ตัวแรกที่เปิดแสดง) — จะได้โชว์ใบที่ลูกค้าเห็นจริง
+    const live = rows.find((b) => b.publish_state === 'published') ?? rows[0] ?? null;
+    const extra = rows.length - (live ? 1 : 0);
+    const aspect = BANNER_ASPECT[pm.value];
+
+    return (
+      <Card size="small" styles={{ body: { padding: 14 } }} className="mb-3">
+        <div className="flex gap-4 items-start">
+          {/* กรอบรูปตามสัดส่วนจริงที่แอปแสดง — เห็นทรงถูกตั้งแต่ยังไม่อัป */}
+          <div
+            className="shrink-0 rounded-none border border-[#E8E8E8] overflow-hidden bg-[#FAFAFA] grid place-items-center"
+            style={{ width: 132, height: Math.round(132 / aspect) }}>
+            {live?.image_path ? (
+              <img src={live.image_path} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <RiImageAddLine className="w-6 h-6 text-gray-300" />
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-[#2B2320]">{pm.label}</span>
+              {!live ? (
+                <Tag color="default">ยังไม่มีรูป</Tag>
+              ) : live.publish_state === 'published' ? (
+                <Tag color="success" variant="filled">แสดงอยู่</Tag>
+              ) : (
+                <Tag color="warning" variant="filled">ซ่อนอยู่</Tag>
+              )}
+              <Tag color="processing">{ratioLabel(aspect)}</Tag>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">{pm.where}</div>
+            {live?.headline ? (
+              <div className="text-xs text-gray-400 mt-1">หัวข้อ: {live.headline}</div>
+            ) : null}
+            {/* รูปส่วนเกินต้องเข้าถึงได้ ไม่ใช่แค่เตือนว่ามี — การ์ดโชว์ใบที่แอปใช้จริง
+                ใบเดียว ถ้าไม่ลิสต์ส่วนเกินไว้ตรงนี้ มันจะกลายเป็นรูปที่ลบไม่ได้เลย
+                (ของเดิมเป็นตารางจึงเห็นครบทุกใบอยู่แล้ว) */}
+            {extra > 0 ? (
+              <div className="mt-2">
+                <div className="bg-amber-50 text-amber-700 text-xs px-3 py-2">
+                  ช่องนี้ใช้รูปเดียว — อีก {extra} รูปด้านล่างยังไม่ถูกใช้ ลบทิ้งได้เพื่อไม่ให้สับสน
+                </div>
+                {rows
+                  .filter((b) => b.id !== live?.id)
+                  .map((b) => (
+                    <div key={b.id} className="flex items-center gap-2 mt-2">
+                      {b.image_path ? (
+                        <img src={b.image_path} alt="" className="w-16 h-8 object-cover border border-[#E8E8E8]" />
+                      ) : (
+                        <div className="w-16 h-8 bg-[#F5F5F5] grid place-items-center text-gray-300">
+                          <RiImageAddLine className="w-4 h-4" />
+                        </div>
+                      )}
+                      <span className="text-xs text-gray-500 flex-1 min-w-0 truncate">
+                        {b.headline || 'ไม่มีหัวข้อ'}
+                      </span>
+                      <Button size="small" onClick={() => setEditing(b)}>
+                        แก้ไข
+                      </Button>
+                      <Popconfirm title="ลบแบนเนอร์นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(b)}>
+                        <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+                      </Popconfirm>
+                    </div>
+                  ))}
+              </div>
+            ) : null}
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {live ? (
+                <>
+                  <Switch
+                    checked={live.publish_state === 'published'}
+                    onChange={(v) => void togglePublish(live, v)}
+                    checkedChildren="แสดง"
+                    unCheckedChildren="ซ่อน"
+                  />
+                  <Button size="small" color="orange" variant="solid" icon={<RiPencilLine className="w-[15px] h-[15px]" />} onClick={() => setEditing(live)}>
+                    เปลี่ยนรูป / แก้ไข
+                  </Button>
+                  <Popconfirm title="ลบแบนเนอร์นี้?" okText="ลบ" cancelText="ยกเลิก" okButtonProps={{ danger: true }} onConfirm={() => void onDelete(live)}>
+                    <Tooltip title="ลบ">
+                      <Button size="small" danger icon={<RiDeleteBinLine className="w-[15px] h-[15px]" />} />
+                    </Tooltip>
+                  </Popconfirm>
+                </>
+              ) : (
+                <Button size="small" type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setAdding(pm.value)}>
+                  อัปโหลดรูป
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  /* ช่องเดียวที่ใส่ได้หลายรูป (สไลด์หน้าแรก) — ที่นี่เท่านั้นที่ต้องมีตารางลากจัดลำดับ */
+  const MultiSlot = ({ pm }: { pm: PlacementMeta }) => {
+    const rows = banners.filter((b) => b.placement === pm.value);
+    const pub = rows.filter((b) => b.publish_state === 'published').length;
+    return (
+      <Card size="small" styles={{ body: { padding: 14 } }} className="mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-[#2B2320]">{pm.label}</span>
+              <Tag color={pub > 0 ? 'success' : 'default'} variant={pub > 0 ? 'filled' : undefined}>
+                {pub > 0 ? `แสดงอยู่ ${pub} รูป` : 'ยังไม่มีรูปที่แสดง'}
+              </Tag>
+              <Tag color="processing">{ratioLabel(BANNER_ASPECT[pm.value])}</Tag>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">{pm.where} · ลากสลับลำดับได้</div>
+          </div>
+          <Button size="small" type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setAdding(pm.value)}>
+            เพิ่มรูป
+          </Button>
+        </div>
+
+        <DndTable<Banner>
+          items={rows}
+          onReorder={(next) => void onReorder(pm.value, next)}
+          loading={loading}
+          scroll={{ x: 520 }}
+          columns={columns}
+          locale={{ emptyText: 'ยังไม่มีรูปในช่องนี้' }}
+        />
+      </Card>
+    );
+  };
+
   return (
     <>
       <div className="mb-4">
-        <Text type="secondary">จัดการแบนเนอร์ทุกจุดในแอปจากที่เดียว — แยกตามตำแหน่งที่แสดง</Text>
+        <Text type="secondary">
+          ทุกช่องแบนเนอร์ในแอปอยู่ที่นี่ — เรียงตามหน้าจอที่ลูกค้าเห็น อัปรูปแล้วระบบครอปให้ตรงกับที่แอปแสดงจริง
+        </Text>
       </div>
 
-      {PLACEMENTS.map((pm) => {
-        const rows = banners.filter((b) => b.placement === pm.value);
-        const pubCount = rows.filter((b) => b.publish_state === 'published').length;
-        return (
-          <Card key={pm.value} size="small" styles={{ body: { padding: 16 } }} className="mb-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-[#2B2320]">{pm.label}</span>
-                  {rows.length > 0 && (
-                    <Tag color="processing" variant="filled">
-                      {rows.length} รูป
-                    </Tag>
-                  )}
-                </div>
-                <div className="text-xs text-gray-400">{pm.hint}</div>
-              </div>
-              <Button size="small" type="primary" icon={<RiAddLine className="w-4 h-4" />} onClick={() => setAdding(pm.value)}>
-                เพิ่มแบนเนอร์
-              </Button>
-            </div>
-
-            {!pm.multi && pubCount > 1 && (
-              <div className="mb-2 rounded-none bg-amber-50 text-amber-700 text-xs px-3 py-2">
-                ตำแหน่งนี้ใช้รูปเดียว — แอปจะแสดงรูปที่เปิดไว้เป็นอันแรก
-              </div>
-            )}
-
-            <DndTable<Banner>
-              items={rows}
-              onReorder={(next) => void onReorder(pm.value, next)}
-              loading={loading}
-              scroll={{ x: 520 }}
-              columns={columns}
-              locale={{ emptyText: 'ยังไม่มีแบนเนอร์ในจุดนี้' }}
-            />
-          </Card>
-        );
-      })}
+      {SCREENS.map((screen) => (
+        <div key={screen} className="mb-6">
+          <div className="text-sm font-semibold text-[#2B2320] mb-2">{screen}</div>
+          {PLACEMENTS.filter((p) => p.screen === screen).map((pm) =>
+            pm.multi ? <MultiSlot key={pm.value} pm={pm} /> : <SingleSlot key={pm.value} pm={pm} />,
+          )}
+        </div>
+      ))}
 
       {editing || adding ? (
         <BannerModal
