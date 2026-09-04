@@ -11,10 +11,15 @@
  * โชว์แค่ MAX ใบแล้วให้กด "ดูทั้งหมด" ไปแท็บคูปอง — หน้าแรกเป็นทางเข้า ไม่ใช่รายการเต็ม
  * ถ้ามีคูปอง 12 ใบแล้วเรียงหมดบนหน้าแรก แบนเนอร์ที่อยู่ถัดลงไปจะไม่มีใครเลื่อนไปเห็น
  *
- * ดึงข้อมูลเองไม่รับผ่าน props เพราะไม่มีที่อื่นบนหน้าแรกต้องใช้คูปอง — และถ้าไม่มี
- * คูปองเลยจะซ่อนทั้งบล็อก ไม่ทิ้งหัวข้อว่างไว้ให้เก้อ
+ * ★ ไม่มีคูปองก็ยังยึดตำแหน่งไว้ ★ (เจ้าของสั่ง 4 ก.ย. 2026 "ตำแหน่งนั้นต้องเป็นคูปอง
+ * ครับผม และด้านล่างเป็นแบรนเนอร์") — ตอนแรกทำให้ซ่อนทั้งบล็อกเมื่อไม่มีคูปอง ผลคือ
+ * แบนเนอร์เลื่อนขึ้นมาแทนที่ กลายเป็นว่าใต้การ์ดโหมดเป็นแบนเนอร์ ไม่ใช่คูปอง
+ * ตำแหน่งของสองบล็อกนี้ตายตัว ต่อให้ข้างในยังว่างอยู่ก็ตาม
+ *
+ * ดึงข้อมูลเองไม่รับผ่าน props เพราะไม่มีที่อื่นบนหน้าแรกต้องใช้คูปอง
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -25,7 +30,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Toast } from '@/components/ui/Toast';
 import { BRAND_ACCENT, type Accent } from '@/constants/accent';
-import { Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import { claimCoupon, listCoupons, type Coupon } from '@/lib/data/coupons';
 
 /** โชว์กี่ใบบนหน้าแรก — ที่เหลือไปดูที่แท็บคูปอง */
@@ -94,8 +99,7 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
     }
   };
 
-  // ไม่มีคูปอง = ไม่มีบล็อกนี้เลย ดีกว่าโชว์หัวข้อแล้วว่างข้างล่าง
-  if (loaded && coupons.length === 0) return null;
+  const empty = loaded && coupons.length === 0;
 
   return (
     <View style={styles.section}>
@@ -113,6 +117,17 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
       </View>
 
       <View style={styles.list}>
+        {empty ? (
+          /* ใบเปล่าทรงเดียวกับตั๋วจริง — บอกตรง ๆ ว่าตอนนี้ยังไม่มี ดีกว่าปล่อยช่องว่าง
+             ให้เดาว่าแอปพังหรือโหลดไม่ขึ้น และคนที่เคยเห็นคูปองตรงนี้จะได้รู้ว่ากลับมาดูได้ */
+          <View style={[styles.emptyCard, { borderColor: accent.tint }]}>
+            <Ionicons name="pricetag-outline" size={26} color={accent.strong} />
+            <View style={styles.emptyCopy}>
+              <Text style={styles.emptyTitle}>ยังไม่มีคูปองตอนนี้</Text>
+              <Text style={styles.emptyBody}>มีโปรใหม่เมื่อไหร่จะขึ้นตรงนี้</Text>
+            </View>
+          </View>
+        ) : null}
         {!loaded
           ? [0, 1].map((i) => <CouponTicketSkeleton key={i} accent={accent} />)
           : coupons
@@ -163,4 +178,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   list: { gap: Spacing.md },
+  /* เส้นประรอบใบเปล่า — สื่อว่า "ช่องนี้รอของอยู่" ไม่ใช่การ์ดจริงที่กดได้
+     ที่นี่ใช้ dashed ได้เพราะกำหนดขอบครบทุกด้าน (ต่างจากเส้นปรุของตั๋วที่ต้องการ
+     ด้านเดียว RN จึงวาดให้ไม่ได้) */
+  emptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    backgroundColor: Colors.surface,
+  },
+  emptyCopy: { flex: 1 },
+  emptyTitle: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    color: Colors.text,
+  },
+  emptyBody: { fontSize: 13, color: Colors.textMuted, marginTop: 1 },
 });
