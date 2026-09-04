@@ -23,6 +23,9 @@ export type ProductRailProps = {
   loading?: boolean;
   /** สีเน้นของโหมดที่แถวนี้ไปโผล่ — ส่งต่อให้การ์ดด้วย ไม่ส่ง = สีแบรนด์ (ส้ม) */
   accent?: Accent;
+  /** แทนที่การกดการ์ด/ปุ่ม + ของทุกใบในแถว (ดูเหตุผลใน ProductCard) */
+  onCardPress?: (product: Product) => void;
+  onCardQuickAdd?: (product: Product) => void;
 };
 
 /** Fixed card width inside a horizontal rail. */
@@ -37,6 +40,8 @@ export function ProductRail({
   onSeeAll,
   loading = false,
   accent = BRAND_ACCENT,
+  onCardPress,
+  onCardQuickAdd,
 }: ProductRailProps) {
   const t = useT();
   const showHead = !!title || !!onSeeAll;
@@ -66,7 +71,13 @@ export function ProductRail({
             ))
           : data.map((product, i) => (
               <View key={product.id} style={styles.card}>
-                <ProductCard product={product} index={i} accent={accent} />
+                <ProductCard
+                  product={product}
+                  index={i}
+                  accent={accent}
+                  onPress={onCardPress ? () => onCardPress(product) : undefined}
+                  onQuickAdd={onCardQuickAdd ? () => onCardQuickAdd(product) : undefined}
+                />
               </View>
             ))}
       </ScrollView>

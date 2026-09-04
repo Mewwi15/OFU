@@ -48,17 +48,38 @@ export type ProductCardProps = {
   index?: number;
   /** สีเน้นของโหมดที่การ์ดนี้ไปโผล่ — ไม่ส่ง = สีแบรนด์ (ส้ม) */
   accent?: Accent;
+  /**
+   * แทนที่การกดการ์ด/ปุ่ม + ด้วยของจุดเรียกใช้ — ไม่ส่งมาก็ทำงานเดิม (เข้าหน้าสินค้า /
+   * ใส่ตะกร้าเลย)
+   *
+   * มีไว้ให้แถบสินค้าขายดีบนหน้าแรกแทรกด่าน "เลือกวิธีรับของก่อน" ได้ (เจ้าของสั่ง
+   * 4 ก.ย. 2026) — ★ ต้องแทรกได้ทั้งสองทาง ★ ถ้าดักแค่การกดการ์ดแต่ปล่อยปุ่ม +
+   * ลูกค้าจะใส่ของลงตะกร้าโดยยังไม่ได้เลือกโหมดอยู่ดี ซึ่งเป็นรูที่ตั้งใจจะปิดพอดี
+   */
+  onPress?: () => void;
+  onQuickAdd?: () => void;
 };
 
-export function ProductCard({ product, style, index = 0, accent = BRAND_ACCENT }: ProductCardProps) {
+export function ProductCard({
+  product,
+  style,
+  index = 0,
+  accent = BRAND_ACCENT,
+  onPress,
+  onQuickAdd,
+}: ProductCardProps) {
   const router = useRouter();
   const add = useCart((s) => s.add);
   const bump = useSharedValue(1);
 
-  const open = () => router.push(`/product/${product.id}`);
+  const open = () => (onPress ? onPress() : router.push(`/product/${product.id}`));
   const soldOut = product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
 
   const quickAdd = () => {
+    if (onQuickAdd) {
+      onQuickAdd();
+      return;
+    }
     add(product);
     bump.value = withSequence(withSpring(1.3, { damping: 9, stiffness: 380 }), withSpring(1));
   };

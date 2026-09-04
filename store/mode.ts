@@ -132,6 +132,17 @@ export function meetsMinOrder(_mode: ShopMode, _subtotal: number): boolean {
 
 export type ModeState = {
   mode: ShopMode;
+  /**
+   * ลูกค้า "เลือกเอง" ในรอบการใช้งานนี้แล้วหรือยัง — ไม่ถูกบันทึกลงเครื่อง
+   *
+   * ★ ไม่เหมือน mode ★ mode มีค่าตั้งต้นเป็นเดลิเวอรี่และถูกจำไว้ข้ามการเปิดแอป จึงตอบ
+   * ไม่ได้ว่า "ลูกค้าตั้งใจเลือกไว้แบบนี้" หรือ "แค่ค่าตั้งต้นค้างอยู่" — คนที่อยู่ไกลเกินเขต
+   * ส่งแล้วไม่เคยแตะการ์ดโหมดเลย จะอยู่ในโหมดเดลิเวอรี่โดยไม่รู้ตัวและไปตันตอนจ่ายเงิน
+   * ตัวนี้จึงเริ่มเป็น false ทุกครั้งที่เปิดแอป แถบสินค้าขายดีบนหน้าแรกใช้ค่านี้ตัดสินว่า
+   * ต้องถามก่อนไหม (เจ้าของสั่ง 4 ก.ย. 2026 "ต้องเลือก delivery หรือ ONLINE ก่อนถึงจะ
+   * เลือกสินค้าได้")
+   */
+  pickedThisSession: boolean;
   setMode: (mode: ShopMode) => void;
 };
 
@@ -139,9 +150,12 @@ export const useMode = create<ModeState>()(
   persist(
     (set) => ({
       mode: DELIVERY_COMING_SOON ? 'online' : 'delivery',
+      pickedThisSession: false,
       setMode: (mode) => {
         if (MODE_META[mode].comingSoon) return; // not selectable yet
-        set({ mode });
+        /* ทุกทางที่ตั้งโหมดคือการเลือกของลูกค้าทั้งนั้น (การ์ดหน้าแรก จอเตรียมพร้อม
+           แผ่นเลือกโหมด) — ตั้งธงที่นี่ที่เดียว จะได้ไม่มีทางไหนหลุด */
+        set({ mode, pickedThisSession: true });
       },
     }),
     {

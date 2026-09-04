@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ProductRail } from '@/components/product/ProductRail';
 import { CouponPicks } from '@/components/shop/CouponPicks';
+import { ModePickSheet } from '@/components/shop/ModePickSheet';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
@@ -25,7 +27,9 @@ import { useT } from '@/lib/i18n';
 import { BRAND_ACCENT, GREEN_ACCENT } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
 import { BANNER_ASPECT, bannersFor } from '@/lib/data/catalog';
+import type { Product } from '@/data/products';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
+import { useCart } from '@/store/cart';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
 import { useShopOpen } from '@/lib/useShopOpen';
 import { loadIfStale, useCatalog } from '@/store/catalog';
@@ -96,6 +100,11 @@ export default function HomeScreen() {
 
   /* ----- Catalog (from Supabase) ----- */
   const reloadCatalog = useCatalog((s) => s.load);
+  const products = useCatalog((s) => s.products);
+  const bestsellerIds = useCatalog((s) => s.bestsellerIds);
+  /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มโหลดและตอนเสร็จแล้ว
+     ถ้าดูแค่ loading แถบขายดีจะโล่งอยู่ดีในช่วงก่อนคำขอแรกจะยิงออกไป */
+  const catalogLoaded = useCatalog((s) => s.loaded);
   const [refreshing, setRefreshing] = useState(false);
   // Re-fetch on focus only if the catalog is stale (loadIfStale), so admin
   // changes (new products, prices, banners) still show up without a restart,
@@ -160,6 +169,37 @@ export default function HomeScreen() {
     }, BANNER_INTERVAL);
     return () => clearInterval(timer);
   }, [promoW, promoBanners.length]);
+
+  /* ----- แถบสินค้าขายดี + ด่านเลือกวิธีรับของ ----- */
+  /* เรียงตามลำดับที่ RPC ให้มา (ยอดขายจริง POS + ออนไลน์ ดู 0034) ไม่ใช่ลำดับใน
+     คลังสินค้า — id ที่หาสินค้าไม่เจอถูกทิ้ง (สินค้าถูกเก็บ/ยกเลิกขายหลังจากเคยขายดี) */
+  const bestsellers = bestsellerIds
+    .map((id) => products.find((p) => p.id === id))
+    .filter((p): p is Product => !!p)
+    .slice(0, 8);
+
+  const addToCart = useCart((s) => s.add);
+  const pickedMode = useMode((s) => s.pickedThisSession);
+  /* งานที่ค้างรอผลการเลือกโหมด — เก็บทั้งสินค้าและสิ่งที่จะทำ เพราะกดการ์ดกับกดปุ่ม +
+     ไปคนละทางกัน (เข้าหน้าสินค้า vs ใส่ตะกร้าเลย) */
+  const [pending, setPending] = useState<{ product: Product; action: 'open' | 'add' } | null>(null);
+
+  const runAction = useCallback(
+    (product: Product, action: 'open' | 'add') => {
+      if (action === 'add') addToCart(product);
+      else router.push(`/product/${product.id}`);
+    },
+    [addToCart, router],
+  );
+
+  /* เลือกโหมดไว้แล้วในรอบนี้ = ไปต่อเลย ไม่ถามซ้ำ — ด่านที่ถามทุกครั้งคือด่านที่คนเลิกใช้ */
+  const gate = useCallback(
+    (product: Product, action: 'open' | 'add') => {
+      if (pickedMode) runAction(product, action);
+      else setPending({ product, action });
+    },
+    [pickedMode, runAction],
+  );
 
   const onBannerLayout = (e: LayoutChangeEvent) =>
     setBannerWidth(e.nativeEvent.layout.width);
@@ -392,8 +432,37 @@ export default function HomeScreen() {
               </LinearGradient>
             )}
           </View>
+
+          {/* สินค้าขายดีจากยอดขายจริง (เจ้าของสั่ง 4 ก.ย. 2026 "ด้านล่างเป็นสินค้าขายดี
+              แนะนำครับ ... ยอดขายจริง")
+              ★ ดูได้เลย แต่กดแล้วต้องเลือกวิธีรับของก่อน ★ เจ้าของวางกติกาไว้ว่าต้องเลือก
+              delivery หรือ ONLINE ก่อนถึงจะเลือกสินค้าได้ — ดักตอนกด ไม่ใช่ตอนดู เพราะ
+              ของสวย ๆ ต้องได้ทำหน้าที่ดึงดูดก่อน ไม่ใช่ซ่อนไว้หลังด่าน
+              ไม่มี "ดูทั้งหมด" เพราะหน้ารวมสินค้าถูกถอดออกไปแล้ว ทางเข้าคือการ์ดโหมด */}
+          {catalogLoaded && bestsellers.length === 0 ? null : (
+            <ProductRail
+              title="ขายดีแนะนำ"
+              data={bestsellers}
+              loading={!catalogLoaded}
+              accent={GREEN_ACCENT}
+              onCardPress={(p) => gate(p, 'open')}
+              onCardQuickAdd={(p) => gate(p, 'add')}
+            />
+          )}
         </View>
       </ScrollView>
+
+      {pending ? (
+        <ModePickSheet
+          productName={pending.product.name}
+          onPicked={() => {
+            const { product, action } = pending;
+            setPending(null);
+            runAction(product, action);
+          }}
+          onClose={() => setPending(null)}
+        />
+      ) : null}
     </View>
   );
 }
