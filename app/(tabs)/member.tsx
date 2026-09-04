@@ -150,13 +150,29 @@ export default function MemberScreen() {
         {/* ── หัวจอสีเต็มความกว้าง ไหลถึงขอบบน ──
             ไม่มีแถบหัวข้อขาวคั่นแบบหน้าอื่น — ตัวอย่างที่เจ้าของส่งมาให้สีไหลขึ้นไปชนขอบจอ
             ซึ่งทำให้หน้านี้รู้สึกเป็น "บัตร" ทั้งหน้า ไม่ใช่หน้าปกติที่มีการ์ดวางอยู่ */}
-        <LinearGradient
-          /* สามสต็อป ไม่ใช่สอง — เขียวเข้มกับเขียวสดของโทเคนอยู่ใกล้กันมาก ไล่สองสต็อป
-             อ่านออกมาเป็นสีทึบเรียบ ไม่รู้ว่าไล่ไว้ */
-          colors={[ACCENT.strong, tokens.color.brand.accentDark, ACCENT.solid]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.hero, { paddingTop: insets.top + Spacing.md }]}>
+        <View style={[styles.hero, { paddingTop: insets.top + Spacing.md }]}>
+          {/* ลายพื้นหลัง — ไอคอนของร้านซ้ำ ๆ จาง ๆ (เจ้าของทำภาพมาให้ 4 ก.ย. 2026)
+              วางเป็นชั้นล่างสุด ไล่สีทับข้างบนแบบโปร่ง เพื่อให้ได้ทั้งลายและมิติของแสง
+              ★ ถ้าเอาไล่สีไว้ล่างแล้วเอาลายทับ ★ ลายมีพื้นเขียวทึบของตัวเอง จะกลบไล่สี
+              จนหายหมด ต้องเรียงแบบนี้เท่านั้น */}
+          <Image
+            /* .jpg ไม่ใช่ .png — ลายนี้เป็นภาพไล่เฉดนุ่ม ๆ ทึบทั้งใบ ไม่มีส่วนโปร่ง
+               PNG เก็บได้ 1.3 MB ส่วน JPEG คุณภาพ 82 เหลือ 90 KB (เล็กลง 14 เท่า)
+               ลายคอนทราสต์ต่ำมากอยู่แล้ว ร่องรอยการบีบอัดจึงมองไม่เห็น */
+            source={require('@/assets/images/member-pattern.jpg')}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            pointerEvents="none"
+          />
+          <LinearGradient
+            /* สามสต็อป ไม่ใช่สอง — เขียวเข้มกับเขียวสดของโทเคนอยู่ใกล้กันมาก ไล่สองสต็อป
+               อ่านออกมาเป็นสีทึบเรียบ ไม่รู้ว่าไล่ไว้
+               โปร่งบางส่วน ให้ลายที่อยู่ข้างล่างยังโผล่ขึ้นมาเห็นได้ */
+            colors={[ACCENT.strong, tokens.color.brand.accentDark, ACCENT.solid]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, styles.heroTint]}
+          />
           <View style={styles.heroTop}>
             <Text style={styles.brand}>OFU</Text>
             <View style={styles.who}>
@@ -177,7 +193,7 @@ export default function MemberScreen() {
             )}
             <Text style={styles.pointsUnit}>แต้ม</Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* ── การ์ดขาวคร่อมขอบล่างของหัวจอ ──
             ระยะติดลบเท่ากับครึ่งความสูงการ์ด ให้คร่อมพอดีเหมือนตัวอย่าง */}
@@ -367,11 +383,17 @@ const styles = StyleSheet.create({
   /* หัวจอ — ไล่สีเต็มความกว้าง ไหลขึ้นไปถึงขอบบนจอ ไม่มีแถบหัวข้อคั่น
      ล่างสุดเผื่อไว้ให้การ์ดขาวคร่อมทับได้โดยไม่บังแต้ม */
   hero: {
+    // ครอบตัดลายที่ล้นขอบ + เป็นพื้นสำรองกันกระพริบเฟรมแรกก่อนรูปลายโหลดเสร็จ
+    overflow: 'hidden',
+    backgroundColor: ACCENT.strong,
     paddingHorizontal: Spacing.lg,
     /* ★ ต้องมากกว่าระยะที่การ์ดขาวคร่อมขึ้นมา (OVERLAP) ★ ไม่งั้นคำว่า "แต้ม" ที่อยู่
        ล่างสุดของหัวจอจะถูกการ์ดทับ — เจอมาแล้วตอนตั้งเท่ากันพอดี */
     paddingBottom: OVERLAP + Spacing.x2,
   },
+  /* 0.62 คือจุดที่ทั้งสองอย่างยังอยู่ครบ — ทึบกว่านี้ลายหายไปเลย ใสกว่านี้ไล่สีหายและ
+     ลายเด่นเกินจนแย่งสายตาตัวเลขแต้ม */
+  heroTint: { opacity: 0.62 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: {
     fontFamily: 'Mitr_600SemiBold',
