@@ -617,6 +617,9 @@ function ProductModal({
     };
   }, [form, message]);
 
+  const lotFeed = useStockLots(variantId);
+  const prevCost = previousCost(lotFeed.lots);
+
   const reloadImages = async () => {
     if (product) setImages(await listProductImages(product.id));
   };
@@ -731,11 +734,9 @@ function ProductModal({
           <Form.Item
             name="cost_price"
             label="ต้นทุนล่าสุด"
-            /* ★ บอกให้ชัดว่าช่องนี้คืออะไร ★ ก่อนมีระบบล็อต ช่องนี้ถูกใช้ทั้งตั้งราคาและคิด
-               กำไร พอรับของทีไรก็ทับทั้งตัว ของเก่าที่ยังค้างเลยถูกเปลี่ยนทุนย้อนหลังไปด้วย
-               (เจ้าของจับได้ 5 ก.ย. 2026) — ตอนนี้ทุนจริงของแต่ละชุดอยู่ในล็อตด้านล่าง
-               ช่องนี้เหลือหน้าที่เดียวคือเป็นตัวเลขอ้างอิงตอนตั้งราคาขายครั้งต่อไป */
-            extra="ใช้อ้างอิงตอนตั้งราคาขาย · ทุนจริงของของที่ค้างอยู่ดูที่ล็อตด้านล่าง">
+            /* ทุนก่อนหน้าแทนคำอธิบาย — เจ้าของขอเอง 5 ก.ย. 2026 และมันตอบคำถามที่คนเปิด
+               ช่องนี้มาถามจริง ๆ ("ขึ้นมาจากเท่าไหร่") ได้ตรงกว่าประโยคอธิบายว่าช่องนี้คืออะไร */
+            extra={prevCost != null ? `ก่อนหน้า ${money(prevCost)}` : undefined}>
             {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
             <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
           </Form.Item>
@@ -780,9 +781,7 @@ function ProductModal({
             เจ้าของถามเอง 5 ก.ย. 2026 ว่าทุนเก่า/ใหม่ควรอยู่ในหน้านี้ไหม — ใช่ ล็อตเป็น
             ของตัวเลือกสินค้า ไม่ใช่ของใบรับเข้า ใบรับเข้าแค่เป็นเหตุการณ์ที่ทำให้เกิดล็อต
             โชว์เฉพาะตอนแก้สินค้าที่มีอยู่แล้ว — สินค้าใหม่ยังไม่มีล็อตให้ดู */}
-        {product?.product_variants?.[0]?.id ? (
-          <LotPanel variantId={product.product_variants[0].id} />
-        ) : null}
+        {variantId ? <LotPanel feed={lotFeed} /> : null}
 
         <div className="mb-1 text-sm text-[#4b443f]">รูปภาพสินค้า</div>
         <div className="flex flex-wrap gap-3">
@@ -886,20 +885,24 @@ function ProductModal({
   );
 }
 
-/**
- * ล็อตต้นทุนของสินค้าตัวนี้ — ของแต่ละชุดที่เข้ามาด้วยทุนเท่าไหร่ และเหลืออยู่กี่ชิ้น
- *
- * ★ เรียงตามคิวที่จะถูกตัด ★ บนสุดคือชุดที่จะขายออกก่อน — คนดูจะได้ตอบตัวเองได้ทันทีว่า
- * "ตอนนี้กำลังขายของทุนเท่าไหร่อยู่" ซึ่งเป็นคำถามเดียวที่คนเปิดดูล็อตอยากรู้จริง ๆ
- *
- * โชว์ล็อตที่หมดแล้วด้วยแบบจาง — ถ้าซ่อนไป คนจะสงสัยว่าของทุนเก่าหายไปไหน
- */
-function LotPanel({ variantId }: { variantId: string }) {
+const money = (n: number) =>
+  `฿${n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+type LotFeed = { lots: StockLot[]; state: 'loading' | 'ready' | 'unavailable' };
+
+/** โหลดล็อตของสินค้าตัวหนึ่ง — ตารางล่างกับช่อง "ต้นทุนล่าสุด" ใช้ชุดเดียวกัน โหลดครั้งเดียวพอ */
+function useStockLots(variantId?: string): LotFeed {
   const [lots, setLots] = useState<StockLot[]>([]);
-  const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [state, setState] = useState<LotFeed['state']>('loading');
 
   useEffect(() => {
+    if (!variantId) {
+      setLots([]);
+      setState('ready');
+      return;
+    }
     let alive = true;
+    setState('loading');
     void listStockLots(variantId)
       .then((l) => alive && (setLots(l), setState('ready')))
       /* ยังไม่ได้รันไมเกรชัน 0103 = ตารางยังไม่มี — ซ่อนส่วนนี้ไปเงียบ ๆ ดีกว่าโชว์ error
@@ -910,20 +913,80 @@ function LotPanel({ variantId }: { variantId: string }) {
     };
   }, [variantId]);
 
+  return { lots, state };
+}
+
+/** ทุนของชุดก่อนหน้าที่ "คนละราคา" กับชุดล่าสุด — รับของราคาเดิมซ้ำไม่นับว่าทุนเปลี่ยน */
+function previousCost(lots: StockLot[]): number | null {
+  const latest = lots[lots.length - 1]?.unit_cost;
+  if (latest == null) return null;
+  for (let i = lots.length - 2; i >= 0; i--) {
+    if (lots[i].unit_cost !== latest) return lots[i].unit_cost;
+  }
+  return null;
+}
+
+type LotRow = {
+  key: string;
+  unit_cost: number;
+  qty_in: number;
+  qty_left: number;
+  received_at: string;
+  times: number;
+};
+
+/**
+ * รวมชุดที่ทุนเท่ากันและอยู่ติดกันในคิวให้เป็นแถวเดียว
+ *
+ * ★ ทำไมต้องรวม ★ รับของยี่ห้อเดิมราคาเดิมสองใบในวันเดียวเป็นเรื่องปกติ — เดิมกลายเป็น
+ * สองแถวที่ทุกอย่างเหมือนกันหมด เจ้าของเปิดมาเห็นแล้วงงว่าต่างกันตรงไหน (5 ก.ย. 2026)
+ * ทุนเท่ากันคือของชุดเดียวกันในทางบัญชี ตัดใบไหนก่อนก็ได้ตัวเลขเท่ากัน รวมแล้วจึงไม่มี
+ * อะไรผิดเพี้ยน แต่ตารางสั้นลงและอ่านรู้เรื่องขึ้นทันที
+ */
+function groupLots(lots: StockLot[]): LotRow[] {
+  const rows: LotRow[] = [];
+  for (const l of lots) {
+    const last = rows[rows.length - 1];
+    if (last && last.unit_cost === l.unit_cost) {
+      last.qty_in += l.qty_in;
+      last.qty_left += l.qty_left;
+      last.times += 1;
+      continue;
+    }
+    rows.push({
+      key: l.id,
+      unit_cost: l.unit_cost,
+      qty_in: l.qty_in,
+      qty_left: l.qty_left,
+      // วันของใบแรกในกลุ่ม = ตำแหน่งจริงในคิว (ใบหลังตัดทีหลังอยู่แล้ว)
+      received_at: l.received_at,
+      times: 1,
+    });
+  }
+  return rows;
+}
+
+/**
+ * ล็อตต้นทุนของสินค้าตัวนี้ — ของแต่ละชุดที่เข้ามาด้วยทุนเท่าไหร่ และเหลืออยู่กี่ชิ้น
+ *
+ * ★ เรียงตามคิวที่จะถูกตัด ★ บนสุดคือชุดที่จะขายออกก่อน — คนดูจะได้ตอบตัวเองได้ทันทีว่า
+ * "ตอนนี้กำลังขายของทุนเท่าไหร่อยู่" ซึ่งเป็นคำถามเดียวที่คนเปิดดูล็อตอยากรู้จริง ๆ
+ *
+ * โชว์ชุดที่หมดแล้วด้วยแบบจาง — ถ้าซ่อนไป คนจะสงสัยว่าของทุนเก่าหายไปไหน
+ */
+function LotPanel({ feed }: { feed: LotFeed }) {
+  const { lots, state } = feed;
   if (state === 'unavailable') return null;
 
-  const live = lots.filter((l) => l.qty_left > 0);
-  const onHand = live.reduce((s, l) => s + l.qty_left, 0);
-  const value = live.reduce((s, l) => s + l.qty_left * l.unit_cost, 0);
-  /* ★ วันซ้ำกันได้ ★ รับของวันเดียวกันหลายใบเป็นเรื่องปกติ (เจ้าของทัก 5 ก.ย. 2026
-     "บางอันมีวันที่ซ้ำด้วย") — ถ้าเจอวันซ้ำ โชว์เวลาด้วยทั้งตาราง ไม่ใช่โชว์เฉพาะแถวที่ซ้ำ
-     เพราะรูปแบบวันที่ที่ไม่เหมือนกันในตารางเดียวอ่านยากกว่าเดิม */
-  const days = lots.map((l) => thDate(l.received_at).format('YYYY-MM-DD'));
+  const rows = groupLots(lots);
+  const live = rows.filter((r) => r.qty_left > 0);
+  const onHand = live.reduce((s, r) => s + r.qty_left, 0);
+  const value = live.reduce((s, r) => s + r.qty_left * r.unit_cost, 0);
+  /* วันซ้ำยังเกิดได้ถ้าวันเดียวกันรับมาคนละทุน — กรณีนั้นค่อยโชว์เวลา และโชว์ทั้งตาราง
+     เพราะรูปแบบวันที่ไม่เหมือนกันในตารางเดียวอ่านยากกว่าเดิม */
+  const days = rows.map((r) => thDate(r.received_at).format('YYYY-MM-DD'));
   const sameDay = new Set(days).size !== days.length;
-  const firstLiveId = live[0]?.id;
-
-  const money = (n: number) =>
-    `฿${n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const firstLiveKey = live[0]?.key;
 
   return (
     <>
@@ -933,56 +996,52 @@ function LotPanel({ variantId }: { variantId: string }) {
 
       {state === 'loading' ? (
         <div className="mb-3 text-[13px] text-gray-400">กำลังโหลด…</div>
-      ) : lots.length === 0 ? (
-        <div className="mb-3 text-[13px] text-gray-400">
-          ยังไม่มีล็อต — จะเกิดขึ้นเองเมื่อรับของเข้าครั้งถัดไป
-        </div>
+      ) : rows.length === 0 ? (
+        <div className="mb-3 text-[13px] text-gray-400">ยังไม่มีล็อต</div>
       ) : (
         <>
           {/* สรุปก่อน ตารางทีหลัง — คนส่วนใหญ่อยากรู้แค่สองตัวเลขนี้ ไม่ได้จะอ่านทุกแถว */}
-          <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-[#f7f5f3] px-3 py-2 text-[13px]">
+          <div className="mb-3 flex flex-wrap gap-x-6 rounded-lg bg-[#f7f5f3] px-3 py-2 text-[13px]">
             <span>
               คงเหลือรวม <b className="tabular-nums text-[15px]">{onHand.toLocaleString('th-TH')}</b> ชิ้น
             </span>
             <span>
               มูลค่าต้นทุน <b className="tabular-nums text-[15px]">{money(value)}</b>
             </span>
-            {live.length > 1 ? (
-              <span className="text-[#8a807a]">
-                มี {live.length} ชุดคนละทุน — ขายชุดบนสุดก่อน
-              </span>
-            ) : null}
           </div>
 
-          <Table<StockLot>
-            rowKey="id"
+          <Table<LotRow>
+            rowKey="key"
             size="small"
             pagination={false}
-            dataSource={lots}
+            dataSource={rows}
             className="mb-3"
-            rowClassName={(l) => (l.qty_left === 0 ? 'opacity-40' : '')}
+            rowClassName={(r) => (r.qty_left === 0 ? 'opacity-40' : '')}
             columns={[
               {
                 title: 'ชุดที่',
                 width: 64,
                 align: 'center',
-                /* เลขชุดแทนการอ้างวันที่ — วันซ้ำกันได้ แต่เลขชุดไม่ซ้ำ คุยกันรู้เรื่องกว่า
+                /* เลขชุดแทนการอ้างวันที่ — วันซ้ำได้ แต่เลขชุดไม่ซ้ำ คุยกันรู้เรื่องกว่า
                    ตอนต้องชี้ว่า "ชุดไหน" */
-                render: (_: unknown, __: StockLot, i: number) => (
+                render: (_: unknown, __: LotRow, i: number) => (
                   <span className="tabular-nums">{i + 1}</span>
                 ),
               },
               {
                 title: 'รับเข้าเมื่อ',
                 dataIndex: 'received_at',
-                render: (v: string, l: StockLot) => (
+                render: (v: string, r: LotRow) => (
                   <div className="leading-tight">
                     <div>
                       {new Date(v).getFullYear() <= 2000
                         ? 'ยกมาตอนเริ่มระบบ'
                         : thDate(v).format(sameDay ? 'D MMM YY HH:mm' : 'D MMM YY')}
+                      {r.times > 1 ? (
+                        <span className="text-gray-400"> · {r.times} ครั้ง</span>
+                      ) : null}
                     </div>
-                    {l.id === firstLiveId ? (
+                    {r.key === firstLiveKey ? (
                       <Tag color="blue" className="mt-1">
                         กำลังขายชุดนี้
                       </Tag>
@@ -996,21 +1055,19 @@ function LotPanel({ variantId }: { variantId: string }) {
                 width: 110,
                 align: 'right',
                 /* ตัวเลขที่คนเปิดมาดูจริง ๆ — ทำให้เด่นกว่าคอลัมน์อื่น */
-                render: (v: number) => (
-                  <b className="tabular-nums text-[15px]">{money(v)}</b>
-                ),
+                render: (v: number) => <b className="tabular-nums text-[15px]">{money(v)}</b>,
               },
               {
                 title: 'คงเหลือ',
                 width: 120,
                 align: 'right',
-                render: (_: unknown, l: StockLot) =>
-                  l.qty_left === 0 ? (
+                render: (_: unknown, r: LotRow) =>
+                  r.qty_left === 0 ? (
                     <span className="text-[12px]">ขายหมดแล้ว</span>
                   ) : (
                     <span className="tabular-nums">
-                      {l.qty_left}
-                      <span className="text-gray-400"> / {l.qty_in}</span>
+                      {r.qty_left}
+                      <span className="text-gray-400"> / {r.qty_in}</span>
                     </span>
                   ),
               },

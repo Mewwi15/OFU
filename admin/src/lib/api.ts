@@ -365,7 +365,11 @@ export async function listStockLots(variantId: string): Promise<StockLot[]> {
     .from('stock_lots')
     .select('id, unit_cost, qty_in, qty_left, received_at')
     .eq('variant_id', variantId)
+    /* เรียงให้ตรงกับคิวที่ฐานข้อมูลตัดจริง (received_at, created_at ใน 0103) — ใบรับเข้า
+       ลงวันที่ย้อนหลังได้ ของหลายใบจึงมี received_at ตรงกันเป๊ะได้ ถ้าไม่มีตัวตัดสินรอง
+       ลำดับที่โชว์จะสลับไปมาไม่ตรงกับของที่ถูกขายออกจริง */
     .order('received_at')
+    .order('created_at')
     .limit(50);
   if (error) throw error;
   return (data ?? []).map((l) => ({ ...l, unit_cost: Number(l.unit_cost) })) as StockLot[];
