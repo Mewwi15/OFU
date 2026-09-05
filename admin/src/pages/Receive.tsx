@@ -367,14 +367,27 @@ export function Receive() {
   /**
    * สร้างสินค้าร่างจากข้อมูลที่กรอกใน modal แล้วเพิ่มเข้าใบรับเข้าทันที
    *
-   * ราคาขายตั้งต้นใช้สูตรเดียวกับฝั่ง import: เลขในชื่อ ("ขนม 10 บาท" → 10) ก่อน
-   * ถ้าไม่มีก็ทุน×1.25 ปัดขึ้น — ไม่ใช่ 0 เพราะของที่ราคา 0 ถ้าเผลอเผยแพร่คือขายฟรี
+   * ราคาขาย: เอาที่คนรับของกรอกก่อนเสมอ — เขายืนดูของอยู่ตรงนั้น รู้ราคาป้ายดีที่สุด
+   * ไม่ได้กรอกค่อยเดาให้ด้วยสูตรเดียวกับฝั่ง import: เลขในชื่อ ("ขนม 10 บาท" → 10)
+   * แล้วค่อยทุน×1.25 ปัดขึ้น — ไม่ใช่ 0 เพราะของที่ราคา 0 ถ้าเผลอเผยแพร่คือขายฟรี
    */
-  const createProductNow = async (v: { name: string; cost?: number; categoryId?: string }) => {
+  const createProductNow = async (v: {
+    name: string;
+    cost?: number;
+    price?: number;
+    categoryId?: string;
+  }) => {
     const code = newProduct?.code ?? '';
     const name = v.name.trim();
     const mPrice = name.match(/(\d+(?:\.\d+)?)\s*บาท/);
-    const price = mPrice ? Number(mPrice[1]) : v.cost != null ? Math.ceil(v.cost * 1.25) : 0;
+    const price =
+      v.price != null
+        ? v.price
+        : mPrice
+          ? Number(mPrice[1])
+          : v.cost != null
+            ? Math.ceil(v.cost * 1.25)
+            : 0;
     try {
       const { id: productId } = await upsertProduct({ name, category_id: v.categoryId ?? null });
       const { id: variantId } = await upsertVariant({
@@ -859,11 +872,15 @@ export function Receive() {
 }
 
 /**
- * กรอกข้อมูลเบื้องต้นของสินค้าใหม่ตอนรับของ — ชื่อ ทุน หมวดหมู่
+ * กรอกข้อมูลเบื้องต้นของสินค้าใหม่ตอนรับของ — ชื่อ ทุน ราคาขาย หมวดหมู่
  *
- * ★ ขอแค่สามช่อง ★ คนรับของยืนอยู่หน้ากองของ ไม่ใช่หน้าจอจัดการสินค้า — ราคาขาย รูป
- * คำอธิบาย ไปตั้งทีหลังในหน้าสินค้าได้ ถ้าขอครบทุกช่องตรงนี้ของจะกองรอจนกว่าจะกรอกเสร็จ
+ * ★ ขอแค่ไม่กี่ช่อง ★ คนรับของยืนอยู่หน้ากองของ ไม่ใช่หน้าจอจัดการสินค้า — รูปกับคำอธิบาย
+ * ไปตั้งทีหลังในหน้าสินค้าได้ ถ้าขอครบทุกช่องตรงนี้ของจะกองรอจนกว่าจะกรอกเสร็จ
  * สินค้าถูกสร้างเป็นฉบับร่างเสมอ ลูกค้าจึงยังไม่เห็นระหว่างที่ข้อมูลยังไม่ครบ
+ *
+ * ★ ราคาขายอยู่ตรงนี้ด้วย ★ เจ้าของทัก 5 ก.ย. 2026 "มีให้ใส่ทุนแต่ไม่มีให้ใส่ราคาขาย" —
+ * ถูกแล้ว คนรับของถือของอยู่ในมือ อ่านราคาป้ายได้เลย การให้ไปตั้งทีหลังในอีกหน้าคือ
+ * ทำให้ลืม แล้วสินค้าก็ค้างเป็นร่างที่ขายไม่ได้
  */
 function NewProductModal({
   code,
@@ -874,9 +891,16 @@ function NewProductModal({
   code: string;
   categories: { id: string; name: string }[];
   onCancel: () => void;
-  onCreate: (v: { name: string; cost?: number; categoryId?: string }) => Promise<void>;
+  onCreate: (v: {
+    name: string;
+    cost?: number;
+    price?: number;
+    categoryId?: string;
+  }) => Promise<void>;
 }) {
   const [form] = Form.useForm();
+  /* ทุนที่พิมพ์อยู่ตอนนี้ — ใช้เดาราคาขายให้ ไม่ใช่เพื่อบังคับ */
+  const cost = Form.useWatch<number | undefined>('cost', form);
   const [saving, setSaving] = useState(false);
   /* รหัสที่ยิงมาเป็นบาร์โค้ด (ตัวเลข/ตัวอักษรล้วน) → ชื่อยังว่าง ให้กรอกเอง
      ถ้าเป็นคำที่พิมพ์ค้นหา → เอามาเป็นชื่อตั้งต้นเลย คนพิมพ์ก็ตั้งใจจะเรียกของชิ้นนั้นอยู่แล้ว */
@@ -897,6 +921,7 @@ function NewProductModal({
           await onCreate({
             name: v.name,
             cost: typeof v.cost === 'number' ? v.cost : undefined,
+            price: typeof v.price === 'number' ? v.price : undefined,
             categoryId: v.categoryId || undefined,
           });
         } finally {
@@ -909,15 +934,30 @@ function NewProductModal({
         showIcon
         style={{ marginBottom: 16 }}
         message={looksLikeBarcode ? `บาร์โค้ด ${code}` : `ค้นหา "${code}" ไม่พบ`}
-        description="สร้างเป็นฉบับร่างก่อน ลูกค้ายังไม่เห็น — ค่อยไปตั้งราคาขายกับรูปในหน้าสินค้าทีหลัง"
+        description="สร้างเป็นฉบับร่างก่อน ลูกค้ายังไม่เห็น — ค่อยไปใส่รูปกับรายละเอียดในหน้าสินค้าทีหลัง"
       />
       <Form form={form} layout="vertical" initialValues={{ name: looksLikeBarcode ? '' : code }}>
         <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรอกชื่อสินค้า' }]}>
           <Input placeholder="เช่น มาม่าโอเรียนทัลคิทเช่น" autoFocus maxLength={80} />
         </Form.Item>
-        <Form.Item name="cost" label="ทุนต่อชิ้น (บาท)" extra="ใส่ไว้เลยจะได้ไม่ต้องกลับมากรอกทีหลัง">
-          <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
-        </Form.Item>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Form.Item name="cost" label="ทุนต่อชิ้น" extra="ตามราคาในบิลผู้ขาย">
+            <InputNumber min={0} step={0.01} style={{ width: '100%' }} addonBefore="฿" />
+          </Form.Item>
+          <Form.Item
+            name="price"
+            label="ราคาขาย"
+            /* ★ ไม่บังคับ แต่บอกให้รู้ว่าถ้าเว้นจะได้อะไร ★ เว้นว่างแล้วระบบเดาให้เป็น
+               ทุน×1.25 ซึ่งเป็นแค่ตัวเลขตั้งต้น ไม่ใช่ราคาที่ตัดสินใจแล้ว — เขียนไว้
+               ตรงนี้คนจะได้เลือกเองว่าจะกรอกหรือปล่อย ไม่ใช่ไปเซอร์ไพรส์ทีหลัง */
+            extra={
+              cost != null && cost > 0
+                ? `เว้นว่าง = ใช้ ฿${Math.ceil(cost * 1.25).toLocaleString('th-TH')} (ทุน+25%)`
+                : 'เว้นว่างได้ ระบบจะตั้งให้จากทุน'
+            }>
+            <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
+          </Form.Item>
+        </div>
         <Form.Item name="categoryId" label="หมวดหมู่">
           <Select
             allowClear
