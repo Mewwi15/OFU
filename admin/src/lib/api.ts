@@ -1177,6 +1177,9 @@ export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   const { data, error } = await supabase
     .from('goods_receipts')
     .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at, received_at, voided_at')
+    /* ใบที่ยกเลิกแล้วไม่ต้องส่งมา — เจ้าของสั่ง 5 ก.ย. 2026 "ตรงที่ขีดยกเลิกมันน่าจะลบไป
+       เลย" · แถวยังอยู่ในฐานข้อมูลตามเดิม (สมุดสต๊อกอ้างถึงมันอยู่) แค่ไม่เอามารกหน้าจอ */
+    .is('voided_at', null)
     .order('created_at', { ascending: false })
     .limit(200);
   if (error) throw error;

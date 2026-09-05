@@ -275,22 +275,25 @@ export function Receive() {
     );
   };
 
-  /* "ลบ" = ยกเลิกใบ (void): ถอนสต๊อกคืน + ใบติดป้ายยกเลิก ดูย้อนหลังได้
-   * "แก้ไข" = ยกเลิกใบเดิม แล้วดึงทุกบรรทัดกลับเข้าฟอร์ม แก้เสร็จบันทึกเป็นใบใหม่ */
+  /* "ลบ" = ถอนสต๊อกคืนแล้วเอาใบออกจากประวัติ · "แก้ไข" = ลบใบเดิมแล้วดึงทุกบรรทัดกลับ
+   * เข้าฟอร์ม แก้เสร็จบันทึกเป็นใบใหม่
+   * ★ ในฐานข้อมูลยังเป็นการ void ไม่ใช่ลบแถวจริง ★ สมุดสต๊อกอ้างถึงใบนี้อยู่ (ทั้งบรรทัด
+   * ที่รับเข้าและบรรทัดที่ถอนคืน) ลบแถวทิ้งคือทำประวัติสต๊อกขาด — แต่คนใช้งานไม่ต้องรู้
+   * เรื่องนั้น สำหรับเขามันคือลบ ก็ทำให้มันหายไปจากหน้าจอจริง ๆ */
   const doVoid = (r: GoodsReceipt, thenEdit: boolean) => {
     Modal.confirm({
-      title: thenEdit ? `แก้ไขใบ ${r.receipt_number}?` : `ยกเลิกใบ ${r.receipt_number}?`,
+      title: thenEdit ? `แก้ไขใบ ${r.receipt_number}?` : `ลบใบ ${r.receipt_number}?`,
       content: thenEdit
-        ? 'ใบเดิมจะถูกยกเลิก (สต๊อกถอนคืน) แล้วดึงรายการกลับมาแก้ในฟอร์ม — บันทึกใหม่ได้เลขใบใหม่'
+        ? 'ใบเดิมจะถูกลบ (สต๊อกถอนคืน) แล้วดึงรายการกลับมาแก้ในฟอร์ม — บันทึกใหม่ได้เลขใบใหม่'
         : 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
-      okText: thenEdit ? 'ยกเลิกใบเดิมและแก้ไข' : 'ยกเลิกใบ',
+      okText: thenEdit ? 'ลบใบเดิมและแก้ไข' : 'ลบใบ',
       okButtonProps: { danger: true },
       cancelText: 'ไม่ทำ',
       onOk: async () => {
         try {
           const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
           await voidGoodsReceipt(r.id, thenEdit ? 'แก้ไขใบ' : undefined);
-          message.success(`ยกเลิกใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
+          message.success(`ลบใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
           if (thenEdit) {
             // จับคู่บรรทัดเดิมกลับเป็นรายการในฟอร์มผ่านบาร์โค้ด
             const byBc = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
@@ -553,11 +556,8 @@ export function Receive() {
   ];
 
   const historyCols: ColumnsType<GoodsReceipt> = [
-    { title: 'เลขที่ใบ', dataIndex: 'receipt_number', width: 150, render: (v, r) => (
-        <span className={`font-mono ${r.voided_at ? 'line-through text-gray-400' : ''}`}>
-          {v}{r.voided_at ? <Tag className="ml-1" color="default">ยกเลิก</Tag> : null}
-        </span>
-      ) },
+    { title: 'เลขที่ใบ', dataIndex: 'receipt_number', width: 150,
+      render: (v) => <span className="font-mono">{v}</span> },
     { title: 'วันที่รับ', dataIndex: 'received_at', width: 130, render: (v, r) => thDate(v ?? r.created_at).format('DD/MM/YYYY') },
     { title: 'ผู้ขาย', dataIndex: 'supplier', render: (v) => v ?? <Typography.Text type="secondary">—</Typography.Text> },
     { title: 'เลขเอกสาร', dataIndex: 'doc_number', width: 140, render: (v) => v ?? '—' },
@@ -581,23 +581,19 @@ export function Receive() {
               );
             }}
           />
-          {!r.voided_at ? (
-            <>
-              <Button
-                size="small"
-                icon={<RiEditLine className="w-4 h-4" />}
-                title="แก้ไข (ยกเลิกใบเดิม ดึงกลับมาแก้)"
-                onClick={() => doVoid(r, true)}
-              />
-              <Button
-                size="small"
-                danger
-                icon={<RiDeleteBin6Line className="w-4 h-4" />}
-                title="ยกเลิกใบ (ถอนสต๊อกคืน)"
-                onClick={() => doVoid(r, false)}
-              />
-            </>
-          ) : null}
+          <Button
+            size="small"
+            icon={<RiEditLine className="w-4 h-4" />}
+            title="แก้ไข (ลบใบเดิม ดึงกลับมาแก้)"
+            onClick={() => doVoid(r, true)}
+          />
+          <Button
+            size="small"
+            danger
+            icon={<RiDeleteBin6Line className="w-4 h-4" />}
+            title="ลบใบ (ถอนสต๊อกคืน)"
+            onClick={() => doVoid(r, false)}
+          />
         </div>
       ),
     },
