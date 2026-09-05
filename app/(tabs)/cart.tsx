@@ -14,7 +14,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
@@ -217,6 +217,7 @@ export default function CartScreen() {
      (เจ้าของทัก 5 ก.ย. 2026 "ทำไมไม่เป็นสีน้ำเงินครับ") — ส่งสีเข้าคอมโพเนนต์ที่ใช้ร่วมกัน
      แทนการก๊อปหน้าตะกร้าเป็นสองเวอร์ชัน */
   const A = mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
+  const segments = useSegments();
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
@@ -234,6 +235,12 @@ export default function CartScreen() {
   // Minimum-order floor (delivery only) — only relevant once something is ticked.
   const belowMin = !nothingSelected && !meetsMinOrder(mode, subtotal);
   // Online (parcel) needs a parcel-ready address before checkout.
+  /* ★ อยู่ในกลุ่มโหมดหรือเข้ามาจากแถบหลัก ★ ตะกร้าเข้าได้สองทาง: จากแถบล่างของโหมด
+     (/delivery/cart, /online/cart) ซึ่งบอกอยู่แล้วว่านี่คือตะกร้าและโหมดถูกล็อกไว้แล้ว
+     กับจากที่อื่นในแอปซึ่งต้องมีหัวข้อบอกและสลับโหมดได้
+     เดิมเช็กว่า mode === 'online' ซึ่งบังเอิญตรงตอนที่มีแค่ออนไลน์ที่มีแถบล่าง พอ
+     เดลิเวอรี่มีแถบล่างของตัวเอง (5 ก.ย. 2026) การเช็กโหมดเลยผิดทันที */
+  const inModeTabs = segments[0] === 'delivery' || segments[0] === 'online';
   const needsParcel = mode === 'online' && !hasParcelInfo(address);
   /* เดลิเวอรี่ก็ต้องมีชื่อผู้รับ+เบอร์โทร — ที่อยู่ที่มาจากการสแกนพิกัด (0096/จอ
      delivery-check) อาจยังว่างสองช่องนี้ถ้าโปรไฟล์ยังไม่ได้กรอก เจ้าของเลือกไว้ว่า
@@ -398,12 +405,10 @@ export default function CartScreen() {
       {/* โหมดออนไลน์ไม่มีหัวข้อ "ตะกร้าของฉัน" แล้ว (เจ้าของสั่ง 5 ก.ย. 2026) — แถบล่าง
           ของโหมดบอกอยู่แล้วว่านี่คือตะกร้าสินค้า หัวข้อซ้ำอีกทีกินที่เปล่า ๆ
           แถบหลักของแอปยังต้องมี เพราะเข้ามาจากที่อื่นได้และไม่มีอะไรบอกว่าอยู่หน้าไหน */}
-      {mode === 'online' ? null : (
-        <ScreenHeader title={t('cart.title')} style={styles.header} />
-      )}
+      {inModeTabs ? null : <ScreenHeader title={t('cart.title')} style={styles.header} />}
       {/* จำนวนใต้หัวข้อ — โหมดออนไลน์ไม่มีหัวข้อแล้ว บรรทัดนี้เลยลอยเดี่ยว ๆ อยู่บนสุด
           และไปซ้ำกับหัวโซน "รายการสินค้า N รายการ" ที่อยู่ถัดลงไปไม่กี่บรรทัด */}
-      {!isEmpty && mode !== 'online' ? (
+      {!isEmpty && !inModeTabs ? (
         <Text variant="caption" style={styles.headerCount}>
           {items.length} {t('cart.itemsUnit')}
         </Text>
@@ -453,78 +458,54 @@ export default function CartScreen() {
             {/* สวิตช์โหมดไม่มีในโหมดออนไลน์ (เจ้าของสั่ง 5 ก.ย. 2026) — เข้ามาทางแถบล่าง
                 ของโหมดออนไลน์แล้ว โหมดถูกกำหนดไว้ตั้งแต่ต้นทาง ให้สลับตรงนี้ได้อีกจะพา
                 ลูกค้าออกจากโหมดโดยไม่ตั้งใจ */}
-            {mode === 'online' ? null : <ModeSwitch compact style={styles.modeSwitch} />}
+            {inModeTabs ? null : <ModeSwitch compact style={styles.modeSwitch} />}
 
-            {/* Delivery surface (rider address + free-shipping) */}
-            {mode === 'delivery' ? (
-              <View style={styles.deliveryCard}>
+            {/* ── การ์ดที่อยู่ — โครงเดียวกันทั้งสองโหมด ──
+                เจ้าของสั่ง 5 ก.ย. 2026 "content ต้องเหมือน online ครับ แต่สีต้องเป็นสีส้ม"
+                เดิมเดลิเวอรี่ยังเป็นแถวเล็ก ๆ ของดีไซน์เก่า ส่วนออนไลน์ถูกทำใหม่เป็นการ์ด
+                ("ที่อยู่ทำเป็นการ์ดดีๆครับ ตัวเลขชัดเจน ตัวหนังสือชัดเจน") — ตอนนี้ใช้
+                โครงเดียวกัน ต่างแค่ชุดสีกับสิ่งที่ที่อยู่แต่ละแบบต้องมี
+                ★ ต่างกันเท่าที่จำเป็นจริง ★ พัสดุต้องมีจังหวัด+รหัสไปรษณีย์ ส่วนไรเดอร์วิ่ง
+                ตามหมุด ไม่ต้องใช้ และมีแถบส่งฟรีซึ่งออนไลน์ไม่มี */}
+            <View style={[styles.parcelCard, mode === 'delivery' && styles.addrCardGap]}>
+              <View style={styles.parcelHead}>
+                <View style={styles.parcelTag}>
+                  <Ionicons
+                    name={mode === 'online' ? 'cube' : 'bicycle'}
+                    size={14}
+                    color={A.strong}
+                  />
+                  <Text style={styles.parcelTagText}>
+                    {mode === 'online' ? 'ที่อยู่จัดส่งพัสดุ' : 'ที่อยู่จัดส่ง'}
+                  </Text>
+                </View>
                 <PressableScale
                   accessibilityRole="button"
-                  accessibilityLabel={t('cart.selectAddressA11y')}
+                  accessibilityLabel={
+                    mode === 'online' ? t('cart.parcelAddressA11y') : t('cart.selectAddressA11y')
+                  }
                   onPress={() => router.push(address ? '/address' : '/address/picker')}
-                  scaleTo={0.98}
-                  style={styles.addrRow}>
-                  <View style={styles.addrTile}>
-                    <Ionicons name="location-outline" size={20} color={A.strong} />
-                  </View>
-                  <View style={styles.addrBody}>
-                    {address ? (
-                      <>
-                        <Text style={styles.addrTitle} numberOfLines={1}>
-                          {t('cart.deliverTo')} {address.label}
-                        </Text>
-                        <Text variant="caption" numberOfLines={1}>
-                          {address.recipient}   {address.phone}
-                        </Text>
-                        <Text variant="caption" numberOfLines={1}>
-                          {address.line}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.addrTitle}>{t('cart.addAddress')}</Text>
-                        <Text variant="caption">{t('cart.addAddressCap')}</Text>
-                      </>
-                    )}
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+                  hitSlop={8}>
+                  <Text style={[styles.parcelEdit, { color: A.strong }]}>
+                    {address ? 'เปลี่ยน' : 'เพิ่ม'}
+                  </Text>
                 </PressableScale>
-                <View style={styles.insetHairline} />
-                <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} accent={A} />
               </View>
-            ) : (
-              /* Online surface — nationwide parcel address
-                 การ์ดที่อยู่แบบเต็ม (เจ้าของสั่ง 5 ก.ย. 2026 "ที่อยู่ทำเป็นการ์ดดีๆครับ
-                 ตัวเลขชัดเจน ตัวหนังสือชัดเจน") — เดิมเป็นแถวเล็ก ๆ ตัวอักษรจางเท่ากันหมด
-                 อ่านไม่ออกว่าอะไรสำคัญ พัสดุส่งผิดที่เพราะอ่านที่อยู่ผิดคือความเสียหายจริง */
-              <View style={styles.parcelCard}>
-                <View style={styles.parcelHead}>
-                  <View style={styles.parcelTag}>
-                    <Ionicons name="cube" size={14} color={ONLINE_ACCENT.strong} />
-                    <Text style={styles.parcelTagText}>ที่อยู่จัดส่งพัสดุ</Text>
-                  </View>
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel={t('cart.parcelAddressA11y')}
-                    onPress={() => router.push(address ? '/address' : '/address/picker')}
-                    hitSlop={8}>
-                    <Text style={[styles.parcelEdit, { color: ONLINE_ACCENT.strong }]}>
-                      {address ? 'เปลี่ยน' : 'เพิ่ม'}
-                    </Text>
-                  </PressableScale>
-                </View>
 
-                {address && !needsParcel ? (
-                  <>
-                    {/* ชื่อกับเบอร์อยู่บรรทัดเดียวกันแต่คนละน้ำหนัก — เบอร์เป็นตัวเลขที่
-                        พนักงานขนส่งต้องอ่านออกตอนโทรหา ต้องเด่นพอ ๆ กับชื่อ */}
-                    <View style={styles.parcelWho}>
-                      <Text style={styles.parcelName} numberOfLines={1}>
-                        {address.recipient}
-                      </Text>
-                      <Text style={styles.parcelPhone}>{address.phone}</Text>
-                    </View>
-                    <Text style={styles.parcelLine}>{streetOnly(address)}</Text>
+              {address && !needsParcel && !needsContact ? (
+                <>
+                  {/* ชื่อกับเบอร์อยู่บรรทัดเดียวกันแต่คนละน้ำหนัก — เบอร์เป็นตัวเลขที่คนส่ง
+                      ต้องอ่านออกตอนโทรหา ต้องเด่นพอ ๆ กับชื่อ (ไรเดอร์ก็โทรเหมือนกัน) */}
+                  <View style={styles.parcelWho}>
+                    <Text style={styles.parcelName} numberOfLines={1}>
+                      {address.recipient}
+                    </Text>
+                    <Text style={styles.parcelPhone}>{address.phone}</Text>
+                  </View>
+                  <Text style={styles.parcelLine}>{streetOnly(address)}</Text>
+                  {/* ตำบล/อำเภอ/จังหวัด + รหัสไปรษณีย์ มีความหมายเฉพาะกับพัสดุ —
+                      ไรเดอร์วิ่งตามหมุดที่ลูกค้าปักไว้ ไม่ได้อ่านรหัสไปรษณีย์ */}
+                  {mode === 'online' ? (
                     <View style={styles.parcelZone}>
                       <Text style={styles.parcelZoneText} numberOfLines={2}>
                         {[address.subDistrict, address.district, address.province]
@@ -539,26 +520,42 @@ export default function CartScreen() {
                         </View>
                       ) : null}
                     </View>
-                  </>
-                ) : address ? (
-                  <View style={styles.parcelWarn}>
-                    <Ionicons name="alert-circle" size={18} color={Colors.dangerStrong} />
-                    <View style={styles.parcelWarnCopy}>
-                      <Text style={styles.parcelWarnTitle}>{t('cart.parcelIncomplete')}</Text>
-                      <Text variant="caption">{t('cart.parcelIncompleteCap')}</Text>
-                    </View>
+                  ) : null}
+                </>
+              ) : address ? (
+                <View style={styles.parcelWarn}>
+                  <Ionicons name="alert-circle" size={18} color={Colors.dangerStrong} />
+                  <View style={styles.parcelWarnCopy}>
+                    <Text style={styles.parcelWarnTitle}>
+                      {needsContact ? t('cart.needContact') : t('cart.parcelIncomplete')}
+                    </Text>
+                    <Text variant="caption">
+                      {needsContact ? t('cart.addAddressCap') : t('cart.parcelIncompleteCap')}
+                    </Text>
                   </View>
-                ) : (
-                  <View style={styles.parcelWarn}>
-                    <Ionicons name="add-circle-outline" size={18} color={ONLINE_ACCENT.strong} />
-                    <View style={styles.parcelWarnCopy}>
-                      <Text style={styles.parcelWarnTitle}>{t('cart.addParcelAddress')}</Text>
-                      <Text variant="caption">{t('cart.addParcelAddressCap')}</Text>
-                    </View>
+                </View>
+              ) : (
+                <View style={styles.parcelWarn}>
+                  <Ionicons name="add-circle-outline" size={18} color={A.strong} />
+                  <View style={styles.parcelWarnCopy}>
+                    <Text style={styles.parcelWarnTitle}>
+                      {mode === 'online' ? t('cart.addParcelAddress') : t('cart.addAddress')}
+                    </Text>
+                    <Text variant="caption">
+                      {mode === 'online' ? t('cart.addParcelAddressCap') : t('cart.addAddressCap')}
+                    </Text>
                   </View>
-                )}
-              </View>
-            )}
+                </View>
+              )}
+
+              {/* ส่งฟรีเมื่อถึงยอด — มีเฉพาะเดลิเวอรี่ (พัสดุคิดค่าส่งตามจริงเสมอ) */}
+              {mode === 'delivery' ? (
+                <>
+                  <View style={styles.insetHairline} />
+                  <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} accent={A} />
+                </>
+              ) : null}
+            </View>
 
             {/* Items ledger */}
             {/* ★ นับให้ตรงหน่วย ★ เดิมใช้จำนวน "บรรทัด" แต่เขียนหน่วยว่า "ชิ้น" — ตะกร้า
@@ -828,6 +825,9 @@ const styles = StyleSheet.create({
     gap: 6,
     ...Shadow.card,
   },
+  /* เดลิเวอรี่มีแถบส่งฟรีต่อท้ายในการ์ดเดียวกัน เว้นล่างไว้ไม่ให้ชนหัวโซนถัดไป
+     (ฝั่งออนไลน์ระยะมาจาก marginTop ของหัวโซนอยู่แล้ว) */
+  addrCardGap: { marginBottom: Spacing.sm },
   parcelHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   parcelTag: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   parcelTagText: { fontFamily: 'Mitr_500Medium', fontSize: 13, color: Colors.textMuted },
@@ -912,39 +912,9 @@ const styles = StyleSheet.create({
     color: Colors.dangerStrong,
   },
 
-  /* Delivery surface */
-  deliveryCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-    marginBottom: Spacing.x2,
-    ...Shadow.card,
-  },
-  addrRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.lg,
-  },
-  addrTile: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addrBody: {
-    flex: 1,
-    gap: 1,
-  },
-  addrTitle: {
-    ...Typography.bodyStrong,
-    color: Colors.text,
-  },
-  addrWarn: {
-    color: Colors.dangerStrong,
-  },
+  /* แถวที่อยู่ของดีไซน์เก่าฝั่งเดลิเวอรี่ (deliveryCard/addrRow/addrTile/...) ถูกลบทิ้ง
+     พร้อมกับที่รวมการ์ดที่อยู่เป็นโครงเดียวกันสองโหมด — สไตล์ที่ไม่มีใครใช้แล้วทิ้งไว้
+     คนอ่านทีหลังจะไม่รู้ว่าอันไหนของจริง */
   insetHairline: {
     height: 1,
     backgroundColor: Colors.border,

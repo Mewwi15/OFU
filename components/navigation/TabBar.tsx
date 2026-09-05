@@ -9,10 +9,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBadge } from '@/components/navigation/CartBadge';
+import { useCartFly } from '@/store/cartFly';
 import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
@@ -78,6 +80,29 @@ export function TabBar({
   const t = useT();
   const insets = useSafeAreaInsets();
   const isDesktopWeb = useIsDesktopWeb();
+  /* บอกตำแหน่งปุ่มตะกร้าให้ชั้นที่วาดของบินรู้ — ไม่ได้เดาพิกัดจากขนาดจอ เพราะแถบล่าง
+     ขยับตามขอบล่างของเครื่องแต่ละรุ่น และมีสองชุด (เดลิเวอรี่/ออนไลน์) */
+  const setFlyTarget = useCartFly((s) => s.setTarget);
+  /* ★ แถบไหนไม่มีตะกร้า ก็ต้องไม่มีปลายทาง ★ แถบหลักของแอปยกช่อง "คำสั่งซื้อ" ขึ้นกลาง
+     ไม่ใช่ตะกร้า — ถ้าปล่อยปลายทางเก่าจากแถบของโหมดค้างไว้ ของจะบินไปกองตรงปุ่มที่ไม่ใช่
+     ตะกร้า · ล้างตอนถอดแถบด้วย เพราะออกจากโหมดแล้วแถบนั้นหายไปทั้งอัน */
+  const hasCartTab = state.routes.some((r) => r.name === cartRoute && (tabs ?? TABS)[r.name]);
+  useEffect(() => {
+    if (!hasCartTab) setFlyTarget(null);
+    return () => setFlyTarget(null);
+  }, [hasCartTab, setFlyTarget]);
+
+  const measureCart = useCallback(
+    (e: LayoutChangeEvent) => {
+      const el = e.target as unknown as {
+        measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+      };
+      el.measureInWindow?.((x, y, w, h) => {
+        if (w && h) setFlyTarget({ x: x + w / 2, y: y + h / 2 });
+      });
+    },
+    [setFlyTarget],
+  );
 
   // Desktop web navigates via the SiteHeader — no floating tab bar.
   if (isDesktopWeb) return null;
@@ -87,7 +112,13 @@ export function TabBar({
       pointerEvents="box-none"
       style={[
         styles.wrap,
-        { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+        /* ★ ไม่เว้นเต็มขอบล่างของเครื่อง ★ iPhone รุ่นมีแถบโฮมรายงานขอบล่างมา 34pt
+           เว้นเต็มตามนั้นแล้วไอคอนกับตัวหนังสือลอยห่างจากพื้นจอจนดูเหมือนแถบยังไม่ติดขอบ
+           (เจ้าของทัก 5 ก.ย. 2026 "มันยังห่างจากพื้นอยู่เลย ลองเป็นเข้าไปได้หน่อย")
+           ครึ่งเดียวพอ — ยังไม่ทับแถบโฮม แต่แถบแนบพื้นจอขึ้นชัด
+           เครื่องที่ไม่มีแถบโฮม (Android ปุ่มจริง / เว็บ) ขอบล่างเป็น 0 อยู่แล้ว
+           จึงต้องมีค่าต่ำสุดกันไม่ให้ตัวหนังสือไปติดขอบจอพอดี */
+        { paddingBottom: Math.max(insets.bottom / 2, Spacing.sm) },
       ]}>
       <View style={styles.bar}>
         {state.routes.map((route, index) => {
@@ -131,6 +162,7 @@ export function TabBar({
                 onLongPress={onLongPress}
                 style={styles.raisedItem}>
                 <View
+                  onLayout={route.name === cartRoute ? measureCart : undefined}
                   style={[
                     styles.raisedDisc,
                     { backgroundColor: isFocused ? accent.strong : accent.solid },

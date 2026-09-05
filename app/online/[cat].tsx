@@ -39,12 +39,14 @@ const SKELETON_ROWS = Array.from({ length: 6 }, (_, i) => ({ id: `sk-${i}` }) as
 
 export default function DeliveryCategory() {
   const insets = useSafeAreaInsets();
-  const { cat } = useLocalSearchParams<{ cat?: string }>();
+  /* focus=1 มาจากช่องค้นหาบนหน้าร้าน — เปิดแป้นพิมพ์ให้เลย ไม่ต้องกดช่องค้นหาซ้ำ
+     q = คำค้นตั้งต้น เผื่อวันหลังมีทางเข้าที่ส่งคำค้นมาด้วย (เช่น กดคำค้นยอดนิยม) */
+  const { cat, q, focus } = useLocalSearchParams<{ cat?: string; q?: string; focus?: string }>();
   const category = cat ?? ALL_CATEGORY;
   const products = useCatalog((s) => s.products);
   /* เช็ค loaded ไม่ใช่ loading — loading เป็น false ทั้งตอนยังไม่เริ่มและตอนเสร็จแล้ว */
   const catalogLoaded = useCatalog((s) => s.loaded);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(q ?? '');
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -91,7 +93,7 @@ export default function DeliveryCategory() {
               color={ONLINE_INK}
               style={styles.glassBtn}
               accessibilityLabel="ตะกร้า"
-              onPress={() => router.push('/cart')}
+              onPress={() => router.push('/online/cart')}
             />
             <CartBadge />
           </View>
@@ -99,6 +101,8 @@ export default function DeliveryCategory() {
         <SearchBar
           value={query}
           onChangeText={setQuery}
+          autoFocus={focus === '1'}
+          returnKeyType="search"
           placeholder={`ค้นหาใน${category}`}
           containerStyle={styles.search}
         />

@@ -400,15 +400,48 @@ export default function DeliveryHome() {
           styles.searchFloat,
           { top: headEff - SEARCH_H / 2, opacity: searchO, transform: [{ translateY: searchY }] },
         ]}>
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          placeholder="ค้นหาสินค้าที่อยากได้"
-          containerStyle={styles.search}
-        />
+        {/* ★ ช่องค้นหาที่กดแล้วค้นได้จริง ★ เจ้าของทัก 5 ก.ย. 2026 "ตรงค้นหาของ Delivery
+            และออนไลน์ทำให้ค้นหาได้ด้วย" — เดิมพิมพ์ได้แต่ไม่มีอะไรเกิดขึ้น เพราะหน้านี้
+            ไม่มีที่แสดงผลลัพธ์ (เป็นหน้าโปรโมชั่น: แบนเนอร์ หมวดหมู่ ขายดี)
+            กดแล้วพาไปหน้ารายการสินค้าทั้งหมดพร้อมเปิดแป้นพิมพ์ให้เลย ที่นั่นมีการค้นหา
+            ที่ทำงานอยู่แล้ว — ทำผลลัพธ์ซ้ำอีกชุดบนหน้านี้คือมีสองที่ให้แก้เวลาต้องแก้
+            ไม่ให้พิมพ์ตรงนี้ (editable={false}) เพราะพิมพ์ได้แต่ไม่มีผลลัพธ์คือสิ่งที่พัง
+            อยู่เดิม — กดแล้วเด้งไปทันทีตั้งแต่ตัวอักษรแรกยังไม่ทันพิมพ์ */}
+        <Pressable
+          accessibilityRole="search"
+          accessibilityLabel="ค้นหาสินค้า"
+          /* ★ ต้องส่งต่อ flex ทุกชั้น ★ แถบค้นหายืดเต็มความกว้างด้วย flex: 1 ที่ตัวมันเอง
+             ห่อด้วยกล่องที่ไม่มี flex เมื่อไหร่ มันจะหดเหลือเท่าไอคอนแว่นขยายทันที */
+          style={styles.searchPress}
+          onPress={() =>
+            router.push({
+              pathname: '/delivery/[cat]',
+              params: { cat: ALL_CATEGORY, focus: '1' },
+            })
+          }>
+          {/* ★ ห้ามใส่ flex ที่ชั้นนี้ ★ กล่องนี้อยู่ในแนวตั้งของ Pressable ที่สูงตามเนื้อหา
+              — flex: 1 ในกล่องที่แม่ไม่มีความสูงตายตัวจะยุบเหลือ 0 ช่องค้นหายังวาดออกมา
+              ครบเพราะล้นออกนอกกรอบได้ แต่กรอบที่รับการกดสูง 0 กดยังไงก็ไม่ติด
+              (เจอตอนทดสอบบนซิม 5 ก.ย. 2026 — เห็นเต็มตาแต่กดไม่ติดสักที) */}
+          <View pointerEvents="none">
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              editable={false}
+              placeholder="ค้นหาสินค้าที่อยากได้"
+              containerStyle={styles.search}
+            />
+          </View>
+        </Pressable>
       </Animated.View>
 
       <View
+        /* ★ แถบหัวจอต้องปล่อยการกดผ่านตรงที่ไม่มีปุ่ม ★ มันเป็นกล่องทึบวางทับทั้งแถบบน
+           รวมถึงครึ่งบนของช่องค้นหาที่คร่อมขอบอยู่ — ค่าเริ่มต้นของกล่องคือ "กินการกด"
+           แม้ตรงนั้นจะไม่มีปุ่มอะไรเลย ตอนช่องค้นหายังกดไม่ได้ก็ไม่มีใครรู้ พอทำให้กดค้นหา
+           ได้ (5 ก.ย. 2026) กดเท่าไหร่ก็ไม่ติด เพราะโดนกล่องนี้กินไปหมด
+           box-none = กล่องนี้ไม่รับการกดเอง แต่ปุ่มย้อนกลับ/ตะกร้า/ที่อยู่ข้างในยังกดได้ */
+        pointerEvents="box-none"
         style={[styles.head, { paddingTop: insets.top + HEAD_PAD_TOP }]}
         onLayout={(e) => setHeadH(e.nativeEvent.layout.height)}>
         <View style={styles.headRow}>
@@ -434,7 +467,7 @@ export default function DeliveryHome() {
               color={HEAD_INK}
               style={styles.glassBtn}
               accessibilityLabel="ตะกร้า"
-              onPress={() => router.push('/cart')}
+              onPress={() => router.push('/delivery/cart')}
             />
             <CartBadge />
           </View>
@@ -514,9 +547,15 @@ const styles = StyleSheet.create({
     left: Spacing.lg,
     right: Spacing.lg,
     flexDirection: 'row',
+    /* ★ ต้องอยู่ชั้นบนสุดจริง ๆ ไม่ใช่แค่ดูเหมือนอยู่บน ★ แถบหัวจอถูกวาดทีหลังจึงทับ
+       ช่องค้นหาอยู่ตรงครึ่งบนที่คร่อมกันพอดี ตอนเป็นแค่กล่องเปล่าไม่มีใครรู้ พอทำให้กด
+       ค้นหาได้ (5 ก.ย. 2026) การกดครึ่งบนของช่องเลยตกไปโดนแถวที่อยู่ข้างหลังแทน */
+    zIndex: 2,
+    elevation: 2,
   },
   /* เงาต้องอยู่ที่ตัวช่องค้นหาเอง ไม่ใช่ที่กรอบนอกที่ครอบมันอยู่ — กรอบนอกพื้นใส
      iOS จะไม่วาดเงาให้วิวที่ไม่มีพื้น */
+  searchPress: { flex: 1 },
   search: { flex: 1, height: SEARCH_H, borderRadius: Radius.sm, ...Shadow.float },
   scroll: { backgroundColor: 'transparent' },
   sheet: {

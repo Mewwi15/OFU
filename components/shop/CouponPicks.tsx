@@ -8,8 +8,10 @@
  * ใช้ตั๋วใบเดียวกับแท็บคูปอง (components/shop/CouponTicket.tsx) ไม่ได้ทำทรงใหม่ —
  * ลูกค้าเห็นคูปองใบเดียวกันสองที่ ต้องหน้าตาเหมือนกันเป๊ะ
  *
- * โชว์แค่ MAX ใบแล้วให้กด "ดูทั้งหมด" ไปแท็บคูปอง — หน้าแรกเป็นทางเข้า ไม่ใช่รายการเต็ม
- * ถ้ามีคูปอง 12 ใบแล้วเรียงหมดบนหน้าแรก แบนเนอร์ที่อยู่ถัดลงไปจะไม่มีใครเลื่อนไปเห็น
+ * ★ แถวเดียวเลื่อนแนวนอน ★ (เจ้าของสั่ง 5 ก.ย. 2026 "ตรงคูปองมันต้องเป็นแถวเดียว
+ * อะไรใช้แล้วให้ไปต่อท้าย") — เดิมเรียงลงมาเป็นตั้ง คูปองสองสามใบก็ดันแบนเนอร์กับสินค้า
+ * ขายดีตกจอไปหมด แถวเดียวกินความสูงเท่าใบเดียวไม่ว่าจะมีกี่ใบ
+ * ใบถัดไปโผล่ขอบมาให้เห็นนิดหนึ่ง เป็นสัญญาณว่าเลื่อนต่อได้ ไม่ต้องมีลูกศรบอก
  *
  * ★ ไม่มีคูปองก็ยังยึดตำแหน่งไว้ ★ (เจ้าของสั่ง 4 ก.ย. 2026 "ตำแหน่งนั้นต้องเป็นคูปอง
  * ครับผม และด้านล่างเป็นแบรนเนอร์") — ตอนแรกทำให้ซ่อนทั้งบล็อกเมื่อไม่มีคูปอง ผลคือ
@@ -23,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { CouponTicket, CouponTicketSkeleton } from '@/components/shop/CouponTicket';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -36,6 +38,9 @@ import { claimCoupon, listCoupons, type Coupon } from '@/lib/data/coupons';
 /** โชว์กี่ใบบนหน้าแรก — ที่เหลือไปดูที่แท็บคูปอง */
 const MAX = 3;
 
+/** เผื่อไว้ให้ใบถัดไปโผล่ขอบมา — สัญญาณว่ายังเลื่อนต่อได้ */
+const PEEK = 30;
+
 export type CouponPicksProps = {
   /** สีพื้นของหน้าจอ — ตั๋วใช้วาดรอยบาก (ดูเหตุผลใน CouponTicket) */
   notchColor: string;
@@ -45,6 +50,10 @@ export type CouponPicksProps = {
 
 export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksProps) {
   const router = useRouter();
+  /* ความกว้างใบ = เต็มความกว้างเนื้อหา ลบส่วนที่เผื่อให้ใบถัดไปโผล่มา
+     คิดจากความกว้างจอจริง ไม่ใช่เลขตายตัว — จอเล็กอย่าง SE กับจอใหญ่ต้องได้สัดส่วนเดียวกัน */
+  const { width } = useWindowDimensions();
+  const cardW = width - Spacing.lg * 2 - PEEK;
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState<{ key: number; msg: string; sub?: string } | null>(null);
@@ -120,10 +129,10 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
         ) : null}
       </View>
 
-      <View style={styles.list}>
-        {empty ? (
-          /* ใบเปล่าทรงเดียวกับตั๋วจริง — บอกตรง ๆ ว่าตอนนี้ยังไม่มี ดีกว่าปล่อยช่องว่าง
-             ให้เดาว่าแอปพังหรือโหลดไม่ขึ้น และคนที่เคยเห็นคูปองตรงนี้จะได้รู้ว่ากลับมาดูได้ */
+      {empty ? (
+        <View style={styles.list}>
+          {/* ใบเปล่าทรงเดียวกับตั๋วจริง — บอกตรง ๆ ว่าตอนนี้ยังไม่มี ดีกว่าปล่อยช่องว่าง
+              ให้เดาว่าแอปพังหรือโหลดไม่ขึ้น และคนที่เคยเห็นคูปองตรงนี้จะได้รู้ว่ากลับมาดูได้ */}
           <View style={[styles.emptyCard, { borderColor: accent.tint }]}>
             <Ionicons name="pricetag-outline" size={26} color={accent.strong} />
             <View style={styles.emptyCopy}>
@@ -131,23 +140,36 @@ export function CouponPicks({ notchColor, accent = BRAND_ACCENT }: CouponPicksPr
               <Text style={styles.emptyBody}>มีโปรใหม่เมื่อไหร่จะขึ้นตรงนี้</Text>
             </View>
           </View>
-        ) : null}
-        {!loaded
-          ? [0, 1].map((i) => <CouponTicketSkeleton key={i} accent={accent} />)
-          : ordered
-              .slice(0, MAX)
-              .map((c) => (
-                <CouponTicket
-                  key={c.id}
-                  coupon={c}
-                  notchColor={notchColor}
-                  accent={accent}
-                  busy={busyId === c.id}
-                  dimmed={c.claimed}
-                  onPress={() => void press(c)}
-                />
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          /* หยุดทีละใบ ไม่ให้ค้างคาครึ่งใบ — ตั๋วเป็นของที่ต้องอ่านทั้งใบถึงจะตัดสินใจได้ */
+          snapToInterval={cardW + Spacing.md}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          contentContainerStyle={styles.rail}>
+          {!loaded
+            ? [0, 1].map((i) => (
+                <View key={i} style={{ width: cardW }}>
+                  <CouponTicketSkeleton accent={accent} />
+                </View>
+              ))
+            : ordered.slice(0, MAX).map((c) => (
+                <View key={c.id} style={{ width: cardW }}>
+                  <CouponTicket
+                    coupon={c}
+                    notchColor={notchColor}
+                    accent={accent}
+                    busy={busyId === c.id}
+                    dimmed={c.claimed}
+                    onPress={() => void press(c)}
+                  />
+                </View>
               ))}
-      </View>
+        </ScrollView>
+      )}
 
       {toast ? (
         <Toast
@@ -184,6 +206,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   list: { gap: Spacing.md },
+  /* ระยะห่างระหว่างใบ + เว้นท้ายแถวให้ใบสุดท้ายไม่ชนขอบจอตอนเลื่อนสุด */
+  rail: { gap: Spacing.md, paddingRight: Spacing.lg },
   /* เส้นประรอบใบเปล่า — สื่อว่า "ช่องนี้รอของอยู่" ไม่ใช่การ์ดจริงที่กดได้
      ที่นี่ใช้ dashed ได้เพราะกำหนดขอบครบทุกด้าน (ต่างจากเส้นปรุของตั๋วที่ต้องการ
      ด้านเดียว RN จึงวาดให้ไม่ได้) */

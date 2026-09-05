@@ -10,10 +10,12 @@
  * หน้าโค้ดส่วนลด / ตะกร้า / บัญชี ใช้จอเดิมทั้งดุ้น ไม่ได้ก๊อป — ดูไฟล์ในโฟลเดอร์นี้
  */
 
-import { Tabs } from 'expo-router';
+import { Tabs, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 import { TabBar } from '@/components/navigation/TabBar';
 import { ONLINE_ACCENT } from '@/constants/online';
+import { useMode } from '@/store/mode';
 
 /** เมนูทั้งห้า — ชื่อและลำดับตามที่เจ้าของสั่งมาเป๊ะ ไม่ใช่คำสั้นแบบแถบหลักของแอป */
 const ONLINE_TABS = {
@@ -52,7 +54,18 @@ const ONLINE_TABS = {
   },
 };
 
+/** เข้ากลุ่มนี้ = อยู่โหมดออนไลน์ — เหตุผลเดียวกับฝั่งเดลิเวอรี่ (ดู app/delivery/_layout.tsx) */
+function useLockOnlineMode() {
+  useFocusEffect(
+    useCallback(() => {
+      if (useMode.getState().mode !== 'online') useMode.getState().setMode('online');
+    }, []),
+  );
+}
+
 export default function OnlineLayout() {
+  useLockOnlineMode();
+
   return (
     <Tabs
       /* น้ำเงินตามโหมด ไม่ใช่ส้มของแบรนด์ — ทั้งโหมดเป็นน้ำเงินหมดแล้ว แถบล่างเป็น

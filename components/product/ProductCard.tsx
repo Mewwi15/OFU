@@ -23,6 +23,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useRef } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   FadeIn,
@@ -40,6 +41,7 @@ import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { productThumb } from '@/lib/image';
 import { useCart } from '@/store/cart';
+import { useCartFly } from '@/store/cartFly';
 import { useFavorites } from '@/store/favorites';
 
 export type ProductCardProps = {
@@ -72,6 +74,10 @@ export function ProductCard({
   const router = useRouter();
   const add = useCart((s) => s.add);
   const bump = useSharedValue(1);
+  /* กรอบรูปบนการ์ด — ใช้วัดว่ารูปอยู่ตรงไหนของจอตอนกด เพื่อให้ภาพที่บินออกไปเริ่มจาก
+     ตำแหน่งเดียวกับรูปที่คนเพิ่งกดพอดี ไม่ใช่โผล่มาจากที่อื่น */
+  const imgRef = useRef<View>(null);
+  const launch = useCartFly((s) => s.launch);
   /* อ่านเป็น boolean ไม่ใช่ทั้งชุด id — ถ้า subscribe ทั้งชุด การ์ดทุกใบในกริดจะเรนเดอร์
      ใหม่ทุกครั้งที่มีการกดหัวใจใบใดใบหนึ่ง (หน้าหมวดหมู่มีสินค้าหลายร้อยใบ) */
   const isFav = useFavorites((s) => s.ids.includes(product.id));
@@ -87,6 +93,17 @@ export function ProductCard({
     }
     add(product);
     bump.value = withSequence(withSpring(1.3, { damping: 9, stiffness: 380 }), withSpring(1));
+    /* ★ ของบินเข้าตะกร้า ★ (เจ้าของสั่ง 5 ก.ย. 2026 "พอกดแล้วทำอนิเมชันสินค้าวิ่งเข้าไป
+       ในตะกร้าหน่อย เพื่อเป็นการบ่งบอกว่าเราเลือกแล้ว")
+       วัดตำแหน่งตอนกด ไม่ใช่ตอนวาด — การ์ดอยู่ในรายการที่เลื่อนได้ ตำแหน่งเปลี่ยนตลอด
+       การวัดจะได้ผลหลังเฟรมถัดไป ระหว่างนั้นของถูกใส่ตะกร้าไปแล้ว ภาพบินจึงเป็นแค่การ
+       บอกผล ถ้าวัดไม่ได้ (เช่นการ์ดหลุดจอไปแล้ว) ก็แค่ไม่มีภาพบิน ของยังเข้าตะกร้าปกติ */
+    const uri = productThumb(product.images[0], 400);
+    if (!uri) return; // สินค้าที่ยังไม่มีรูป ไม่มีอะไรให้บิน — ปุ่มเด้งอย่างเดียวพอ
+    imgRef.current?.measureInWindow((x, y, w, h) => {
+      if (!w || !h) return;
+      launch(uri, { x: x + w / 2, y: y + h / 2 }, w);
+    });
   };
 
   const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
@@ -96,7 +113,7 @@ export function ProductCard({
       entering={FadeIn.delay(Math.min(index, 8) * 55).duration(320)}
       style={[styles.wrapper, style]}>
       <PressableScale accessibilityRole="button" onPress={open} style={styles.card}>
-        <View>
+        <View ref={imgRef} collapsable={false}>
           <Image
             source={{ uri: productThumb(product.images[0], 400) }}
             style={[styles.image, { backgroundColor: accent.tint }, soldOut && styles.imageDimmed]}

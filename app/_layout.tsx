@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
+import { CartFlyLayer } from '@/components/shop/CartFlyLayer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SiteShell } from '@/components/web/SiteShell';
 import { supabase } from '@/lib/supabase/client';
@@ -226,10 +227,9 @@ export default function RootLayout() {
             <Stack.Protected guard={showApp}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="product/[id]" />
-              <Stack.Screen name="delivery/index" />
-              <Stack.Screen name="delivery/[cat]" />
-              {/* โหมดออนไลน์มีแถบล่างของตัวเอง (app/online/_layout.tsx) จึงลงทะเบียน
-                  เป็นกลุ่มเดียว ไม่ใช่ทีละหน้าเหมือนเดิม */}
+              {/* ทั้งสองโหมดมีแถบล่างของตัวเอง (app/<โหมด>/_layout.tsx) จึงลงทะเบียน
+                  เป็นกลุ่มเดียว ไม่ใช่ทีละหน้า */}
+              <Stack.Screen name="delivery" />
               <Stack.Screen name="online" />
               {/* เต็มจอ ไม่ใช่โมดัลอีกต่อไป (เจ้าของสั่ง 3 ก.ย. 2026 "ทำให้หน้าเต็มจอไปเลย")
                   โมดัลเดิมเผยให้เห็นขอบจอด้านหลังโปร่งแสง ซึ่งขัดกับพื้นไล่สีส้มเต็มจอ
@@ -263,6 +263,9 @@ export default function RootLayout() {
             <Stack.Screen name="auth-callback" />
           </Stack>
           </ErrorBoundary>
+          {/* ★ นอก Stack ★ รูปสินค้าที่บินเข้าตะกร้าต้องวาดทับทุกหน้าและไม่โดนกรอบของ
+              รายการที่เลื่อนอยู่ตัดหาย — วางไว้ในนี้ชั้นเดียว ทุกหน้าใช้ร่วมกัน */}
+          <CartFlyLayer />
           </SiteShell>
           <StatusBar style="auto" />
         </ThemeProvider>
