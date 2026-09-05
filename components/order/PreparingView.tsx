@@ -19,6 +19,8 @@ import { Breathing } from '@/components/ui/Breathing';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { TrackedOrder } from '@/data/fulfillment';
 import { money } from '@/lib/format';
@@ -82,6 +84,9 @@ function StepStrip({ awaitingSlip, isSlipFlow }: { awaitingSlip: boolean; isSlip
 }
 
 export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }: Props) {
+  /* สีของหน้าตามโหมดของ "ออเดอร์ใบนี้" ไม่ใช่โหมดที่แอปอยู่ตอนนี้ (ดูเหตุผลที่
+     TrackedOrder.mode) — ออเดอร์เก่าที่ยังไม่มีฟิลด์นี้ถือเป็นเดลิเวอรี่ตามเดิม */
+  const A = order.mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
   const insets = useSafeAreaInsets();
   const t = useT();
   const isSlipFlow = order.paymentMethod === 'promptpay_slip';
@@ -113,7 +118,7 @@ export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }
         <Animated.View entering={FadeInDown.delay(70).springify().damping(18)} style={styles.shopCard}>
           <View style={styles.shopTop}>
             <View style={styles.shopAvatar}>
-              <Ionicons name="storefront" size={20} color={Colors.primaryStrong} />
+              <Ionicons name="storefront" size={20} color={A.strong} />
             </View>
             <Text style={styles.shopName} numberOfLines={1}>
               {order.shopName}
@@ -164,7 +169,7 @@ export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }
               </View>
             ) : (
               <View style={styles.thumbFallback}>
-                <Ionicons name="bag-handle-outline" size={20} color={Colors.primaryStrong} />
+                <Ionicons name="bag-handle-outline" size={20} color={A.strong} />
               </View>
             )}
             <View style={styles.sumText}>
@@ -187,7 +192,7 @@ export function PreparingView({ order, onClose, onCancel, awaitingSlip = false }
         {/* Delivery address + ETA */}
         <Animated.View entering={FadeInDown.delay(210).springify().damping(18)} style={styles.addrCard}>
           <View style={styles.addrPin}>
-            <Ionicons name="home" size={18} color={Colors.primaryStrong} />
+            <Ionicons name="home" size={18} color={A.strong} />
           </View>
           <View style={styles.addrText}>
             <Text variant="caption">{t('track.deliverTo')}</Text>

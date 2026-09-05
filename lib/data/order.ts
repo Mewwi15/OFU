@@ -265,6 +265,7 @@ function toTracked(r: OrderRow): TrackedOrder {
     .filter((p): p is string => !!p)
     .slice(0, 4);
   return {
+    mode: r.shop_mode === 'online' ? 'online' : 'delivery',
     id: r.order_number,
     orderId: r.id,
     cancelReason: r.cancel_reason ?? undefined,

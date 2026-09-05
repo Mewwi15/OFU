@@ -32,6 +32,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { TrackedOrder } from '@/data/fulfillment';
 import { money } from '@/lib/format';
@@ -91,6 +93,9 @@ type Props = {
 };
 
 export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Props) {
+  /* สีของหน้าตามโหมดของ "ออเดอร์ใบนี้" ไม่ใช่โหมดที่แอปอยู่ตอนนี้ (ดูเหตุผลที่
+     TrackedOrder.mode) — ออเดอร์เก่าที่ยังไม่มีฟิลด์นี้ถือเป็นเดลิเวอรี่ตามเดิม */
+  const A = order.mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
   const insets = useSafeAreaInsets();
   const t = useT();
   const [stars, setStars] = useState(0);
@@ -119,7 +124,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
         <Animated.View entering={FadeInDown.delay(80).springify().damping(18)} style={styles.orderCard}>
           <View style={styles.orderTop}>
             <View style={styles.shopAvatar}>
-              <Ionicons name="storefront" size={20} color={Colors.primaryStrong} />
+              <Ionicons name="storefront" size={20} color={A.strong} />
             </View>
             <Text style={styles.shopName} numberOfLines={1}>
               {order.shopName}
@@ -137,7 +142,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
               </View>
             </View>
             <View style={styles.orderIcon}>
-              <Ionicons name="basket" size={26} color={Colors.primary} />
+              <Ionicons name="basket" size={26} color={A.solid} />
             </View>
           </View>
         </Animated.View>
@@ -169,7 +174,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
                 <Text style={styles.riderName} numberOfLines={1}>
                   {order.rider.name}
                 </Text>
-                <Ionicons name="shield-checkmark" size={14} color={Colors.primaryStrong} />
+                <Ionicons name="shield-checkmark" size={14} color={A.strong} />
               </View>
             </View>
             <PressableScale
@@ -177,7 +182,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
               accessibilityLabel={t('track.chatRiderA11y')}
               onPress={onChat}
               style={styles.riderAction}>
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primaryStrong} />
+              <Ionicons name="chatbubble-ellipses-outline" size={20} color={A.strong} />
             </PressableScale>
             {!!order.rider.phone && (
               <PressableScale
@@ -185,7 +190,7 @@ export function DeliveredView({ order, onClose, onChat, onCall, onSubmit }: Prop
                 accessibilityLabel={t('track.callRiderA11y')}
                 onPress={onCall}
                 style={styles.riderAction}>
-                <Ionicons name="call-outline" size={20} color={Colors.primaryStrong} />
+                <Ionicons name="call-outline" size={20} color={A.strong} />
               </PressableScale>
             )}
           </View>

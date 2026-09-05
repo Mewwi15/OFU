@@ -707,6 +707,7 @@ export default function CheckoutScreen() {
               ? t('checkout.successCod')
               : t('checkout.successPrepay')
           }
+          accent={A}
           actionLabel={t('checkout.done')}
           onAction={finishSuccess}
           onHide={finishSuccess}
@@ -717,6 +718,7 @@ export default function CheckoutScreen() {
       {/* Copied toast */}
       {copied ? (
         <Toast
+          accent={A}
           message={t('checkout.copied')}
           subtitle={t('checkout.copiedSub')}
           onHide={() => setCopied(false)}

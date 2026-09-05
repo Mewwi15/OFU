@@ -19,6 +19,8 @@ import { Breathing } from '@/components/ui/Breathing';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import {
   EXCEPTION_META,
@@ -51,6 +53,9 @@ type Props = {
 };
 
 export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }: Props) {
+  /* สีของหน้าตามโหมดของ "ออเดอร์ใบนี้" ไม่ใช่โหมดที่แอปอยู่ตอนนี้ (ดูเหตุผลที่
+     TrackedOrder.mode) — ออเดอร์เก่าที่ยังไม่มีฟิลด์นี้ถือเป็นเดลิเวอรี่ตามเดิม */
+  const A = order.mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
   const insets = useSafeAreaInsets();
   const t = useT();
   const [copied, setCopied] = useState(false);
@@ -108,7 +113,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
                   accessibilityIgnoresInvertColors
                 />
               ) : (
-                <Ionicons name="cube" size={48} color={Colors.primaryStrong} />
+                <Ionicons name="cube" size={48} color={A.strong} />
               )}
             </Breathing>
           )}
@@ -161,7 +166,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
                 <Ionicons
                   name={copied ? 'checkmark' : 'copy-outline'}
                   size={15}
-                  color={Colors.primaryStrong}
+                  color={A.strong}
                 />
                 <Text style={styles.copyText}>{copied ? t('track.copied') : t('track.copy')}</Text>
               </Pressable>
@@ -238,7 +243,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
         {/* Destination */}
         <Animated.View entering={FadeInDown.delay(180).springify().damping(18)} style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={18} color={Colors.primaryStrong} />
+            <Ionicons name="location-outline" size={18} color={A.strong} />
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
                 {t('track.deliverToLabel')} · {order.addressLabel}
@@ -250,7 +255,7 @@ export function ParcelTrackingView({ order, onClose, onArrived, onDone, onHelp }
           </View>
           <View style={styles.infoHairline} />
           <View style={styles.infoRow}>
-            <Ionicons name="receipt-outline" size={18} color={Colors.primaryStrong} />
+            <Ionicons name="receipt-outline" size={18} color={A.strong} />
             <View style={styles.flexOne}>
               <Text variant="caption" style={styles.muted}>
                 {order.id} · {order.itemCount} {t('track.itemsUnit')}

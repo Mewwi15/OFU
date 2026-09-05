@@ -190,6 +190,14 @@ export type TrackedOrder = {
       address without dropping a pin, which the tracking map has to survive. */
   destination?: LatLng;
   shopName: string;
+  /**
+   * โหมดที่สั่งออเดอร์นี้ — ใช้เลือกชุดสีของหน้าติดตามออเดอร์
+   *
+   * ★ สีต้องมาจากออเดอร์ ไม่ใช่จากโหมดที่แอปอยู่ตอนนี้ ★ ลูกค้าเปิดดูออเดอร์เดลิเวอรี่เก่า
+   * ขณะกำลังช้อปในโหมดออนไลน์ได้ ถ้าใช้โหมดปัจจุบัน หน้าออเดอร์นั้นจะกลายเป็นน้ำเงิน
+   * ทั้งที่เป็นออเดอร์เดลิเวอรี่
+   */
+  mode?: 'delivery' | 'online';
   status: OrderStatus;
   /** Human ETA window, e.g. "30-45 นาที". */
   etaText: string;
