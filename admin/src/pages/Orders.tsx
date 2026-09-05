@@ -46,6 +46,9 @@ import {
   type SlipRejectReason,
 } from '../lib/orders';
 import { printAddressLabel, printPickList } from '../lib/printOrder';
+import { getShopInfo, type ShopInfo } from '../lib/api';
+import { Receipt } from '../components/Receipt';
+import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { ORDERS_CHANGED_EVT } from '../components/OrderAlerts';
 import { RiderPanel } from '../components/RiderPanel';
 
@@ -536,6 +539,14 @@ function OrderDrawer({
   const [trackingNo, setTrackingNo] = useState<string | null>(null);
   const [shipOpen, setShipOpen] = useState(false);
   const [shipNo, setShipNo] = useState('');
+  /* ── บิลของออเดอร์ในแอป ──
+     เจ้าของสั่ง 5 ก.ย. 2026 "หน้าออเดอร์ต้องออกบิลได้ด้วยเหมือนหน้าร้าน" — ใช้ใบเสร็จตัว
+     เดียวกับ POS ทั้งดุ้น (โลโก้ หัวใบ ขนาดกระดาษ 48/58mm ตามที่ตั้งไว้ในเครื่องนั้น)
+     ไม่ทำใบใหม่ ลูกค้าจะได้บิลหน้าตาเดียวกันไม่ว่าซื้อหน้าร้านหรือสั่งในแอป
+     ข้อมูลร้านโหลดตอนกดพิมพ์ครั้งแรก ไม่ใช่ตอนเปิดลิ้นชัก — คนเปิดดูออเดอร์เฉย ๆ
+     ไม่ต้องเสียรอบเรียกเซิร์ฟเวอร์ */
+  const [bill, setBill] = useState<ShopInfo | null>(null);
+  const [billBusy, setBillBusy] = useState(false);
 
   useEffect(() => {
     if (!order) {
@@ -634,7 +645,74 @@ function OrderDrawer({
           onClick={async () => printAddressLabel(order, await getShopName(), trackingNo)}>
           พิมพ์ใบจ่าหน้า
         </Button>
+        <Button
+          icon={<RiPrinterLine className="w-4 h-4" />}
+          loading={billBusy}
+          onClick={async () => {
+            setBillBusy(true);
+            try {
+              setBill(await getShopInfo());
+            } catch {
+              message.error('โหลดข้อมูลร้านไม่สำเร็จ — ลองใหม่อีกครั้ง');
+            } finally {
+              setBillBusy(false);
+            }
+          }}>
+          พิมพ์บิล
+        </Button>
       </Space>
+
+      {bill ? (
+        <Modal
+          open
+          onCancel={() => setBill(null)}
+          width={340}
+          destroyOnHidden
+          footer={[
+            <Button
+              key="print"
+              icon={<RiPrinterLine className="w-4 h-4" />}
+              onClick={() => window.print()}>
+              พิมพ์บิล
+            </Button>,
+            <Button key="close" type="primary" onClick={() => setBill(null)}>
+              ปิด
+            </Button>,
+          ]}>
+          {/* ใบเสร็จพังไม่ควรลาก modal ทั้งอันไปด้วย — กติกาเดียวกับ POS */}
+          <ReceiptBoundary onClose={() => setBill(null)}>
+            <Receipt
+              shop={bill}
+              saleNumber={order.order_number}
+              at={fmtTime(order.placed_at)}
+              items={items.map((it) => ({
+                name: it.name_snapshot,
+                size: it.size_snapshot,
+                qty: it.qty,
+                unitPrice: it.unit_price,
+                lineTotal: it.line_total,
+              }))}
+              subtotal={order.subtotal}
+              discount={order.discount_amount}
+              deliveryFee={order.delivery_fee}
+              /* ร้านยังไม่จด VAT — ถ้าวันหนึ่งจด ใบเสร็จจะโชว์สองบรรทัดนี้เอง จึงถอดกลับ
+                 จากยอดสุทธิแบบราคารวมภาษี (วิธีเดียวกับที่ POS คิด) ไม่ปล่อยให้เป็น 0 */
+              netAmount={
+                bill.vat_registered
+                  ? Math.round((order.total * 100) / (100 + bill.vat_rate))
+                  : order.total
+              }
+              vatAmount={
+                bill.vat_registered
+                  ? order.total - Math.round((order.total * 100) / (100 + bill.vat_rate))
+                  : 0
+              }
+              total={order.total}
+              paymentMethod={order.payment_method}
+            />
+          </ReceiptBoundary>
+        </Modal>
+      ) : null}
 
       <Divider titlePlacement="left" style={{ margin: '20px 0 12px' }}>
         รายการสินค้า

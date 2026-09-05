@@ -12,6 +12,9 @@ export type ReceiptProps = {
   customerName?: string | null;
   customerTaxId?: string | null;
   items: ReceiptLine[];
+  /* ออเดอร์ในแอปมีค่าส่ง — ถ้าไม่มีบรรทัดนี้ ยอดสินค้ากับยอดสุทธิบนบิลจะไม่เท่ากันแล้ว
+     ลูกค้าเถียงไม่ได้ว่าส่วนต่างมาจากไหน (บิลหน้าร้านไม่มีค่าส่ง จึงเป็น optional) */
+  deliveryFee?: number | null;
   // Nullable on purpose: a replayed sale (double-tap / re-pay) can arrive with
   // these missing if it came from an older create_pos_sale, and a receipt that
   // renders a stale/undefined amount must degrade to 0, never crash the till
@@ -27,7 +30,14 @@ export type ReceiptProps = {
   offline?: boolean;
 };
 
-const PAY_LABEL: Record<string, string> = { cash: 'เงินสด', promptpay: 'พร้อมเพย์', store_credit: 'เครดิตร้าน' };
+const PAY_LABEL: Record<string, string> = {
+  cash: 'เงินสด',
+  promptpay: 'พร้อมเพย์',
+  store_credit: 'เครดิตร้าน',
+  // ออเดอร์ในแอป (0002): โอนแล้วแนบสลิป / เก็บเงินปลายทาง
+  promptpay_slip: 'โอน (พร้อมเพย์)',
+  cod: 'เก็บเงินปลายทาง',
+};
 // Null-safe: `undefined.toLocaleString()` is exactly what blanked the whole POS
 // on a receipt replay (H5). A missing amount prints as 0 rather than throwing.
 const baht = (n: number | null | undefined) => (n ?? 0).toLocaleString('th-TH');
@@ -53,6 +63,7 @@ export function Receipt({
   customerName,
   customerTaxId,
   items,
+  deliveryFee,
   subtotal,
   discount,
   vatAmount,
@@ -136,6 +147,7 @@ export function Receipt({
         <div className="border-t border-dashed border-black my-1.5" />
         <Line2 label="ยอดรวม" value={subtotal} />
         {(discount ?? 0) > 0 && <Line2 label="ส่วนลด" value={-(discount ?? 0)} />}
+        {(deliveryFee ?? 0) > 0 && <Line2 label="ค่าจัดส่ง" value={deliveryFee} />}
         {shop.vat_registered && (
           <>
             <Line2 label="มูลค่าก่อน VAT" value={netAmount} />
