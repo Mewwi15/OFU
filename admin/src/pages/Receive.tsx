@@ -39,6 +39,39 @@ import { d as thDate } from '../lib/time';
 
 dayjs.extend(customParseFormat);
 
+/** ใบรับเข้าที่ยังทำไม่เสร็จ เก็บไว้ในเครื่องกันหายตอนรีเฟรช */
+type ReceiveDraft = {
+  supplier: string;
+  docNo: string;
+  receivedAt: string;
+  note: string | null;
+  lines: DraftLine[];
+  savedAt: number;
+};
+const DRAFT_KEY = 'ofu-receive-draft';
+
+function readDraft(): ReceiveDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as ReceiveDraft;
+    /* ใบที่ค้างข้ามวันไปแล้วไม่ถามซ้ำ — คนรับของคงลืมไปแล้วว่าเคยทำอะไรค้างไว้ และการ
+       เด้งถามทุกเช้าเรื่องใบเมื่อวานคือสิ่งที่ทำให้คนเลิกอ่านกล่องข้อความ */
+    if (!d?.lines?.length || Date.now() - (d.savedAt ?? 0) > 24 * 60 * 60 * 1000) return null;
+    return d;
+  } catch {
+    return null;
+  }
+}
+function writeDraft(d: ReceiveDraft | null) {
+  try {
+    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* โหมดส่วนตัว/พื้นที่เต็ม — ไม่ใช่เรื่องที่ต้องหยุดการรับของ */
+  }
+}
+
 /** แปลงสินค้าจากหลังบ้านเป็นรายการที่ช่องค้นหาของหน้ารับเข้าใช้ — เดิมเขียนซ้ำสองที่ */
 function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
   return ps.flatMap((p) => {
@@ -122,6 +155,40 @@ export function Receive() {
   const [creatingDrafts, setCreatingDrafts] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null); // 'เลขที่เอกสาร: ขนม' จากหัวไฟล์
   const [lines, setLines] = useState<DraftLine[]>([]);
+
+  /* ── ใบที่ทำค้างไว้ ต้องไม่หายตอนรีเฟรช ──
+     เจ้าของสั่ง 5 ก.ย. 2026 "รีทีนึงแล้วต้องเริ่มใหม่" — คนรับของยิงของไปแล้วสามสิบชิ้น
+     เผลอกดรีเฟรช/แท็บถูกปิด แล้วต้องยิงใหม่ทั้งใบ ซึ่งเป็นงานที่เสียเวลาที่สุดของหน้านี้
+     ★ เก็บในเครื่อง ไม่ใช่ในฐานข้อมูล ★ ใบที่ยังทำไม่เสร็จไม่ใช่เอกสารของร้าน ยังไม่ควรมี
+     ตัวตนในระบบ — ถ้าเก็บขึ้นเซิร์ฟเวอร์ต้องมีเรื่องใครเป็นเจ้าของใบ ใบค้างของคนอื่น
+     ลบได้ไหม ฯลฯ ทั้งที่ปัญหาจริงคือแค่ "อย่าให้หายตอนรีเฟรช" */
+  const [restore, setRestore] = useState<ReceiveDraft | null>(null);
+  const restoredRef = useRef(false);
+
+  // เปิดหน้ามาแล้วเจอใบค้าง — ถามก่อน ไม่เติมให้เองเงียบ ๆ
+  useEffect(() => {
+    const d = readDraft();
+    if (d) setRestore(d);
+    else restoredRef.current = true;
+  }, []);
+
+  /* เก็บทุกครั้งที่ใบเปลี่ยน — แต่ไม่เก็บก่อนจะตอบเรื่องใบค้างเสร็จ ไม่งั้นสถานะว่าง ๆ
+     ตอนเพิ่งเปิดหน้าจะไปทับใบที่ค้างอยู่ทิ้งทันที */
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    if (lines.length === 0) {
+      writeDraft(null);
+      return;
+    }
+    writeDraft({
+      supplier,
+      docNo,
+      receivedAt: receivedAt.toISOString(),
+      note: importNote,
+      lines,
+      savedAt: Date.now(),
+    });
+  }, [lines, supplier, docNo, receivedAt, importNote]);
   const [saving, setSaving] = useState(false);
   const [receipts, setReceipts] = useState<GoodsReceipt[] | null>(null);
   const [lineCache, setLineCache] = useState<Record<string, GoodsReceiptLine[]>>({});
@@ -363,6 +430,8 @@ export function Receive() {
         })),
       });
       message.success(`บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
+      // บันทึกเข้าระบบแล้ว ใบค้างในเครื่องหมดหน้าที่ ต้องไม่ถามซ้ำรอบหน้า
+      writeDraft(null);
       // ไม่พิมพ์อัตโนมัติ (เจ้าของสั่ง 23 ส.ค.) — ปุ่มพิมพ์อยู่ในประวัติเมื่อต้องการ
       setLines([]);
       setSupplier('');
@@ -700,6 +769,42 @@ export function Receive() {
         รับของที่นี่ = สต๊อกบวกทันที ลงสมุดสต๊อกทุกบรรทัด · ทุนที่กรอกจะกลายเป็นทุนล่าสุดของสินค้าตัวนั้น
         · ปุ่ม <Tag className="mx-1">เติม</Tag> ในหน้าสต๊อกยังใช้ได้เหมือนเดิมสำหรับของชิ้นเดียวไม่มีเอกสาร
       </Typography.Text>
+
+      {/* ── ใบที่ทำค้างไว้ ──
+          ★ ถามก่อน ไม่เติมให้เองเงียบ ๆ ★ ถ้าเติมกลับให้อัตโนมัติ คนที่ตั้งใจจะเริ่มใบใหม่
+          จะเผลอบันทึกของเก่าปนเข้าไปโดยไม่ทันสังเกต — ใบรับเข้าบวกสต๊อกจริง ผิดแล้วต้อง
+          ไปตามยกเลิกใบ */}
+      <Modal
+        open={!!restore}
+        title="มีใบรับเข้าที่ทำค้างไว้"
+        okText="ทำต่อจากเดิม"
+        cancelText="เริ่มใบใหม่"
+        closable={false}
+        maskClosable={false}
+        onOk={() => {
+          if (!restore) return;
+          setSupplier(restore.supplier ?? '');
+          setDocNo(restore.docNo ?? '');
+          setReceivedAt(restore.receivedAt ? dayjs(restore.receivedAt) : dayjs());
+          setImportNote(restore.note ?? null);
+          setLines(restore.lines ?? []);
+          setRestore(null);
+          restoredRef.current = true;
+        }}
+        onCancel={() => {
+          writeDraft(null);
+          setRestore(null);
+          restoredRef.current = true;
+        }}>
+        <p style={{ margin: 0 }}>
+          ค้างไว้ <b>{restore?.lines.length ?? 0}</b> รายการ
+          {restore?.supplier ? <> จาก <b>{restore.supplier}</b></> : null}
+          {restore?.savedAt ? <> เมื่อ {thDate(restore.savedAt).format('D MMM HH:mm น.')}</> : null}
+        </p>
+        <p style={{ marginTop: 8, marginBottom: 0, color: '#8a807a' }}>
+          ใบนี้ยังไม่ถูกบันทึกเข้าระบบ สต๊อกยังไม่ขยับ — เลือก “เริ่มใบใหม่” จะลบทิ้งเลย
+        </p>
+      </Modal>
 
       {newProduct && (
         <NewProductModal

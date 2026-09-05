@@ -160,6 +160,56 @@ await move(20, 'admin_adjust', 12, '2026-02-01T00:00:00Z');
     error ? undefined : `อ่านได้ ${(data ?? []).length} แถว`);
 }
 
+/* ── G. ทุนที่เก็บลงบรรทัดบิลต้องมาจากล็อต ไม่ใช่ทุนล่าสุด (0104) ────────── */
+{
+  /* สถานการณ์ที่เจ้าของอธิบาย: ของเก่าทุน ฿10 ยังค้าง แล้วรับใหม่ทุน ฿12 →
+     cost_price กลายเป็น 12 แต่ของที่ขายออกไปคือของเก่า ต้องคิดทุน ฿10 */
+  const { data: p2 } = await db
+    .from('products').insert({ shop_id: shop.id, name: `ทดสอบทุนบิล ${stamp}` }).select('id').single();
+  const { data: v2 } = await db
+    .from('product_variants')
+    .insert({ product_id: p2.id, price: 20, cost_price: 10, stock_qty: 0 })
+    .select('id').single();
+
+  const mv = async (delta, reason, unitCost, at) => {
+    const row = { variant_id: v2.id, delta_stock: delta, reason };
+    if (unitCost != null) row.unit_cost = unitCost;
+    if (at) row.created_at = at;
+    await db.from('stock_movements').insert(row);
+  };
+  await mv(10, 'admin_adjust', 10, '2026-01-01T00:00:00Z');
+  await mv(20, 'admin_adjust', 12, '2026-02-01T00:00:00Z');
+  await db.from('product_variants').update({ cost_price: 12, stock_qty: 30 }).eq('id', v2.id);
+
+  const { data: cost5 } = await db.rpc('fifo_unit_cost', { p_variant_id: v2.id, p_qty: 5 });
+  check('G1', Number(cost5) === 10, 'ขาย 5 ชิ้นจากล็อตเก่า คิดทุน ฿10 ไม่ใช่ ฿12 (ทุนล่าสุด)',
+    `ได้ ${cost5}`);
+
+  const { data: cost12 } = await db.rpc('fifo_unit_cost', { p_variant_id: v2.id, p_qty: 12 });
+  // (10×10 + 2×12) / 12 = 10.3333
+  check('G2', Math.abs(Number(cost12) - 10.3333) < 0.001,
+    'ขายคร่อมสองล็อตได้ทุนเฉลี่ยถ่วงน้ำหนัก', `ได้ ${cost12}`);
+
+  const { data: cost99 } = await db.rpc('fifo_unit_cost', { p_variant_id: v2.id, p_qty: 99 });
+  check('G3', Number(cost99) > 10 && Number(cost99) <= 12,
+    'ขายเกินล็อตที่มี ส่วนเกินคิดด้วยทุนล่าสุด ไม่คืนค่าว่าง', `ได้ ${cost99}`);
+
+  const { data: p3 } = await db
+    .from('products').insert({ shop_id: shop.id, name: `ไม่มีล็อต ${stamp}` }).select('id').single();
+  const { data: v3 } = await db
+    .from('product_variants')
+    .insert({ product_id: p3.id, price: 5, cost_price: 3, stock_qty: 0 })
+    .select('id').single();
+  const { data: none } = await db.rpc('fifo_unit_cost', { p_variant_id: v3.id, p_qty: 1 });
+  check('G4', none === null, 'สินค้าที่ยังไม่เคยรับเข้า คืนค่าว่างให้ตกไปใช้ทุนล่าสุด', `ได้ ${none}`);
+
+  await db.from('stock_lot_uses').delete().eq('variant_id', v2.id);
+  await db.from('stock_lots').delete().eq('variant_id', v2.id);
+  await db.from('stock_movements').delete().eq('variant_id', v2.id);
+  await db.from('product_variants').delete().in('id', [v2.id, v3.id]);
+  await db.from('products').delete().in('id', [p2.id, p3.id]);
+}
+
 /* ── ล้างของทดสอบ ────────────────────────────────────────────────────────── */
 await db.from('stock_lot_uses').delete().eq('variant_id', VID);
 await db.from('stock_lots').delete().eq('variant_id', VID);
