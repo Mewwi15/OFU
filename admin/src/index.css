@@ -67,19 +67,25 @@ body {
      (ลิ้นชักใช้ .ant-drawer เฉย ๆ) จึงไม่โดนอะไรเลย
      คัดที่ลูกของ body ตรง ๆ แทนการไล่เดาชื่อคลาสของไลบรารี แล้วค่อยเก็บตกชั้นในอีกที
      เผื่อกรณีที่หลายกล่องใช้ portal ร่วมกัน */
-  body > *:not(:has(#pos-receipt)),
+  /* :not(#pos-receipt) เผื่อวันหนึ่งใบเสร็จถูกวางเป็นลูกของ body ตรง ๆ — :has() มองแต่
+     ลูกหลาน ตัวมันเองจึงไม่เข้าเงื่อนไขและจะโดนซ่อนทิ้งทั้งใบ */
+  body > *:not(:has(#pos-receipt)):not(#pos-receipt),
   .ant-drawer:not(:has(#pos-receipt)),
   .ant-modal-root:not(:has(#pos-receipt)) {
     display: none !important;
   }
   #pos-receipt {
     /* width comes from the inline style (paper config); keep the rest tuned. */
-    margin: 0 auto;
-    padding: 1mm 1.5mm; /* minimal quiet zone; keep content within the roll */
+    /* ★ ชิดซ้าย ไม่จัดกลาง ★ เจ้าของขอ 5 ก.ย. 2026 — หัวพิมพ์ความร้อนเริ่มพิมพ์จากขอบ
+       ซ้ายอยู่แล้ว การจัดกลางทำให้เนื้อบิลลอยไปกลางม้วนแล้วเสียที่ทั้งสองข้าง */
+    margin: 0;
+    padding: 1mm 0.5mm; /* minimal quiet zone; keep content within the roll */
     background: #fff;
     color: #000;
-    font-size: 8px;
-    line-height: 1.2;
+    /* เท่ากับขนาดฐานบนจอ — เดิมย่อเหลือ 8px ตอนพิมพ์ ตัวหนังสือบนกระดาษเลยเล็กกว่าที่
+       เห็นในตัวอย่าง และเล็กเกินจะอ่านสบาย */
+    font-size: 11px;
+    line-height: 1.3;
   }
   /* Force crisp black on thermal paper regardless of on-screen greys. */
   #pos-receipt * {
