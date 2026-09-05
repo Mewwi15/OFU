@@ -3,17 +3,14 @@
  *
  * Two cards:
  *  • Marketing/promo push toggle (PDPA opt-out; transactional alerts always send).
- *  • Biometric unlock (Face ID / fingerprint) toggle — previously only offered
- *    once during PIN setup; now switchable any time. Enabling requires passing
- *    a biometric prompt first; the row hides on devices without enrolled
- *    biometrics (and on simulators without a test face/finger).
+ *  (สวิตช์สแกนนิ้ว/ใบหน้าถูกถอดออก 5 ก.ย. 2026 พร้อมกับการเลิกใช้ PIN — มันเป็นวิธี
+ *   ปลดล็อกของ PIN ไม่ได้มีหน้าที่อื่น พอไม่มีล็อกแล้วสวิตช์นี้ก็ไม่ได้ทำอะไรเลย)
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/IconButton';
@@ -24,7 +21,6 @@ import { authRepo } from '@/lib/data/auth';
 import { getPushEnabled, setPushEnabled } from '@/lib/data/notifications';
 import { useT } from '@/lib/i18n';
 import { showAlert, showConfirm } from '@/lib/showAlert';
-import { useLock } from '@/store/lock';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -33,11 +29,6 @@ export default function SettingsScreen() {
   const [push, setPush] = useState<boolean | null>(null); // null = loading
   const [saving, setSaving] = useState(false);
 
-  const biometricEnabled = useLock((s) => s.biometricEnabled);
-  const setBiometricEnabled = useLock((s) => s.setBiometricEnabled);
-  const [bioAvailable, setBioAvailable] = useState(false);
-  const [bioLabel, setBioLabel] = useState('');
-  const [bioSaving, setBioSaving] = useState(false);
 
   // PDPA data-processing consent — required by place_order (CONSENT_REQUIRED);
   // withdrawing it blocks new orders until granted again, browsing/cart still
@@ -53,20 +44,7 @@ export default function SettingsScreen() {
       .getConsentStatus()
       .then((s) => setConsentGranted(s.data_processing ?? false))
       .catch(() => setConsentGranted(true)); // fail open on read — don't alarm on a network hiccup
-    if (Platform.OS === 'web') return; // no biometrics / app lock on web
-    (async () => {
-      const [hasHw, enrolled, types] = await Promise.all([
-        LocalAuthentication.hasHardwareAsync(),
-        LocalAuthentication.isEnrolledAsync(),
-        LocalAuthentication.supportedAuthenticationTypesAsync(),
-      ]);
-      if (hasHw && enrolled) {
-        setBioAvailable(true);
-        const isFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
-        setBioLabel(isFace ? 'Face ID' : t('lock.fingerprint'));
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const toggle = async (value: boolean) => {
@@ -103,24 +81,6 @@ export default function SettingsScreen() {
       showAlert(t('settings.consentUpdateFailed'));
     } finally {
       setConsentSaving(false);
-    }
-  };
-
-  const toggleBio = async (value: boolean) => {
-    if (!value) {
-      await setBiometricEnabled(false);
-      return;
-    }
-    // Turning ON requires passing the scan once — proves it works on this device.
-    setBioSaving(true);
-    try {
-      const res = await LocalAuthentication.authenticateAsync({
-        promptMessage: `${t('lock.bioPromptPrefix')}${bioLabel}${t('lock.bioPromptSuffix')}`,
-        cancelLabel: t('common.cancel'),
-      });
-      if (res.success) await setBiometricEnabled(true);
-    } finally {
-      setBioSaving(false);
     }
   };
 
@@ -163,26 +123,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {bioAvailable ? (
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>
-                  {t('settings.bioLabel')} ({bioLabel})
-                </Text>
-                <Text variant="caption" style={styles.rowCaption}>
-                  {t('settings.bioCap')}
-                </Text>
-              </View>
-              <Switch
-                value={biometricEnabled}
-                onValueChange={toggleBio}
-                disabled={bioSaving}
-                trackColor={{ true: Colors.primary, false: Colors.border }}
-              />
-            </View>
-          </View>
-        ) : null}
 
         <View style={styles.card}>
           <View style={styles.row}>

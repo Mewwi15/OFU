@@ -20,6 +20,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -38,6 +39,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
+import { DELIVERY_INK, DELIVERY_INK_SHADOW, DELIVERY_RAMP } from '@/constants/delivery';
 import {
   signInWithAppleNative,
   signInWithGoogleNative,
@@ -50,6 +52,7 @@ import { startLineAuth } from '@/lib/line';
 import { useAuth } from '@/store/auth';
 
 const BRAND = { google: '#FFFFFF', line: '#06C755' } as const;
+const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
 const CODE_LENGTH = 6;
 const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -294,26 +297,39 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* ★ หัวจอไล่สีเต็มความกว้าง ไม่ใช่แถบสีอ่อนลอย ๆ ★ (เจ้าของตีกลับ 5 ก.ย. 2026
+          "ไม่สวยเลย ทำใหม่หน่อย") — หน้าร้านทั้งสองโหมดกับหน้าสมาชิกใช้โครงเดียวกันหมด
+          คือพื้นไล่สีเต็มจอแล้วมีแผ่นเนื้อหาสีขาวโค้งทับขึ้นมา หน้าล็อกอินเป็นหน้าแรกที่
+          ลูกค้าเห็น แต่กลับเป็นหน้าเดียวที่ไม่เข้าชุดกับที่เหลือ */}
+      <LinearGradient
+        colors={DELIVERY_RAMP}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        locations={[0, 0.6, 1]}
+        style={styles.heroBg}
+        pointerEvents="none"
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
-          { paddingTop: topInset + Spacing.x3, paddingBottom: bottomInset + Spacing.x3 },
+          { paddingTop: topInset + Spacing.lg, paddingBottom: bottomInset + Spacing.x3 },
         ]}>
-        {/* Brand — a tinted hero band (not just text floating on the plain
-            background) so the screen reads as designed, not placeholder. */}
         <View style={styles.brand}>
-          <Image source={require('@/assets/images/logo-oofoo.png')} style={styles.logo} contentFit="contain" />
+          {/* มาสคอตคู่กับโลโก้ — ตัวเดียวกับที่ลูกค้าเห็นบนหน้าร้าน จำร้านได้ตั้งแต่จอแรก */}
+          <Image source={MASCOT_SRC} style={styles.mascot} contentFit="contain" />
           <Text variant="heading" style={styles.welcome}>
             {t('login.welcome')}
           </Text>
-          <View style={styles.taglineChip}>
-            <Text variant="body" style={styles.tagline}>
-              {t('login.tagline')}
-            </Text>
-          </View>
+          <Text variant="body" style={styles.tagline}>
+            {t('login.tagline')}
+          </Text>
         </View>
+
+        {/* แผ่นเนื้อหา — ยกขึ้นมาทับพื้นไล่สีเล็กน้อย ให้อ่านเป็นการ์ดที่วางอยู่บนพื้น
+            ไม่ใช่สองโซนที่ต่อกันเฉย ๆ */}
+        <View style={styles.sheet}>
 
         {socialError ? (
           <View style={styles.socialErrorBanner}>
@@ -640,6 +656,8 @@ export default function LoginScreen() {
           </>
         )}
 
+        </View>
+
         {/* PDPA consent — both open the same hosted policy page (no separate
             terms-of-use page exists yet; see lib/legal.ts).
             Real Pressables, not `<Text onPress>` nested in a sentence: that
@@ -731,32 +749,23 @@ const styles = StyleSheet.create({
   // centers it when content is short (the LINE-only view) instead of leaving
   // a stark empty gap above a footer pinned to the bottom; it's a no-op once
   // content is tall enough to scroll (the classic email/password form).
-  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.x2 },
+  content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.lg },
 
-  // Tinted hero band (bleeds past the content padding) instead of the logo
-  // and welcome text floating alone on the plain page background.
-  brand: {
-    alignItems: 'center',
-    marginHorizontal: -Spacing.x2,
-    marginBottom: Spacing.x3,
-    paddingHorizontal: Spacing.x2,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.x3,
-    backgroundColor: Colors.primaryTint,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
-  },
-  logo: { width: 160, height: 70, marginBottom: Spacing.md },
-  welcome: { color: Colors.text },
-  taglineChip: {
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.pill,
+  /* พื้นไล่สีอยู่หลังทุกอย่าง สูงพอให้หัวจอมีที่หายใจแม้แป้นพิมพ์ดันเนื้อหาขึ้น */
+  heroBg: { position: 'absolute', left: 0, right: 0, top: 0, height: '46%' },
+  brand: { alignItems: 'center', paddingBottom: Spacing.x2 },
+  mascot: { width: 132, height: 132 },
+  /* ตัวหนังสือบนพื้นไล่สีเป็นสีขาว + เงาบาง ๆ ตรึงขอบ — ชุดเดียวกับหัวจอหน้าร้าน */
+  welcome: { color: DELIVERY_INK, ...DELIVERY_INK_SHADOW, textAlign: 'center' },
+  tagline: { color: DELIVERY_INK, ...DELIVERY_INK_SHADOW, marginTop: 2 },
+
+  sheet: {
     backgroundColor: Colors.surface,
-    ...Shadow.card,
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    paddingTop: Spacing.x2,
+    ...Shadow.float,
   },
-  tagline: { color: Colors.textMuted },
 
   socialErrorBanner: {
     flexDirection: 'row',

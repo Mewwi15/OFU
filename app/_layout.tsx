@@ -8,8 +8,8 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
-import { AppState, Platform } from 'react-native';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
@@ -32,13 +32,6 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-/**
- * Re-lock grace period. Locking on EVERY background made in-app detours
- * require the PIN again: the image picker (slip/avatar) and the Google OAuth
- * browser both background the app for a few seconds.
- */
-const LOCK_GRACE_MS = 2 * 60 * 1000;
-
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     Mitr_300Light,
@@ -52,15 +45,12 @@ export default function RootLayout() {
   // guarded blocks below is active at a time.
   const isAuthed = useAuth((s) => s.status === 'authenticated');
   const authHydrated = useAuth((s) => s.hydrated);
-  const userId = useAuth((s) => s.userId);
   const initAuth = useAuth((s) => s.initialize);
   const hydrated = useLock((s) => s.hydrated);
   const onboarded = useLock((s) => s.onboarded);
   const hasPin = useLock((s) => s.hasPin);
-  const locked = useLock((s) => s.locked);
   const hydrate = useLock((s) => s.hydrate);
-  const lock = useLock((s) => s.lock);
-  const ensurePinOwner = useLock((s) => s.ensurePinOwner);
+  const resetLock = useLock((s) => s.resetLock);
 
   // Hydrate persisted lock state + Supabase auth session once on startup.
   useEffect(() => {
@@ -159,26 +149,12 @@ export default function RootLayout() {
     };
   }, []);
 
-  // The PIN belongs to an account, not the device: if another account's PIN is
-  // still stored here (account switch / phone-OTP era), clear it so this
-  // account gets the setup flow instead of a lock it can never pass.
+  /* ★ ล้าง PIN ที่ค้างอยู่ในเครื่องทิ้ง ★ คนที่เคยตั้งไว้ก่อนเลิกใช้ ยังมีรหัสเก็บอยู่ใน
+     ที่เก็บความลับของเครื่อง ถ้าไม่ล้าง มันจะค้างอยู่อย่างนั้นไปตลอดโดยไม่มีทางเอาออก
+     (หน้าตั้ง/ปลดล็อกถูกถอดออกไปแล้ว) — ล้างครั้งเดียวตอนเปิดแอปครั้งถัดไป */
   useEffect(() => {
-    if (userId && hydrated) void ensurePinOwner(userId);
-  }, [userId, hydrated, ensurePinOwner]);
-
-  const backgroundedAt = useRef<number | null>(null);
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') {
-        backgroundedAt.current = Date.now();
-      } else if (state === 'active') {
-        const away = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
-        backgroundedAt.current = null;
-        if (away > LOCK_GRACE_MS) lock();
-      }
-    });
-    return () => sub.remove();
-  }, [lock]);
+    if (hydrated && hasPin) void resetLock();
+  }, [hydrated, hasPin, resetLock]);
 
   const ready = (loaded || error) && hydrated && authHydrated;
 
@@ -192,14 +168,13 @@ export default function RootLayout() {
     return null;
   }
 
-  // The PIN app-lock rides on the OS keychain (expo-secure-store), which has
-  // no web backend — on web the browser session is the lock, so skip it.
-  const lockSupported = Platform.OS !== 'web';
+  /* ★ เลิกใช้ PIN ★ เจ้าของสั่ง 5 ก.ย. 2026 "ยกเลิกใช้พินด้วยครับ มันดูซับซ้อน" —
+     ร้านชำไม่ใช่แอปธนาคาร ด่านที่ลูกค้าต้องผ่านก่อนซื้อของยิ่งน้อยยิ่งดี และตอนนี้เข้าด้วย
+     เบอร์+OTP แล้ว ซึ่งเป็นการยืนยันตัวตนที่แน่นกว่ารหัส 6 หลักที่ตั้งเองอยู่แล้ว
+     เหลือแค่สองด่าน: ยังไม่เคยเปิดแอป → แนะนำตัว · ยังไม่ล็อกอิน → หน้าเข้าสู่ระบบ */
   const showOnboarding = !onboarded;
   const showLogin = onboarded && !isAuthed;
-  const showSetup = onboarded && isAuthed && lockSupported && !hasPin;
-  const showLock = onboarded && isAuthed && lockSupported && hasPin && locked;
-  const showApp = onboarded && isAuthed && (!lockSupported || (hasPin && !locked));
+  const showApp = onboarded && isAuthed;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -214,14 +189,6 @@ export default function RootLayout() {
 
             <Stack.Protected guard={showLogin}>
               <Stack.Screen name="login" />
-            </Stack.Protected>
-
-            <Stack.Protected guard={showSetup}>
-              <Stack.Screen name="lock/setup" />
-            </Stack.Protected>
-
-            <Stack.Protected guard={showLock}>
-              <Stack.Screen name="lock/index" />
             </Stack.Protected>
 
             <Stack.Protected guard={showApp}>
