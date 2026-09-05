@@ -90,6 +90,7 @@ function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
       barcode: v.barcode ?? null,
       sku: v.sku ?? null,
       cost: v.cost_price ?? null,
+      stock: v.stock_qty ?? 0,
       image,
     }));
   });
@@ -136,6 +137,10 @@ type PickItem = {
   barcode: string | null;
   sku: string | null;
   cost: number | null;
+  /* สต๊อกที่มีอยู่ตอนนี้ — ใช้โชว์เฉย ๆ ในใบรับเข้า ★ อ่านจากรายการสินค้าเสมอ ไม่เก็บลง
+     บรรทัดใบ ★ ใบที่ทำค้างไว้ข้ามวันได้ ถ้าแช่ตัวเลขไว้ในใบ พรุ่งนี้มันจะโชว์สต๊อกของ
+     เมื่อวานโดยไม่มีอะไรบอก */
+  stock: number;
   image: string | null;
 };
 
@@ -244,6 +249,7 @@ export function Receive() {
             barcode: u.text,
             sku: null,
             cost: u.cost ?? null,
+            stock: 0,
             image: null,
             qty: u.qty as number,
             unitCost: u.cost ?? null,
@@ -386,6 +392,7 @@ export function Receive() {
           barcode: code,
           sku: null,
           cost: v.cost ?? null,
+          stock: 0,
           image: null,
           qty: 1,
           unitCost: v.cost ?? null,
@@ -447,6 +454,13 @@ export function Receive() {
     }
   };
 
+  /* สต๊อกอ่านจากรายการสินค้าที่โหลดมา ไม่ใช่จากบรรทัดในใบ — ใบค้างข้ามวันจะได้ไม่โชว์
+     ตัวเลขของเมื่อวาน · สินค้าที่หาไม่เจอ (เพิ่งสร้างและยังไม่รีเฟรช) คืนค่าว่างให้โชว์ — */
+  const stockOf = useCallback(
+    (variantId: string) => items.find((i) => i.variantId === variantId)?.stock ?? null,
+    [items],
+  );
+
   const draftCols: ColumnsType<DraftLine> = [
     {
       title: 'สินค้า',
@@ -461,6 +475,21 @@ export function Receive() {
       ),
     },
     {
+      /* เจ้าของสั่ง 5 ก.ย. 2026 — ตอนคีย์ใบรับเข้าจะได้เห็นว่าของเดิมมีเท่าไหร่ ไม่ต้อง
+         เปิดหน้าสต็อกอีกจอ และเป็นตัวจับผิดว่ายิงผิดตัวหรือเปล่าตั้งแต่ตอนคีย์ */
+      title: 'สต๊อกเดิม',
+      width: 90,
+      align: 'right',
+      render: (_, l) => {
+        const now = stockOf(l.variantId);
+        return now == null ? (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ) : (
+          <span className="tabular-nums">{now}</span>
+        );
+      },
+    },
+    {
       title: 'จำนวน',
       width: 110,
       render: (_, l, i) => (
@@ -473,6 +502,21 @@ export function Receive() {
           }
         />
       ),
+    },
+    {
+      title: 'หลังรับ',
+      width: 90,
+      align: 'right',
+      /* เดิม + ที่รับ — ตัวเลขที่จะกลายเป็นสต๊อกจริงหลังกดบันทึก ให้เห็นก่อนกด ไม่ใช่
+         ไปเซอร์ไพรส์ทีหลังในหน้าสินค้า */
+      render: (_, l) => {
+        const now = stockOf(l.variantId);
+        return now == null ? (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ) : (
+          <b className="tabular-nums">{now + l.qty}</b>
+        );
+      },
     },
     {
       title: 'ทุน/หน่วย',
