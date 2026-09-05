@@ -11,7 +11,7 @@
  * The parent owns clipboard + toast via `onCopyNumber`; saving is self-contained
  * here (it owns the QR ref). Tokens-only, zero emoji.
  *
- * Note: the header reads "พร้อมเพย์ · Thai QR Payment" as text rather than the
+ * Note: the header reads "พร้อมเพย์  Thai QR Payment" as text rather than the
  * official PromptPay/Thai-QR logo artwork. Drop the real logo asset in here
  * before launch (brand-guideline requirement).
  */
@@ -25,6 +25,7 @@ import QRCode from 'react-native-qrcode-svg';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -41,6 +42,8 @@ function formatTarget(target: string): string {
 }
 
 type Props = {
+  /** สีเน้นตามโหมด — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
   /** PromptPay id the QR encodes (phone / citizen-id / e-wallet). */
   target: string;
   /** Order amount in Baht — prefilled into the QR. */
@@ -51,7 +54,13 @@ type Props = {
   onCopyNumber: () => void;
 };
 
-export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props) {
+export function PromptPayQR({
+  target,
+  amount,
+  displayName,
+  onCopyNumber,
+  accent = BRAND_ACCENT,
+}: Props) {
   const t = useT();
   const payload = promptPayPayload(target, amount);
   // react-native-qrcode-svg exposes toDataURL on the underlying svg element.
@@ -91,7 +100,7 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
   return (
     <View style={styles.card}>
       {/* Header band */}
-      <View style={styles.band}>
+      <View style={[styles.band, { backgroundColor: accent.solid }]}>
         <Ionicons name="qr-code" size={18} color={Colors.textOnPrimary} />
         <Text style={styles.bandText}>{t('qr.header')}</Text>
       </View>
@@ -124,24 +133,24 @@ export function PromptPayQR({ target, amount, displayName, onCopyNumber }: Props
           <Text style={styles.accountName} numberOfLines={1}>
             {displayName}
           </Text>
-          <Text style={styles.accountNo}>{formatTarget(target)}</Text>
+          <Text style={[styles.accountNo, { color: accent.strong }]}>{formatTarget(target)}</Text>
         </View>
         <View style={styles.actionCol}>
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={t('qr.copyNumberA11y')}
             onPress={onCopyNumber}
-            style={styles.copyBtn}>
-            <Ionicons name="copy-outline" size={16} color={Colors.primaryStrong} />
-            <Text style={styles.copyText}>{t('qr.copy')}</Text>
+            style={[styles.copyBtn, { backgroundColor: accent.tint }]}>
+            <Ionicons name="copy-outline" size={16} color={accent.strong} />
+            <Text style={[styles.copyText, { color: accent.strong }]}>{t('qr.copy')}</Text>
           </PressableScale>
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={t('qr.saveA11y')}
             onPress={() => void saveImage()}
-            style={styles.copyBtn}>
-            <Ionicons name="download-outline" size={16} color={Colors.primaryStrong} />
-            <Text style={styles.copyText}>
+            style={[styles.copyBtn, { backgroundColor: accent.tint }]}>
+            <Ionicons name="download-outline" size={16} color={accent.strong} />
+            <Text style={[styles.copyText, { color: accent.strong }]}>
               {saving ? t('qr.saving') : t('qr.save')}
             </Text>
           </PressableScale>

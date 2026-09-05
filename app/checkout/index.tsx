@@ -256,6 +256,7 @@ export default function CheckoutScreen() {
               variant="tint"
               shape="rounded"
               size={40}
+              accent={A}
               accessibilityLabel={t('common.back')}
               onPress={() => router.back()}
             />
@@ -409,6 +410,7 @@ export default function CheckoutScreen() {
           <IconButton
             icon="chevron-back"
             variant="tint"
+            accent={A}
             shape="rounded"
             size={40}
             accessibilityLabel={t('common.back')}
@@ -582,6 +584,7 @@ export default function CheckoutScreen() {
         {showQr && placed ? (
           <Animated.View entering={FadeIn.duration(220)}>
             <PromptPayQR
+              accent={A}
               target={promptPay.target}
               amount={placed.total}
               displayName={promptPay.displayName}

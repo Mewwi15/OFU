@@ -6,6 +6,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow } from '@/constants/theme';
 
 export type IconButtonVariant = 'surface' | 'primary' | 'tint';
@@ -20,6 +21,8 @@ export type IconButtonProps = {
   /** `surface` = white w/ soft shadow; `primary` = coral filled;
    *  `tint` = flat peach wash w/ coral icon (no shadow). */
   variant?: IconButtonVariant;
+  /** สีเน้นของหน้าที่ปุ่มนี้ไปโผล่ — ใช้กับ variant primary/tint · ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
   /** `circle` (default) or `rounded` — squircle matching Radius.md chips. */
   shape?: IconButtonShape;
   /** Override the icon color. Defaults based on variant. */
@@ -50,19 +53,20 @@ export function IconButton({
   accessibilityLabel,
   disabled,
   style,
+  accent = BRAND_ACCENT,
 }: IconButtonProps) {
   const iconColor =
     color ??
     (variant === 'primary'
       ? Colors.textOnPrimary
       : variant === 'tint'
-        ? Colors.primaryStrong
+        ? accent.strong
         : Colors.text);
   const background =
     variant === 'primary'
-      ? Colors.primary
+      ? accent.solid
       : variant === 'tint'
-        ? Colors.primaryTint
+        ? accent.tint
         : Colors.surface;
   const iconSize = Math.round(size * 0.5);
   // Expand the press area to the 44pt minimum when the circle is smaller.
