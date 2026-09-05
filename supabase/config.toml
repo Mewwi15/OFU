@@ -438,3 +438,12 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ── ฮุคส่ง SMS OTP ───────────────────────────────────────────────────────────
+# ★ ต้องปิดการตรวจ JWT ★ GoTrue เรียกฮุคนี้ด้วยลายเซ็นของ standardwebhooks
+# (หัวข้อ webhook-signature) ไม่ใช่ JWT ของโครงการ — ถ้าเปิดการตรวจ JWT ไว้ตามค่าตั้งต้น
+# ประตูหน้าจะปฏิเสธตั้งแต่ยังไม่ถึงโค้ดในฟังก์ชัน แล้วจะไม่มี SMS ออกไปเลย
+# ความปลอดภัยอยู่ที่การตรวจลายเซ็นในฟังก์ชันเอง (SEND_SMS_HOOK_SECRET) ซึ่งเข้มพอ:
+# ใครยิงมาโดยไม่มีลายเซ็นที่ถูกต้อง โดนตอบ 401 ทุกกรณี
+[functions.send-sms-hook]
+verify_jwt = false
