@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SwipeButton from 'rn-swipe-button';
 
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
@@ -39,6 +40,8 @@ import type { CartItem } from '@/store/cart';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Props = {
+  /** สีเน้นตามโหมด — ไม่ส่ง = สีแบรนด์ (ส้ม) โหมดออนไลน์ส่งน้ำเงินมา */
+  accent?: Accent;
   visible: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -57,20 +60,28 @@ type Props = {
 
 const SWIPE_HEIGHT = 56;
 
-function SlideToConfirm({ label, onConfirm }: { label: string; onConfirm: () => void }) {
+function SlideToConfirm({
+  label,
+  onConfirm,
+  accent,
+}: {
+  label: string;
+  onConfirm: () => void;
+  accent: Accent;
+}) {
   return (
     <SwipeButton
       height={SWIPE_HEIGHT}
       title={label}
-      titleColor={Colors.primaryStrong}
+      titleColor={accent.strong}
       titleFontSize={16}
       titleStyles={styles.swipeTitle}
       railBackgroundColor={Colors.surfaceMuted}
       railBorderColor="transparent"
-      railFillBackgroundColor={Colors.primaryTint}
+      railFillBackgroundColor={accent.tint}
       railFillBorderColor="transparent"
-      thumbIconBackgroundColor={Colors.primary}
-      thumbIconBorderColor={Colors.primary}
+      thumbIconBackgroundColor={accent.solid}
+      thumbIconBorderColor={accent.solid}
       thumbIconComponent={() => (
         <Ionicons name="arrow-forward" size={22} color={Colors.textOnPrimary} />
       )}
@@ -96,6 +107,7 @@ export function CheckoutSheet({
   total,
   mode,
   verb,
+  accent = BRAND_ACCENT,
 }: Props) {
   const t = useT();
   const insets = useSafeAreaInsets();
@@ -182,13 +194,11 @@ export function CheckoutSheet({
           <View style={styles.hairline} />
 
           <View style={styles.sumRow}>
-            <Text variant="body" style={styles.sumMuted}>
-              {t('sheet.subtotal')}
-            </Text>
+            <Text style={styles.sumMuted}>{t('sheet.subtotal')}</Text>
             <Text style={styles.sumValue}>{money(subtotal)}</Text>
           </View>
           <View style={[styles.sumRow, styles.sumGap]}>
-            <Text variant="body" style={styles.sumMuted}>
+            <Text style={styles.sumMuted}>
               {mode === 'delivery' ? t('sheet.deliveryFee') : t('sheet.flashFee')}
             </Text>
             {deliveryFee === 0 ? (
@@ -196,9 +206,7 @@ export function CheckoutSheet({
                 {t('sheet.free')}
               </Text>
             ) : (
-              <Text variant="body" style={{ color: Colors.text }}>
-                {money(deliveryFee)}
-              </Text>
+              <Text style={styles.sumValue}>{money(deliveryFee)}</Text>
             )}
           </View>
 
@@ -210,7 +218,7 @@ export function CheckoutSheet({
           </View>
 
           {/* Slide to confirm */}
-          <SlideToConfirm label={`${t('sheet.slidePrefix')}${verb}`} onConfirm={onConfirm} />
+          <SlideToConfirm accent={accent} label={`${t('sheet.slidePrefix')}${verb}`} onConfirm={onConfirm} />
         </Animated.View>
       </GestureHandlerRootView>
     </Modal>
@@ -290,11 +298,17 @@ const styles = StyleSheet.create({
   sumGap: {
     marginTop: Spacing.sm,
   },
+  /* หนาและเข้มขึ้นทั้งสองฝั่ง (เจ้าของสั่ง 5 ก.ย. 2026 เหมือนที่แก้หน้าตะกร้าและ
+     หน้าชำระเงิน) — ของเดิมฝั่งซ้ายเป็นเทาจาง อ่านคู่กับตัวเลขไม่ติดกันเป็นบรรทัดเดียว
+     แผ่นนี้เป็นด่านสุดท้ายก่อนลูกค้ารูดจ่ายเงิน ตัวเลขต้องอ่านง่ายที่สุดในทั้งแอป */
   sumMuted: {
-    color: Colors.textMuted,
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    color: Colors.text,
   },
   sumValue: {
-    ...Typography.bodyStrong,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 16,
     color: Colors.text,
   },
   totalRow: {

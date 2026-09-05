@@ -823,6 +823,7 @@ export default function CartScreen() {
 
           {/* Slide-to-confirm checkout sheet */}
           <CheckoutSheet
+            accent={A}
             visible={sheetOpen}
             onClose={() => setSheetOpen(false)}
             onConfirm={onConfirmOrder}

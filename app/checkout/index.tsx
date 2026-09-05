@@ -40,6 +40,8 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PromptPayQR } from '@/components/shop/PromptPayQR';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { IconButton } from '@/components/ui/IconButton';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
@@ -62,7 +64,7 @@ import { type PaymentMethod } from '@/lib/payment';
 import { uuidv4 } from '@/lib/uuid';
 import { selectedAddress, useAddress } from '@/store/address';
 import { useAuth } from '@/store/auth';
-import { cartCount, cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
+import { cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
 import { deliveryFeeFor, useFees, useMode } from '@/store/mode';
 import { kmBetween } from '@/lib/geo';
 
@@ -136,7 +138,6 @@ export default function CheckoutScreen() {
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
-  const count = cartCount(chosen);
   const fees = useFees((f) => f.fees);
   const deliveryFee = deliveryFeeFor(mode, subtotal, fees);
 
@@ -149,6 +150,10 @@ export default function CheckoutScreen() {
     const km = kmBetween(fees.shopLat, fees.shopLng, address.lat, address.lng);
     return km > fees.deliveryRadiusKm ? km : null;
   }, [mode, address, fees]);
+
+  /* สีของหน้า — โหมดออนไลน์เป็นน้ำเงินทั้งโหมด หน้าชำระเงินเป็นส้มอยู่หน้าเดียวจะโดด
+     (เหตุผลเดียวกับที่แก้หน้าตะกร้าไปแล้ว) */
+  const A = mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
 
   // Online flow pays up-front (PromptPay only); delivery defaults to COD but may
   // also pay by PromptPay.
@@ -434,8 +439,9 @@ export default function CheckoutScreen() {
               size={14}
               color={Colors.textMuted}
             />
+            {/* ไม่มีจุดคั่นและไม่มีหน่วย "ชิ้น" (เจ้าของสั่ง 5 ก.ย. 2026) — บรรทัดนี้บอก
+                วิธีรับของอย่างเดียวพอ จำนวนของอยู่ในรายการสินค้าที่หน้าตะกร้าแล้ว */}
             <Text variant="caption" style={styles.amountMetaText}>
-              {count} {t('checkout.itemsUnit')} ·{' '}
               {mode === 'delivery' ? t('checkout.homeDelivery') : t('checkout.flashDelivery')}
             </Text>
           </View>
@@ -443,11 +449,11 @@ export default function CheckoutScreen() {
           {/* Breakdown */}
           <View style={styles.breakdown}>
             <View style={styles.breakRow}>
-              <Text variant="caption">{t('checkout.subtotal')}</Text>
+              <Text style={styles.breakLabel}>{t('checkout.subtotal')}</Text>
               <Text style={styles.breakValue}>{money(shownSubtotal)}</Text>
             </View>
             <View style={[styles.breakRow, styles.breakRowGap]}>
-              <Text variant="caption">
+              <Text style={styles.breakLabel}>
                 {mode === 'delivery' ? t('checkout.deliveryFee') : t('checkout.flashFee')}
               </Text>
               {shownFee === 0 ? (
@@ -460,7 +466,7 @@ export default function CheckoutScreen() {
             </View>
             {shownDiscount > 0 ? (
               <View style={[styles.breakRow, styles.breakRowGap]}>
-                <Text variant="caption">
+                <Text style={styles.breakLabel}>
                   {t('checkout.discount')}
                   {promo ? ` (${promo})` : ''}
                 </Text>
@@ -486,8 +492,8 @@ export default function CheckoutScreen() {
               />
               <Text variant="caption" style={styles.addrText} numberOfLines={2}>
                 {mode === 'online'
-                  ? `${address.recipient} · ${address.phone} · ${[address.line, address.subDistrict, address.district, address.province, address.postalCode].filter(Boolean).join(' ')}`
-                  : `${address.label} · ${address.line}`}
+                  ? `${address.recipient}   ${address.phone}   ${[address.line, address.subDistrict, address.district, address.province, address.postalCode].filter(Boolean).join(' ')}`
+                  : `${address.label}   ${address.line}`}
               </Text>
             </View>
           ) : null}
@@ -510,11 +516,15 @@ export default function CheckoutScreen() {
                   disabled={!!placed || busy}
                   onPress={() => setMethod(m.key)}
                   style={[styles.methodRow, !!placed && m.key !== method && styles.methodRowOff]}>
-                  <View style={[styles.methodIcon, active && styles.methodIconOn]}>
+                  <View
+                    style={[
+                      styles.methodIcon,
+                      { backgroundColor: active ? A.solid : A.tint },
+                    ]}>
                     <Ionicons
                       name={m.icon}
                       size={20}
-                      color={active ? Colors.textOnPrimary : Colors.primaryStrong}
+                      color={active ? Colors.textOnPrimary : A.strong}
                     />
                   </View>
                   <View style={styles.methodBody}>
@@ -524,7 +534,7 @@ export default function CheckoutScreen() {
                   <Ionicons
                     name={active ? 'radio-button-on' : 'radio-button-off'}
                     size={22}
-                    color={active ? Colors.primary : Colors.borderStrong}
+                    color={active ? A.solid : Colors.borderStrong}
                   />
                 </PressableScale>
               </View>
@@ -637,6 +647,7 @@ export default function CheckoutScreen() {
           onPress={awaiting ? onSubmitSlip : onPlaceOrder}
           style={[
             styles.confirmCta,
+            { backgroundColor: A.solid },
             (!canConfirm || busy || status === 'success') && styles.confirmCtaOff,
           ]}>
           <Text style={styles.confirmCtaText}>{ctaLabel}</Text>
@@ -648,7 +659,7 @@ export default function CheckoutScreen() {
       {busy ? (
         <Animated.View entering={FadeIn.duration(150)} style={styles.verifyOverlay}>
           <View style={styles.verifyCard}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <ActivityIndicator size="large" color={A.solid} />
             <Text style={styles.verifyText}>
               {status === 'placing' ? t('checkout.placing') : t('checkout.verifying')}
             </Text>
@@ -754,8 +765,16 @@ const styles = StyleSheet.create({
   breakRowGap: {
     marginTop: Spacing.sm,
   },
+  /* หนาและเข้มขึ้นทั้งสองฝั่ง (เจ้าของสั่ง 5 ก.ย. 2026 เหมือนที่แก้ในหน้าตะกร้า) —
+     ของเดิมฝั่งซ้ายเป็น caption สีเทาจาง อ่านคู่กับตัวเลขฝั่งขวาไม่ติดกันเป็นบรรทัดเดียว */
+  breakLabel: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    color: Colors.text,
+  },
   breakValue: {
-    ...Typography.bodyStrong,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 16,
     color: Colors.text,
   },
   addrRow: {
@@ -806,9 +825,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  methodIconOn: {
-    backgroundColor: Colors.primary,
   },
   methodBody: {
     flex: 1,
