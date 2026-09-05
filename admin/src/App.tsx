@@ -21,6 +21,7 @@ import { PosSales } from './pages/PosSales';
 import { Products } from './pages/Products';
 import { Receive } from './pages/Receive';
 import { Shift } from './pages/Shift';
+import { MemberRewards } from './pages/MemberRewards';
 import { Promotions } from './pages/Promotions';
 import { Reports } from './pages/Reports';
 import { Stock } from './pages/Stock';
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/promotions" element={<Promotions />} />
+          <Route path="/member-rewards" element={<MemberRewards />} />
           <Route path="/store-credit" element={<StoreCredit />} />
           <Route path="/broadcast" element={<Broadcast />} />
           <Route path="/banners" element={<Banners />} />

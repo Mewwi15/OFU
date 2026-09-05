@@ -18,11 +18,13 @@ import QRCode from 'qrcode';
 import {
   apiError,
   createPosSale,
+  findCustomerByPhone,
   getOpenShift,
   getShopInfo,
   listCategories,
   listPosCatalog,
   type Category,
+  type Customer,
   type PosProduct,
   type PosVariant,
   type SaleResult,
@@ -56,6 +58,7 @@ import {
   Modal,
   Pagination,
   Segmented,
+  Space,
   Statistic,
   Tag,
   type InputRef,
@@ -349,6 +352,32 @@ export function Pos() {
     );
   }
 
+  /* ── สมาชิกที่ผูกกับบิลนี้ ──────────────────────────────────────────────
+     เจ้าของสั่ง 5 ก.ย. 2026 ให้แต้มเดินจากการซื้อหน้าร้านด้วย — ทริกเกอร์ใน 0100 ให้แต้ม
+     เมื่อบิลมี customer_user_id เท่านั้น ก่อนหน้านี้ POS ไม่เคยส่งค่านี้เลย แต้มจากหน้าร้าน
+     จึงไม่เคยเดิน */
+  const [member, setMember] = useState<Customer | null>(null);
+  const [memberBusy, setMemberBusy] = useState(false);
+
+  /** ค้นสมาชิกจากเบอร์ (พิมพ์เองหรือสแกนคิวอาร์ก็ได้ ฝั่งฐานข้อมูลตัดรูปแบบให้แล้ว) */
+  const attachMember = useCallback(async (phone: string): Promise<boolean> => {
+    const p = phone.trim();
+    if (!p) return false;
+    setMemberBusy(true);
+    try {
+      const found = await findCustomerByPhone(p);
+      if (found) {
+        setMember(found);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      setMemberBusy(false);
+    }
+  }, []);
+
   /* ── barcode / QR scanner ──────────────────────────────────────────────── */
   // Scanner guns act as a keyboard wedge: they "type" the code fast then Enter.
   type ScanTone = 'ok' | 'warn' | 'error';
@@ -377,6 +406,18 @@ export function Pos() {
       const oos = hit.v.stock_qty <= 0;
       const label = `${hit.p.name}${hit.v.size ? ' · ' + hit.v.size : ''}`;
       flashScan(oos ? `${label} — สต็อกหมด` : label, oos ? 'warn' : 'ok');
+      return true;
+    }
+    /* ★ ไม่ใช่สินค้า → ลองเป็นคิวอาร์สมาชิกก่อนค่อยบอกว่าไม่พบ ★ คิวอาร์บนหน้า OFU
+       MEMBER เข้ารหัสเป็นเบอร์โทร ถ้าไม่ดักตรงนี้ แคชเชียร์สแกนบัตรสมาชิกแล้วจะได้เสียง
+       error ทุกครั้ง — ดูจากรูปแบบก่อน (มีแต่ตัวเลข/เครื่องหมาย ยาว 9-13 หลัก) ไม่งั้น
+       บาร์โค้ดสินค้าที่หาไม่เจอจะถูกเอาไปค้นลูกค้าทุกครั้งโดยเปล่าประโยชน์ */
+    const digits = raw.replace(/\D/g, '');
+    if (/^\+?[\d\s-]+$/.test(raw.trim()) && digits.length >= 9 && digits.length <= 13) {
+      void attachMember(raw).then((ok) => {
+        if (ok) flashScan('ผูกบัตรสมาชิกแล้ว', 'ok');
+        else if (fromScanner) flashScan(`ไม่พบสมาชิกเบอร์ ${raw.trim()}`, 'error');
+      });
       return true;
     }
     if (fromScanner) flashScan(`ไม่พบสินค้ารหัส ${raw.trim()}`, 'error');
@@ -527,6 +568,8 @@ export function Pos() {
       tax_invoice: taxInvoice,
       customer_name: taxInvoice ? custName || undefined : undefined,
       customer_tax_id: taxInvoice ? custTaxId || undefined : undefined,
+      /* ผูกบิลกับบัญชีลูกค้า — ทริกเกอร์ให้แต้มอ่านค่านี้ (0100) */
+      customer_user_id: member?.user_id,
     };
     // Reuse the SAME client_op_id for a retry of the exact same attempt. If
     // the previous try actually committed server-side but the client only
@@ -562,6 +605,9 @@ export function Pos() {
     try {
       if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline');
       const sale = await createPosSale(input);
+      /* ★ ล้างสมาชิกทุกครั้งที่ปิดบิล ★ ไม่งั้นลูกค้าคนถัดไปจะได้แต้มเข้าบัญชีคนก่อน
+         ซึ่งเป็นความผิดพลาดที่ไม่มีใครสังเกตจนกว่าจะมีคนทัก */
+      setMember(null);
       setReceipt({
         sale,
         lines: soldLines,
@@ -1153,6 +1199,38 @@ export function Pos() {
             )}
             {method === 'promptpay' && (
               <PromptPayPanel target={shop?.promptpay_id ?? null} amount={total} name={shop?.promptpay_name} />
+            )}
+
+            {/* ── บัตรสมาชิก ──
+                สแกนคิวอาร์จากหน้า OFU MEMBER ได้เลย (ตัวจับสแกนทั่วทั้งหน้าดักให้แล้ว)
+                หรือพิมพ์เบอร์เอง — ไม่ผูกก็ขายได้ตามปกติ แค่ลูกค้าไม่ได้แต้ม */}
+            {member ? (
+              <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2">
+                <div className="text-sm">
+                  <div className="font-medium">{member.display_name ?? 'สมาชิก'}</div>
+                  <div className="text-xs text-gray-500">
+                    {member.phone} · {(member.points ?? 0).toLocaleString('th-TH')} แต้ม
+                  </div>
+                </div>
+                <Button size="small" onClick={() => setMember(null)}>
+                  เอาออก
+                </Button>
+              </div>
+            ) : (
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="เบอร์สมาชิก หรือสแกนคิวอาร์"
+                  inputMode="tel"
+                  allowClear
+                  onPressEnter={async (e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    const ok = await attachMember(v);
+                    if (ok) (e.target as HTMLInputElement).value = '';
+                    else flashScan('ไม่พบสมาชิกเบอร์นี้', 'error');
+                  }}
+                />
+                <Button loading={memberBusy}>ค้นหา</Button>
+              </Space.Compact>
             )}
 
             {shop?.vat_registered && (

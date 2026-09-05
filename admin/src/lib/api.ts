@@ -345,6 +345,94 @@ export async function uploadBannerImage(file: File): Promise<string> {
   return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
+/** path ในบักเก็ต → URL เต็มสำหรับพรีวิวในหน้าแอดมิน (ปล่อยผ่านถ้าเป็น URL อยู่แล้ว) */
+export function storageUrl(bucket: string, path: string | null): string | null {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+/* ── ระบบสมาชิก: ของรางวัล + ปิดงานแลกของ (0100 / 0102) ───────────────────── */
+export type MemberReward = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_path: string | null;
+  points_cost: number;
+  /** null = ไม่จำกัดจำนวน */
+  stock: number | null;
+  display_order: number;
+  publish_state: 'draft' | 'published';
+};
+
+/** ของรางวัลทุกชิ้นรวมฉบับร่าง — RLS ปล่อยให้แอดมินของร้านเห็นทั้งหมด */
+export async function listMemberRewards(): Promise<MemberReward[]> {
+  const { data, error } = await supabase
+    .from('member_rewards')
+    .select('id, name, description, image_path, points_cost, stock, display_order, publish_state')
+    .order('display_order');
+  if (error) throw error;
+  return data as MemberReward[];
+}
+
+export const upsertMemberReward = (p: {
+  id?: string;
+  name: string;
+  description?: string | null;
+  image_path?: string | null;
+  points_cost: number;
+  stock?: number | null;
+  display_order?: number;
+  publish_state?: 'draft' | 'published';
+}) =>
+  rpc<{ id: string }>('upsert_member_reward', {
+    p_id: p.id ?? undefined,
+    p_name: p.name,
+    p_description: p.description ?? undefined,
+    p_image_path: p.image_path ?? undefined,
+    p_points_cost: p.points_cost,
+    p_stock: p.stock ?? undefined,
+    p_display_order: p.display_order ?? 0,
+    p_publish_state: p.publish_state ?? 'draft',
+  });
+
+export const deleteMemberReward = (id: string) => rpc('delete_member_reward', { p_id: id });
+
+export type RedemptionLookup =
+  | {
+      ok: true;
+      id: string;
+      code: string;
+      status: 'pending' | 'collected' | 'cancelled';
+      points_cost: number;
+      reward_name: string;
+      customer_name: string | null;
+      created_at: string;
+    }
+  | { ok: false; code: string; message_th: string };
+
+/** ดูรายละเอียดโค้ดก่อนกดยืนยัน — แคชเชียร์ต้องเห็นว่าจะจ่ายอะไรให้ใคร */
+export const findRedemption = (code: string) =>
+  rpc<RedemptionLookup>('find_redemption', { p_code: code });
+
+/** ยืนยันว่าจ่ายของรางวัลให้ลูกค้าแล้ว — กดซ้ำจะถูกปฏิเสธ (ดู 0102) */
+export const collectRedemption = (code: string) =>
+  rpc<{ ok: boolean; reward_name?: string; code?: string; message_th?: string }>(
+    'collect_redemption',
+    { p_code: code },
+  );
+
+/** ภาพของรางวัลไปอยู่บักเก็ตรูปเดิม ไม่ต้องเปิดบักเก็ตใหม่ — คืน path ให้แอปประกอบ URL เอง */
+export async function uploadRewardImage(file: File): Promise<string> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const path = `member-rewards/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from('product-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+  if (error) throw error;
+  return path;
+}
+
 /* ── product images (upload to the public bucket, then register the row) ─────── */
 export async function uploadProductImage(productId: string, file: File, isPrimary = false) {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -899,7 +987,14 @@ export const verifyBackOfficePin = (pin: string) => rpc<boolean>('verify_back_of
 export const setBackOfficePin = (pin: string) => rpc<void>('set_back_office_pin', { p_pin: pin });
 
 /* ── store credit ────────────────────────────────────────────────────────────── */
-export type Customer = { user_id: string; display_name: string | null; phone: string | null; balance: number };
+export type Customer = {
+  user_id: string;
+  display_name: string | null;
+  phone: string | null;
+  balance: number;
+  /** แต้มสะสม — 0102 คืนมาด้วยเพื่อให้แคชเชียร์บอกลูกค้าได้ทันที */
+  points?: number;
+};
 export const findCustomerByPhone = (phone: string) =>
   rpc<Customer | null>('find_customer_by_phone', { p_phone: phone });
 export const topupStoreCredit = (userId: string, amount: number, note?: string) =>
