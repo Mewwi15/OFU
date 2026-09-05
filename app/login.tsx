@@ -398,13 +398,15 @@ export default function LoginScreen() {
                 {/* ★ ให้พิมพ์ 0 นำได้ตรง ๆ ★ เจ้าของทัก 5 ก.ย. 2026 "คนไทยส่วนมากชอบพิมพ์
                     เบอร์แบบมี 0 ก่อน" — ป้าย +66 ที่เคยติดไว้หน้าช่องทำให้อ่านเป็น
                     "+66 0812345678" ซึ่งไม่มีจริง คนจะลังเลว่าต้องตัด 0 ออกไหม
-                    ระบบแปลงเป็นรูปแบบสากลให้เองตอนส่งอยู่แล้ว (toE164Thai) */}
+                    ระบบแปลงเป็นรูปแบบสากลให้เองตอนส่งอยู่แล้ว (toE164Thai)
+                    คำใบ้ในช่องเหลือแค่ "เบอร์มือถือ" — ตัวอย่างเบอร์ยาว ๆ ไม่ได้ช่วยอะไร
+                    ในเมื่อไม่มีรูปแบบให้ต้องเดาแล้ว (เจ้าของสั่งตัดออก) */}
                 <View style={styles.field}>
                   <Ionicons name="call-outline" size={20} color={Colors.textMuted} />
                   <TextInput
                     value={phone}
                     onChangeText={(v) => setPhone(v.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="เบอร์มือถือ เช่น 0812345678"
+                    placeholder="เบอร์มือถือ"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="phone-pad"
                     textContentType="telephoneNumber"
