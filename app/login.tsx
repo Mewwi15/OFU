@@ -1,12 +1,20 @@
 /**
  * Login / register — `/login`.
  *
- * Cost-free auth (no SMS): email + password with a 6-digit email verification
- * code, plus Google social sign-in — and, on iOS, native Sign in with Apple
- * (guideline 4.8: mandatory once any third-party login exists). Two modes
- * (sign in / sign up); signing up moves to a verify step where the emailed
- * code is entered. PDPA consent line per product requirements. Tokens-only,
- * zero emoji.
+ * ★ เบอร์โทร + OTP เป็นทางหลัก ★ (เจ้าของสั่ง 5 ก.ย. 2026 "ทำระบบ login โดยใช้เบอร์
+ * กันครับ otp ผ่าน sms") — ลูกค้าร้านชำจำเบอร์ตัวเองได้ทุกคน แต่หลายคนไม่มีอีเมลหรือ
+ * จำรหัสผ่านไม่ได้ · เบอร์ยังเป็นกุญแจเดียวกับที่หน้าร้านใช้ค้นสมาชิกสะสมแต้ม (0102)
+ * คนที่สมัครในแอปจึงกลายเป็นสมาชิกที่แคชเชียร์ค้นเจอทันทีโดยไม่ต้องลงทะเบียนซ้ำ
+ *
+ * ไม่มีขั้น "สมัครสมาชิก" แยกสำหรับเบอร์ — ยิง OTP ครั้งแรกคือการสมัคร ระบบสร้างบัญชี
+ * ให้เอง ลดหน้าจอที่ลูกค้าต้องผ่านจากสองเป็นหนึ่ง
+ *
+ * ทางเดิมยังอยู่ครบ: อีเมล + รหัสผ่าน (ยืนยันด้วยรหัส 6 หลักทางอีเมล), Google,
+ * Sign in with Apple บน iOS (ข้อ 4.8 บังคับเมื่อมี social login อื่น) และ LINE บนเว็บ
+ * — บัญชีที่สมัครไว้ก่อนหน้านี้ต้องเข้าได้เหมือนเดิม
+ *
+ * ★ SMS มีค่าใช้จ่ายต่อข้อความ ★ ต่างจากอีเมลที่ส่งฟรี — จึงมีตัวนับถอยหลังก่อนส่งซ้ำได้
+ * ทุกจุดที่ยิง OTP ไม่งั้นคนกดรัวสิบครั้งคือเงินสิบข้อความ
  */
 
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +38,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
-import { signInWithAppleNative, signInWithGoogleNative, signInWithOAuthProvider } from '@/lib/data/auth';
+import {
+  signInWithAppleNative,
+  signInWithGoogleNative,
+  signInWithOAuthProvider,
+  toE164Thai,
+} from '@/lib/data/auth';
 import { useT } from '@/lib/i18n';
 import { PRIVACY_URL } from '@/lib/legal';
 import { startLineAuth } from '@/lib/line';
@@ -42,6 +55,18 @@ const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 type Mode = 'signin' | 'signup';
 type Step = 'form' | 'verify';
+/** ทางเข้าที่กำลังเลือกอยู่ — เบอร์เป็นค่าตั้งต้น */
+type Method = 'phone' | 'email';
+
+/** เบอร์ไทยที่กรอกได้จริง: 10 หลักขึ้นต้น 0 แล้วตามด้วย 6/8/9 (มือถือไทยทุกค่าย) */
+const phoneValid = (digits: string) => /^0[689]\d{8}$/.test(digits);
+
+/** 0812345678 → 081-234-5678 (ใช้โชว์ตอนยืนยัน ให้ตรวจทานเบอร์ตัวเองได้ในแวบเดียว) */
+const prettyThaiPhone = (digits: string) =>
+  digits.length === 10 ? `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}` : digits;
+
+/** วินาทีที่ต้องรอก่อนส่ง SMS ซ้ำ — ทุกครั้งที่ส่งคือเงินจริงของร้าน */
+const RESEND_COOLDOWN = 60;
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -66,11 +91,17 @@ export default function LoginScreen() {
   const signUpEmail = useAuth((s) => s.signUpEmail);
   const verifyEmailCode = useAuth((s) => s.verifyEmailCode);
   const resendEmailCode = useAuth((s) => s.resendEmailCode);
+  const startPhoneOtp = useAuth((s) => s.startPhoneOtp);
+  const verifyPhoneOtp = useAuth((s) => s.verifyPhoneOtp);
   const socialCallbackError = useAuth((s) => s.socialCallbackError);
   const setSocialCallbackError = useAuth((s) => s.setSocialCallbackError);
 
   const [mode, setMode] = useState<Mode>('signin');
+  const [method, setMethod] = useState<Method>('phone');
   const [step, setStep] = useState<Step>('form');
+  const [phone, setPhone] = useState('');
+  /* เหลืออีกกี่วินาทีถึงจะส่ง SMS ซ้ำได้ — 0 = ส่งได้ */
+  const [cooldown, setCooldown] = useState(0);
   // Web: LINE-only by default (owner pivot); the classic form is opt-in.
   const [showClassic, setShowClassic] = useState(Platform.OS !== 'web');
   const lineOnly = Platform.OS === 'web' && !showClassic;
@@ -205,6 +236,54 @@ export default function LoginScreen() {
     }
   };
 
+  /* ตัวนับถอยหลังของปุ่มส่งซ้ำ — เดินเฉพาะตอนมีค่าค้างอยู่ ไม่ตั้ง interval ทิ้งไว้เปล่า ๆ */
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown((c) => (c <= 1 ? 0 : c - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
+  const phoneDigits = phone.replace(/\D/g, '');
+
+  /* ส่ง OTP — ใช้ทั้งตอนกดครั้งแรกและตอนกดส่งซ้ำ
+     ★ ไม่บอกว่าเบอร์นี้มีบัญชีอยู่หรือยัง ★ ตอบเหมือนกันทุกกรณี ไม่งั้นใครก็ไล่ยิงเบอร์
+     เพื่อดูว่าใครเป็นลูกค้าร้านนี้ได้ (และการสมัครกับเข้าสู่ระบบเป็นทางเดียวกันอยู่แล้ว) */
+  const sendOtp = async () => {
+    if (!phoneValid(phoneDigits) || busy || cooldown > 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await startPhoneOtp(toE164Thai(phoneDigits));
+      setCode('');
+      setStep('verify');
+      setCooldown(RESEND_COOLDOWN);
+      setTimeout(() => codeRef.current?.focus(), 250);
+    } catch (e) {
+      setError(otpMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitPhoneCode = async () => {
+    if (!codeValid || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyPhoneOtp(toE164Thai(phoneDigits), code);
+    } catch (e) {
+      setError(otpMessage(e));
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const switchMethod = (next: Method) => {
+    setMethod(next);
+    setError(null);
+  };
+
   const switchMode = (next: Mode) => {
     setMode(next);
     setError(null);
@@ -278,7 +357,75 @@ export default function LoginScreen() {
           </>
         ) : step === 'form' ? (
           <>
-            {/* Mode toggle */}
+            {/* เลือกทางเข้า — เบอร์โทรมาก่อนเพราะเป็นทางหลัก */}
+            <View style={styles.modeToggle}>
+              {(['phone', 'email'] as Method[]).map((m) => (
+                <Pressable
+                  key={m}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: method === m }}
+                  onPress={() => switchMethod(m)}
+                  style={[styles.modeBtn, method === m && styles.modeBtnActive]}>
+                  <Text style={[styles.modeText, method === m && styles.modeTextActive]}>
+                    {m === 'phone' ? 'เบอร์โทร' : 'อีเมล'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {method === 'phone' ? (
+              <>
+                <Text style={styles.label}>เบอร์โทรศัพท์</Text>
+                <View style={styles.field}>
+                  {/* +66 ตายตัว ไม่ให้แก้ — ร้านส่งของในไทยอย่างเดียว การเปิดให้เลือก
+                      รหัสประเทศคือเพิ่มช่องให้กรอกผิดโดยไม่มีใครได้ประโยชน์ */}
+                  <View style={styles.dialCode}>
+                    <Text style={styles.dialCodeText}>+66</Text>
+                  </View>
+                  <TextInput
+                    value={phone}
+                    onChangeText={(v) => setPhone(v.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="08X-XXX-XXXX"
+                    placeholderTextColor={Colors.textMuted}
+                    keyboardType="phone-pad"
+                    textContentType="telephoneNumber"
+                    autoComplete="tel"
+                    style={styles.input}
+                    onSubmitEditing={sendOtp}
+                    returnKeyType="done"
+                  />
+                </View>
+                {phoneDigits.length === 10 && !phoneValid(phoneDigits) ? (
+                  <Text style={styles.hintErr}>เบอร์มือถือไทยขึ้นต้นด้วย 06 08 หรือ 09</Text>
+                ) : null}
+
+                {/* ★ ปุ่มต้องรู้เรื่องเวลารอด้วย ★ ตัวนับเดินต่อแม้กดย้อนกลับมาหน้านี้ —
+                    ถ้าปุ่มยังกดได้แต่ข้างในเงียบ คนจะกดซ้ำแล้วคิดว่าแอปค้าง */}
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityLabel="ส่งรหัส OTP"
+                  disabled={!phoneValid(phoneDigits) || busy || cooldown > 0}
+                  onPress={sendOtp}
+                  style={[
+                    styles.primaryBtn,
+                    (!phoneValid(phoneDigits) || busy || cooldown > 0) && styles.primaryBtnOff,
+                  ]}>
+                  <Text style={styles.primaryText}>
+                    {busy
+                      ? 'กำลังส่งรหัส…'
+                      : cooldown > 0
+                        ? `ขอรหัสใหม่ได้ในอีก ${cooldown} วินาที`
+                        : 'ส่งรหัส OTP'}
+                  </Text>
+                </PressableScale>
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                <Text variant="caption" style={styles.methodHint}>
+                  ยังไม่เคยมีบัญชีก็ใช้เบอร์นี้ได้เลย ระบบสมัครให้อัตโนมัติ
+                </Text>
+              </>
+            ) : (
+              <>
+            {/* สมัคร/เข้าสู่ระบบ มีเฉพาะทางอีเมล — ทางเบอร์ยิง OTP ครั้งแรกคือสมัครเลย */}
             <View style={styles.modeToggle}>
               {(['signin', 'signup'] as Mode[]).map((m) => (
                 <Pressable
@@ -377,6 +524,9 @@ export default function LoginScreen() {
               </Pressable>
             ) : null}
 
+              </>
+            )}
+
             {/* Divider + Google */}
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
@@ -430,10 +580,11 @@ export default function LoginScreen() {
             </Pressable>
 
             <Text variant="subtitle" style={styles.otpTitle}>
-              ยืนยันอีเมล
+              {method === 'phone' ? 'ยืนยันเบอร์โทร' : 'ยืนยันอีเมล'}
             </Text>
             <Text variant="body" style={styles.otpSub}>
-              กรอกรหัส 6 หลักที่ส่งไปที่ {email}
+              กรอกรหัส 6 หลักที่ส่งไปที่{' '}
+              {method === 'phone' ? prettyThaiPhone(phoneDigits) : email}
             </Text>
 
             <Pressable style={styles.otpRow} onPress={() => codeRef.current?.focus()}>
@@ -461,14 +612,30 @@ export default function LoginScreen() {
               accessibilityRole="button"
               accessibilityLabel="ยืนยัน"
               disabled={!codeValid || busy}
-              onPress={submitCode}
+              onPress={method === 'phone' ? submitPhoneCode : submitCode}
               style={[styles.primaryBtn, (!codeValid || busy) && styles.primaryBtnOff]}>
               <Text style={styles.primaryText}>{busy ? 'กำลังยืนยัน…' : 'ยืนยัน'}</Text>
             </PressableScale>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Pressable accessibilityRole="button" hitSlop={8} onPress={resend} style={styles.resend}>
-              <Text style={styles.resendText}>ส่งรหัสอีกครั้ง</Text>
+            {/* ★ ส่งซ้ำต้องรอ ★ SMS เสียเงินต่อข้อความ ไม่เหมือนอีเมลที่ส่งฟรี — ปุ่มจึงบอก
+                ตรง ๆ ว่าเหลืออีกกี่วินาที ไม่ใช่กดได้เรื่อย ๆ แล้วเงียบ หรือกดแล้วเด้ง error
+                (ทางอีเมลไม่ต้องรอ ของเดิมทำงานเหมือนเดิม) */}
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              disabled={method === 'phone' && (cooldown > 0 || busy)}
+              onPress={method === 'phone' ? sendOtp : resend}
+              style={styles.resend}>
+              <Text
+                style={[
+                  styles.resendText,
+                  method === 'phone' && cooldown > 0 && styles.resendTextOff,
+                ]}>
+                {method === 'phone' && cooldown > 0
+                  ? `ส่งรหัสอีกครั้งใน ${cooldown} วินาที`
+                  : 'ส่งรหัสอีกครั้ง'}
+              </Text>
             </Pressable>
           </>
         )}
@@ -511,6 +678,32 @@ export default function LoginScreen() {
 }
 
 /** Map Supabase auth errors to friendly Thai copy. */
+/**
+ * ข้อความผิดพลาดของ OTP ทางเบอร์ — แปลงศัพท์เทคนิคของ Supabase เป็นคำที่ลูกค้าทำอะไรต่อได้
+ *
+ * ★ แยก "รหัสผิด" ออกจาก "ส่งไม่ออก" ★ สองอย่างนี้ลูกค้าต้องทำคนละเรื่อง: รหัสผิดให้กรอกใหม่
+ * ส่งไม่ออกให้รอแล้วลองอีกที ถ้ารวบเป็น "ผิดพลาด" เหมือนกันหมด คนจะนั่งกรอกรหัสซ้ำทั้งที่
+ * ไม่มี SMS มาถึงตั้งแต่แรก
+ */
+function otpMessage(e: unknown): string {
+  const err = e as { message?: string; code?: string; status?: number };
+  const code = err?.code ?? '';
+  const msg = err?.message?.toLowerCase() ?? '';
+  if (code === 'otp_expired' || msg.includes('expired'))
+    return 'รหัสหมดอายุแล้ว — กดส่งรหัสใหม่อีกครั้ง';
+  if (code === 'otp_disabled' || msg.includes('signups not allowed') || msg.includes('disabled'))
+    return 'ยังเปิดใช้การเข้าสู่ระบบด้วยเบอร์ไม่ได้ ลองวิธีอื่นก่อนนะ';
+  if (msg.includes('invalid') && (msg.includes('token') || msg.includes('otp')))
+    return 'รหัสไม่ถูกต้อง ลองตรวจดูอีกที';
+  /* โควตาต่อชั่วโมงของโครงการ หรือความถี่ต่อเบอร์ — คนละเรื่องกับรหัสผิด ต้องบอกให้รอ */
+  if (err?.status === 429 || code.includes('rate') || msg.includes('rate limit') || msg.includes('too many'))
+    return 'ขอรหัสบ่อยเกินไป รอสักครู่แล้วลองใหม่';
+  if (msg.includes('invalid') && msg.includes('phone')) return 'เบอร์นี้ไม่ถูกต้อง ลองตรวจดูอีกที';
+  if (msg.includes('sms') || msg.includes('provider') || msg.includes('send'))
+    return 'ส่ง SMS ไม่สำเร็จ ลองใหม่อีกครั้ง หรือเข้าด้วยวิธีอื่นก่อน';
+  return 'ไม่สำเร็จ ลองใหม่อีกครั้ง';
+}
+
 function authMessage(e: unknown, mode: Mode): string {
   const err = e as { message?: string; code?: string };
   const code = err?.code ?? '';
@@ -606,6 +799,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   input: { ...Typography.subtitle, flex: 1, color: Colors.text, padding: 0 },
+  /* +66 ติดอยู่กับช่อง มีเส้นคั่นบาง ๆ — อ่านเป็น "ส่วนหนึ่งของเบอร์" ไม่ใช่ปุ่มที่กดได้ */
+  dialCode: {
+    paddingRight: Spacing.sm,
+    marginRight: Spacing.xs,
+    borderRightWidth: 1,
+    borderRightColor: Colors.border,
+  },
+  dialCodeText: { ...Typography.subtitle, color: Colors.textMuted },
+  methodHint: { textAlign: 'center', color: Colors.textMuted, marginTop: Spacing.md },
+  resendTextOff: { color: Colors.textMuted },
   hintErr: { ...Typography.caption, color: Colors.dangerStrong, marginTop: -Spacing.sm, marginBottom: Spacing.md },
 
   /* Primary button */
