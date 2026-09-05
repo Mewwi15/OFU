@@ -65,6 +65,13 @@ export default function OnlineFavoritesScreen() {
     [ids, products],
   );
 
+  /* เติมช่องว่างให้จำนวนเป็นคู่ — กริดสองคอลัมน์ที่มีของแถวละใบจะกางเต็มแถว (flex: 1)
+     การ์ดใบเดียวเลยใหญ่ผิดขนาดกว่าทุกหน้าในแอป เติมใบเปล่าไว้กันที่ไว้ให้ */
+  const grid: (Product | null)[] = useMemo(
+    () => (items.length % 2 === 1 ? [...items, null] : items),
+    [items],
+  );
+
   const loading = !favLoaded || !catalogLoaded;
 
   return (
@@ -73,8 +80,8 @@ export default function OnlineFavoritesScreen() {
       <ScreenHeader title="สินค้าโปรด" style={styles.header} />
 
       <FlatList
-        data={loading ? [] : items}
-        keyExtractor={(item) => item.id}
+        data={loading ? [] : grid}
+        keyExtractor={(item, index) => item?.id ?? `pad-${index}`}
         numColumns={2}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
@@ -89,9 +96,13 @@ export default function OnlineFavoritesScreen() {
             tintColor={ONLINE_ACCENT.solid}
           />
         }
-        renderItem={({ item, index }) => (
-          <ProductCard product={item} index={index} accent={ONLINE_ACCENT} />
-        )}
+        renderItem={({ item, index }) =>
+          item ? (
+            <ProductCard product={item} index={index} accent={ONLINE_ACCENT} />
+          ) : (
+            <View style={styles.pad} />
+          )
+        }
         ListEmptyComponent={
           loading ? (
             <View style={styles.row}>
@@ -134,6 +145,8 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   row: { gap: Spacing.md, marginBottom: Spacing.md },
   skCell: { flex: 1 },
+  // ใบเปล่ากันที่ ไม่ให้การ์ดใบสุดท้ายกางเต็มแถว
+  pad: { flex: 1 },
   empty: { alignItems: 'center', paddingTop: Spacing.x3 * 2 },
   emptyIcon: {
     width: 84,
