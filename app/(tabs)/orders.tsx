@@ -20,6 +20,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PressableScale } from '@/components/ui/PressableScale';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { isAwaitingSlipCheck, type OrderStatus, type TrackedOrder } from '@/data/fulfillment';
 import { getReorderItems, TERMINAL } from '@/lib/data/order';
@@ -51,7 +53,10 @@ const TONE_BADGE: Record<StatusTone, object> = {
 const TONE_TEXT: Record<StatusTone, string> = {
   active: Colors.primaryStrong,
   done: Colors.accentStrong,
-  fail: Colors.dangerStrong,
+  /* ★ เทา ไม่ใช่แดง ★ ออเดอร์ที่ยกเลิกไปแล้วเป็นเรื่องที่จบไปแล้ว ไม่ใช่ปัญหาที่ลูกค้า
+     ต้องรีบจัดการ — ป้ายแดงในรายการย้อนหลังทำให้ทั้งหน้าดูเหมือนมีอะไรผิดพลาดเต็มไปหมด
+     สีแดงเก็บไว้ใช้กับสิ่งที่ต้องลงมือทำจริง ๆ */
+  fail: Colors.textMuted,
 };
 
 const THUMB = 44;
@@ -100,6 +105,8 @@ function OrderCard({
 }) {
   const t = useT();
   const meta = STATUS_META[order.status];
+  /* สีตามโหมดของออเดอร์ใบนี้ ไม่ใช่โหมดที่แอปอยู่ตอนนี้ (เหตุผลเดียวกับหน้าติดตามออเดอร์) */
+  const A = order.mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
   const ongoing = !onReorder;
   // "และอีก N รายการ" counts other product lines, not leftover units.
   const restCount = (order.lineCount ?? order.itemCount) - 1;
@@ -114,15 +121,24 @@ function OrderCard({
       accessibilityLabel={`${t('orders.trackA11y')} ${order.id}`}
       onPress={onPress}
       scaleTo={0.98}
-      style={[styles.card, ongoing && styles.cardOngoing]}>
+      style={[styles.card, ongoing && { borderColor: A.solid }, ongoing && styles.cardOngoing]}>
       {/* Header: order no. + date | status badge */}
       <View style={styles.cardHead}>
         <Text variant="caption" numberOfLines={1} style={styles.headMeta}>
           #{order.id}
-          {order.placedAtLabel ? ` · ${order.placedAtLabel}` : ''}
+          {order.placedAtLabel ? `   ${order.placedAtLabel}` : ''}
         </Text>
-        <View style={[styles.badge, TONE_BADGE[meta.tone]]}>
-          <Text style={[styles.badgeText, { color: TONE_TEXT[meta.tone] }]}>
+        <View
+          style={[
+            styles.badge,
+            TONE_BADGE[meta.tone],
+            meta.tone === 'active' && { backgroundColor: A.tint },
+          ]}>
+          <Text
+            style={[
+              styles.badgeText,
+              { color: meta.tone === 'active' ? A.strong : TONE_TEXT[meta.tone] },
+            ]}>
             {statusLabel}
           </Text>
         </View>
@@ -149,9 +165,16 @@ function OrderCard({
 
       {/* Footer action */}
       {ongoing ? (
-        <View style={styles.trackStrip}>
-          <Text style={styles.trackText}>{t('orders.trackCta')}</Text>
-          <Ionicons name="arrow-forward" size={16} color={Colors.textOnPrimary} />
+        /* ★ ปุ่มไม่กินเต็มความกว้าง ★ ของเดิมเป็นแถบสีทึบเต็มการ์ด ทั้งใบเลยตะโกนแข่งกับ
+           ทุกอย่างบนหน้า ทั้งที่ทั้งการ์ดกดได้อยู่แล้ว — ย่อเป็นปุ่มชิดขวาพอ */
+        <View style={styles.cardFoot}>
+          <Text variant="caption" numberOfLines={1} style={styles.footMeta}>
+            {order.deliveredAt ?? ''}
+          </Text>
+          <View style={[styles.trackPill, { backgroundColor: A.solid }]}>
+            <Text style={styles.trackText}>{t('orders.trackCta')}</Text>
+            <Ionicons name="arrow-forward" size={15} color={Colors.textOnPrimary} />
+          </View>
         </View>
       ) : (
         <View style={styles.cardFoot}>
@@ -163,9 +186,9 @@ function OrderCard({
             accessibilityLabel={`${t('orders.reorderA11y')} ${order.id}`}
             hitSlop={8}
             onPress={onReorder}
-            style={styles.reorderPill}>
-            <Ionicons name="refresh" size={14} color={Colors.primaryStrong} />
-            <Text style={styles.reorderText}>{t('orders.reorder')}</Text>
+            style={[styles.reorderPill, { borderColor: A.tint }]}>
+            <Ionicons name="refresh" size={14} color={A.strong} />
+            <Text style={[styles.reorderText, { color: A.strong }]}>{t('orders.reorder')}</Text>
           </PressableScale>
         </View>
       )}
@@ -305,19 +328,22 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
+    /* แน่นขึ้นกว่าเดิม — ของเดิมเว้นขอบในกว้างจนเห็นได้แค่สองใบครึ่งต่อจอ
+       หน้านี้เป็นรายการที่ต้องกวาดตาหา ไม่ใช่หน้าที่อ่านทีละใบ */
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
     ...Shadow.card,
   },
-  cardOngoing: {
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-  },
+  /* ★ ขอบบางลงมาก ★ ของเดิม 1.5 สีทึบทั้งกรอบ อ่านออกมาเป็นกล่องเตือนภัยมากกว่า
+     "ออเดอร์ที่กำลังมา" — บาง ๆ พอให้รู้ว่าใบนี้ต่างจากใบอื่น ไม่ต้องตะโกน */
+  cardOngoing: { borderWidth: 1 },
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   headMeta: {
     flexShrink: 1,
@@ -348,8 +374,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 1,
   },
+  /* เล็กลงกว่าเดิมหนึ่งขั้น — ของเดิมตัวเลขใหญ่กว่าชื่อสินค้า สายตาเลยไปหาตัวเลขก่อน
+     ทั้งที่คนเปิดหน้านี้มาหา "ออเดอร์ไหน" ไม่ใช่ "จ่ายไปเท่าไหร่" */
   totalValue: {
-    ...Typography.subtitle,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 16,
     color: Colors.text,
   },
 
@@ -388,15 +417,15 @@ const styles = StyleSheet.create({
   },
 
   /* Footer — ongoing: track CTA strip */
-  trackStrip: {
+  /* ปุ่มติดตามชิดขวา ไม่กินเต็มความกว้าง — ทั้งการ์ดกดได้อยู่แล้ว ปุ่มนี้แค่บอกว่ากดแล้ว
+     จะไปไหน ไม่ต้องเป็นแถบทึบเต็มใบ */
+  trackPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    minHeight: 40,
-    marginTop: Spacing.lg,
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    height: 36,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
   },
   trackText: {
     ...Typography.button,
@@ -404,15 +433,14 @@ const styles = StyleSheet.create({
   },
 
   /* Footer — history: delivered date + reorder */
+  /* ไม่มีเส้นคั่นแล้ว — เส้นบวกระยะห่างสองชั้นทำให้เกิดแถบว่างใต้การ์ดทุกใบ
+     ปุ่มอยู่แถวเดียวกับวันที่ก็แยกออกจากเนื้อหาได้เองอยู่แล้ว */
   cardFoot: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.sm,
     marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
   },
   footMeta: {
     flexShrink: 1,
