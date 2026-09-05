@@ -13,6 +13,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CartBadge } from '@/components/navigation/CartBadge';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
 import { useIsDesktopWeb } from '@/lib/useAppWidth';
@@ -22,6 +23,13 @@ type IconName = keyof typeof Ionicons.glyphMap;
 type TabMeta = {
   /** i18n key for the label shown under the icon (also the accessibility label). */
   labelKey: string;
+  /**
+   * ป้ายแบบระบุคำตรง ๆ — ชนะ labelKey ถ้าใส่มา
+   *
+   * แถบของโหมดออนไลน์ใช้คำที่เจ้าของสั่งมาเป๊ะ ("โค้ดส่วนลด" ไม่ใช่ "คูปอง") ซึ่งต่างจาก
+   * แถบหลักที่ใช้คำสั้นกว่า — ไปแก้ที่พจนานุกรมกลางจะเปลี่ยนแถบหลักตามไปด้วย
+   */
+  label?: string;
   active: IconName;
   inactive: IconName;
   /** Render as the raised, prominent centre button (FAB-style). */
@@ -55,9 +63,18 @@ export type TabBarProps = BottomTabBarProps & {
   tabs?: Record<string, TabMeta>;
   /** ชื่อเส้นทางที่ให้ป้ายนับสินค้าในตะกร้าไปเกาะ — ไม่ส่ง = 'cart' */
   cartRoute?: string;
+  /** สีเน้นของแถบ — ไม่ส่ง = สีแบรนด์ (ส้ม) โหมดออนไลน์ส่งน้ำเงินมา */
+  accent?: Accent;
 };
 
-export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart' }: TabBarProps) {
+export function TabBar({
+  state,
+  descriptors,
+  navigation,
+  tabs,
+  cartRoute = 'cart',
+  accent = BRAND_ACCENT,
+}: TabBarProps) {
   const t = useT();
   const insets = useSafeAreaInsets();
   const isDesktopWeb = useIsDesktopWeb();
@@ -81,7 +98,7 @@ export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart
           // Skip any route we don't have metadata for (defensive).
           if (!meta) return null;
 
-          const label = t(meta.labelKey);
+          const label = meta.label ?? t(meta.labelKey);
 
           const onPress = () => {
             if (Platform.OS !== 'web') {
@@ -113,19 +130,27 @@ export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart
                 onPress={onPress}
                 onLongPress={onLongPress}
                 style={styles.raisedItem}>
-                <View style={[styles.raisedDisc, isFocused && styles.raisedDiscActive]}>
+                <View
+                  style={[
+                    styles.raisedDisc,
+                    { backgroundColor: isFocused ? accent.strong : accent.solid },
+                  ]}>
                   <Ionicons
                     name={isFocused ? meta.active : meta.inactive}
                     size={32}
                     color={Colors.textOnPrimary}
                   />
+                  {/* ★ ป้ายนับต้องมาที่นี่ด้วย ★ กิ่งของปุ่มกลางคืนค่าออกไปก่อนถึงบรรทัด
+                      ที่วาดป้ายนับของเมนูปกติ ตอนที่ตะกร้ายังไม่เคยเป็นปุ่มกลางเลยไม่มีใคร
+                      เจอ พอโหมดออนไลน์ยกตะกร้าขึ้นเป็นปุ่มกลาง เลขในตะกร้าเลยหายไปเฉย ๆ */}
+                  {route.name === cartRoute ? <CartBadge /> : null}
                 </View>
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.label,
                     styles.raisedLabel,
-                    { color: isFocused ? Colors.primaryStrong : Colors.textMuted },
+                    { color: isFocused ? accent.strong : Colors.textMuted },
                   ]}>
                   {label}
                 </Text>
@@ -133,7 +158,7 @@ export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart
             );
           }
 
-          const tint = isFocused ? Colors.primary : Colors.textMuted;
+          const tint = isFocused ? accent.solid : Colors.textMuted;
 
           return (
             <Pressable
@@ -152,7 +177,7 @@ export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart
               <View
                 style={[
                   styles.indicator,
-                  isFocused && styles.indicatorActive,
+                  isFocused && [styles.indicatorActive, { backgroundColor: accent.solid }],
                 ]}
               />
               <View style={styles.iconWrap}>
@@ -167,7 +192,7 @@ export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart
                 numberOfLines={1}
                 style={[
                   styles.label,
-                  { color: isFocused ? Colors.primaryStrong : Colors.textMuted },
+                  { color: isFocused ? accent.strong : Colors.textMuted },
                 ]}>
                 {label}
               </Text>
@@ -240,6 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
+  // สีจริงมาจาก accent ที่จุดเรียกใช้ — ค่าใน stylesheet เป็นแค่ตัวสำรอง
   raisedDisc: {
     // วงกลมใหญ่ขึ้นตามที่เจ้าของสั่ง 3 ก.ย. 2026 (60 → 68)
     // marginTop เป็นลบครึ่งหนึ่งของขนาดเสมอ วงจึงโผล่พ้นขอบบนแถบพอดีครึ่งวง
@@ -253,9 +279,6 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: Colors.surface,
     ...Shadow.float,
-  },
-  raisedDiscActive: {
-    backgroundColor: Colors.primaryStrong,
   },
   raisedLabel: {
     /* ให้ป้าย "คำสั่งซื้อ" อยู่แนวเดียวกับป้ายอื่น (เจ้าของทัก 3 ก.ย. 2026)

@@ -13,12 +13,19 @@
 import { Tabs } from 'expo-router';
 
 import { TabBar } from '@/components/navigation/TabBar';
+import { ONLINE_ACCENT } from '@/constants/online';
 
-/** เมนูทั้งห้าตามที่เจ้าของสั่ง เรียงตามที่สั่งมาเป๊ะ */
+/** เมนูทั้งห้า — ชื่อและลำดับตามที่เจ้าของสั่งมาเป๊ะ ไม่ใช่คำสั้นแบบแถบหลักของแอป */
 const ONLINE_TABS = {
-  index: { labelKey: 'tab.home', active: 'home' as const, inactive: 'home-outline' as const },
+  index: {
+    labelKey: 'tab.home',
+    label: 'หน้าหลัก',
+    active: 'home' as const,
+    inactive: 'home-outline' as const,
+  },
   coupons: {
     labelKey: 'tab.coupons',
+    label: 'โค้ดส่วนลด',
     active: 'pricetag' as const,
     inactive: 'pricetag-outline' as const,
   },
@@ -26,17 +33,20 @@ const ONLINE_TABS = {
      (แถบหลักของแอปยก "คำสั่งซื้อ" ขึ้นด้วยเหตุผลเดียวกัน) */
   cart: {
     labelKey: 'tab.cart',
+    label: 'ตะกร้าสินค้า',
     active: 'cart' as const,
     inactive: 'cart-outline' as const,
     raised: true,
   },
   favorites: {
     labelKey: 'tab.favorites',
+    label: 'สินค้าโปรด',
     active: 'heart' as const,
     inactive: 'heart-outline' as const,
   },
   account: {
     labelKey: 'tab.account',
+    label: 'บัญชีของฉัน',
     active: 'person' as const,
     inactive: 'person-outline' as const,
   },
@@ -45,7 +55,9 @@ const ONLINE_TABS = {
 export default function OnlineLayout() {
   return (
     <Tabs
-      tabBar={(props) => <TabBar {...props} tabs={ONLINE_TABS} />}
+      /* น้ำเงินตามโหมด ไม่ใช่ส้มของแบรนด์ — ทั้งโหมดเป็นน้ำเงินหมดแล้ว แถบล่างเป็น
+         ส้มอยู่อันเดียวจะโดดออกมาทันที (เจ้าของทัก 5 ก.ย. 2026 "สีต้องเป็นสีน้ำเงินสิครับ") */
+      tabBar={(props) => <TabBar {...props} tabs={ONLINE_TABS} accent={ONLINE_ACCENT} />}
       screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="coupons" />
