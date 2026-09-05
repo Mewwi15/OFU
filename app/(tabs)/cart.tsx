@@ -62,16 +62,7 @@ import {
   useMode,
 } from '@/store/mode';
 
-/** Payment hint i18n key per mode (the two flows differ on payment). */
-const PAYMENT_HINT = {
-  delivery: 'cart.payHintDelivery',
-  online: 'cart.payHintOnline',
-} as const;
 
-const PAYMENT_ICON = {
-  delivery: 'wallet-outline',
-  online: 'qr-code-outline',
-} as const;
 
 /** Footprint of the floating tab bar above the screen bottom. */
 const TAB_BAR_FOOTPRINT = 64;
@@ -169,9 +160,11 @@ function FreeShipBlock({
 function AddOnRail({
   items,
   onAdd,
+  accent,
 }: {
   items: Product[];
   onAdd: (product: Product) => void;
+  accent: Accent;
 }) {
   const t = useT();
   if (items.length === 0) return null;
@@ -186,7 +179,7 @@ function AddOnRail({
           <View key={p.id} style={styles.addonCard}>
             <Image
               source={{ uri: productThumb(p.images[0], 232, 192) }}
-              style={styles.addonImg}
+              style={[styles.addonImg, { backgroundColor: accent.tint }]}
               contentFit="cover"
               transition={200}
               cachePolicy="memory-disk"
@@ -195,13 +188,13 @@ function AddOnRail({
               {p.name}
             </Text>
             <View style={styles.addonBottom}>
-              <Text style={styles.addonPrice}>{money(p.price)}</Text>
+              <Text style={[styles.addonPrice, { color: accent.strong }]}>{money(p.price)}</Text>
               <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={`${t('cart.addProductA11yPrefix')} ${p.name} ${t('cart.addProductA11ySuffix')}`}
                 hitSlop={7}
                 onPress={() => onAdd(p)}
-                style={styles.addonAdd}>
+                style={[styles.addonAdd, { backgroundColor: accent.solid }]}>
                 <Ionicons name="add" size={18} color={Colors.textOnPrimary} />
               </PressableScale>
             </View>
@@ -430,7 +423,9 @@ export default function CartScreen() {
       {mode === 'online' ? null : (
         <ScreenHeader title={t('cart.title')} style={styles.header} />
       )}
-      {!isEmpty ? (
+      {/* จำนวนใต้หัวข้อ — โหมดออนไลน์ไม่มีหัวข้อแล้ว บรรทัดนี้เลยลอยเดี่ยว ๆ อยู่บนสุด
+          และไปซ้ำกับหัวโซน "รายการสินค้า N รายการ" ที่อยู่ถัดลงไปไม่กี่บรรทัด */}
+      {!isEmpty && mode !== 'online' ? (
         <Text variant="caption" style={styles.headerCount}>
           {items.length} {t('cart.itemsUnit')}
         </Text>
@@ -498,10 +493,10 @@ export default function CartScreen() {
                     {address ? (
                       <>
                         <Text style={styles.addrTitle} numberOfLines={1}>
-                          {t('cart.deliverTo')} · {address.label}
+                          {t('cart.deliverTo')} {address.label}
                         </Text>
                         <Text variant="caption" numberOfLines={1}>
-                          {address.recipient} · {address.phone}
+                          {address.recipient}   {address.phone}
                         </Text>
                         <Text variant="caption" numberOfLines={1}>
                           {address.line}
@@ -588,7 +583,12 @@ export default function CartScreen() {
             )}
 
             {/* Items ledger */}
-            <Text style={styles.eyebrow}>{t('cart.itemsEyebrow')} · {items.length} {t('cart.unitPieces')}</Text>
+            {/* ★ นับให้ตรงหน่วย ★ เดิมใช้จำนวน "บรรทัด" แต่เขียนหน่วยว่า "ชิ้น" — ตะกร้า
+                ที่มีมาม่า 3 ห่อกับน้ำยา 2 ถุง ขึ้นว่า "2 ชิ้น" ทั้งที่มีของ 5 ชิ้น
+                (เจ้าของทัก 5 ก.ย. 2026) บรรทัดกับชิ้นเป็นคนละเรื่อง บอกทั้งสองอย่างไปเลย */}
+            <Text style={styles.eyebrow}>
+              {t('cart.itemsEyebrow')} {items.length} รายการ
+            </Text>
             <View style={styles.itemsCard}>
               {/* Select-all header */}
               <View style={styles.selectAllRow}>
@@ -640,7 +640,7 @@ export default function CartScreen() {
             </View>
 
             {/* Upsell rail */}
-            <AddOnRail items={suggestions} onAdd={onAddSuggestion} />
+            <AddOnRail items={suggestions} onAdd={onAddSuggestion} accent={A} />
 
             {/* Summary */}
             <Text style={[styles.eyebrow, styles.eyebrowTop]}>{t('cart.summaryEyebrow')}</Text>
@@ -722,7 +722,7 @@ export default function CartScreen() {
               {/* Breakdown */}
               <View style={styles.sumRow}>
                 <Text variant="body" style={styles.sumLabel}>
-                  {t('cart.subtotalLabel')} ({selectedCount} {t('cart.unitPieces')})
+                  {t('cart.subtotalLabel')}
                 </Text>
                 <Text style={styles.sumValue}>{money(subtotal)}</Text>
               </View>
@@ -753,13 +753,9 @@ export default function CartScreen() {
                 </View>
               ) : null}
 
-              {/* Payment hint — its own full-width line */}
-              <View style={styles.payRow}>
-                <Ionicons name={PAYMENT_ICON[mode]} size={14} color={Colors.textMuted} />
-                <Text variant="caption" style={styles.payText}>
-                  {t(PAYMENT_HINT[mode])}
-                </Text>
-              </View>
+              {/* วิธีชำระเงินไม่อยู่ในสรุปแล้ว (เจ้าของสั่ง 5 ก.ย. 2026 "ชำอะไรออนไลน์
+                  promptPay เอาออกไปเลย เราแค่สรุปรายการครับ") — กล่องนี้มีหน้าที่บอกว่า
+                  จ่ายเท่าไหร่ ไม่ใช่จ่ายอย่างไร วิธีจ่ายไปเลือกที่หน้าชำระเงินอยู่แล้ว */}
 
               <View style={styles.summaryHairline} />
 
@@ -782,7 +778,7 @@ export default function CartScreen() {
                 style={[styles.checkoutLabel, !canCheckout && !nothingSelected && styles.checkoutLabelWarn]}
                 numberOfLines={1}>
                 {!shopOpen
-                  ? `${t('cart.closedShort')} · ${shopHoursLabel(shopHours)}`
+                  ? `${t('cart.closedShort')} ${shopHoursLabel(shopHours)}`
                   : nothingSelected
                       ? t('cart.nothingSelected')
                       : needsParcel
@@ -795,8 +791,8 @@ export default function CartScreen() {
                              เห็นเลขไม่ตรงกับที่บวกเอง (เจ้าของทัก "ทำยอดให้ตรงด้วยครับ")
                              ค่าส่งเป็นศูนย์ก็ไม่ต้องเขียนถึง ไม่งั้นรกโดยไม่ได้ความ */
                           : deliveryFee > 0
-                            ? `ยอดที่ต้องจ่าย · ${selectedCount} ${t('cart.unitPieces')} + ค่าส่ง`
-                            : `ยอดที่ต้องจ่าย · ${selectedCount} ${t('cart.unitPieces')}`}
+                            ? 'ยอดที่ต้องจ่าย รวมค่าส่ง'
+                            : 'ยอดที่ต้องจ่าย'}
               </Text>
               <View style={styles.checkoutTotalRow}>
                 <Text style={styles.checkoutTotal}>
@@ -902,13 +898,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
   },
+  /* หัวโซน — หนาขึ้นและเข้มขึ้นกว่าเดิม (เจ้าของทัก 5 ก.ย. 2026 "ตัวหนังสือเอาตัวหนา
+     ครับ บางแล้วมองไม่ชัด") ของเดิมเป็นตัวกลางสีเทาจาง อ่านยากบนพื้นขาวโดยเฉพาะ
+     กลางแดดหรือจอที่หรี่แสงอยู่ */
   eyebrow: {
-    ...Typography.label,
-    color: Colors.textMuted,
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.text,
+    /* ★ เว้นบนให้ห่างจากโซนก่อนหน้า ★ เดิมหัวข้อลอยชิดการ์ดที่อยู่ด้านบนจนดูเป็นก้อน
+       เดียวกัน (เจ้าของทัก "อย่าเอาไปชิดกับข้างบน แยกโซนให้ชัดเจน") — ระยะบนต้อง
+       มากกว่าระยะล่างชัด ๆ หัวข้อจึงจะอ่านเป็น "ของก้อนถัดไป" ไม่ใช่หางของก้อนบน */
+    marginTop: Spacing.x2,
     marginBottom: Spacing.sm,
   },
   eyebrowTop: {
-    marginTop: Spacing.x2,
+    marginTop: Spacing.x3,
   },
   modeSwitch: {
     marginBottom: Spacing.x2,
@@ -1097,7 +1102,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   myCouponsRow: { gap: Spacing.sm },
-  couponCell: { width: 208 },
+  couponCell: { width: 194 },
   couponUse: { fontFamily: 'Mitr_500Medium', fontSize: 12 },
   couponChip: {
     flexDirection: 'row',
@@ -1147,21 +1152,17 @@ const styles = StyleSheet.create({
   sumRowGap: {
     marginTop: Spacing.md,
   },
+  /* หนาและเข้มขึ้น (เจ้าของสั่ง 5 ก.ย. 2026 "ตรงสรุปคำสั่งซื้อ ทำตัวอักษรให้หนา") —
+     ของเดิมฝั่งซ้ายเป็นเทาจาง อ่านคู่กับตัวเลขฝั่งขวาไม่ติดกันเป็นบรรทัดเดียว */
   sumLabel: {
-    color: Colors.textMuted,
-  },
-  sumValue: {
-    ...Typography.bodyStrong,
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
     color: Colors.text,
   },
-  payRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
-  },
-  payText: {
-    flex: 1,
+  sumValue: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 16,
+    color: Colors.text,
   },
   grandTotal: {
     ...Typography.title,

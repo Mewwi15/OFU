@@ -291,7 +291,7 @@ export default function MemberScreen() {
                     ) : null}
                     <Text style={[styles.rewardCost, { color: ACCENT.strong }]}>
                       {r.pointsCost.toLocaleString('th-TH')} แต้ม
-                      {r.stock != null ? ` · เหลือ ${r.stock}` : ''}
+                      {r.stock != null ? `   เหลือ ${r.stock}` : ''}
                     </Text>
                   </View>
                   {/* กดไม่ได้ต้องดูออกว่ากดไม่ได้ ไม่ใช่กดแล้วเงียบ */}

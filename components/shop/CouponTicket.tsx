@@ -112,14 +112,14 @@ export function CouponTicket({
   torn = false,
   onPress,
 }: CouponTicketProps) {
-  const stubW = compact ? 68 : STUB_W;
+  const stubW = compact ? 62 : STUB_W;
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={c.claimed ? `คัดลอกโค้ด ${c.code}` : `เก็บคูปอง ${c.code}`}
       disabled={busy}
       onPress={onPress}
-      style={[styles.ticket, torn && styles.ticketTorn]}>
+      style={[styles.ticket, compact && styles.ticketCompact, torn && styles.ticketTorn]}>
       {/* ต้นขั้วซ้าย — ฉีกแล้วเลื่อนออกจากตัวตั๋วพร้อมเอียงนิดหน่อย */}
       <View
         style={[
@@ -128,13 +128,18 @@ export function CouponTicket({
           compact && styles.stubCompact,
           torn && styles.stubTorn,
         ]}>
-        {!compact ? <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" /> : null}
+        {/* ★ ย่อขนาดแต่ต้องเป็นใบเดียวกับที่ลูกค้ากดเก็บ ★ (เจ้าของสั่ง 5 ก.ย. 2026
+            "ต้องเป็นอันเดียวกับที่เก็บได้ UI ส่วนลด ราคาอะไรต้องตรงหมด") — มาสคอตกับ
+            วันหมดอายุอยู่ครบ แค่เล็กลง ไม่ใช่ตัดทิ้งจนกลายเป็นของคนละใบ */}
+        <Image
+          source={MASCOT_SRC}
+          style={compact ? styles.stubArtCompact : styles.stubArt}
+          contentFit="contain"
+        />
         <Text style={[styles.stubLabel, compact && styles.stubLabelCompact]}>คูปอง</Text>
-        {!compact ? (
-          <Text style={styles.stubExpiry}>
-            {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
-          </Text>
-        ) : null}
+        <Text style={[styles.stubExpiry, compact && styles.stubExpiryCompact]}>
+          {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
+        </Text>
       </View>
 
       {/* รอยปรุ + รอยบากบนล่าง */}
@@ -167,7 +172,7 @@ export function CouponTicket({
           {couponHeadline(c)}
         </Text>
         <Text numberOfLines={compact ? 2 : undefined} style={styles.conds}>
-          {couponConditions(c).join(' · ')}
+          {couponConditions(c).join('   ')}
         </Text>
         {footer !== undefined ? (
           <View style={styles.codeRow}>{footer}</View>
@@ -229,6 +234,10 @@ const styles = StyleSheet.create({
   },
   /* ฉีกแล้ว: สองซีกแยกออกจากกันตรงรอยปรุพร้อมเอียงคนละทาง — ตั๋วจริงถูกฉีกตรงนั้น
      ภาพนี้จึงอ่านออกทันทีโดยไม่ต้องอ่านตัวหนังสือ */
+  /* ★ ต้องมีเส้นขอบตอนย่อ ★ ตั๋วเป็นการ์ดขาว แต่ในหน้าตะกร้ามันวางอยู่บนการ์ดสรุปที่ก็
+     ขาวเหมือนกัน — เงาอย่างเดียวจางเกินกว่าจะเห็นขอบ ตั๋วเลยดูเหมือนข้อความลอย ๆ ไม่ใช่
+     ของที่กดได้ ในแท็บคูปองไม่มีปัญหานี้เพราะพื้นหน้าเป็นเทาอ่อน */
+  ticketCompact: { borderWidth: 1, borderColor: Colors.border },
   ticketTorn: { opacity: 0.75 },
   stubTorn: { transform: [{ translateX: -6 }, { rotate: '-2.5deg' }] },
   bodyTorn: { transform: [{ translateX: 6 }, { rotate: '1.5deg' }] },
@@ -259,11 +268,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xs,
     gap: 2,
   },
-  stubCompact: { paddingVertical: Spacing.sm },
+  stubCompact: { paddingVertical: Spacing.sm, paddingHorizontal: 4, gap: 1 },
   stubArt: { width: 46, height: 55 },
-  stubLabelCompact: { fontSize: 12 },
-  ticketBodyCompact: { padding: Spacing.sm },
-  headlineCompact: { fontSize: 16 },
+  stubArtCompact: { width: 26, height: 31 },
+  stubLabelCompact: { fontSize: 11 },
+  stubExpiryCompact: { fontSize: 8, lineHeight: 11 },
+  ticketBodyCompact: { padding: Spacing.sm, gap: 1 },
+  headlineCompact: { fontSize: 15 },
   stubLabel: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 13,
