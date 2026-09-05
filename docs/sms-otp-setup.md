@@ -34,7 +34,38 @@ Supabase Dashboard → **Authentication → Hooks** → **Send SMS hook**
 
 ---
 
-## ขั้นที่ 3 — ตั้งค่าให้ตรงกับผู้ให้บริการ
+## ค่าสำหรับ SMS KUB (ที่สมัครไว้แล้ว)
+
+อ่านจากคู่มือ API ของเขาแล้ว — ใช้ชุดนี้ได้เลย ไม่ต้องเดา
+
+```bash
+npx supabase secrets set \
+  SEND_SMS_HOOK_SECRET='v1,whsec_...' \
+  SMS_API_URL='https://console.sms-kub.com/api/messages' \
+  SMS_AUTH='header:key:<API Key ที่สร้างในหน้า SMS API>' \
+  SMS_CONTENT_TYPE='json' \
+  SMS_SENDER='<ชื่อผู้ส่งที่ใช้ได้>' \
+  SMS_BODY='{"to":["{phone_local}"],"from":"{sender}","message":"{message}"}'
+```
+
+หมายเหตุของเจ้านี้:
+
+- กุญแจส่งทาง **หัวข้อชื่อ `key`** ไม่ใช่ `Authorization`
+- ช่อง `to` เป็น **อาร์เรย์** และใช้เบอร์แบบในประเทศ `08…` (จึงใช้ `{phone_local}`)
+- ดูชื่อผู้ส่งที่ใช้ได้จริงของบัญชีตัวเอง:
+
+```bash
+curl -s 'https://console.sms-kub.com/api/senders/usable' -H 'key: <API Key>'
+```
+
+  เลือกอันที่ `type` เป็น **OTP** ถ้ามี — SMS ประเภท OTP ส่งได้ตลอดเวลาและถึงเร็วกว่า
+  ประเภทการตลาด
+
+- เช็กเครดิตคงเหลือ: `curl -s 'https://console.sms-kub.com/api/transactions/balance' -H 'key: <API Key>'`
+
+---
+
+## ขั้นที่ 3 — ตั้งค่าให้ตรงกับผู้ให้บริการ (เจ้าอื่น)
 
 **ไม่ต้องแก้โค้ด** ทุกอย่างมาจากค่าที่ตั้งไว้ตรงนี้
 
