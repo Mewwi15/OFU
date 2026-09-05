@@ -82,6 +82,19 @@ import { productThumb } from '../lib/image';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
 
+/**
+ * เงินแบบปัดเป็นบาทถ้วน แสดงลงท้าย .00 เสมอ (เจ้าของสั่ง 5 ก.ย. 2026 "ยอดรวมที่เป็น
+ * ทศนิยม ทำปัดเศษให้เป็น .00 เลย")
+ *
+ * ★ ใช้กับทั้งช่อง "รวม" ของแต่ละแถวและเงินรวมท้ายใบ ★ ถ้าปัดเฉพาะยอดรวม ตัวเลขในตาราง
+ * จะบวกแล้วไม่เท่ากับยอดล่าง ซึ่งเป็นสิ่งที่คนตรวจใบรับของจับได้ทันทีและเชื่อตัวเลขไม่ได้
+ * อีกเลย — ปัดที่ระดับแถวแล้วบวกจากค่าที่ปัดแล้ว ทุกอย่างบนจอจึงตรงกันเสมอ
+ *
+ * ทุนต่อชิ้นที่บันทึกลงฐานข้อมูลไม่ถูกแตะ ยังเก็บทศนิยมตามที่กรอกทุกประการ
+ */
+const bahtRound = (n: number) =>
+  `฿${Math.round(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 type PickItem = {
   variantId: string;
   label: string;
@@ -330,7 +343,9 @@ export function Receive() {
     if (matches.length === 0 && query.trim()) setNewProduct({ code: query.trim() });
   };
 
-  const total = lines.reduce((s, l) => s + (l.unitCost ?? 0) * l.qty, 0);
+  /* บวกจากค่าที่ปัดแล้วทีละแถว ไม่ใช่ปัดตอนท้าย — ตัวเลขในตารางกับยอดล่างจะได้ตรงกัน
+     (ปัดตอนท้ายทำให้ 0.5+0.5 กลายเป็น 1 ทั้งที่ในตารางโชว์ 1+1 = 2) */
+  const total = lines.reduce((s, l) => s + Math.round((l.unitCost ?? 0) * l.qty), 0);
 
   const save = async () => {
     if (lines.length === 0) return;
@@ -408,7 +423,7 @@ export function Receive() {
       title: 'รวม',
       width: 110,
       align: 'right',
-      render: (_, l) => (l.unitCost != null ? baht(l.unitCost * l.qty) : '—'),
+      render: (_, l) => (l.unitCost != null ? bahtRound(l.unitCost * l.qty) : '—'),
     },
     {
       title: '',
@@ -630,7 +645,7 @@ export function Receive() {
                 </span>
                 {total > 0 ? (
                   <span className="text-[15px]">
-                    เงินรวม <b className="tabular-nums text-[19px]">{baht(total)}</b>
+                    เงินรวม <b className="tabular-nums text-[19px]">{bahtRound(total)}</b>
                   </span>
                 ) : null}
               </div>
@@ -963,7 +978,11 @@ export function printReceiptSheet(
   _viaDialog = false,
 ) {
   const money = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
-  const total = lines.reduce((s, l) => s + (l.unitCost ?? 0) * l.qty, 0);
+  /* ใบพิมพ์ใช้กติกาเดียวกับหน้าจอ — ใบที่พิมพ์ออกมาแล้วยอดไม่ตรงกับที่เห็นตอนกดบันทึก
+     คือปัญหาที่อธิบายกับซัพพลายเออร์ไม่ได้ */
+  const moneyRound = (n: number) =>
+    `฿${Math.round(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const total = lines.reduce((s, l) => s + Math.round((l.unitCost ?? 0) * l.qty), 0);
   const pieces = lines.reduce((s, l) => s + l.qty, 0);
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     body{font-family:'Noto Sans Thai',Sarabun,sans-serif;font-size:13px;color:#111;margin:24px}
@@ -983,9 +1002,9 @@ export function printReceiptSheet(
         <td>${esc(l.productName)}${l.size ? ` (${esc(l.size)})` : ''}</td>
         <td class="r">${l.qty}</td>
         <td class="r">${l.unitCost != null ? money(l.unitCost) : '-'}</td>
-        <td class="r">${l.unitCost != null ? money(l.unitCost * l.qty) : '-'}</td>
+        <td class="r">${l.unitCost != null ? moneyRound(l.unitCost * l.qty) : '-'}</td>
       </tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="2">รวม ${lines.length} รายการ</td><td class="r">${pieces} ชิ้น</td><td></td><td class="r">${money(total)}</td></tr></tfoot>
+      <tfoot><tr><td colspan="2">รวม ${lines.length} รายการ</td><td class="r">${pieces} ชิ้น</td><td></td><td class="r">${moneyRound(total)}</td></tr></tfoot>
     </table>
   </body></html>`;
   const frame = document.createElement('iframe');
