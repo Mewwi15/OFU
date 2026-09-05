@@ -915,6 +915,15 @@ function LotPanel({ variantId }: { variantId: string }) {
   const live = lots.filter((l) => l.qty_left > 0);
   const onHand = live.reduce((s, l) => s + l.qty_left, 0);
   const value = live.reduce((s, l) => s + l.qty_left * l.unit_cost, 0);
+  /* ★ วันซ้ำกันได้ ★ รับของวันเดียวกันหลายใบเป็นเรื่องปกติ (เจ้าของทัก 5 ก.ย. 2026
+     "บางอันมีวันที่ซ้ำด้วย") — ถ้าเจอวันซ้ำ โชว์เวลาด้วยทั้งตาราง ไม่ใช่โชว์เฉพาะแถวที่ซ้ำ
+     เพราะรูปแบบวันที่ที่ไม่เหมือนกันในตารางเดียวอ่านยากกว่าเดิม */
+  const days = lots.map((l) => thDate(l.received_at).format('YYYY-MM-DD'));
+  const sameDay = new Set(days).size !== days.length;
+  const firstLiveId = live[0]?.id;
+
+  const money = (n: number) =>
+    `฿${n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <>
@@ -930,52 +939,83 @@ function LotPanel({ variantId }: { variantId: string }) {
         </div>
       ) : (
         <>
-          <div className="mb-2 text-[13px] text-[#4b443f]">
-            คงเหลือ <b>{onHand.toLocaleString('th-TH')}</b> ชิ้น · มูลค่าต้นทุนรวม{' '}
-            <b>
-              ฿
-              {Math.round(value).toLocaleString('th-TH', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </b>
+          {/* สรุปก่อน ตารางทีหลัง — คนส่วนใหญ่อยากรู้แค่สองตัวเลขนี้ ไม่ได้จะอ่านทุกแถว */}
+          <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-[#f7f5f3] px-3 py-2 text-[13px]">
+            <span>
+              คงเหลือรวม <b className="tabular-nums text-[15px]">{onHand.toLocaleString('th-TH')}</b> ชิ้น
+            </span>
+            <span>
+              มูลค่าต้นทุน <b className="tabular-nums text-[15px]">{money(value)}</b>
+            </span>
+            {live.length > 1 ? (
+              <span className="text-[#8a807a]">
+                มี {live.length} ชุดคนละทุน — ขายชุดบนสุดก่อน
+              </span>
+            ) : null}
           </div>
-          <table className="mb-3 w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-gray-400">
-                <th className="py-1 font-normal">รับเข้าเมื่อ</th>
-                <th className="py-1 text-right font-normal">ทุน/ชิ้น</th>
-                <th className="py-1 text-right font-normal">รับมา</th>
-                <th className="py-1 text-right font-normal">เหลือ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lots.map((l, i) => {
-                const done = l.qty_left === 0;
-                /* ล็อตแรกที่ยังมีของ = ชุดที่กำลังขายอยู่ ทำให้เด่นกว่าเพื่อน */
-                const current = !done && lots.slice(0, i).every((x) => x.qty_left === 0);
-                return (
-                  <tr key={l.id} className={done ? 'text-gray-300' : undefined}>
-                    <td className="py-1">
-                      {new Date(l.received_at).getFullYear() <= 2000
+
+          <Table<StockLot>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            dataSource={lots}
+            className="mb-3"
+            rowClassName={(l) => (l.qty_left === 0 ? 'opacity-40' : '')}
+            columns={[
+              {
+                title: 'ชุดที่',
+                width: 64,
+                align: 'center',
+                /* เลขชุดแทนการอ้างวันที่ — วันซ้ำกันได้ แต่เลขชุดไม่ซ้ำ คุยกันรู้เรื่องกว่า
+                   ตอนต้องชี้ว่า "ชุดไหน" */
+                render: (_: unknown, __: StockLot, i: number) => (
+                  <span className="tabular-nums">{i + 1}</span>
+                ),
+              },
+              {
+                title: 'รับเข้าเมื่อ',
+                dataIndex: 'received_at',
+                render: (v: string, l: StockLot) => (
+                  <div className="leading-tight">
+                    <div>
+                      {new Date(v).getFullYear() <= 2000
                         ? 'ยกมาตอนเริ่มระบบ'
-                        : thDate(l.received_at).format('D MMM YY')}
-                      {current ? (
-                        <Tag color="blue" className="ml-2">
-                          กำลังขายชุดนี้
-                        </Tag>
-                      ) : null}
-                    </td>
-                    <td className="py-1 text-right tabular-nums">
-                      ฿{l.unit_cost.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-1 text-right tabular-nums">{l.qty_in}</td>
-                    <td className="py-1 text-right tabular-nums">{done ? 'หมด' : l.qty_left}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        : thDate(v).format(sameDay ? 'D MMM YY HH:mm' : 'D MMM YY')}
+                    </div>
+                    {l.id === firstLiveId ? (
+                      <Tag color="blue" className="mt-1">
+                        กำลังขายชุดนี้
+                      </Tag>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                title: 'ทุน/ชิ้น',
+                dataIndex: 'unit_cost',
+                width: 110,
+                align: 'right',
+                /* ตัวเลขที่คนเปิดมาดูจริง ๆ — ทำให้เด่นกว่าคอลัมน์อื่น */
+                render: (v: number) => (
+                  <b className="tabular-nums text-[15px]">{money(v)}</b>
+                ),
+              },
+              {
+                title: 'คงเหลือ',
+                width: 120,
+                align: 'right',
+                render: (_: unknown, l: StockLot) =>
+                  l.qty_left === 0 ? (
+                    <span className="text-[12px]">ขายหมดแล้ว</span>
+                  ) : (
+                    <span className="tabular-nums">
+                      {l.qty_left}
+                      <span className="text-gray-400"> / {l.qty_in}</span>
+                    </span>
+                  ),
+              },
+            ]}
+          />
         </>
       )}
     </>
