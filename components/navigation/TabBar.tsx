@@ -44,7 +44,20 @@ const TABS: Record<string, TabMeta> = {
   account: { labelKey: 'tab.account', active: 'person', inactive: 'person-outline' },
 };
 
-export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export type TabBarProps = BottomTabBarProps & {
+  /**
+   * ตารางเมนูของแถบนี้ — ไม่ส่งมา = แถบหลักของแอป
+   *
+   * โหมดออนไลน์มีแถบล่างของตัวเอง (เจ้าของสั่ง 5 ก.ย. 2026) คนละชุดเมนูกับแถบหลัก
+   * ส่งตารางเข้ามาแทนการก๊อปคอมโพเนนต์ทั้งตัว — หน้าตาแถบ ระยะ เงา จังหวะสั่น
+   * และปุ่มกลางที่ยกขึ้น จะได้เหมือนกันตลอด แก้ที่เดียวขยับทั้งสองแถบ
+   */
+  tabs?: Record<string, TabMeta>;
+  /** ชื่อเส้นทางที่ให้ป้ายนับสินค้าในตะกร้าไปเกาะ — ไม่ส่ง = 'cart' */
+  cartRoute?: string;
+};
+
+export function TabBar({ state, descriptors, navigation, tabs, cartRoute = 'cart' }: TabBarProps) {
   const t = useT();
   const insets = useSafeAreaInsets();
   const isDesktopWeb = useIsDesktopWeb();
@@ -62,7 +75,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
-          const meta = TABS[route.name];
+          const meta = (tabs ?? TABS)[route.name];
           const isFocused = state.index === index;
 
           // Skip any route we don't have metadata for (defensive).
@@ -148,7 +161,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   size={28}
                   color={tint}
                 />
-                {route.name === 'cart' ? <CartBadge /> : null}
+                {route.name === cartRoute ? <CartBadge /> : null}
               </View>
               <Text
                 numberOfLines={1}

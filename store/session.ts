@@ -26,6 +26,7 @@
 import { useAddress } from '@/store/address';
 import { useCart } from '@/store/cart';
 import { useChat } from '@/store/chat';
+import { useFavorites } from '@/store/favorites';
 import { useNotifications } from '@/store/notifications';
 import { useOrder } from '@/store/order';
 
@@ -33,6 +34,8 @@ import { useOrder } from '@/store/order';
 export function clearUserScopedState(): void {
   useAddress.getState().reset();
   useCart.getState().reset();
+  /* ของโปรดผูกกับบัญชี — ค้างไว้ให้คนถัดไปที่ล็อกอินบนเครื่องเดียวกันเห็นไม่ได้ */
+  useFavorites.getState().reset();
   useOrder.getState().reset();
   useNotifications.getState().reset();
   useChat.getState().reset();

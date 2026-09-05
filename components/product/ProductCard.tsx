@@ -40,6 +40,7 @@ import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { productThumb } from '@/lib/image';
 import { useCart } from '@/store/cart';
+import { useFavorites } from '@/store/favorites';
 
 export type ProductCardProps = {
   product: Product;
@@ -71,6 +72,10 @@ export function ProductCard({
   const router = useRouter();
   const add = useCart((s) => s.add);
   const bump = useSharedValue(1);
+  /* อ่านเป็น boolean ไม่ใช่ทั้งชุด id — ถ้า subscribe ทั้งชุด การ์ดทุกใบในกริดจะเรนเดอร์
+     ใหม่ทุกครั้งที่มีการกดหัวใจใบใดใบหนึ่ง (หน้าหมวดหมู่มีสินค้าหลายร้อยใบ) */
+  const isFav = useFavorites((s) => s.ids.includes(product.id));
+  const toggleFav = useFavorites((s) => s.toggle);
 
   const open = () => (onPress ? onPress() : router.push(`/product/${product.id}`));
   const soldOut = product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
@@ -99,6 +104,24 @@ export function ProductCard({
             transition={250}
             cachePolicy="memory-disk"
           />
+          {/* หัวใจมุมขวาบนของรูป — Pressable ซ้อนใน PressableScale ของการ์ด RN แยกการ
+              รับสัมผัสให้เอง (อันที่อยู่บนสุดได้ไป) จึงไม่ต้องกัน event ให้ยุ่ง เหมือนปุ่ม + */}
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={isFav ? `เอา ${product.name} ออกจากสินค้าโปรด` : `เพิ่ม ${product.name} ลงสินค้าโปรด`}
+            accessibilityState={{ selected: isFav }}
+            onPress={() => void toggleFav(product.id)}
+            style={styles.favBtn}
+            hitSlop={8}>
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={17}
+              /* แดงเสมอตอนกดแล้ว ไม่ใช่สีของโหมด — หัวใจเป็นภาษาสากลของ "ถูกใจ"
+                 ถ้าเปลี่ยนสีตามโหมดจะอ่านเป็นปุ่มอย่างอื่น */
+              color={isFav ? '#E5484D' : Colors.textOnPrimary}
+            />
+          </PressableScale>
+
           {soldOut ? (
             <View style={styles.soldOutBadge}>
               <Text style={styles.soldOutText}>สินค้าหมด</Text>
@@ -152,6 +175,18 @@ const styles = StyleSheet.create({
   },
   imageDimmed: {
     opacity: 0.45,
+  },
+  /* พื้นดำโปร่งรองไว้ — หัวใจลอยอยู่บนรูปสินค้าที่สีอะไรก็ได้ ขาวล้วนบนรูปสว่างจะหายไป */
+  favBtn: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.32)',
   },
   soldOutBadge: {
     position: 'absolute',
