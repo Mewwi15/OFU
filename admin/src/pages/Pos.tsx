@@ -1553,6 +1553,9 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
       ]}>
       {/* Scoped boundary: a throw while rendering the receipt dismisses the
           receipt instead of white-screening the till (H5). */}
+      <div className="no-print mb-2 text-[12px] text-[#8a807a]">
+        ในหน้าพิมพ์: ระยะขอบ = ไม่มี · ปรับขนาด = กำหนดเอง 100%
+      </div>
       <ReceiptBoundary onClose={onClose}>
         <Receipt
           shop={shop}
