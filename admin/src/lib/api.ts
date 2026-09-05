@@ -345,6 +345,32 @@ export async function uploadBannerImage(file: File): Promise<string> {
   return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
+/* ── ต้นทุนแบบล็อต FIFO (0103) ────────────────────────────────────────────── */
+export type StockLot = {
+  id: string;
+  unit_cost: number;
+  qty_in: number;
+  qty_left: number;
+  received_at: string;
+};
+
+/**
+ * ล็อตของตัวเลือกสินค้าหนึ่งตัว เรียงตามคิวที่จะถูกตัด (เก่าก่อน)
+ *
+ * คืนล็อตที่หมดแล้วมาด้วย — คนดูต้องเห็นว่าของทุนเก่าหมดไปแล้วจริง ไม่ใช่หายไปเฉย ๆ
+ * แล้วสงสัยว่าระบบลืมบันทึก
+ */
+export async function listStockLots(variantId: string): Promise<StockLot[]> {
+  const { data, error } = await supabase
+    .from('stock_lots')
+    .select('id, unit_cost, qty_in, qty_left, received_at')
+    .eq('variant_id', variantId)
+    .order('received_at')
+    .limit(50);
+  if (error) throw error;
+  return (data ?? []).map((l) => ({ ...l, unit_cost: Number(l.unit_cost) })) as StockLot[];
+}
+
 /** path ในบักเก็ต → URL เต็มสำหรับพรีวิวในหน้าแอดมิน (ปล่อยผ่านถ้าเป็น URL อยู่แล้ว) */
 export function storageUrl(bucket: string, path: string | null): string | null {
   if (!path) return null;

@@ -39,6 +39,7 @@ import {
   listCategories,
   listProductImages,
   listProducts,
+  listStockLots,
   setPrimaryImage,
   setPublishState,
   uploadProductImage,
@@ -47,8 +48,10 @@ import {
   type Category,
   type Product,
   type ProductImage,
+  type StockLot,
 } from '../lib/api';
 import { productThumb } from '../lib/image';
+import { d as thDate } from '../lib/time';
 
 const { Text } = Typography;
 
@@ -725,7 +728,14 @@ function ProductModal({
           <Form.Item name="price" label="ราคาขาย" rules={[{ required: true, message: 'กรอกราคา' }]}>
             <InputNumber addonBefore="฿" min={0} style={{ width: '100%' }} placeholder="0" />
           </Form.Item>
-          <Form.Item name="cost_price" label="ต้นทุน (ถ้ามี)">
+          <Form.Item
+            name="cost_price"
+            label="ต้นทุนล่าสุด"
+            /* ★ บอกให้ชัดว่าช่องนี้คืออะไร ★ ก่อนมีระบบล็อต ช่องนี้ถูกใช้ทั้งตั้งราคาและคิด
+               กำไร พอรับของทีไรก็ทับทั้งตัว ของเก่าที่ยังค้างเลยถูกเปลี่ยนทุนย้อนหลังไปด้วย
+               (เจ้าของจับได้ 5 ก.ย. 2026) — ตอนนี้ทุนจริงของแต่ละชุดอยู่ในล็อตด้านล่าง
+               ช่องนี้เหลือหน้าที่เดียวคือเป็นตัวเลขอ้างอิงตอนตั้งราคาขายครั้งต่อไป */
+            extra="ใช้อ้างอิงตอนตั้งราคาขาย · ทุนจริงของของที่ค้างอยู่ดูที่ล็อตด้านล่าง">
             {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
             <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
           </Form.Item>
@@ -765,6 +775,14 @@ function ProductModal({
             <Input placeholder="ชิ้น" />
           </Form.Item>
         </div>
+
+        {/* ── ล็อตต้นทุน ──
+            เจ้าของถามเอง 5 ก.ย. 2026 ว่าทุนเก่า/ใหม่ควรอยู่ในหน้านี้ไหม — ใช่ ล็อตเป็น
+            ของตัวเลือกสินค้า ไม่ใช่ของใบรับเข้า ใบรับเข้าแค่เป็นเหตุการณ์ที่ทำให้เกิดล็อต
+            โชว์เฉพาะตอนแก้สินค้าที่มีอยู่แล้ว — สินค้าใหม่ยังไม่มีล็อตให้ดู */}
+        {product?.product_variants?.[0]?.id ? (
+          <LotPanel variantId={product.product_variants[0].id} />
+        ) : null}
 
         <div className="mb-1 text-sm text-[#4b443f]">รูปภาพสินค้า</div>
         <div className="flex flex-wrap gap-3">
@@ -865,5 +883,101 @@ function ProductModal({
           </div>
       </Form>
     </Modal>
+  );
+}
+
+/**
+ * ล็อตต้นทุนของสินค้าตัวนี้ — ของแต่ละชุดที่เข้ามาด้วยทุนเท่าไหร่ และเหลืออยู่กี่ชิ้น
+ *
+ * ★ เรียงตามคิวที่จะถูกตัด ★ บนสุดคือชุดที่จะขายออกก่อน — คนดูจะได้ตอบตัวเองได้ทันทีว่า
+ * "ตอนนี้กำลังขายของทุนเท่าไหร่อยู่" ซึ่งเป็นคำถามเดียวที่คนเปิดดูล็อตอยากรู้จริง ๆ
+ *
+ * โชว์ล็อตที่หมดแล้วด้วยแบบจาง — ถ้าซ่อนไป คนจะสงสัยว่าของทุนเก่าหายไปไหน
+ */
+function LotPanel({ variantId }: { variantId: string }) {
+  const [lots, setLots] = useState<StockLot[]>([]);
+  const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+
+  useEffect(() => {
+    let alive = true;
+    void listStockLots(variantId)
+      .then((l) => alive && (setLots(l), setState('ready')))
+      /* ยังไม่ได้รันไมเกรชัน 0103 = ตารางยังไม่มี — ซ่อนส่วนนี้ไปเงียบ ๆ ดีกว่าโชว์ error
+         ให้คนใช้งานตกใจ ทั้งที่หน้าที่เหลือทำงานได้ปกติ */
+      .catch(() => alive && setState('unavailable'));
+    return () => {
+      alive = false;
+    };
+  }, [variantId]);
+
+  if (state === 'unavailable') return null;
+
+  const live = lots.filter((l) => l.qty_left > 0);
+  const onHand = live.reduce((s, l) => s + l.qty_left, 0);
+  const value = live.reduce((s, l) => s + l.qty_left * l.unit_cost, 0);
+
+  return (
+    <>
+      <Divider titlePlacement="left" style={{ margin: '4px 0 14px', fontSize: 13, color: '#8a807a' }}>
+        ต้นทุนของที่ค้างอยู่
+      </Divider>
+
+      {state === 'loading' ? (
+        <div className="mb-3 text-[13px] text-gray-400">กำลังโหลด…</div>
+      ) : lots.length === 0 ? (
+        <div className="mb-3 text-[13px] text-gray-400">
+          ยังไม่มีล็อต — จะเกิดขึ้นเองเมื่อรับของเข้าครั้งถัดไป
+        </div>
+      ) : (
+        <>
+          <div className="mb-2 text-[13px] text-[#4b443f]">
+            คงเหลือ <b>{onHand.toLocaleString('th-TH')}</b> ชิ้น · มูลค่าต้นทุนรวม{' '}
+            <b>
+              ฿
+              {Math.round(value).toLocaleString('th-TH', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </b>
+          </div>
+          <table className="mb-3 w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-gray-400">
+                <th className="py-1 font-normal">รับเข้าเมื่อ</th>
+                <th className="py-1 text-right font-normal">ทุน/ชิ้น</th>
+                <th className="py-1 text-right font-normal">รับมา</th>
+                <th className="py-1 text-right font-normal">เหลือ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lots.map((l, i) => {
+                const done = l.qty_left === 0;
+                /* ล็อตแรกที่ยังมีของ = ชุดที่กำลังขายอยู่ ทำให้เด่นกว่าเพื่อน */
+                const current = !done && lots.slice(0, i).every((x) => x.qty_left === 0);
+                return (
+                  <tr key={l.id} className={done ? 'text-gray-300' : undefined}>
+                    <td className="py-1">
+                      {new Date(l.received_at).getFullYear() <= 2000
+                        ? 'ยกมาตอนเริ่มระบบ'
+                        : thDate(l.received_at).format('D MMM YY')}
+                      {current ? (
+                        <Tag color="blue" className="ml-2">
+                          กำลังขายชุดนี้
+                        </Tag>
+                      ) : null}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      ฿{l.unit_cost.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">{l.qty_in}</td>
+                    <td className="py-1 text-right tabular-nums">{done ? 'หมด' : l.qty_left}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+    </>
   );
 }
