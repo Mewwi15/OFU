@@ -13,7 +13,9 @@ import { RiAddLine, RiDeleteBin6Line, RiEditLine, RiFileExcel2Line, RiPrinterLin
 import {
   Alert,
   AutoComplete,
+  Form,
   Modal,
+  Select,
   Button,
   Card,
   DatePicker,
@@ -36,6 +38,30 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { d as thDate } from '../lib/time';
 
 dayjs.extend(customParseFormat);
+
+/** แปลงสินค้าจากหลังบ้านเป็นรายการที่ช่องค้นหาของหน้ารับเข้าใช้ — เดิมเขียนซ้ำสองที่ */
+function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
+  return ps.flatMap((p) => {
+    const image =
+      productThumb(
+        p.product_images.find((i) => i.is_primary)?.storage_path ??
+          p.product_images[0]?.storage_path ??
+          null,
+        64,
+      ) ?? null;
+    return p.product_variants.map((v) => ({
+      variantId: v.id,
+      label: `${p.name}${v.size ? ` (${v.size})` : ''}`,
+      productName: p.name,
+      size: v.size ?? null,
+      barcode: v.barcode ?? null,
+      sku: v.sku ?? null,
+      cost: v.cost_price ?? null,
+      image,
+    }));
+  });
+}
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
 
@@ -45,6 +71,7 @@ import {
   getGoodsReceiptLines,
   invalidateProductsCache,
   voidGoodsReceipt,
+  listCategories,
   listProducts,
   upsertProduct,
   upsertVariant,
@@ -87,6 +114,19 @@ export function Receive() {
   const [lineCache, setLineCache] = useState<Record<string, GoodsReceiptLine[]>>({});
   const [query, setQuery] = useState('');
   const searchRef = useRef<InputRef>(null);
+
+  /* ── สร้างสินค้าใหม่ตรงนี้เลย (เจ้าของสั่ง 5 ก.ย. 2026) ──
+     เดิมยิงบาร์โค้ดที่ยังไม่มีในระบบแล้วได้แค่คำเตือน "ไม่พบสินค้า" ต้องไปเปิดหน้าสินค้า
+     สร้างเอง แล้วค่อยกลับมายิงใหม่ — ของกองอยู่ตรงหน้าแต่คนรับของต้องสลับหน้าไปมา
+     ★ เป็นฉบับร่างเสมอ ★ ลูกค้าไม่เห็นจนกว่าจะไปตั้งราคา/รูปแล้วเผยแพร่เอง
+     กติกาเดียวกับปุ่ม "สร้างสินค้าร่าง" ของฝั่ง import ที่ทำไว้แล้ว */
+  const [newProduct, setNewProduct] = useState<{ code: string } | null>(null);
+  const [cats, setCats] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    void listCategories()
+      .then((cs) => setCats(cs.map((c) => ({ id: c.id, name: c.name }))))
+      .catch(() => setCats([]));
+  }, []);
 
   /* สร้างสินค้าใหม่ (ฉบับร่าง) จากแถวที่ไม่พบ — เจ้าของยืนยัน: "น่าจะเป็นสินค้าใหม่"
    * ราคาขายตั้งต้น: ① เลขในชื่อ ("ขนม 10 บาท" → 10) ② ทุน×1.25 ปัดขึ้น (สูตรเดียว
@@ -137,25 +177,7 @@ export function Receive() {
     invalidateProductsCache();
     void listProducts(true).then((ps) => {
       setItems(
-        ps.flatMap((p) => {
-          const image =
-            productThumb(
-              p.product_images.find((i) => i.is_primary)?.storage_path ??
-                p.product_images[0]?.storage_path ??
-                null,
-              64,
-            ) ?? null;
-          return p.product_variants.map((v) => ({
-            variantId: v.id,
-            label: `${p.name}${v.size ? ` (${v.size})` : ''}`,
-            productName: p.name,
-            size: v.size ?? null,
-            barcode: v.barcode ?? null,
-            sku: v.sku ?? null,
-            cost: v.cost_price ?? null,
-            image,
-          }));
-        }),
+        itemsFromProducts(ps),
       );
     });
     setImportReport((prev) =>
@@ -212,25 +234,7 @@ export function Receive() {
   useEffect(() => {
     void listProducts().then((ps) => {
       setItems(
-        ps.flatMap((p) => {
-          const image =
-            productThumb(
-              p.product_images.find((i) => i.is_primary)?.storage_path ??
-                p.product_images[0]?.storage_path ??
-                null,
-              64,
-            ) ?? null;
-          return p.product_variants.map((v) => ({
-            variantId: v.id,
-            label: `${p.name}${v.size ? ` (${v.size})` : ''}`,
-            productName: p.name,
-            size: v.size ?? null,
-            barcode: v.barcode ?? null,
-            sku: v.sku ?? null,
-            cost: v.cost_price ?? null,
-            image,
-          }));
-        }),
+        itemsFromProducts(ps),
       );
     });
     loadReceipts();
@@ -271,12 +275,59 @@ export function Receive() {
     searchRef.current?.focus();
   }, []);
 
+  /**
+   * สร้างสินค้าร่างจากข้อมูลที่กรอกใน modal แล้วเพิ่มเข้าใบรับเข้าทันที
+   *
+   * ราคาขายตั้งต้นใช้สูตรเดียวกับฝั่ง import: เลขในชื่อ ("ขนม 10 บาท" → 10) ก่อน
+   * ถ้าไม่มีก็ทุน×1.25 ปัดขึ้น — ไม่ใช่ 0 เพราะของที่ราคา 0 ถ้าเผลอเผยแพร่คือขายฟรี
+   */
+  const createProductNow = async (v: { name: string; cost?: number; categoryId?: string }) => {
+    const code = newProduct?.code ?? '';
+    const name = v.name.trim();
+    const mPrice = name.match(/(\d+(?:\.\d+)?)\s*บาท/);
+    const price = mPrice ? Number(mPrice[1]) : v.cost != null ? Math.ceil(v.cost * 1.25) : 0;
+    try {
+      const { id: productId } = await upsertProduct({ name, category_id: v.categoryId ?? null });
+      const { id: variantId } = await upsertVariant({
+        product_id: productId,
+        price,
+        /* ใส่เป็นบาร์โค้ดเฉพาะตอนที่สิ่งที่พิมพ์มาเป็นรหัสจริง ๆ — ถ้าคนรับของพิมพ์ชื่อ
+           สินค้าไปค้นแล้วไม่เจอ เอาชื่อไปใส่ช่องบาร์โค้ดจะทำให้ยิงของจริงไม่เจอตลอดไป */
+        barcode: /^[0-9A-Za-z-]{6,}$/.test(code) ? code : undefined,
+        cost_price: v.cost ?? undefined,
+      });
+      setLines((prev) => [
+        ...prev,
+        {
+          variantId,
+          label: name,
+          productName: name,
+          size: null,
+          barcode: code,
+          sku: null,
+          cost: v.cost ?? null,
+          image: null,
+          qty: 1,
+          unitCost: v.cost ?? null,
+        },
+      ]);
+      invalidateProductsCache();
+      void listProducts(true).then((ps) => setItems(itemsFromProducts(ps)));
+      setNewProduct(null);
+      setQuery('');
+      searchRef.current?.focus();
+      message.success(`เพิ่ม "${name}" เป็นสินค้าร่างแล้ว — อย่าลืมตั้งราคา/รูป แล้วเผยแพร่ในหน้าสินค้า`);
+    } catch (e) {
+      message.error(apiError(e));
+    }
+  };
+
   const onSearchEnter = () => {
     // บาร์โค้ดเป๊ะมาก่อน (เครื่องยิงจบด้วย Enter เสมอ) — ไม่งั้นถ้าเหลือตัวเดียวก็เอาตัวนั้น
     const exact = items.find((i) => i.barcode === query.trim());
     if (exact) return addLine(exact);
     if (matches.length === 1) return addLine(matches[0]);
-    if (matches.length === 0 && query.trim()) message.warning('ไม่พบสินค้า — เช็คบาร์โค้ดหรือสะกดอีกครั้ง');
+    if (matches.length === 0 && query.trim()) setNewProduct({ code: query.trim() });
   };
 
   const total = lines.reduce((s, l) => s + (l.unitCost ?? 0) * l.qty, 0);
@@ -634,7 +685,90 @@ export function Receive() {
         รับของที่นี่ = สต๊อกบวกทันที ลงสมุดสต๊อกทุกบรรทัด · ทุนที่กรอกจะกลายเป็นทุนล่าสุดของสินค้าตัวนั้น
         · ปุ่ม <Tag className="mx-1">เติม</Tag> ในหน้าสต๊อกยังใช้ได้เหมือนเดิมสำหรับของชิ้นเดียวไม่มีเอกสาร
       </Typography.Text>
+
+      {newProduct && (
+        <NewProductModal
+          code={newProduct.code}
+          categories={cats}
+          onCancel={() => setNewProduct(null)}
+          onCreate={createProductNow}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * กรอกข้อมูลเบื้องต้นของสินค้าใหม่ตอนรับของ — ชื่อ ทุน หมวดหมู่
+ *
+ * ★ ขอแค่สามช่อง ★ คนรับของยืนอยู่หน้ากองของ ไม่ใช่หน้าจอจัดการสินค้า — ราคาขาย รูป
+ * คำอธิบาย ไปตั้งทีหลังในหน้าสินค้าได้ ถ้าขอครบทุกช่องตรงนี้ของจะกองรอจนกว่าจะกรอกเสร็จ
+ * สินค้าถูกสร้างเป็นฉบับร่างเสมอ ลูกค้าจึงยังไม่เห็นระหว่างที่ข้อมูลยังไม่ครบ
+ */
+function NewProductModal({
+  code,
+  categories,
+  onCancel,
+  onCreate,
+}: {
+  code: string;
+  categories: { id: string; name: string }[];
+  onCancel: () => void;
+  onCreate: (v: { name: string; cost?: number; categoryId?: string }) => Promise<void>;
+}) {
+  const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  /* รหัสที่ยิงมาเป็นบาร์โค้ด (ตัวเลข/ตัวอักษรล้วน) → ชื่อยังว่าง ให้กรอกเอง
+     ถ้าเป็นคำที่พิมพ์ค้นหา → เอามาเป็นชื่อตั้งต้นเลย คนพิมพ์ก็ตั้งใจจะเรียกของชิ้นนั้นอยู่แล้ว */
+  const looksLikeBarcode = /^[0-9A-Za-z-]{6,}$/.test(code);
+
+  return (
+    <Modal
+      open
+      title="สินค้าใหม่ (ยังไม่มีในระบบ)"
+      onCancel={onCancel}
+      okText="สร้างเป็นร่าง + เพิ่มเข้าใบ"
+      cancelText="ยกเลิก"
+      confirmLoading={saving}
+      onOk={async () => {
+        const v = await form.validateFields();
+        setSaving(true);
+        try {
+          await onCreate({
+            name: v.name,
+            cost: typeof v.cost === 'number' ? v.cost : undefined,
+            categoryId: v.categoryId || undefined,
+          });
+        } finally {
+          setSaving(false);
+        }
+      }}
+      destroyOnHidden>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={looksLikeBarcode ? `บาร์โค้ด ${code}` : `ค้นหา "${code}" ไม่พบ`}
+        description="สร้างเป็นฉบับร่างก่อน ลูกค้ายังไม่เห็น — ค่อยไปตั้งราคาขายกับรูปในหน้าสินค้าทีหลัง"
+      />
+      <Form form={form} layout="vertical" initialValues={{ name: looksLikeBarcode ? '' : code }}>
+        <Form.Item name="name" label="ชื่อสินค้า" rules={[{ required: true, message: 'กรอกชื่อสินค้า' }]}>
+          <Input placeholder="เช่น มาม่าโอเรียนทัลคิทเช่น" autoFocus maxLength={80} />
+        </Form.Item>
+        <Form.Item name="cost" label="ทุนต่อชิ้น (บาท)" extra="ใส่ไว้เลยจะได้ไม่ต้องกลับมากรอกทีหลัง">
+          <InputNumber min={0} style={{ width: '100%' }} addonBefore="฿" />
+        </Form.Item>
+        <Form.Item name="categoryId" label="หมวดหมู่">
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="เลือกหมวดหมู่ (ไม่บังคับ)"
+            options={categories.map((c) => ({ value: c.id, label: c.name }))}
+          />
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }
 
