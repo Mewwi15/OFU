@@ -40,6 +40,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PromptPayQR } from '@/components/shop/PromptPayQR';
+import { streetOnly } from '@/lib/address';
 import { BRAND_ACCENT } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
 import { IconButton } from '@/components/ui/IconButton';
@@ -490,11 +491,35 @@ export default function CheckoutScreen() {
                 size={14}
                 color={Colors.textMuted}
               />
-              <Text variant="caption" style={styles.addrText} numberOfLines={2}>
-                {mode === 'online'
-                  ? `${address.recipient}   ${address.phone}   ${[address.line, address.subDistrict, address.district, address.province, address.postalCode].filter(Boolean).join(' ')}`
-                  : `${address.label}   ${address.line}`}
-              </Text>
+              {/* ★ แยกสองบรรทัด ไม่ใช่ต่อกันยาวรวดเดียว ★ ของเดิมเอาชื่อ เบอร์ ที่อยู่
+                  ตำบล อำเภอ จังหวัด รหัสไปรษณีย์ มาต่อกันหมดแล้วตัดท้ายทิ้งด้วย
+                  numberOfLines — ลูกค้าเลยเห็นที่อยู่ไม่ครบตอนกำลังจะจ่ายเงิน
+                  ชื่อกับเบอร์เป็นบรรทัดของตัวเอง ที่อยู่อยู่บรรทัดถัดไป
+                  streetOnly ตัดรหัสไปรษณีย์ที่ซ้ำกับช่องแยกออก (ดูเหตุผลใน lib/address) */}
+              <View style={styles.addrCopy}>
+                {mode === 'online' ? (
+                  <>
+                    <Text style={styles.addrWho}>
+                      {address.recipient}   {address.phone}
+                    </Text>
+                    <Text variant="caption" style={styles.addrText}>
+                      {[
+                        streetOnly(address),
+                        address.subDistrict,
+                        address.district,
+                        address.province,
+                        address.postalCode,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </Text>
+                  </>
+                ) : (
+                  <Text variant="caption" style={styles.addrText} numberOfLines={2}>
+                    {address.label}   {address.line}
+                  </Text>
+                )}
+              </View>
             </View>
           ) : null}
         </View>
@@ -545,8 +570,8 @@ export default function CheckoutScreen() {
         {/* PromptPay — before the order exists there is no amount we're allowed
             to put on a QR, so the customer gets the reason instead. */}
         {needsSlip && !placed ? (
-          <View style={styles.codNote}>
-            <Ionicons name="lock-closed-outline" size={18} color={Colors.primaryStrong} />
+          <View style={[styles.codNote, { backgroundColor: A.tint }]}>
+            <Ionicons name="lock-closed-outline" size={18} color={A.strong} />
             <Text variant="caption" style={styles.codNoteText}>
               {t('checkout.qrAfterOrder')}
             </Text>
@@ -588,7 +613,7 @@ export default function CheckoutScreen() {
                     hitSlop={8}
                     onPress={pickSlip}
                     style={styles.slipChange}>
-                    <Ionicons name="image-outline" size={14} color={Colors.primaryStrong} />
+                    <Ionicons name="image-outline" size={14} color={A.strong} />
                     <Text style={styles.slipChangeText}>{t('checkout.changeImage')}</Text>
                   </PressableScale>
                 </View>
@@ -607,8 +632,8 @@ export default function CheckoutScreen() {
                 scaleTo={0.98}
                 onPress={pickSlip}
                 style={styles.slipDrop}>
-                <View style={styles.slipDropIcon}>
-                  <Ionicons name="cloud-upload-outline" size={24} color={Colors.primaryStrong} />
+                <View style={[styles.slipDropIcon, { backgroundColor: A.tint }]}>
+                  <Ionicons name="cloud-upload-outline" size={24} color={A.strong} />
                 </View>
                 <Text style={styles.slipDropTitle}>{t('checkout.tapToAttach')}</Text>
                 <Text variant="caption" style={styles.slipDropCaption}>
@@ -620,8 +645,8 @@ export default function CheckoutScreen() {
         ) : null}
 
         {method === 'cod' ? (
-          <View style={styles.codNote}>
-            <Ionicons name="information-circle-outline" size={18} color={Colors.primaryStrong} />
+          <View style={[styles.codNote, { backgroundColor: A.tint }]}>
+            <Ionicons name="information-circle-outline" size={18} color={A.strong} />
             <Text variant="caption" style={styles.codNoteText}>
               {t('checkout.prepareCash')} {money(shownTotal)} {t('checkout.payRiderOnReceive')}
             </Text>
@@ -775,6 +800,12 @@ const styles = StyleSheet.create({
   breakValue: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 16,
+    color: Colors.text,
+  },
+  addrCopy: { flex: 1, gap: 1 },
+  addrWho: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 14,
     color: Colors.text,
   },
   addrRow: {
