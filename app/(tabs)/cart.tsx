@@ -28,6 +28,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProductListItem } from '@/components/product/ProductListItem';
 import { CheckoutSheet } from '@/components/shop/CheckoutSheet';
 import { ModeSwitch } from '@/components/shop/ModeSwitch';
+import { CouponTicket } from '@/components/shop/CouponTicket';
+import { BRAND_ACCENT } from '@/constants/accent';
+import { ONLINE_ACCENT } from '@/constants/online';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { PressableScale } from '@/components/ui/PressableScale';
@@ -80,6 +83,29 @@ const CHECKOUT_BAR_HEIGHT = 80;
 /* ----------------------------------------------------------------------- */
 /* Free-shipping progress (a block inside the delivery surface)            */
 /* ----------------------------------------------------------------------- */
+
+/**
+ * ตัดส่วนที่ซ้ำกับช่องข้อมูลแยกออกจากที่อยู่บรรทัดหลัก
+ *
+ * ★ ห้ามโชว์รหัสไปรษณีย์สองตัวที่ไม่ตรงกัน ★ บรรทัดที่อยู่มาจากการถอดรหัสพิกัดหรือที่
+ * ลูกค้าพิมพ์เอง ส่วนตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์เป็นช่องแยกที่ลูกค้าแก้ทีหลังได้
+ * สองอย่างนี้ไม่ตรงกันได้ (ย้ายที่แล้วแก้แค่ช่องแยก) พอโชว์ทั้งคู่เต็ม ๆ ลูกค้าจะเห็น
+ * "10800" กับ "10330" อยู่ติดกันแล้วไม่รู้ว่าพัสดุจะไปไหน
+ * ช่องแยกคือตัวที่ใช้ส่งจริง บรรทัดหลักจึงเหลือแค่ชื่อถนน/บ้านเลขที่
+ */
+function streetOnly(a: { line: string; subDistrict?: string; district?: string; province?: string; postalCode?: string }): string {
+  let out = a.line;
+  for (const part of [a.postalCode, a.province, a.district, a.subDistrict]) {
+    const token = part?.trim();
+    if (token) out = out.split(token).join(' ');
+  }
+  /* ตัดรหัสไปรษณีย์ท้ายบรรทัดทิ้งเสมอ ไม่ใช่เฉพาะตัวที่ตรงกับช่องแยก — ถ้าสองที่ไม่ตรงกัน
+     (ลูกค้าย้ายที่แล้วแก้แค่ช่องแยก) การโชว์ทั้งคู่คือการโชว์เลขที่ขัดกันเองให้ลูกค้าเดา
+     ช่องแยกคือตัวที่ใช้ส่งจริง เลขในบรรทัดจึงต้องหายไป ไม่ใช่มาแข่งกัน
+     ตัดเฉพาะที่อยู่ท้ายบรรทัด — รหัสไปรษณีย์ไทยอยู่ท้ายเสมอ ส่วนบ้านเลขที่อยู่ต้น */
+  out = out.replace(/\s*\b\d{5}\b\s*$/, '');
+  return out.replace(/\s{2,}/g, ' ').trim() || a.line;
+}
 
 function FreeShipBlock({ subtotal, freeMin }: { subtotal: number; freeMin: number }) {
   const t = useT();
@@ -265,6 +291,13 @@ export default function CartScreen() {
   /* กดเลือกจากคูปองที่เก็บไว้ = เติมโค้ดลงช่องแล้วตรวจให้เลย ไม่ใช่ตั้งส่วนลดเอง —
      ต้องผ่าน validate_promo เหมือนพิมพ์เองทุกประการ เพราะยอดขั้นต่ำ/โควตาตัดสินตอนนี้
      ไม่ใช่ตอนเก็บ ถ้าลัดขั้นตอนจะได้ส่วนลดที่ place_order ปฏิเสธทีหลัง */
+  /* เอาคูปองออกจากออเดอร์ — ล้างทั้งใบที่ใช้อยู่และช่องพิมพ์โค้ด ไม่ให้เหลือโค้ดค้างใน
+     ช่องแล้วลูกค้าเข้าใจว่ายังใช้อยู่ */
+  const clearCoupon = () => {
+    setAppliedPromo(null);
+    setPromo('');
+  };
+
   const applyCoupon = async (c: Coupon) => {
     setPromo(c.code);
     setPromoBusy(true);
@@ -377,7 +410,12 @@ export default function CartScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScreenHeader title={t('cart.title')} style={styles.header} />
+      {/* โหมดออนไลน์ไม่มีหัวข้อ "ตะกร้าของฉัน" แล้ว (เจ้าของสั่ง 5 ก.ย. 2026) — แถบล่าง
+          ของโหมดบอกอยู่แล้วว่านี่คือตะกร้าสินค้า หัวข้อซ้ำอีกทีกินที่เปล่า ๆ
+          แถบหลักของแอปยังต้องมี เพราะเข้ามาจากที่อื่นได้และไม่มีอะไรบอกว่าอยู่หน้าไหน */}
+      {mode === 'online' ? null : (
+        <ScreenHeader title={t('cart.title')} style={styles.header} />
+      )}
       {!isEmpty ? (
         <Text variant="caption" style={styles.headerCount}>
           {items.length} {t('cart.itemsUnit')}
@@ -425,7 +463,10 @@ export default function CartScreen() {
             ) : null}
 
             {/* Mode segmented control */}
-            <ModeSwitch compact style={styles.modeSwitch} />
+            {/* สวิตช์โหมดไม่มีในโหมดออนไลน์ (เจ้าของสั่ง 5 ก.ย. 2026) — เข้ามาทางแถบล่าง
+                ของโหมดออนไลน์แล้ว โหมดถูกกำหนดไว้ตั้งแต่ต้นทาง ให้สลับตรงนี้ได้อีกจะพา
+                ลูกค้าออกจากโหมดโดยไม่ตั้งใจ */}
+            {mode === 'online' ? null : <ModeSwitch compact style={styles.modeSwitch} />}
 
             {/* Delivery surface (rider address + free-shipping) */}
             {mode === 'delivery' ? (
@@ -465,53 +506,70 @@ export default function CartScreen() {
                 <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} />
               </View>
             ) : (
-              /* Online surface — nationwide parcel address */
-              <View style={styles.deliveryCard}>
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityLabel={t('cart.parcelAddressA11y')}
-                  onPress={() => router.push(address ? '/address' : '/address/picker')}
-                  scaleTo={0.98}
-                  style={styles.addrRow}>
-                  <View style={styles.addrTile}>
-                    <Ionicons name="cube-outline" size={20} color={Colors.primaryStrong} />
+              /* Online surface — nationwide parcel address
+                 การ์ดที่อยู่แบบเต็ม (เจ้าของสั่ง 5 ก.ย. 2026 "ที่อยู่ทำเป็นการ์ดดีๆครับ
+                 ตัวเลขชัดเจน ตัวหนังสือชัดเจน") — เดิมเป็นแถวเล็ก ๆ ตัวอักษรจางเท่ากันหมด
+                 อ่านไม่ออกว่าอะไรสำคัญ พัสดุส่งผิดที่เพราะอ่านที่อยู่ผิดคือความเสียหายจริง */
+              <View style={styles.parcelCard}>
+                <View style={styles.parcelHead}>
+                  <View style={styles.parcelTag}>
+                    <Ionicons name="cube" size={14} color={ONLINE_ACCENT.strong} />
+                    <Text style={styles.parcelTagText}>ที่อยู่จัดส่งพัสดุ</Text>
                   </View>
-                  <View style={styles.addrBody}>
-                    {address && !needsParcel ? (
-                      <>
-                        <Text style={styles.addrTitle} numberOfLines={1}>
-                          {t('cart.flashTo')} · {address.label}
-                        </Text>
-                        <Text variant="caption" numberOfLines={1}>
-                          {address.recipient} · {address.phone}
-                        </Text>
-                        <Text variant="caption" numberOfLines={2}>
-                          {address.line}
-                        </Text>
-                        <Text variant="caption" numberOfLines={1}>
-                          {[address.subDistrict, address.district, address.province, address.postalCode]
-                            .filter(Boolean)
-                            .join(' ')}
-                        </Text>
-                      </>
-                    ) : address ? (
-                      <>
-                        <Text style={[styles.addrTitle, styles.addrWarn]} numberOfLines={1}>
-                          {t('cart.parcelIncomplete')}
-                        </Text>
-                        <Text variant="caption">
-                          {t('cart.parcelIncompleteCap')}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.addrTitle}>{t('cart.addParcelAddress')}</Text>
-                        <Text variant="caption">{t('cart.addParcelAddressCap')}</Text>
-                      </>
-                    )}
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={t('cart.parcelAddressA11y')}
+                    onPress={() => router.push(address ? '/address' : '/address/picker')}
+                    hitSlop={8}>
+                    <Text style={[styles.parcelEdit, { color: ONLINE_ACCENT.strong }]}>
+                      {address ? 'เปลี่ยน' : 'เพิ่ม'}
+                    </Text>
+                  </PressableScale>
+                </View>
+
+                {address && !needsParcel ? (
+                  <>
+                    {/* ชื่อกับเบอร์อยู่บรรทัดเดียวกันแต่คนละน้ำหนัก — เบอร์เป็นตัวเลขที่
+                        พนักงานขนส่งต้องอ่านออกตอนโทรหา ต้องเด่นพอ ๆ กับชื่อ */}
+                    <View style={styles.parcelWho}>
+                      <Text style={styles.parcelName} numberOfLines={1}>
+                        {address.recipient}
+                      </Text>
+                      <Text style={styles.parcelPhone}>{address.phone}</Text>
+                    </View>
+                    <Text style={styles.parcelLine}>{streetOnly(address)}</Text>
+                    <View style={styles.parcelZone}>
+                      <Text style={styles.parcelZoneText} numberOfLines={2}>
+                        {[address.subDistrict, address.district, address.province]
+                          .filter(Boolean)
+                          .join(' ')}
+                      </Text>
+                      {/* รหัสไปรษณีย์แยกออกมาเป็นก้อนตัวเลขเว้นระยะ — เลขห้าหลักที่ผิด
+                          ตัวเดียวพัสดุไปคนละจังหวัด ต้องตรวจทานได้ด้วยตาในแวบเดียว */}
+                      {address.postalCode ? (
+                        <View style={styles.zip}>
+                          <Text style={styles.zipText}>{address.postalCode}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </>
+                ) : address ? (
+                  <View style={styles.parcelWarn}>
+                    <Ionicons name="alert-circle" size={18} color={Colors.dangerStrong} />
+                    <View style={styles.parcelWarnCopy}>
+                      <Text style={styles.parcelWarnTitle}>{t('cart.parcelIncomplete')}</Text>
+                      <Text variant="caption">{t('cart.parcelIncompleteCap')}</Text>
+                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
-                </PressableScale>
+                ) : (
+                  <View style={styles.parcelWarn}>
+                    <Ionicons name="add-circle-outline" size={18} color={ONLINE_ACCENT.strong} />
+                    <View style={styles.parcelWarnCopy}>
+                      <Text style={styles.parcelWarnTitle}>{t('cart.addParcelAddress')}</Text>
+                      <Text variant="caption">{t('cart.addParcelAddressCap')}</Text>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
@@ -575,6 +633,9 @@ export default function CartScreen() {
               {myCoupons.length > 0 ? (
                 <View style={styles.myCoupons}>
                   <Text style={styles.myCouponsHead}>คูปองที่เก็บไว้</Text>
+                  {/* ตั๋วใบเดียวกับแท็บคูปอง แค่ย่อขนาด (เจ้าของสั่ง 5 ก.ย. 2026 "เอา ui
+                      ของเรามาย่อขนาดก็ได้") — ลูกค้าเห็นคูปองใบเดิมที่เคยกดเก็บ ไม่ใช่
+                      ชิปเล็ก ๆ ที่ดูเป็นคนละอย่าง · กดที่ใบเพื่อใช้ ใบที่ใช้อยู่จะถูกฉีก */}
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -582,23 +643,34 @@ export default function CartScreen() {
                     {myCoupons.map((c) => {
                       const on = appliedPromo?.code === c.code;
                       return (
-                        <PressableScale
-                          key={c.id}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: on }}
-                          accessibilityLabel={`ใช้คูปอง ${c.code}`}
-                          disabled={promoBusy}
-                          onPress={() => void applyCoupon(c)}
-                          style={[styles.couponChip, on && styles.couponChipOn]}>
-                          <Ionicons
-                            name={on ? 'checkmark-circle' : 'pricetag'}
-                            size={14}
-                            color={on ? Colors.textOnPrimary : Colors.primaryStrong}
+                        <View key={c.id} style={styles.couponCell}>
+                          <CouponTicket
+                            coupon={c}
+                            compact
+                            torn={on}
+                            notchColor={Colors.background}
+                            accent={mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT}
+                            busy={promoBusy}
+                            /* กดใบที่ใช้อยู่ = เอาออก ไม่ใช่กดแล้วไม่มีอะไรเกิดขึ้น —
+                               ไม่งั้นลูกค้าเปลี่ยนใจไปใช้ใบอื่นไม่ได้เลย */
+                            onPress={() => (on ? clearCoupon() : void applyCoupon(c))}
+                            footer={
+                              <Text
+                                style={[
+                                  styles.couponUse,
+                                  {
+                                    color: on
+                                      ? Colors.textMuted
+                                      : mode === 'online'
+                                        ? ONLINE_ACCENT.strong
+                                        : BRAND_ACCENT.strong,
+                                  },
+                                ]}>
+                                {on ? 'แตะเพื่อเอาออก' : 'แตะเพื่อใช้'}
+                              </Text>
+                            }
                           />
-                          <Text style={[styles.couponChipText, on && styles.couponChipTextOn]}>
-                            {c.type === 'percent' ? `ลด ${c.value}%` : `ลด ${money(c.value)}`}
-                          </Text>
-                        </PressableScale>
+                        </View>
                       );
                     })}
                   </ScrollView>
@@ -705,7 +777,14 @@ export default function CartScreen() {
                         ? t('cart.needParcelAddress')
                         : needsContact
                           ? t('cart.needContact')
-                          : `${t('cart.selectedTotal')} · ${selectedCount} ${t('cart.unitPieces')}`}
+                          /* ★ คำอธิบายต้องตรงกับตัวเลขที่โชว์ ★ ตัวเลขข้างล่างคือยอด
+                             ที่ต้องจ่ายจริง (รวมค่าส่ง หักส่วนลดแล้ว) แต่คำเดิมเขียนว่า
+                             "รวมที่เลือก · N ชิ้น" ซึ่งอ่านเป็นยอดค่าสินค้าเฉย ๆ ลูกค้าเลย
+                             เห็นเลขไม่ตรงกับที่บวกเอง (เจ้าของทัก "ทำยอดให้ตรงด้วยครับ")
+                             ค่าส่งเป็นศูนย์ก็ไม่ต้องเขียนถึง ไม่งั้นรกโดยไม่ได้ความ */
+                          : deliveryFee > 0
+                            ? `ยอดที่ต้องจ่าย · ${selectedCount} ${t('cart.unitPieces')} + ค่าส่ง`
+                            : `ยอดที่ต้องจ่าย · ${selectedCount} ${t('cart.unitPieces')}`}
               </Text>
               <View style={styles.checkoutTotalRow}>
                 <Text style={styles.checkoutTotal}>
@@ -749,6 +828,48 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* การ์ดที่อยู่พัสดุ — ลำดับความสำคัญชัด: ชื่อ+เบอร์ > ที่อยู่ > ตำบล/อำเภอ/จังหวัด
+     + รหัสไปรษณีย์แยกเป็นก้อนตัวเลข (เจ้าของสั่งให้ตัวเลขกับตัวหนังสือชัดเจน) */
+  parcelCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    gap: 6,
+    ...Shadow.card,
+  },
+  parcelHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  parcelTag: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  parcelTagText: { fontFamily: 'Mitr_500Medium', fontSize: 13, color: Colors.textMuted },
+  parcelEdit: { fontFamily: 'Mitr_500Medium', fontSize: 13 },
+  parcelWho: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm, marginTop: 2 },
+  parcelName: { flexShrink: 1, fontFamily: 'Mitr_500Medium', fontSize: 16, color: Colors.text },
+  // เบอร์เป็นตัวเลขที่พนักงานขนส่งต้องอ่านออกตอนโทรหา เว้นระยะตัวอักษรให้อ่านทีละหลักได้
+  parcelPhone: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 15,
+    letterSpacing: 0.5,
+    color: Colors.text,
+  },
+  parcelLine: { fontSize: 14, lineHeight: 21, color: Colors.text },
+  parcelZone: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  parcelZoneText: { flex: 1, fontSize: 14, lineHeight: 21, color: Colors.textMuted },
+  /* ก้อนรหัสไปรษณีย์ — เลขห้าหลักที่ผิดตัวเดียวพัสดุไปคนละจังหวัด ต้องตรวจได้ในแวบเดียว */
+  zip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceMuted,
+  },
+  zipText: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 15,
+    letterSpacing: 2,
+    color: Colors.text,
+  },
+  parcelWarn: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, marginTop: 2 },
+  parcelWarnCopy: { flex: 1 },
+  parcelWarnTitle: { fontFamily: 'Mitr_500Medium', fontSize: 15, color: Colors.text },
+
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -960,6 +1081,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   myCouponsRow: { gap: Spacing.sm },
+  couponCell: { width: 208 },
+  couponUse: { fontFamily: 'Mitr_500Medium', fontSize: 12 },
   couponChip: {
     flexDirection: 'row',
     alignItems: 'center',

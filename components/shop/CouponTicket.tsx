@@ -13,7 +13,9 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -80,6 +82,22 @@ export type CouponTicketProps = {
    * ส่วนหน้าแรกต้องการให้ใบที่เก็บแล้วถอยไปเป็นฉากหลัง เพราะของที่ควรสะดุดตาคือใบที่ยังไม่เก็บ
    */
   dimmed?: boolean;
+  /**
+   * ย่อขนาดลง — ใช้ในแถวคูปองบนหน้าตะกร้า (เจ้าของสั่ง 5 ก.ย. 2026 "เอา ui ของเรามา
+   * ย่อขนาดก็ได้") ต้นขั้วแคบลง ตัวอักษรเล็กลง ตัดมาสคอตออก เพราะที่หน้าตะกร้าตั๋วเป็น
+   * ตัวเลือกในแถวเลื่อน ไม่ใช่พระเอกของหน้าเหมือนในแท็บคูปอง
+   */
+  compact?: boolean;
+  /** แทนที่แถวโค้ด/ปุ่มเก็บด้วยของจุดเรียกใช้ (หน้าตะกร้าใช้บอกสถานะ "ใช้อยู่") */
+  footer?: ReactNode;
+  /**
+   * ฉีกแล้ว — ใบที่ถูกใช้ไปกับออเดอร์นี้
+   *
+   * สองซีกแยกออกจากกันตรงรอยปรุพร้อมเอียงเล็กน้อย + ตราปั๊ม "ใช้แล้ว" — ตั๋วจริงถูกฉีก
+   * ตรงรอยปรุ ภาพนี้จึงอ่านออกทันทีโดยไม่ต้องอ่านตัวหนังสือ (เจ้าของสั่ง "มี effect
+   * ฉีกการ์ดใช้แล้ว")
+   */
+  torn?: boolean;
   onPress: () => void;
 };
 
@@ -89,38 +107,71 @@ export function CouponTicket({
   accent = BRAND_ACCENT,
   busy = false,
   dimmed = false,
+  compact = false,
+  footer,
+  torn = false,
   onPress,
 }: CouponTicketProps) {
+  const stubW = compact ? 68 : STUB_W;
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={c.claimed ? `คัดลอกโค้ด ${c.code}` : `เก็บคูปอง ${c.code}`}
       disabled={busy}
       onPress={onPress}
-      style={styles.ticket}>
-      {/* ต้นขั้วซ้าย — มาสคอต + วันหมดอายุ เหมือนตัวอย่างที่เจ้าของส่งมา */}
-      <View style={[styles.stub, { backgroundColor: dimmed ? Colors.textMuted : accent.solid }]}>
-        <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" />
-        <Text style={styles.stubLabel}>คูปอง</Text>
-        <Text style={styles.stubExpiry}>
-          {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
-        </Text>
+      style={[styles.ticket, torn && styles.ticketTorn]}>
+      {/* ต้นขั้วซ้าย — ฉีกแล้วเลื่อนออกจากตัวตั๋วพร้อมเอียงนิดหน่อย */}
+      <View
+        style={[
+          styles.stub,
+          { width: stubW, backgroundColor: dimmed || torn ? Colors.textMuted : accent.solid },
+          compact && styles.stubCompact,
+          torn && styles.stubTorn,
+        ]}>
+        {!compact ? <Image source={MASCOT_SRC} style={styles.stubArt} contentFit="contain" /> : null}
+        <Text style={[styles.stubLabel, compact && styles.stubLabelCompact]}>คูปอง</Text>
+        {!compact ? (
+          <Text style={styles.stubExpiry}>
+            {c.activeTo ? `หมดอายุ ${expiryLabel(c.activeTo)}` : 'ไม่มีวันหมดอายุ'}
+          </Text>
+        ) : null}
       </View>
 
       {/* รอยปรุ + รอยบากบนล่าง */}
-      <View style={styles.perf} pointerEvents="none">
+      <View style={[styles.perf, { left: stubW - 1 }]} pointerEvents="none">
         {PERF_DASHES.map((k) => (
           <View key={k} style={styles.perfDash} />
         ))}
       </View>
-      <View style={[styles.notch, styles.notchTop, { backgroundColor: notchColor }]} />
-      <View style={[styles.notch, styles.notchBottom, { backgroundColor: notchColor }]} />
+      <View
+        style={[styles.notch, styles.notchTop, { left: stubW - NOTCH_R, backgroundColor: notchColor }]}
+      />
+      <View
+        style={[styles.notch, styles.notchBottom, { left: stubW - NOTCH_R, backgroundColor: notchColor }]}
+      />
 
-      <View style={styles.ticketBody}>
-        <Text style={[styles.headline, { color: dimmed ? Colors.textMuted : accent.strong }]}>
+      {/* ตราปั๊ม "ใช้แล้ว" — เอียงเหมือนปั๊มยางจริง ไม่ใช่ป้ายตรง ๆ */}
+      {torn ? (
+        <Animated.View entering={FadeIn.duration(220)} style={styles.stamp} pointerEvents="none">
+          <Text style={styles.stampText}>ใช้แล้ว</Text>
+        </Animated.View>
+      ) : null}
+
+      <View style={[styles.ticketBody, compact && styles.ticketBodyCompact, torn && styles.bodyTorn]}>
+        <Text
+          style={[
+            styles.headline,
+            compact && styles.headlineCompact,
+            { color: dimmed || torn ? Colors.textMuted : accent.strong },
+          ]}>
           {couponHeadline(c)}
         </Text>
-        <Text style={styles.conds}>{couponConditions(c).join(' · ')}</Text>
+        <Text numberOfLines={compact ? 2 : undefined} style={styles.conds}>
+          {couponConditions(c).join(' · ')}
+        </Text>
+        {footer !== undefined ? (
+          <View style={styles.codeRow}>{footer}</View>
+        ) : (
         <View style={styles.codeRow}>
           {/* เก็บแล้วโชว์โค้ดให้คัดลอก · ยังไม่เก็บซ่อนโค้ดไว้ก่อน ให้กดเก็บ —
               ถ้าโชว์โค้ดตั้งแต่ยังไม่เก็บ ปุ่มเก็บก็ไม่มีความหมาย ใครก็จดไปใช้ได้
@@ -146,6 +197,7 @@ export function CouponTicket({
             </View>
           )}
         </View>
+        )}
       </View>
     </PressableScale>
   );
@@ -175,6 +227,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Shadow.card,
   },
+  /* ฉีกแล้ว: สองซีกแยกออกจากกันตรงรอยปรุพร้อมเอียงคนละทาง — ตั๋วจริงถูกฉีกตรงนั้น
+     ภาพนี้จึงอ่านออกทันทีโดยไม่ต้องอ่านตัวหนังสือ */
+  ticketTorn: { opacity: 0.75 },
+  stubTorn: { transform: [{ translateX: -6 }, { rotate: '-2.5deg' }] },
+  bodyTorn: { transform: [{ translateX: 6 }, { rotate: '1.5deg' }] },
+  stamp: {
+    position: 'absolute',
+    right: 10,
+    top: '38%',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    borderWidth: 2,
+    borderColor: '#C9372C',
+    transform: [{ rotate: '-12deg' }],
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    zIndex: 2,
+  },
+  stampText: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 13,
+    letterSpacing: 1,
+    color: '#C9372C',
+  },
   stub: {
     width: STUB_W,
     alignItems: 'center',
@@ -183,7 +259,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xs,
     gap: 2,
   },
+  stubCompact: { paddingVertical: Spacing.sm },
   stubArt: { width: 46, height: 55 },
+  stubLabelCompact: { fontSize: 12 },
+  ticketBodyCompact: { padding: Spacing.sm },
+  headlineCompact: { fontSize: 16 },
   stubLabel: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 13,
