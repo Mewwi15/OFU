@@ -52,7 +52,8 @@ import { startLineAuth } from '@/lib/line';
 import { useAuth } from '@/store/auth';
 
 const BRAND = { google: '#FFFFFF', line: '#06C755' } as const;
-const MASCOT_SRC = require('@/assets/images/mascot-tiger.png') as number;
+/* มาสคอตเต็มตัวที่เจ้าของส่งมา 5 ก.ย. 2026 — วางให้ครึ่งล่างหลบหลังการ์ดตามที่สั่ง */
+const MASCOT_SRC = require('@/assets/images/mascot-delivery.png') as number;
 const CODE_LENGTH = 6;
 const emailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
@@ -317,14 +318,17 @@ export default function LoginScreen() {
           { paddingTop: topInset + Spacing.lg, paddingBottom: bottomInset + Spacing.x3 },
         ]}>
         <View style={styles.brand}>
-          {/* มาสคอตคู่กับโลโก้ — ตัวเดียวกับที่ลูกค้าเห็นบนหน้าร้าน จำร้านได้ตั้งแต่จอแรก */}
-          <Image source={MASCOT_SRC} style={styles.mascot} contentFit="contain" />
           <Text variant="heading" style={styles.welcome}>
             {t('login.welcome')}
           </Text>
           <Text variant="body" style={styles.tagline}>
             {t('login.tagline')}
           </Text>
+          {/* ★ ครึ่งล่างหลบหลังการ์ด ★ (เจ้าของสั่ง "วางรูปนี้แบบหลบหลังการ์ด")
+              ใช้ระยะล่างติดลบ ไม่ใช่วางลอยแบบ absolute — แบบนี้ตัวมาสคอตยังนับความสูง
+              ของตัวเองในการจัดหน้า ส่วนที่โผล่พ้นการ์ดจึงได้ที่ของมันจริง ๆ ไม่ไปทับ
+              ข้อความด้านบนตอนจอสั้น · การ์ดถูกวาดทีหลังจึงบังส่วนล่างให้เอง */}
+          <Image source={MASCOT_SRC} style={styles.mascot} contentFit="contain" />
         </View>
 
         {/* แผ่นเนื้อหา — ยกขึ้นมาทับพื้นไล่สีเล็กน้อย ให้อ่านเป็นการ์ดที่วางอยู่บนพื้น
@@ -391,17 +395,16 @@ export default function LoginScreen() {
 
             {method === 'phone' ? (
               <>
-                <Text style={styles.label}>เบอร์โทรศัพท์</Text>
+                {/* ★ ให้พิมพ์ 0 นำได้ตรง ๆ ★ เจ้าของทัก 5 ก.ย. 2026 "คนไทยส่วนมากชอบพิมพ์
+                    เบอร์แบบมี 0 ก่อน" — ป้าย +66 ที่เคยติดไว้หน้าช่องทำให้อ่านเป็น
+                    "+66 0812345678" ซึ่งไม่มีจริง คนจะลังเลว่าต้องตัด 0 ออกไหม
+                    ระบบแปลงเป็นรูปแบบสากลให้เองตอนส่งอยู่แล้ว (toE164Thai) */}
                 <View style={styles.field}>
-                  {/* +66 ตายตัว ไม่ให้แก้ — ร้านส่งของในไทยอย่างเดียว การเปิดให้เลือก
-                      รหัสประเทศคือเพิ่มช่องให้กรอกผิดโดยไม่มีใครได้ประโยชน์ */}
-                  <View style={styles.dialCode}>
-                    <Text style={styles.dialCodeText}>+66</Text>
-                  </View>
+                  <Ionicons name="call-outline" size={20} color={Colors.textMuted} />
                   <TextInput
                     value={phone}
                     onChangeText={(v) => setPhone(v.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="08X-XXX-XXXX"
+                    placeholder="เบอร์มือถือ เช่น 0812345678"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="phone-pad"
                     textContentType="telephoneNumber"
@@ -752,9 +755,13 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: Spacing.lg },
 
   /* พื้นไล่สีอยู่หลังทุกอย่าง สูงพอให้หัวจอมีที่หายใจแม้แป้นพิมพ์ดันเนื้อหาขึ้น */
-  heroBg: { position: 'absolute', left: 0, right: 0, top: 0, height: '46%' },
-  brand: { alignItems: 'center', paddingBottom: Spacing.x2 },
-  mascot: { width: 132, height: 132 },
+  heroBg: { position: 'absolute', left: 0, right: 0, top: 0, height: '42%' },
+  brand: { alignItems: 'center' },
+  /* ★ ทุกอย่างต้องอยู่ในจอเดียว ★ เจ้าของสั่ง "ไม่อยากให้เลื่อน" — จอล็อกอินที่ต้องเลื่อน
+     หาปุ่มคือด่านแรกที่ทำให้คนถอดใจ ทุกระยะในแผ่นเนื้อหาถูกบีบลงหนึ่งขั้น
+     ส่วนมาสคอตกินความสูงจริงแค่ 148 (196 ลบส่วนที่หลบหลังการ์ด 48) — ที่ว่างใต้การ์ด
+     ยังเหลือพอ จึงขยายให้เต็มหัวจอได้โดยไม่ทำให้ต้องเลื่อน */
+  mascot: { width: 210, height: 196, marginBottom: -48 },
   /* ตัวหนังสือบนพื้นไล่สีเป็นสีขาว + เงาบาง ๆ ตรึงขอบ — ชุดเดียวกับหัวจอหน้าร้าน */
   welcome: { color: DELIVERY_INK, ...DELIVERY_INK_SHADOW, textAlign: 'center' },
   tagline: { color: DELIVERY_INK, ...DELIVERY_INK_SHADOW, marginTop: 2 },
@@ -763,7 +770,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.xl,
     padding: Spacing.lg,
-    paddingTop: Spacing.x2,
     ...Shadow.float,
   },
 
@@ -786,7 +792,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryTint,
     borderRadius: Radius.pill,
     padding: 4,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   modeBtn: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm + 2, borderRadius: Radius.pill },
   modeBtnActive: { backgroundColor: Colors.surface, ...Platform.select({ ios: {}, default: {} }) },
@@ -799,13 +805,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    minHeight: 56,
+    minHeight: 52,
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   input: { ...Typography.subtitle, flex: 1, color: Colors.text, padding: 0 },
   /* +66 ติดอยู่กับช่อง มีเส้นคั่นบาง ๆ — อ่านเป็น "ส่วนหนึ่งของเบอร์" ไม่ใช่ปุ่มที่กดได้ */
@@ -816,7 +822,7 @@ const styles = StyleSheet.create({
     borderRightColor: Colors.border,
   },
   dialCodeText: { ...Typography.subtitle, color: Colors.textMuted },
-  methodHint: { textAlign: 'center', color: Colors.textMuted, marginTop: Spacing.md },
+  methodHint: { textAlign: 'center', color: Colors.textMuted, marginTop: Spacing.sm },
   resendTextOff: { color: Colors.textMuted },
   hintErr: { ...Typography.caption, color: Colors.dangerStrong, marginTop: -Spacing.sm, marginBottom: Spacing.md },
 
@@ -824,7 +830,7 @@ const styles = StyleSheet.create({
   primaryBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 56,
+    minHeight: 52,
     borderRadius: Radius.pill,
     backgroundColor: Colors.primary,
     marginTop: Spacing.xs,
@@ -837,7 +843,7 @@ const styles = StyleSheet.create({
   primaryText: { ...Typography.button, fontSize: 16, color: Colors.textOnPrimary },
 
   /* Divider */
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginVertical: Spacing.xl },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginVertical: Spacing.md },
   divider: { flex: 1, height: 1, backgroundColor: Colors.border },
   dividerText: { color: Colors.textMuted },
 
@@ -847,7 +853,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: Radius.pill,
   },
   socialBordered: { borderWidth: 1, borderColor: Colors.border },
@@ -907,7 +913,7 @@ const styles = StyleSheet.create({
   resendText: { ...Typography.button, color: Colors.primaryStrong },
 
   /* Consent */
-  consentBlock: { marginTop: Spacing.x3, paddingTop: Spacing.x2 },
+  consentBlock: { marginTop: Spacing.lg },
   consent: { textAlign: 'center', lineHeight: 19 },
   consentLinkRow: {
     flexDirection: 'row',
