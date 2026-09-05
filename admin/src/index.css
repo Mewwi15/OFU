@@ -84,7 +84,7 @@ body {
     color: #000;
     /* เท่ากับขนาดฐานบนจอ — เดิมย่อเหลือ 8px ตอนพิมพ์ ตัวหนังสือบนกระดาษเลยเล็กกว่าที่
        เห็นในตัวอย่าง และเล็กเกินจะอ่านสบาย */
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.3;
   }
   /* Force crisp black on thermal paper regardless of on-screen greys. */

@@ -52,8 +52,12 @@ export function setReceiptConfig(patch: Partial<ReceiptConfig>): ReceiptConfig {
 }
 
 /** Content width (mm) for the receipt body — a hair narrower than the roll so
- *  nothing clips at the printer's edge margins. */
-export const contentMm = (w: PaperWidth) => (w === 58 ? 48 : 40);
+ *  nothing clips at the printer's edge margins.
+ *
+ *  ม้วน 48mm เดิมตั้งไว้ 40mm ซึ่งเผื่อขอบมากเกินไป: พอพิมพ์ที่ 100% แบบไม่มีระยะขอบ
+ *  (ตามที่แก้ไป 5 ก.ย. 2026) บิลชิดซ้ายจริงแต่เหลือกระดาษว่างทางขวาเกือบ 1 ซม.
+ *  ที่ 45mm ใช้กระดาษเต็มขึ้น ชื่อสินค้าตกบรรทัดน้อยลง และรับตัวหนังสือที่ใหญ่ขึ้นได้ */
+export const contentMm = (w: PaperWidth) => (w === 58 ? 48 : 45);
 
 /** Live config that re-renders on change (this tab or another). */
 export function useReceiptConfig(): [ReceiptConfig, (p: Partial<ReceiptConfig>) => void] {
