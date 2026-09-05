@@ -85,7 +85,7 @@ export type OpenSlip = {
 
 export function printShiftOpenSlip(s: OpenSlip) {
   const cfg = getReceiptConfig();
-  const cw = contentMm(cfg.paperWidth);
+  const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบเปิดรอบ</title>
@@ -128,7 +128,7 @@ export type NoSaleSlip = {
  */
 export function printNoSaleSlip(s: NoSaleSlip) {
   const cfg = getReceiptConfig();
-  const cw = contentMm(cfg.paperWidth);
+  const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>เปิดลิ้นชัก</title>
@@ -161,7 +161,7 @@ export function printNoSaleSlip(s: NoSaleSlip) {
  */
 export function printCountKickSlip(shopName: string, cashier: string) {
   const cfg = getReceiptConfig();
-  const cw = contentMm(cfg.paperWidth);
+  const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
   const at = new Date().toISOString();
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
@@ -193,7 +193,7 @@ export function printCashCountSheet(p: {
   total: number;
 }) {
   const cfg = getReceiptConfig();
-  const cw = contentMm(cfg.paperWidth);
+  const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบนับเงินในลิ้นชัก</title>

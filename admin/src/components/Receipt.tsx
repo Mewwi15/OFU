@@ -77,7 +77,7 @@ export function Receipt({
   const [cfg] = useReceiptConfig();
   const payLabel = PAY_LABEL[paymentMethod] ?? paymentMethod;
   const payValue = paymentMethod === 'cash' && cashPaid != null ? cashPaid : total;
-  const cw = contentMm(cfg.paperWidth);
+  const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
 
   return (
     <>

@@ -34,7 +34,7 @@ import {
   type DeletionRequest,
 } from '../lib/deletionRequests';
 import { unlockBackOffice } from '../lib/backOffice';
-import { contentMm, useReceiptConfig } from '../lib/receiptConfig';
+import { MIN_CONTENT_MM, contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Text } = Typography;
 
@@ -195,8 +195,30 @@ export function Settings() {
                 { value: 58, label: '58 มม.' },
               ]}
             />
-            <div className="text-xs text-gray-400 mt-2">
-              เนื้อหาบิลจะกว้าง {contentMm(cfg.paperWidth)} มม. (เผื่อขอบเครื่อง) — ตั้งให้ตรงกับม้วนกระดาษของเครื่องพิมพ์
+            <div className="text-xs text-gray-400 mt-2">ตั้งให้ตรงกับม้วนกระดาษของเครื่องพิมพ์</div>
+
+            {/* ★ ปรับความกว้างเนื้อบิลเองได้ ★ พื้นที่พิมพ์จริงของแต่ละเครื่องแคบกว่าความ
+                กว้างม้วน และแคบไม่เท่ากันในแต่ละรุ่น — กว้างไปตัวหนังสือฝั่งขวาโดนตัด
+                (เจ้าของเจอ 5 ก.ย. 2026) แคบไปก็เสียกระดาษและชื่อสินค้าตกบรรทัดถี่
+                เดาจากส่วนกลางให้ถูกทุกเครื่องไม่ได้ ให้ปรับเองแล้วกดพิมพ์ทดสอบจบเร็วกว่า */}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm shrink-0">ความกว้างเนื้อบิล</span>
+              <InputNumber
+                min={MIN_CONTENT_MM}
+                max={cfg.paperWidth}
+                style={{ width: 110 }}
+                addonAfter="มม."
+                value={contentMm(cfg.paperWidth, cfg.contentWidthMm)}
+                onChange={(v) => update({ contentWidthMm: typeof v === 'number' ? v : null })}
+              />
+              {cfg.contentWidthMm != null ? (
+                <Button size="small" type="link" onClick={() => update({ contentWidthMm: null })}>
+                  ค่ามาตรฐาน
+                </Button>
+              ) : null}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              ตัวหนังสือฝั่งขวาโดนตัด = ลดลง · เหลือกระดาษว่างทางขวา = เพิ่มขึ้น (กดพิมพ์ทดสอบดูได้)
             </div>
           </Card>
 
