@@ -11,10 +11,13 @@ import Animated, {
 
 import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { useT } from '@/lib/i18n';
 
 export type QuantityStepperProps = {
+  /** สีปุ่ม — ไม่ส่ง = สีแบรนด์ (ส้ม) โหมดออนไลน์ส่งน้ำเงินมา */
+  accent?: Accent;
   value: number;
   onChange: (next: number) => void;
   /** Lower bound (inclusive). Defaults to 1. */
@@ -45,6 +48,7 @@ export function QuantityStepper({
   removable = false,
   onRemove,
   style,
+  accent = BRAND_ACCENT,
 }: QuantityStepperProps) {
   const t = useT();
   const canDecrement = value > min;
@@ -87,6 +91,7 @@ export function QuantityStepper({
         style={[
           styles.button,
           styles.minus,
+          { backgroundColor: accent.tint },
           !showTrash && !canDecrement && styles.disabled,
         ]}>
         <Ionicons
@@ -108,7 +113,7 @@ export function QuantityStepper({
         hitSlop={6}
         disabled={!canIncrement}
         onPress={increment}
-        style={[styles.button, styles.plus, !canIncrement && styles.disabled]}>
+        style={[styles.button, styles.plus, { backgroundColor: accent.solid }, !canIncrement && styles.disabled]}>
         <Ionicons name="add" size={18} color={Colors.textOnPrimary} />
       </PressableScale>
     </View>

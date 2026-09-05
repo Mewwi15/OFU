@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import { Checkbox } from '@/components/ui/Checkbox';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
@@ -31,6 +32,8 @@ import { cartItemId, useCart } from '@/store/cart';
 export type ProductListItemVariant = 'cart';
 
 export type ProductListItemProps = {
+  /** สีเน้นของหน้าที่แถวนี้ไปโผล่ — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
   product: Product;
   variant: ProductListItemVariant;
   /**
@@ -69,6 +72,7 @@ export function ProductListItem({
   onToggleSelect,
   onRemove,
   style,
+  accent = BRAND_ACCENT,
 }: ProductListItemProps) {
   const t = useT();
   const router = useRouter();
@@ -93,6 +97,7 @@ export function ProductListItem({
       {/* Optional left checkbox (cart selection) */}
       {selectable ? (
         <Checkbox
+          accent={accent}
           checked={selected}
           onPress={onToggleSelect}
           accessibilityLabel={selected ? t('widget.deselectItem') : t('widget.selectItem')}
@@ -131,11 +136,12 @@ export function ProductListItem({
           </View>
         ) : null}
 
-        <Text style={styles.price}>{money(product.price)}</Text>
+        <Text style={[styles.price, { color: accent.strong }]}>{money(product.price)}</Text>
       </View>
 
       {/* Right: quantity stepper (delete folds into the minus button) */}
       <QuantityStepper
+        accent={accent}
         value={qty}
         onChange={(next) => setQty(resolvedLineId, next)}
         min={1}
@@ -203,6 +209,7 @@ const styles = StyleSheet.create({
   },
   price: {
     ...Typography.price,
+    // สีจริงมาจาก accent ที่จุดเรียกใช้
     color: Colors.primaryStrong,
   },
   rightWishlist: {

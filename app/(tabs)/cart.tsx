@@ -29,7 +29,7 @@ import { ProductListItem } from '@/components/product/ProductListItem';
 import { CheckoutSheet } from '@/components/shop/CheckoutSheet';
 import { ModeSwitch } from '@/components/shop/ModeSwitch';
 import { CouponTicket } from '@/components/shop/CouponTicket';
-import { BRAND_ACCENT } from '@/constants/accent';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -107,7 +107,15 @@ function streetOnly(a: { line: string; subDistrict?: string; district?: string; 
   return out.replace(/\s{2,}/g, ' ').trim() || a.line;
 }
 
-function FreeShipBlock({ subtotal, freeMin }: { subtotal: number; freeMin: number }) {
+function FreeShipBlock({
+  subtotal,
+  freeMin,
+  accent,
+}: {
+  subtotal: number;
+  freeMin: number;
+  accent: Accent;
+}) {
   const t = useT();
   // freeMin 0 = ส่งฟรีทุกยอด — เต็มหลอดทันที ไม่ใช่หารด้วยศูนย์
   const progress = freeMin > 0 ? Math.min(1, subtotal / freeMin) : 1;
@@ -126,7 +134,7 @@ function FreeShipBlock({ subtotal, freeMin }: { subtotal: number; freeMin: numbe
         <Ionicons
           name={reached ? 'checkmark-circle' : 'bicycle-outline'}
           size={18}
-          color={reached ? Colors.accentStrong : Colors.primaryStrong}
+          color={reached ? Colors.accentStrong : accent.strong}
         />
         {reached ? (
           <Text style={[styles.shipText, { color: Colors.accentStrong }]}>
@@ -145,6 +153,7 @@ function FreeShipBlock({ subtotal, freeMin }: { subtotal: number; freeMin: numbe
           style={[
             styles.shipFill,
             fillStyle,
+            { backgroundColor: accent.solid },
             reached && { backgroundColor: Colors.accentStrong },
           ]}
         />
@@ -232,6 +241,11 @@ export default function CartScreen() {
      รายการที่เก็บได้ ต้องพิมพ์เองเท่านั้น */
   const [myCoupons, setMyCoupons] = useState<Coupon[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  /* สีของหน้า — โหมดออนไลน์เป็นน้ำเงินทั้งโหมดแล้ว ตะกร้าเป็นส้มอยู่หน้าเดียวจะโดดออกมา
+     (เจ้าของทัก 5 ก.ย. 2026 "ทำไมไม่เป็นสีน้ำเงินครับ") — ส่งสีเข้าคอมโพเนนต์ที่ใช้ร่วมกัน
+     แทนการก๊อปหน้าตะกร้าเป็นสองเวอร์ชัน */
+  const A = mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT;
 
   const chosen = selectedItems(items, selectedIds);
   const subtotal = cartSubtotal(chosen);
@@ -425,7 +439,7 @@ export default function CartScreen() {
       {isEmpty ? (
         <View style={[styles.empty, { paddingBottom: TAB_BAR_FOOTPRINT + Spacing.x3 }]}>
           <View style={styles.emptyBadge}>
-            <Ionicons name="bag-handle-outline" size={40} color={Colors.primaryStrong} />
+            <Ionicons name="bag-handle-outline" size={40} color={A.strong} />
           </View>
           <Text variant="title" style={styles.emptyTitle}>
             {t('cart.emptyTitle')}
@@ -478,7 +492,7 @@ export default function CartScreen() {
                   scaleTo={0.98}
                   style={styles.addrRow}>
                   <View style={styles.addrTile}>
-                    <Ionicons name="location-outline" size={20} color={Colors.primaryStrong} />
+                    <Ionicons name="location-outline" size={20} color={A.strong} />
                   </View>
                   <View style={styles.addrBody}>
                     {address ? (
@@ -503,7 +517,7 @@ export default function CartScreen() {
                   <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
                 </PressableScale>
                 <View style={styles.insetHairline} />
-                <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} />
+                <FreeShipBlock subtotal={subtotal} freeMin={fees.freeDeliveryMin} accent={A} />
               </View>
             ) : (
               /* Online surface — nationwide parcel address
@@ -582,6 +596,7 @@ export default function CartScreen() {
                   checked={allSelected}
                   onPress={() => selectAll(!allSelected)}
                   accessibilityLabel={t('cart.selectAll')}
+                  accent={A}
                 />
                 <Text style={styles.selectAllText}>{t('cart.selectAll')}</Text>
                 <Text variant="caption" style={styles.selectAllCount}>
@@ -618,6 +633,7 @@ export default function CartScreen() {
                     selected={selectedIds.includes(item.id)}
                     onToggleSelect={() => toggleSelect(item.id)}
                     onRemove={() => confirmRemoveLine(item)}
+                    accent={A}
                   />
                 </View>
               ))}
@@ -649,7 +665,7 @@ export default function CartScreen() {
                             compact
                             torn={on}
                             notchColor={Colors.background}
-                            accent={mode === 'online' ? ONLINE_ACCENT : BRAND_ACCENT}
+                            accent={A}
                             busy={promoBusy}
                             /* กดใบที่ใช้อยู่ = เอาออก ไม่ใช่กดแล้วไม่มีอะไรเกิดขึ้น —
                                ไม่งั้นลูกค้าเปลี่ยนใจไปใช้ใบอื่นไม่ได้เลย */
@@ -659,11 +675,7 @@ export default function CartScreen() {
                                 style={[
                                   styles.couponUse,
                                   {
-                                    color: on
-                                      ? Colors.textMuted
-                                      : mode === 'online'
-                                        ? ONLINE_ACCENT.strong
-                                        : BRAND_ACCENT.strong,
+                                    color: on ? Colors.textMuted : A.strong,
                                   },
                                 ]}>
                                 {on ? 'แตะเพื่อเอาออก' : 'แตะเพื่อใช้'}
@@ -695,7 +707,7 @@ export default function CartScreen() {
                   hitSlop={8}
                   disabled={promoBusy}
                   onPress={onApply}>
-                  <Text style={styles.promoApply}>
+                  <Text style={[styles.promoApply, { color: A.strong }]}>
                     {promoBusy
                       ? t('cart.promoChecking')
                       : appliedPromo
@@ -803,7 +815,11 @@ export default function CartScreen() {
               accessibilityLabel={checkoutLabel}
               disabled={!canCheckout}
               onPress={openCheckout}
-              style={[styles.checkoutCta, !canCheckout && styles.checkoutCtaOff]}>
+              style={[
+                styles.checkoutCta,
+                { backgroundColor: A.solid },
+                !canCheckout && styles.checkoutCtaOff,
+              ]}>
               <Text style={styles.checkoutCtaText}>{checkoutVerb}</Text>
               <Ionicons name="arrow-forward" size={18} color={Colors.textOnPrimary} />
             </PressableScale>

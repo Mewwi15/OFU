@@ -11,15 +11,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 
 import { PressableScale } from '@/components/ui/PressableScale';
+import { BRAND_ACCENT, type Accent } from '@/constants/accent';
 import { Colors } from '@/constants/theme';
 
 export type CheckboxProps = {
   checked: boolean;
   onPress?: () => void;
   accessibilityLabel?: string;
+  /** สีเมื่อติ๊กแล้ว — ไม่ส่ง = สีแบรนด์ (ส้ม) */
+  accent?: Accent;
 };
 
-export function Checkbox({ checked, onPress, accessibilityLabel }: CheckboxProps) {
+export function Checkbox({ checked, onPress, accessibilityLabel, accent = BRAND_ACCENT }: CheckboxProps) {
   return (
     <PressableScale
       accessibilityRole="checkbox"
@@ -27,7 +30,7 @@ export function Checkbox({ checked, onPress, accessibilityLabel }: CheckboxProps
       accessibilityLabel={accessibilityLabel}
       hitSlop={11}
       onPress={onPress}
-      style={[styles.box, checked && styles.boxOn]}>
+      style={[styles.box, checked && [styles.boxOn, { backgroundColor: accent.solid, borderColor: accent.solid }]]}>
       {checked ? (
         <Ionicons name="checkmark" size={14} color={Colors.textOnPrimary} />
       ) : null}
