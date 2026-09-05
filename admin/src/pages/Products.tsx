@@ -731,15 +731,6 @@ function ProductModal({
           <Form.Item name="price" label="ราคาขาย" rules={[{ required: true, message: 'กรอกราคา' }]}>
             <InputNumber addonBefore="฿" min={0} style={{ width: '100%' }} placeholder="0" />
           </Form.Item>
-          <Form.Item
-            name="cost_price"
-            label="ต้นทุนล่าสุด"
-            /* ทุนก่อนหน้าแทนคำอธิบาย — เจ้าของขอเอง 5 ก.ย. 2026 และมันตอบคำถามที่คนเปิด
-               ช่องนี้มาถามจริง ๆ ("ขึ้นมาจากเท่าไหร่") ได้ตรงกว่าประโยคอธิบายว่าช่องนี้คืออะไร */
-            extra={prevCost != null ? `ก่อนหน้า ${money(prevCost)}` : undefined}>
-            {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
-            <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
-          </Form.Item>
           {isNewProduct ? (
             <Form.Item name="stock_qty" label="สต็อกคงเหลือ">
               <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
@@ -777,10 +768,24 @@ function ProductModal({
           </Form.Item>
         </div>
 
-        {/* ── ล็อตต้นทุน ──
-            เจ้าของถามเอง 5 ก.ย. 2026 ว่าทุนเก่า/ใหม่ควรอยู่ในหน้านี้ไหม — ใช่ ล็อตเป็น
-            ของตัวเลือกสินค้า ไม่ใช่ของใบรับเข้า ใบรับเข้าแค่เป็นเหตุการณ์ที่ทำให้เกิดล็อต
-            โชว์เฉพาะตอนแก้สินค้าที่มีอยู่แล้ว — สินค้าใหม่ยังไม่มีล็อตให้ดู */}
+        {/* ── โซนต้นทุน ──
+            เจ้าของตีกลับ 5 ก.ย. 2026: "เราต้องบอกให้ชัดเจนเลยนี่คือโซนของต้นทุน" — เดิม
+            ช่องทุนไปแทรกอยู่กับราคาขาย/สต็อก ส่วนตารางล็อตอยู่คนละที่ คนอ่านต้องปะติดปะต่อ
+            เอง ทุนทั้งหมดอยู่ใต้หัวข้อเดียวกันแล้วไม่ต้องอธิบายอะไรเพิ่ม */}
+        <Divider titlePlacement="left" style={{ margin: '4px 0 14px', fontSize: 13, color: '#8a807a' }}>
+          ต้นทุน
+        </Divider>
+        <div className="grid grid-cols-2 gap-x-3">
+          <Form.Item
+            name="cost_price"
+            label="ต้นทุนล่าสุด"
+            /* ทุนก่อนหน้าแทนคำอธิบาย — เจ้าของขอเอง 5 ก.ย. 2026 และมันตอบคำถามที่คนเปิด
+               ช่องนี้มาถามจริง ๆ ("ขึ้นมาจากเท่าไหร่") ได้ตรงกว่าประโยคอธิบายว่าช่องนี้คืออะไร */
+            extra={prevCost != null ? `ก่อนหน้า ${money(prevCost)}` : undefined}>
+            {/* ต้นทุนรับทศนิยม (สตางค์) — ราคาขายยังเป็นบาทเต็มตามคณิตเงินทั้งระบบ */}
+            <InputNumber addonBefore="฿" min={0} step={0.01} style={{ width: '100%' }} placeholder="0.00" />
+          </Form.Item>
+        </div>
         {variantId ? <LotPanel feed={lotFeed} /> : null}
 
         <div className="mb-1 text-sm text-[#4b443f]">รูปภาพสินค้า</div>
@@ -979,37 +984,23 @@ function LotPanel({ feed }: { feed: LotFeed }) {
   if (state === 'unavailable') return null;
 
   const rows = groupLots(lots);
-  const live = rows.filter((r) => r.qty_left > 0);
-  const onHand = live.reduce((s, r) => s + r.qty_left, 0);
-  const value = live.reduce((s, r) => s + r.qty_left * r.unit_cost, 0);
-  /* วันซ้ำยังเกิดได้ถ้าวันเดียวกันรับมาคนละทุน — กรณีนั้นค่อยโชว์เวลา และโชว์ทั้งตาราง
+  const firstLiveKey = rows.find((r) => r.qty_left > 0)?.key;
+  /* วันซ้ำเกิดได้ถ้าวันเดียวกันรับมาคนละทุน — กรณีนั้นค่อยโชว์เวลา และโชว์ทั้งตาราง
      เพราะรูปแบบวันที่ไม่เหมือนกันในตารางเดียวอ่านยากกว่าเดิม */
   const days = rows.map((r) => thDate(r.received_at).format('YYYY-MM-DD'));
   const sameDay = new Set(days).size !== days.length;
-  const firstLiveKey = live[0]?.key;
 
   return (
     <>
-      <Divider titlePlacement="left" style={{ margin: '4px 0 14px', fontSize: 13, color: '#8a807a' }}>
-        ต้นทุนของที่ค้างอยู่
-      </Divider>
+      {/* บรรทัดเดียวพอ ★ เจ้าของสั่งเอาสรุป "คงเหลือรวม/มูลค่าต้นทุน" ออก (5 ก.ย. 2026)
+          — มันเป็นเลขที่ไม่ได้ใช้ตัดสินใจอะไร แค่ทำให้โซนนี้รกและดูซับซ้อนกว่าที่เป็นจริง */}
+      <div className="mb-2 text-[13px] text-[#8a807a]">ของแต่ละชุดที่รับเข้ามา</div>
 
       {state === 'loading' ? (
         <div className="mb-3 text-[13px] text-gray-400">กำลังโหลด…</div>
       ) : rows.length === 0 ? (
-        <div className="mb-3 text-[13px] text-gray-400">ยังไม่มีล็อต</div>
+        <div className="mb-3 text-[13px] text-gray-400">ยังไม่มีของที่รับเข้าผ่านระบบ</div>
       ) : (
-        <>
-          {/* สรุปก่อน ตารางทีหลัง — คนส่วนใหญ่อยากรู้แค่สองตัวเลขนี้ ไม่ได้จะอ่านทุกแถว */}
-          <div className="mb-3 flex flex-wrap gap-x-6 rounded-lg bg-[#f7f5f3] px-3 py-2 text-[13px]">
-            <span>
-              คงเหลือรวม <b className="tabular-nums text-[15px]">{onHand.toLocaleString('th-TH')}</b> ชิ้น
-            </span>
-            <span>
-              มูลค่าต้นทุน <b className="tabular-nums text-[15px]">{money(value)}</b>
-            </span>
-          </div>
-
           <Table<LotRow>
             rowKey="key"
             size="small"
@@ -1073,7 +1064,6 @@ function LotPanel({ feed }: { feed: LotFeed }) {
               },
             ]}
           />
-        </>
       )}
     </>
   );
