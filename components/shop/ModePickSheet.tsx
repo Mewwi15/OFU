@@ -18,6 +18,7 @@
  */
 
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +29,7 @@ import { BRAND_ACCENT } from '@/constants/accent';
 import { ONLINE_ACCENT } from '@/constants/online';
 import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
+import { checkDeliveryZone } from '@/lib/deliveryZone';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -53,6 +55,19 @@ export function ModePickSheet({ productName, onPicked, onClose }: ModePickSheetP
   const modes = Object.values(MODE_META);
 
   const pick = (m: ShopMode) => {
+    /* ★ เลือกเดลิเวอรี่ต้องผ่านด่านเขตส่งเสมอ ★ (เจ้าของทัก 6 ก.ย. 2026 "ทำไมลูกค้า
+       ที่อยู่นอกพื้นที่ยังกด Delivery ได้อีก") — เดิมแผ่นนี้ตั้งโหมดแล้วพาเข้าร้านเลย
+       ข้ามจอเช็คตำแหน่งซึ่งเป็นที่เดียวที่กติกาเขตส่งอยู่ ลูกค้านอกเขตจึงหยิบของเต็ม
+       ตะกร้าแล้วไปเจอด่านตอนกดจ่ายเงิน
+       อยู่ในเขตอยู่แล้วก็ไปต่อทันที ไม่ต้องเสียเวลาสแกนซ้ำ — ด่านโผล่เฉพาะตอนที่จำเป็น */
+    if (m === 'delivery') {
+      const zone = checkDeliveryZone();
+      if (!zone.ok) {
+        onClose();
+        router.push('/delivery-check');
+        return;
+      }
+    }
     setMode(m); // ตั้งธง pickedThisSession ให้ด้วยในตัว
     onPicked();
   };

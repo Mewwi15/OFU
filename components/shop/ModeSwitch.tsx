@@ -13,11 +13,13 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import { MODE_META, useMode, type ShopMode } from '@/store/mode';
+import { checkDeliveryZone } from '@/lib/deliveryZone';
 
 const MODES = Object.values(MODE_META);
 
@@ -40,6 +42,12 @@ export function ModeSwitch({ compact = false, style }: Props) {
   const onPick = (m: (typeof MODES)[number]) => {
     if (m.comingSoon) {
       Alert.alert(m.label, 'กำลังจะเปิดให้ใช้งานเร็วๆ นี้');
+      return;
+    }
+    /* สลับมาเดลิเวอรี่ก็ต้องผ่านด่านเขตส่งเหมือนกัน — เหตุผลเดียวกับแผ่นเลือกวิธีรับของ
+       (ดู lib/deliveryZone.ts) ไม่งั้นสวิตช์นี้กลายเป็นทางลัดเข้าโหมดที่ส่งไม่ถึง */
+    if (m.key === 'delivery' && !checkDeliveryZone().ok) {
+      router.push('/delivery-check');
       return;
     }
     setMode(m.key);
