@@ -36,6 +36,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Barcode from 'react-native-barcode-svg';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -191,6 +192,10 @@ export default function MemberScreen() {
   const pending = mine.filter((m) => m.status === 'pending');
 
   const canScan = signedIn && !!profile.phone;
+  /* เลขบนบัตร = เบอร์ในรูปแบบที่คนไทยอ่านออก (0XXXXXXXXX) — เก็บมาเป็น +66… จึงต้องแปลง
+     ฝั่ง POS รับได้ทุกรูปแบบอยู่แล้ว แต่บาร์โค้ดยิ่งสั้นยิ่งอ่านติดง่าย และพนักงานที่ต้อง
+     พิมพ์มือก็อ่านเลขแบบนี้คล่องกว่า */
+  const cardCode = profile.phone.replace(/\D/g, '').replace(/^66/, '0');
 
   return (
     <View style={styles.screen}>
@@ -514,17 +519,42 @@ export default function MemberScreen() {
       </ScrollView>
 
       {/* ── บัตรเต็มจอสำหรับให้พนักงานสแกน ──
-          คิวอาร์ต้องใหญ่และคอนทราสต์สูงถึงจะถูกอ่านติดในร้านที่แสงไม่แน่นอน
-          พื้นขาวเต็มจอช่วยดันความสว่างจอขึ้นเองด้วย (จอ OLED สว่างตามเนื้อหา) */}
+          ★ บาร์โค้ดเส้นเป็นตัวหลัก คิวอาร์เป็นตัวสำรอง ★ (เจ้าของถาม 6 ก.ย. 2026 "อยากให้
+          ใช้เป็นขีด ๆ มากกว่า QR") — เครื่องยิงบาร์โค้ดแบบเลเซอร์ที่ร้านค้าใช้กันส่วนใหญ่
+          อ่านได้เฉพาะบาร์โค้ดเส้น อ่านคิวอาร์ไม่ได้เลย ส่วนเครื่องแบบกล้อง (2D) อ่านได้
+          ทั้งสองแบบ — เอาเส้นขึ้นก่อนจึงครอบคลุมเครื่องได้มากกว่า
+          ใส่คิวอาร์ตัวเล็กไว้ข้างล่างด้วย เผื่อร้านใช้เครื่องที่ตั้งค่าให้อ่านแต่ 2D
+
+          ★ เข้ารหัสเป็นเลข 10 หลักล้วน ★ ไม่ใช่ +66… เพราะบาร์โค้ดเส้นยิ่งอักขระน้อยยิ่ง
+          แคบและอ่านติดง่าย และฝั่ง POS แปลงเบอร์ทุกรูปแบบให้ตรงกันอยู่แล้ว (0102)
+
+          พื้นขาวเต็มจอช่วยดันความสว่างจอขึ้นเอง (จอ OLED สว่างตามเนื้อหา) ซึ่งจำเป็นมาก
+          เวลาสแกนจากหน้าจอ */}
       {showCard && canScan ? (
         <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={() => setShowCard(false)}>
           <Pressable style={styles.cardBackdrop} onPress={() => setShowCard(false)}>
             <View style={styles.bigCard}>
               <Text style={styles.bigCardName}>{profile.name}</Text>
               <Text style={styles.bigCardPhone}>{profile.phone}</Text>
-              <View style={styles.bigQr}>
-                <QRCode value={profile.phone} size={216} backgroundColor="transparent" />
+
+              <View style={styles.bigBarcode}>
+                <Barcode
+                  value={cardCode}
+                  format="CODE128"
+                  singleBarWidth={2.6}
+                  maxWidth={280}
+                  height={96}
+                  lineColor="#000000"
+                  backgroundColor="#FFFFFF"
+                />
               </View>
+              {/* เลขใต้เส้น — พนักงานพิมพ์มือได้ถ้าเครื่องยิงไม่ติด (จอมีรอย/แสงสะท้อน) */}
+              <Text style={styles.bigCardCode}>{cardCode}</Text>
+
+              <View style={styles.bigQr}>
+                <QRCode value={cardCode} size={120} backgroundColor="transparent" />
+              </View>
+
               <Text style={styles.bigCardHint}>ยื่นให้พนักงานสแกนก่อนจ่ายเงิน</Text>
               <Text style={styles.bigCardClose}>แตะที่ใดก็ได้เพื่อปิด</Text>
             </View>
@@ -655,6 +685,20 @@ const styles = StyleSheet.create({
   },
   bigCardName: { fontFamily: 'Mitr_500Medium', fontSize: 18, color: Colors.text },
   bigCardPhone: { fontSize: 14, color: Colors.textMuted, marginTop: 1 },
+  bigBarcode: {
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.md,
+  },
+  /* เลขใต้บาร์โค้ด เว้นระยะตัวอักษรให้อ่านทีละหลักได้ตอนต้องพิมพ์มือ */
+  bigCardCode: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 18,
+    letterSpacing: 3,
+    color: Colors.text,
+    marginTop: Spacing.sm,
+  },
   bigQr: { marginTop: Spacing.lg },
   bigCardHint: {
     fontFamily: 'Mitr_500Medium',
