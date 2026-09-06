@@ -237,6 +237,17 @@ export default function MemberScreen() {
           </View>
           <Text style={styles.brandSub}>MEMBER</Text>
 
+          {/* ★ เสือประดับมุมซ้ายล่างของหัวจอ ★ (เจ้าของสั่ง 6 ก.ย. 2026 "เสือผมเอามาไว้
+              ประดับตรงสีเขียว") — วางลอยแบบ absolute ไม่ใช่ในแถว เพราะแต้มต้องอยู่ชิดขวา
+              ที่เดิมเป๊ะ ตัวเลขแต้มคือสิ่งเดียวที่ลูกค้าเปิดหน้านี้มาดู ห้ามให้อะไรมาเบียด
+              pointerEvents none — เป็นของประดับ ไม่ใช่ปุ่ม กดโดนแล้วต้องไม่มีอะไรเกิดขึ้น */}
+          <Image
+            source={MEMBER_MASCOT}
+            style={styles.heroMascot}
+            contentFit="contain"
+            pointerEvents="none"
+          />
+
           {/* แต้มชิดขวา ตัวใหญ่ที่สุดบนหน้า — เป็นสิ่งเดียวที่ลูกค้าเปิดหน้านี้มาดู */}
           <View style={styles.pointsBlock}>
             {loaded ? (
@@ -501,6 +512,15 @@ const styles = StyleSheet.create({
      ลายเด่นเกินจนแย่งสายตาตัวเลขแต้ม */
   heroTint: { opacity: 0.62 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /* ล่างสุดของหัวจอพอดี — ส่วนล่างของตัวเสือถูกการ์ดขาวที่คร่อมอยู่บังไปนิดหน่อย
+     ซึ่งทำให้ดูเหมือนเสือยืนอยู่หลังการ์ด ไม่ใช่ภาพลอยแปะ */
+  heroMascot: {
+    position: 'absolute',
+    left: Spacing.sm,
+    bottom: 0,
+    width: 148,
+    height: 148,
+  },
   brand: {
     fontFamily: 'Mitr_600SemiBold',
     fontSize: 30,
