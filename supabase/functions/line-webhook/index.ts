@@ -128,7 +128,22 @@ Deno.serve(async (req) => {
           .select('id, line_owner_user_id')
           .limit(1)
           .maybeSingle();
-        if (shop?.line_owner_user_id !== userId) continue; // ไม่ใช่เจ้าของ → เงียบ
+        /* ★ เปิดให้เครื่องพนักงานที่ผูกไว้ใช้คำสั่งได้ด้วย ★ (0109) — เขาเป็นแอดมินที่เข้า
+           หลังร้านได้อยู่แล้ว การให้ถามสต๊อก/ออเดอร์ผ่านแชทจึงไม่ได้เปิดอะไรใหม่ แต่ทำให้
+           คนที่อยู่หน้าร้านตอบลูกค้าได้ทันทีโดยไม่ต้องเปิดคอม
+           คนนอกยังเงียบเหมือนเดิม ไม่ตอบว่า "ไม่มีสิทธิ์" ซึ่งเท่ากับยืนยันว่ามีอะไรให้เข้าถึง */
+        if (!shop) continue;
+        let allowed = shop.line_owner_user_id === userId;
+        if (!allowed) {
+          const { data: r } = await supabase
+            .from('shop_line_recipients')
+            .select('id')
+            .eq('shop_id', shop.id)
+            .eq('line_user_id', userId)
+            .maybeSingle();
+          allowed = !!r;
+        }
+        if (!allowed) continue;
 
         const adminUrl = Deno.env.get('ADMIN_URL') ?? undefined;
         try {
@@ -151,26 +166,66 @@ Deno.serve(async (req) => {
       const secret = Deno.env.get('OWNER_BIND_SECRET');
       // No secret configured = binding switched off entirely. Never treat an
       // empty env as "match everything".
-      if (secret && text === secret) {
+      /* ── ผูกเครื่องเข้ากับร้าน ──
+         ★ รหัสเดียวกัน แต่ผลต่างกันตามสถานะ ★ (เจ้าของสั่ง 6 ก.ย. 2026 "อยากให้อีก 2
+         เครื่องที่เป็นแอดมินได้ไลน์ OA ของเราด้วย")
+           · ยังไม่มีเจ้าของ → คนแรกที่พิมพ์เป็นเจ้าของ
+           · มีเจ้าของแล้ว คนอื่นพิมพ์ → เพิ่มเป็นเครื่องรับแจ้งเตือน (ไม่แย่งความเป็นเจ้าของ)
+           · พิมพ์ "<รหัส> เจ้าของ" → ยึดความเป็นเจ้าของ (ทางกู้คืนถ้าผูกผิดคน ซึ่งเป็น
+             เหตุผลที่โค้ดเดิมให้รหัสถูกต้องทับได้เสมอ — เก็บทางนั้นไว้แต่ต้องตั้งใจพิมพ์)
+         คนที่ผูกแล้วพิมพ์ซ้ำก็แค่บอกว่าผูกอยู่แล้ว ไม่สร้างซ้ำ (unique กันอีกชั้น) */
+      const wantOwner = !!secret && text === `${secret} เจ้าของ`;
+      if (secret && (text === secret || wantOwner)) {
         const { data: shop } = await supabase
           .from('shops')
           .select('id, line_owner_user_id')
           .limit(1)
           .maybeSingle();
         if (!shop) continue;
-        if (shop.line_owner_user_id === userId) {
+
+        const isOwner = shop.line_owner_user_id === userId;
+        const takeOwner = wantOwner || !shop.line_owner_user_id;
+
+        if (isOwner && !wantOwner) {
           await reply(ev.replyToken, 'บัญชีนี้ผูกเป็นเจ้าของร้านอยู่แล้ว', OWNER_QUICK_REPLY);
-        } else {
-          // Correct secret always rebinds — including over an existing holder.
-          // Knowing the secret IS the ownership proof, so recovering from a
-          // squatted binding is just typing it once.
+        } else if (takeOwner) {
           await supabase.from('shops').update({ line_owner_user_id: userId }).eq('id', shop.id);
           await reply(
             ev.replyToken,
             'ผูกบัญชีเจ้าของร้านเรียบร้อย\nออเดอร์ใหม่และสลิปที่ลูกค้าแนบจะแจ้งเตือนที่แชทนี้\n\nพิมพ์ "สต๊อก" หรือ "ออเดอร์" เพื่อดูสถานะร้านได้ตลอดเวลา',
             OWNER_QUICK_REPLY,
           );
+        } else {
+          const { error } = await supabase
+            .from('shop_line_recipients')
+            .upsert(
+              { shop_id: shop.id, line_user_id: userId },
+              { onConflict: 'shop_id,line_user_id' },
+            );
+          await reply(
+            ev.replyToken,
+            error
+              ? 'ผูกไม่สำเร็จ ลองใหม่อีกครั้งครับ'
+              : 'ผูกเครื่องนี้กับร้านเรียบร้อย\nออเดอร์ใหม่และสลิปที่ลูกค้าแนบจะแจ้งเตือนที่แชทนี้ด้วย\n\nพิมพ์ "สต๊อก" หรือ "ออเดอร์" เพื่อดูสถานะร้านได้ตลอดเวลา\nไม่อยากรับแจ้งเตือนแล้วพิมพ์ "เลิกแจ้งเตือน"',
+            OWNER_QUICK_REPLY,
+          );
         }
+        continue;
+      }
+
+      /* เลิกรับแจ้งเตือน — คนที่เปลี่ยนงานหรือเปลี่ยนเครื่องต้องถอนตัวเองได้ ไม่ต้องรอ
+         เจ้าของไปลบให้ (เจ้าของถอนตัวเองไม่ได้ทางนี้ ต้องผูกเครื่องใหม่แทน) */
+      if (['เลิกแจ้งเตือน', 'ยกเลิกแจ้งเตือน'].includes(text)) {
+        const { data: shop } = await supabase.from('shops').select('id').limit(1).maybeSingle();
+        if (!shop) continue;
+        const { data: gone } = await supabase
+          .from('shop_line_recipients')
+          .delete()
+          .eq('shop_id', shop.id)
+          .eq('line_user_id', userId)
+          .select('id');
+        if (gone?.length) await reply(ev.replyToken, 'หยุดแจ้งเตือนที่เครื่องนี้แล้ว');
+        continue; // ไม่ได้ผูกไว้ → เงียบ
       }
       // wrong guesses (including the old public phrase): stay silent
     }
