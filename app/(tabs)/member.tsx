@@ -389,46 +389,77 @@ export default function MemberScreen() {
               const soldOut = r.stock != null && r.stock <= 0;
               const enough = points >= r.pointsCost;
               return (
+                /* ★ ของรางวัลคือเหตุผลเดียวที่คนสะสมแต้ม ★ (เจ้าของตีกลับ 6 ก.ย. 2026
+                   "การ์ดไม่สวยเลยไม่เด่นเลย") — ของเดิมเป็นแถวเตี้ย ๆ รูปจิ๋ว 56px
+                   อ่านดูเหมือนรายการตั้งค่า ไม่ใช่ของที่อยากได้
+                   ทำเป็นการ์ดใบใหญ่ รูปเต็มความกว้าง แบบเดียวกับการ์ดสินค้าในร้าน */
                 <View key={r.id} style={styles.reward}>
                   {r.image ? (
                     <Image source={{ uri: r.image }} style={styles.rewardArt} contentFit="cover" />
                   ) : (
                     <View style={[styles.rewardArt, styles.rewardArtEmpty]}>
-                      <Ionicons name="gift" size={22} color={ACCENT.strong} />
+                      <Ionicons name="gift" size={40} color={ACCENT.strong} />
                     </View>
                   )}
+                  {/* ป้ายแต้มทับมุมรูป — เห็นราคาพร้อมของในสายตาเดียว ไม่ต้องกวาดตาหา */}
+                  <View style={[styles.rewardCostChip, { backgroundColor: ACCENT.strong }]}>
+                    <Ionicons name="medal" size={13} color={Colors.textOnPrimary} />
+                    <Text style={styles.rewardCostChipText}>
+                      {r.pointsCost.toLocaleString('th-TH')} แต้ม
+                    </Text>
+                  </View>
+                  {soldOut ? (
+                    <View style={styles.rewardSoldOut}>
+                      <Text style={styles.rewardSoldOutText}>ของหมดแล้ว</Text>
+                    </View>
+                  ) : null}
+
                   <View style={styles.rewardCopy}>
                     <Text numberOfLines={1} style={styles.rewardName}>
                       {r.name}
                     </Text>
                     {r.description ? (
-                      <Text numberOfLines={1} style={styles.rewardDesc}>
+                      <Text numberOfLines={2} style={styles.rewardDesc}>
                         {r.description}
                       </Text>
                     ) : null}
-                    <Text style={[styles.rewardCost, { color: ACCENT.strong }]}>
-                      {r.pointsCost.toLocaleString('th-TH')} แต้ม
-                      {r.stock != null ? `   เหลือ ${r.stock}` : ''}
-                    </Text>
-                  </View>
-                  {/* กดไม่ได้ต้องดูออกว่ากดไม่ได้ ไม่ใช่กดแล้วเงียบ */}
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel={`แลก ${r.name}`}
-                    disabled={soldOut || !enough || busyId === r.id || !signedIn}
-                    onPress={() => void redeem(r)}
-                    style={[
-                      styles.redeemBtn,
-                      { backgroundColor: soldOut || !enough ? Colors.surfaceMuted : ACCENT.solid },
-                    ]}>
-                    <Text
+
+                    {/* บอกว่าเหลืออีกกี่แต้ม ไม่ใช่แค่ "แต้มไม่พอ" — คนจะได้รู้ว่าต้องซื้อ
+                        อีกเท่าไหร่ถึงจะได้ ซึ่งเป็นเหตุผลที่ทำให้เขากลับมาซื้อ */}
+                    {!soldOut && !enough ? (
+                      <Text style={styles.rewardShort}>
+                        อีก {(r.pointsCost - points).toLocaleString('th-TH')} แต้ม
+                      </Text>
+                    ) : null}
+                    {r.stock != null && r.stock > 0 ? (
+                      <Text style={styles.rewardStock}>เหลือ {r.stock} ชิ้น</Text>
+                    ) : null}
+
+                    {/* กดไม่ได้ต้องดูออกว่ากดไม่ได้ ไม่ใช่กดแล้วเงียบ */}
+                    <PressableScale
+                      accessibilityRole="button"
+                      accessibilityLabel={`แลก ${r.name}`}
+                      disabled={soldOut || !enough || busyId === r.id || !signedIn}
+                      onPress={() => void redeem(r)}
                       style={[
-                        styles.redeemText,
-                        { color: soldOut || !enough ? Colors.textMuted : Colors.textOnPrimary },
+                        styles.redeemBtn,
+                        { backgroundColor: soldOut || !enough ? Colors.surfaceMuted : ACCENT.solid },
                       ]}>
-                      {soldOut ? 'หมด' : enough ? 'แลก' : 'แต้มไม่พอ'}
-                    </Text>
-                  </PressableScale>
+                      <Text
+                        style={[
+                          styles.redeemText,
+                          { color: soldOut || !enough ? Colors.textMuted : Colors.textOnPrimary },
+                        ]}>
+                        {busyId === r.id
+                          ? 'กำลังแลก…'
+                          : soldOut
+                            ? 'ของหมดแล้ว'
+                            : enough
+                              ? 'แลกเลย'
+                              : 'แต้มยังไม่พอ'}
+                      </Text>
+                    </PressableScale>
+                  </View>
                 </View>
               );
             })
@@ -688,32 +719,60 @@ const styles = StyleSheet.create({
   pendingDate: { fontSize: 12, color: Colors.textMuted },
 
   reward: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.md,
+    overflow: 'hidden',
     ...Shadow.card,
   },
-  rewardArt: { width: 56, height: 56, borderRadius: Radius.md },
-  rewardArtEmpty: {
-    backgroundColor: ACCENT.tint,
+  /* รูปเต็มความกว้าง — ของรางวัลต้องขายตัวเองด้วยรูป เหมือนการ์ดสินค้าในร้าน
+     4:3 ไม่ใช่จัตุรัส เพราะรูปถ่ายสินค้าที่ร้านถ่ายมาส่วนใหญ่เป็นแนวนอน */
+  rewardArt: { width: '100%', aspectRatio: 4 / 3, backgroundColor: ACCENT.tint },
+  rewardArtEmpty: { alignItems: 'center', justifyContent: 'center' },
+  rewardCostChip: {
+    position: 'absolute',
+    top: Spacing.sm,
+    left: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+  },
+  rewardCostChipText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13,
+    color: Colors.textOnPrimary,
+  },
+  /* ของหมดคลุมทั้งรูป — ต้องเห็นตั้งแต่ยังไม่อ่านตัวหนังสือว่าอันนี้แลกไม่ได้แล้ว */
+  rewardSoldOut: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    aspectRatio: 4 / 3,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.72)',
   },
-  rewardCopy: { flex: 1, gap: 1 },
-  rewardName: { fontFamily: 'Mitr_500Medium', fontSize: 15, color: Colors.text },
-  rewardDesc: { fontSize: 12, color: Colors.textMuted },
-  rewardCost: { fontFamily: 'Mitr_500Medium', fontSize: 13 },
+  rewardSoldOutText: {
+    fontFamily: 'Mitr_600SemiBold',
+    fontSize: 16,
+    color: Colors.textMuted,
+  },
+  rewardCopy: { gap: 2, padding: Spacing.md },
+  rewardName: { fontFamily: 'Mitr_500Medium', fontSize: 17, color: Colors.text },
+  rewardDesc: { fontSize: 13, lineHeight: 19, color: Colors.textMuted },
+  rewardShort: { fontFamily: 'Mitr_500Medium', fontSize: 13, color: ACCENT.strong, marginTop: 2 },
+  rewardStock: { fontSize: 12, color: Colors.textMuted },
   redeemBtn: {
-    paddingHorizontal: Spacing.md,
-    height: 34,
+    marginTop: Spacing.sm,
+    height: 46,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  redeemText: { fontFamily: 'Mitr_500Medium', fontSize: 13 },
+  redeemText: { fontFamily: 'Mitr_500Medium', fontSize: 15 },
 
   historyRow: {
     flexDirection: 'row',
