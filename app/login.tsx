@@ -72,6 +72,20 @@ const prettyThaiPhone = (digits: string) =>
 /** วินาทีที่ต้องรอก่อนส่ง SMS ซ้ำ — ทุกครั้งที่ส่งคือเงินจริงของร้าน */
 const RESEND_COOLDOWN = 60;
 
+/**
+ * ★ สวิตช์เดียวที่คุมทางเข้าด้วยเบอร์ ★ (ปิดชั่วคราว 6 ก.ย. 2026 ตามที่เจ้าของสั่ง
+ * "ปิดแบบมือถือไปก่อนก็ได้ครับ รออนุมัติ")
+ *
+ * ตอนยื่นขอชื่อผู้ส่ง OFU กับผู้ให้บริการ ชื่อที่ยืมใช้อยู่เดิม (SMS-DEMO) ถูกถอดออกจาก
+ * บัญชีทันที = ส่ง SMS ไม่ได้เลยจนกว่าจะอนุมัติ — เปิดแท็บทิ้งไว้ก็มีแต่คนกดแล้วรอ
+ * รหัสที่ไม่มีวันมาถึง
+ *
+ * ★ ปิดแค่ทางเข้า ไม่ได้ถอดโค้ดทิ้ง ★ ทุกอย่างที่เหลือ (ส่ง OTP ยืนยันรหัส นับถอยหลัง
+ * ข้อความผิดพลาด) ยังอยู่ครบและทดสอบผ่านมาแล้ว พออนุมัติแค่กลับค่านี้เป็น true
+ * แล้วส่ง OTA — ไม่ต้องรื้ออะไรใหม่
+ */
+const PHONE_LOGIN_ENABLED = false;
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const t = useT();
@@ -101,7 +115,7 @@ export default function LoginScreen() {
   const setSocialCallbackError = useAuth((s) => s.setSocialCallbackError);
 
   const [mode, setMode] = useState<Mode>('signin');
-  const [method, setMethod] = useState<Method>('phone');
+  const [method, setMethod] = useState<Method>(PHONE_LOGIN_ENABLED ? 'phone' : 'email');
   const [step, setStep] = useState<Step>('form');
   const [phone, setPhone] = useState('');
   /* เหลืออีกกี่วินาทีถึงจะส่ง SMS ซ้ำได้ — 0 = ส่งได้ */
@@ -377,21 +391,24 @@ export default function LoginScreen() {
           </>
         ) : step === 'form' ? (
           <>
-            {/* เลือกทางเข้า — เบอร์โทรมาก่อนเพราะเป็นทางหลัก */}
-            <View style={styles.modeToggle}>
-              {(['phone', 'email'] as Method[]).map((m) => (
-                <Pressable
-                  key={m}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: method === m }}
-                  onPress={() => switchMethod(m)}
-                  style={[styles.modeBtn, method === m && styles.modeBtnActive]}>
-                  <Text style={[styles.modeText, method === m && styles.modeTextActive]}>
-                    {m === 'phone' ? 'เบอร์โทร' : 'อีเมล'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            {/* เลือกทางเข้า — เบอร์โทรมาก่อนเพราะเป็นทางหลัก
+                ปิดทางเบอร์อยู่ = ไม่ต้องมีตัวสลับให้เลือกอะไรเลย เหลือทางเดียวก็แสดงทางนั้น */}
+            {PHONE_LOGIN_ENABLED ? (
+              <View style={styles.modeToggle}>
+                {(['phone', 'email'] as Method[]).map((m) => (
+                  <Pressable
+                    key={m}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: method === m }}
+                    onPress={() => switchMethod(m)}
+                    style={[styles.modeBtn, method === m && styles.modeBtnActive]}>
+                    <Text style={[styles.modeText, method === m && styles.modeTextActive]}>
+                      {m === 'phone' ? 'เบอร์โทร' : 'อีเมล'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             {method === 'phone' ? (
               <>
