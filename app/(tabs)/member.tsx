@@ -401,13 +401,6 @@ export default function MemberScreen() {
                       <Ionicons name="gift" size={40} color={ACCENT.strong} />
                     </View>
                   )}
-                  {/* ป้ายแต้มทับมุมรูป — เห็นราคาพร้อมของในสายตาเดียว ไม่ต้องกวาดตาหา */}
-                  <View style={[styles.rewardCostChip, { backgroundColor: ACCENT.strong }]}>
-                    <Ionicons name="medal" size={13} color={Colors.textOnPrimary} />
-                    <Text style={styles.rewardCostChipText}>
-                      {r.pointsCost.toLocaleString('th-TH')} แต้ม
-                    </Text>
-                  </View>
                   {soldOut ? (
                     <View style={styles.rewardSoldOut}>
                       <Text style={styles.rewardSoldOutText}>ของหมดแล้ว</Text>
@@ -424,15 +417,28 @@ export default function MemberScreen() {
                       </Text>
                     ) : null}
 
+                    {/* ★ ป้ายแต้มอยู่ใต้รูป ไม่ทับรูป ★ (เจ้าของทัก 6 ก.ย. 2026 "เอาแต้ม
+                        ไว้ที่อื่นสิ มันทับ") — รูปของรางวัลเป็นภาพที่ร้านตั้งใจถ่าย/ทำมา
+                        มีของอยู่เต็มใบ อะไรวางทับก็บังของที่กำลังจะขาย
+                        แถวเดียวกับจำนวนคงเหลือ: ราคากับของที่เหลือคือสองอย่างที่คนดูคู่กัน */}
+                    <View style={styles.rewardMetaRow}>
+                      <View style={[styles.rewardCostChip, { backgroundColor: ACCENT.tint }]}>
+                        <Ionicons name="medal" size={14} color={ACCENT.strong} />
+                        <Text style={[styles.rewardCostChipText, { color: ACCENT.strong }]}>
+                          {r.pointsCost.toLocaleString('th-TH')} แต้ม
+                        </Text>
+                      </View>
+                      {r.stock != null && r.stock > 0 ? (
+                        <Text style={styles.rewardStock}>เหลือ {r.stock} ชิ้น</Text>
+                      ) : null}
+                    </View>
+
                     {/* บอกว่าเหลืออีกกี่แต้ม ไม่ใช่แค่ "แต้มไม่พอ" — คนจะได้รู้ว่าต้องซื้อ
                         อีกเท่าไหร่ถึงจะได้ ซึ่งเป็นเหตุผลที่ทำให้เขากลับมาซื้อ */}
                     {!soldOut && !enough ? (
                       <Text style={styles.rewardShort}>
                         อีก {(r.pointsCost - points).toLocaleString('th-TH')} แต้ม
                       </Text>
-                    ) : null}
-                    {r.stock != null && r.stock > 0 ? (
-                      <Text style={styles.rewardStock}>เหลือ {r.stock} ชิ้น</Text>
                     ) : null}
 
                     {/* กดไม่ได้ต้องดูออกว่ากดไม่ได้ ไม่ใช่กดแล้วเงียบ */}
@@ -728,22 +734,21 @@ const styles = StyleSheet.create({
      4:3 ไม่ใช่จัตุรัส เพราะรูปถ่ายสินค้าที่ร้านถ่ายมาส่วนใหญ่เป็นแนวนอน */
   rewardArt: { width: '100%', aspectRatio: 4 / 3, backgroundColor: ACCENT.tint },
   rewardArtEmpty: { alignItems: 'center', justifyContent: 'center' },
-  rewardCostChip: {
-    position: 'absolute',
-    top: Spacing.sm,
-    left: Spacing.sm,
+  rewardMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.sm,
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  rewardCostChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: Spacing.sm + 2,
     paddingVertical: 5,
     borderRadius: Radius.pill,
   },
-  rewardCostChipText: {
-    fontFamily: 'Mitr_500Medium',
-    fontSize: 13,
-    color: Colors.textOnPrimary,
-  },
+  rewardCostChipText: { fontFamily: 'Mitr_500Medium', fontSize: 14 },
   /* ของหมดคลุมทั้งรูป — ต้องเห็นตั้งแต่ยังไม่อ่านตัวหนังสือว่าอันนี้แลกไม่ได้แล้ว */
   rewardSoldOut: {
     position: 'absolute',
