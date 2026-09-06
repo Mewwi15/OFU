@@ -65,6 +65,7 @@ import {
 } from 'antd';
 
 import { OpenShiftPanel } from '../components/OpenShiftPanel';
+import { DRAFT_KEYS, clearDraft, readDraft, writeDraft } from '../lib/draft';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
@@ -80,6 +81,15 @@ type Line = {
   image: string | undefined;
 };
 type PayMethod = 'cash' | 'promptpay';
+/** บิลที่คีย์ค้างไว้ — เก็บเฉพาะสิ่งที่คีย์เอง ไม่เก็บของที่โหลดใหม่ได้ (สินค้า/ราคา/สต๊อก) */
+type PosDraft = {
+  lines: Line[];
+  discount: number;
+  member: Customer | null;
+  taxInvoice: boolean;
+  custName: string;
+  custTaxId: string;
+};
 type ReceiptData = {
   sale: SaleResult;
   lines: Line[];
@@ -357,6 +367,8 @@ export function Pos() {
      เมื่อบิลมี customer_user_id เท่านั้น ก่อนหน้านี้ POS ไม่เคยส่งค่านี้เลย แต้มจากหน้าร้าน
      จึงไม่เคยเดิน */
   const [member, setMember] = useState<Customer | null>(null);
+  /* กันไม่ให้การเรนเดอร์รอบแรก (ที่ยังว่าง) เขียนทับร่างที่เก็บไว้ */
+  const draftReady = useRef(false);
   const [memberBusy, setMemberBusy] = useState(false);
 
   /** ค้นสมาชิกจากเบอร์ (พิมพ์เองหรือสแกนคิวอาร์ก็ได้ ฝั่งฐานข้อมูลตัดรูปแบบให้แล้ว) */
@@ -525,7 +537,49 @@ export function Pos() {
   const net = total - vat;
   const change = method === 'cash' && typeof tendered === 'number' ? tendered - total : 0;
 
+  /* ── ร่างบิลที่ยังไม่ได้รับเงิน ──
+     ★ บิลที่คีย์ไปครึ่งหนึ่งแล้วหายคือความเสียหายจริงหน้าเคาน์เตอร์ ★ ยิงของไปยี่สิบชิ้น
+     แล้วเผลอรีเฟรช/สลับไปหน้าสต็อกดูของ/แท็บถูกปิด = ต้องยิงใหม่ทั้งบิลต่อหน้าลูกค้า
+     ที่ยืนรออยู่ · เก็บทุกครั้งที่บิลเปลี่ยน แล้วเอากลับมาเองตอนเปิดหน้าใหม่
+     ★ เอากลับมาเลย ไม่ต้องถาม ★ ต่างจากใบรับเข้าที่ถามก่อน เพราะใบรับเข้าบวกสต๊อกจริง
+     ผิดแล้วต้องไปตามลบ ส่วนบิลขายยังไม่ได้บันทึกอะไรทั้งนั้น ของยังอยู่ในตะกร้าเฉย ๆ
+     กดล้างเองได้ตลอด และการเด้งถามทุกครั้งที่เปิดหน้าขายคือด่านที่ขวางงานจริง */
+  useEffect(() => {
+    const d = readDraft<PosDraft>(DRAFT_KEYS.posSale);
+    if (!d?.lines?.length) return;
+    setLines(d.lines);
+    setDiscount(d.discount ?? 0);
+    setMember(d.member ?? null);
+    setTaxInvoice(!!d.taxInvoice);
+    setCustName(d.custName ?? '');
+    setCustTaxId(d.custTaxId ?? '');
+    draftReady.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* เขียนร่างหลังโหลดของเก่าเสร็จแล้วเท่านั้น — ไม่งั้นสถานะว่าง ๆ ตอนเพิ่งเปิดหน้าจะไป
+     ทับร่างที่ค้างอยู่ทิ้งก่อนที่เอฟเฟกต์ด้านบนจะได้ทำงาน */
+  useEffect(() => {
+    if (!draftReady.current) {
+      draftReady.current = true;
+      return;
+    }
+    if (!lines.length) {
+      clearDraft(DRAFT_KEYS.posSale);
+      return;
+    }
+    writeDraft<PosDraft>(DRAFT_KEYS.posSale, {
+      lines,
+      discount,
+      member,
+      taxInvoice,
+      custName,
+      custTaxId,
+    });
+  }, [lines, discount, member, taxInvoice, custName, custTaxId]);
+
   function resetSale() {
+    clearDraft(DRAFT_KEYS.posSale);
     setLines([]);
     setDiscount(0);
     setTendered('');

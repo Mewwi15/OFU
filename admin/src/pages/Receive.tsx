@@ -39,38 +39,14 @@ import { d as thDate } from '../lib/time';
 
 dayjs.extend(customParseFormat);
 
-/** ใบรับเข้าที่ยังทำไม่เสร็จ เก็บไว้ในเครื่องกันหายตอนรีเฟรช */
+/** ใบรับเข้าที่ยังทำไม่เสร็จ เก็บไว้ในเครื่องกันหายตอนรีเฟรช (ตัวช่วยกลาง: lib/draft.ts) */
 type ReceiveDraft = {
   supplier: string;
   docNo: string;
   receivedAt: string;
   note: string | null;
   lines: DraftLine[];
-  savedAt: number;
 };
-const DRAFT_KEY = 'ofu-receive-draft';
-
-function readDraft(): ReceiveDraft | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw) as ReceiveDraft;
-    /* ใบที่ค้างข้ามวันไปแล้วไม่ถามซ้ำ — คนรับของคงลืมไปแล้วว่าเคยทำอะไรค้างไว้ และการ
-       เด้งถามทุกเช้าเรื่องใบเมื่อวานคือสิ่งที่ทำให้คนเลิกอ่านกล่องข้อความ */
-    if (!d?.lines?.length || Date.now() - (d.savedAt ?? 0) > 24 * 60 * 60 * 1000) return null;
-    return d;
-  } catch {
-    return null;
-  }
-}
-function writeDraft(d: ReceiveDraft | null) {
-  try {
-    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-    else localStorage.removeItem(DRAFT_KEY);
-  } catch {
-    /* โหมดส่วนตัว/พื้นที่เต็ม — ไม่ใช่เรื่องที่ต้องหยุดการรับของ */
-  }
-}
 
 /** แปลงสินค้าจากหลังบ้านเป็นรายการที่ช่องค้นหาของหน้ารับเข้าใช้ — เดิมเขียนซ้ำสองที่ */
 function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
@@ -112,6 +88,7 @@ import {
   type GoodsReceipt,
   type GoodsReceiptLine,
 } from '../lib/api';
+import { DRAFT_KEYS, clearDraft, draftSavedAt, readDraft, writeDraft } from '../lib/draft';
 import { productThumb } from '../lib/image';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
@@ -168,11 +145,14 @@ export function Receive() {
      ตัวตนในระบบ — ถ้าเก็บขึ้นเซิร์ฟเวอร์ต้องมีเรื่องใครเป็นเจ้าของใบ ใบค้างของคนอื่น
      ลบได้ไหม ฯลฯ ทั้งที่ปัญหาจริงคือแค่ "อย่าให้หายตอนรีเฟรช" */
   const [restore, setRestore] = useState<ReceiveDraft | null>(null);
+  /* เวลาที่ค้างไว้ อ่านจากตัวห่อของร่าง ไม่ใช่จากเนื้อร่าง — อ่านตอนเปิดหน้าครั้งเดียว
+     ก่อนที่การเก็บร่างรอบใหม่จะทับเวลาเดิม */
+  const [restoreAt] = useState<number | null>(() => draftSavedAt(DRAFT_KEYS.receive));
   const restoredRef = useRef(false);
 
   // เปิดหน้ามาแล้วเจอใบค้าง — ถามก่อน ไม่เติมให้เองเงียบ ๆ
   useEffect(() => {
-    const d = readDraft();
+    const d = readDraft<ReceiveDraft>(DRAFT_KEYS.receive);
     if (d) setRestore(d);
     else restoredRef.current = true;
   }, []);
@@ -182,16 +162,15 @@ export function Receive() {
   useEffect(() => {
     if (!restoredRef.current) return;
     if (lines.length === 0) {
-      writeDraft(null);
+      clearDraft(DRAFT_KEYS.receive);
       return;
     }
-    writeDraft({
+    writeDraft<ReceiveDraft>(DRAFT_KEYS.receive, {
       supplier,
       docNo,
       receivedAt: receivedAt.toISOString(),
       note: importNote,
       lines,
-      savedAt: Date.now(),
     });
   }, [lines, supplier, docNo, receivedAt, importNote]);
   const [saving, setSaving] = useState(false);
@@ -454,7 +433,7 @@ export function Receive() {
       });
       message.success(`บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
       // บันทึกเข้าระบบแล้ว ใบค้างในเครื่องหมดหน้าที่ ต้องไม่ถามซ้ำรอบหน้า
-      writeDraft(null);
+      clearDraft(DRAFT_KEYS.receive);
       // ไม่พิมพ์อัตโนมัติ (เจ้าของสั่ง 23 ส.ค.) — ปุ่มพิมพ์อยู่ในประวัติเมื่อต้องการ
       setLines([]);
       setSupplier('');
@@ -845,14 +824,14 @@ export function Receive() {
           restoredRef.current = true;
         }}
         onCancel={() => {
-          writeDraft(null);
+          clearDraft(DRAFT_KEYS.receive);
           setRestore(null);
           restoredRef.current = true;
         }}>
         <p style={{ margin: 0 }}>
           ค้างไว้ <b>{restore?.lines.length ?? 0}</b> รายการ
           {restore?.supplier ? <> จาก <b>{restore.supplier}</b></> : null}
-          {restore?.savedAt ? <> เมื่อ {thDate(restore.savedAt).format('D MMM HH:mm น.')}</> : null}
+          {restoreAt ? <> เมื่อ {thDate(restoreAt).format('D MMM HH:mm น.')}</> : null}
         </p>
         <p style={{ marginTop: 8, marginBottom: 0, color: '#8a807a' }}>
           ใบนี้ยังไม่ถูกบันทึกเข้าระบบ สต๊อกยังไม่ขยับ — เลือก “เริ่มใบใหม่” จะลบทิ้งเลย

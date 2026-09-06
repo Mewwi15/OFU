@@ -12,6 +12,8 @@
 import { Button, Modal, Typography } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 
+import { DRAFT_KEYS, clearDraft, readDraft, writeDraft } from '../lib/draft';
+
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 export type CountLine = { denom: number; count: number };
@@ -31,7 +33,20 @@ export function CashCountModal({
      ได้ว่าแบงก์พันกี่ใบ เหรียญบาทกี่เหรียญ ไม่งั้นตรวจย้อนหลังไม่ได้ว่านับพลาดตรงไหน */
   onDone: (total: number, lines: CountLine[]) => void;
 }) {
-  const [counts, setCounts] = useState<number[]>(() => DENOMS.map(() => 0));
+  /* ── ร่างการนับเงิน ──
+     ★ นับเงินทีละใบแล้วหายกลางคันคือต้องรื้อลิ้นชักนับใหม่ทั้งหมด ★ (เจ้าของสั่ง 6 ก.ย. 2026
+     ให้กันทุกหน้าที่มีข้อมูลค้าง) — คนนับมักนับไปพลางทำอย่างอื่นไปพลาง สลับหน้าไปดูยอด
+     หรือเผลอรีเฟรชแล้วต้องเริ่มนับใหม่ตั้งแต่ใบแรก
+     เก็บเฉพาะจำนวนใบที่นับไปแล้ว ไม่เก็บยอดรวม — ยอดรวมคำนวณจากจำนวนใบเสมอ
+     ถ้าเก็บทั้งสองอย่างแล้ววันหนึ่งไม่ตรงกัน จะไม่มีทางรู้ว่าอันไหนถูก */
+  const [counts, setCounts] = useState<number[]>(
+    () => readDraft<number[]>(DRAFT_KEYS.shiftCount) ?? DENOMS.map(() => 0),
+  );
+  useEffect(() => {
+    /* ยังไม่ได้นับอะไรเลยก็ไม่ต้องเก็บ — ไม่งั้นเปิดตัวนับแล้วปิดทิ้งจะทิ้งร่างเปล่าไว้ */
+    if (counts.some((c) => c > 0)) writeDraft(DRAFT_KEYS.shiftCount, counts);
+    else clearDraft(DRAFT_KEYS.shiftCount);
+  }, [counts]);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
@@ -96,7 +111,12 @@ export function CashCountModal({
             <Button size="large" onClick={onClose}>
               ปิด
             </Button>
-            <Button size="large" type="primary" onClick={() => onDone(Math.round(total), DENOMS.map((d, i) => ({ denom: d, count: counts[i] || 0 })).filter((l) => l.count > 0))}>
+            <Button size="large" type="primary" onClick={() => {
+              /* นับเสร็จส่งยอดออกไปแล้ว ร่างหมดหน้าที่ — ถ้าค้างไว้ รอบถัดไปจะเปิดตัวนับ
+                 มาเจอตัวเลขของรอบก่อนแล้วนับต่อจากนั้นโดยไม่ทันสังเกต */
+              clearDraft(DRAFT_KEYS.shiftCount);
+              onDone(Math.round(total), DENOMS.map((d, i) => ({ denom: d, count: counts[i] || 0 })).filter((l) => l.count > 0));
+            }}>
               ใช้ยอดนี้
             </Button>
           </div>
