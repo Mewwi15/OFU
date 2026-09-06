@@ -408,37 +408,52 @@ export default function MemberScreen() {
                   ) : null}
 
                   <View style={styles.rewardCopy}>
-                    <Text numberOfLines={1} style={styles.rewardName}>
-                      {r.name}
-                    </Text>
+                    {/* ★ ชื่อกับแต้มอยู่แถวเดียวกัน ★ (เจ้าของสั่ง 6 ก.ย. 2026 "เอาไว้ข้าง ๆ
+                        ชื่อ") — อ่านทีเดียวจบว่า "ของอะไร กี่แต้ม" ไม่ต้องกวาดสายตาลงมาหา
+                        ชื่อยืดเต็มที่เหลือ ป้ายแต้มไม่ยอมหด (shrink 0) เพราะตัวเลขแต้มย่อ
+                        ไม่ได้ ถ้าชื่อยาวให้ตัดชื่อ ไม่ใช่ตัดราคา */}
+                    <View style={styles.rewardTitleRow}>
+                      <Text numberOfLines={1} style={styles.rewardName}>
+                        {r.name}
+                      </Text>
+                      <View style={[styles.rewardCostChip, { backgroundColor: ACCENT.tint }]}>
+                        <Ionicons name="medal" size={13} color={ACCENT.strong} />
+                        {/* มีคำว่า "แต้ม" ด้วย — เลขลอย ๆ ในป้ายอ่านเป็นราคาบาทได้ */}
+                        <Text style={[styles.rewardCostChipText, { color: ACCENT.strong }]}>
+                          {r.pointsCost.toLocaleString('th-TH')} แต้ม
+                        </Text>
+                      </View>
+                    </View>
+
                     {r.description ? (
                       <Text numberOfLines={2} style={styles.rewardDesc}>
                         {r.description}
                       </Text>
                     ) : null}
 
-                    {/* ★ ป้ายแต้มอยู่ใต้รูป ไม่ทับรูป ★ (เจ้าของทัก 6 ก.ย. 2026 "เอาแต้ม
-                        ไว้ที่อื่นสิ มันทับ") — รูปของรางวัลเป็นภาพที่ร้านตั้งใจถ่าย/ทำมา
-                        มีของอยู่เต็มใบ อะไรวางทับก็บังของที่กำลังจะขาย
-                        แถวเดียวกับจำนวนคงเหลือ: ราคากับของที่เหลือคือสองอย่างที่คนดูคู่กัน */}
-                    <View style={styles.rewardMetaRow}>
-                      <View style={[styles.rewardCostChip, { backgroundColor: ACCENT.tint }]}>
-                        <Ionicons name="medal" size={14} color={ACCENT.strong} />
-                        <Text style={[styles.rewardCostChipText, { color: ACCENT.strong }]}>
-                          {r.pointsCost.toLocaleString('th-TH')} แต้ม
+                    {/* ★ แถบความคืบหน้า ★ บอกว่าเหลืออีกกี่แต้มด้วยภาพ ไม่ใช่ตัวเลขลอย ๆ —
+                        เห็นว่าตัวเองมาได้ไกลแค่ไหนแล้วคือสิ่งที่ทำให้คนอยากสะสมต่อ
+                        ส่วนคำว่า "แต้มไม่พอ" เฉย ๆ คือการปิดประตูโดยไม่บอกทางไป */}
+                    {!soldOut && !enough ? (
+                      <View style={styles.rewardProgressWrap}>
+                        <View style={styles.rewardTrack}>
+                          <View
+                            style={[
+                              styles.rewardFill,
+                              {
+                                backgroundColor: ACCENT.solid,
+                                width: `${Math.min(100, Math.round((points / r.pointsCost) * 100))}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.rewardShort}>
+                          อีก {(r.pointsCost - points).toLocaleString('th-TH')} แต้ม
+                          {r.stock != null && r.stock > 0 ? `  ·  เหลือ ${r.stock} ชิ้น` : ''}
                         </Text>
                       </View>
-                      {r.stock != null && r.stock > 0 ? (
-                        <Text style={styles.rewardStock}>เหลือ {r.stock} ชิ้น</Text>
-                      ) : null}
-                    </View>
-
-                    {/* บอกว่าเหลืออีกกี่แต้ม ไม่ใช่แค่ "แต้มไม่พอ" — คนจะได้รู้ว่าต้องซื้อ
-                        อีกเท่าไหร่ถึงจะได้ ซึ่งเป็นเหตุผลที่ทำให้เขากลับมาซื้อ */}
-                    {!soldOut && !enough ? (
-                      <Text style={styles.rewardShort}>
-                        อีก {(r.pointsCost - points).toLocaleString('th-TH')} แต้ม
-                      </Text>
+                    ) : r.stock != null && r.stock > 0 ? (
+                      <Text style={styles.rewardStock}>เหลือ {r.stock} ชิ้น</Text>
                     ) : null}
 
                     {/* กดไม่ได้ต้องดูออกว่ากดไม่ได้ ไม่ใช่กดแล้วเงียบ */}
@@ -734,21 +749,31 @@ const styles = StyleSheet.create({
      4:3 ไม่ใช่จัตุรัส เพราะรูปถ่ายสินค้าที่ร้านถ่ายมาส่วนใหญ่เป็นแนวนอน */
   rewardArt: { width: '100%', aspectRatio: 4 / 3, backgroundColor: ACCENT.tint },
   rewardArtEmpty: { alignItems: 'center', justifyContent: 'center' },
-  rewardMetaRow: {
+  rewardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.xs,
+    gap: Spacing.sm,
   },
   rewardCostChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: Radius.pill,
+    /* ห้ามหดตามชื่อที่ยาว — ตัวเลขแต้มย่อไม่ได้ ชื่อตัดได้ */
+    flexShrink: 0,
   },
   rewardCostChipText: { fontFamily: 'Mitr_500Medium', fontSize: 14 },
+  rewardProgressWrap: { gap: 5, marginTop: Spacing.sm },
+  /* แถบบาง ๆ ไม่ใช่แถบหนา — เป็นข้อมูลประกอบ ไม่ใช่พระเอกของการ์ด */
+  rewardTrack: {
+    height: 5,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.surfaceMuted,
+    overflow: 'hidden',
+  },
+  rewardFill: { height: '100%', borderRadius: Radius.pill },
   /* ของหมดคลุมทั้งรูป — ต้องเห็นตั้งแต่ยังไม่อ่านตัวหนังสือว่าอันนี้แลกไม่ได้แล้ว */
   rewardSoldOut: {
     position: 'absolute',
@@ -766,7 +791,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   rewardCopy: { gap: 2, padding: Spacing.md },
-  rewardName: { fontFamily: 'Mitr_500Medium', fontSize: 17, color: Colors.text },
+  rewardName: { flex: 1, fontFamily: 'Mitr_500Medium', fontSize: 17, color: Colors.text },
   rewardDesc: { fontSize: 13, lineHeight: 19, color: Colors.textMuted },
   rewardShort: { fontFamily: 'Mitr_500Medium', fontSize: 13, color: ACCENT.strong, marginTop: 2 },
   rewardStock: { fontSize: 12, color: Colors.textMuted },
