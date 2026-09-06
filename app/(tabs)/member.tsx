@@ -27,7 +27,15 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,6 +48,8 @@ import { GREEN_ACCENT } from '@/constants/accent';
 import { Colors, Radius, Shadow, Spacing, tokens } from '@/constants/theme';
 import {
   BAHT_PER_POINT,
+  WELCOME_POINTS,
+  joinMembership,
   listMyRedemptions,
   listPointsHistory,
   listRewards,
@@ -59,6 +69,9 @@ const ACCENT = GREEN_ACCENT;
  *  ผูกไว้ค่าเดียว สองที่จะได้ไม่หลุดจากกันตอนใครสักคนไปแก้ทีหลัง */
 const OVERLAP = 34;
 
+/* มาสคอตถือบัตรสมาชิก (เจ้าของส่งมา 6 ก.ย. 2026) — ใช้ในการ์ดชวนสมัคร */
+const MEMBER_MASCOT = require('@/assets/images/mascot-member.png') as number;
+
 const thDate = (iso: string) =>
   new Date(iso).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
 
@@ -76,6 +89,10 @@ export default function MemberScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ key: number; msg: string; sub?: string } | null>(null);
   const [showCard, setShowCard] = useState(false);
+  /* ฟอร์มสมัครสมาชิก — โผล่เฉพาะคนที่ยังไม่มีเบอร์ผูกกับบัญชี */
+  const [joinPhone, setJoinPhone] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinErr, setJoinErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +149,42 @@ export default function MemberScreen() {
       setToast({ key: Date.now(), msg: 'แลกไม่สำเร็จ ลองใหม่อีกครั้ง' });
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const joinDigits = joinPhone.replace(/\D/g, '');
+  const joinValid = /^0[689]\d{8}$/.test(joinDigits);
+
+  const join = async () => {
+    if (!joinValid || joining) return;
+    setJoining(true);
+    setJoinErr(null);
+    try {
+      const res = await joinMembership(joinDigits);
+      if (!res.ok) {
+        setJoinErr(
+          res.reason === 'PHONE_TAKEN'
+            ? 'เบอร์นี้ถูกใช้กับอีกบัญชีแล้ว — เข้าด้วยบัญชีนั้นได้เลย'
+            : res.reason === 'BAD_PHONE'
+              ? 'เบอร์ไม่ถูกต้อง ลองตรวจดูอีกที'
+              : 'สมัครไม่สำเร็จ ลองใหม่อีกครั้ง',
+        );
+        return;
+      }
+      setPoints(res.points);
+      /* อัปเดตโปรไฟล์ในเครื่องด้วย — ทั้งหน้าดูที่ profile.phone เพื่อรู้ว่าเป็นสมาชิกแล้ว
+         ถ้าไม่รีเฟรช การ์ดชวนสมัครจะค้างอยู่ทั้งที่สมัครสำเร็จไปแล้ว */
+      await useAuth.getState().refreshProfile();
+      setToast({
+        key: Date.now(),
+        msg: res.awarded ? `รับ ${WELCOME_POINTS} แต้มแล้ว` : 'ผูกเบอร์กับบัญชีแล้ว',
+        sub: res.awarded ? 'ยินดีต้อนรับสู่ OFU MEMBER' : undefined,
+      });
+      void load();
+    } catch {
+      setJoinErr('สมัครไม่สำเร็จ ลองใหม่อีกครั้ง');
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -232,6 +285,59 @@ export default function MemberScreen() {
         </View>
 
         <View style={styles.body}>
+        {/* ── ยังไม่ได้เป็นสมาชิก: ชวนสมัครด้วยเบอร์ ──
+            เจ้าของสั่ง 6 ก.ย. 2026 "ลูกค้าที่ยังไม่มีระบบสมาชิกต้องมาสมัคร กรอกเบอร์
+            ได้รับแต้ม 100"
+            ★ เบอร์คือบัตรสมาชิก ★ แคชเชียร์ค้นสมาชิกที่หน้าร้านด้วยเบอร์ คนที่สมัครด้วย
+            Google/Apple แล้วไม่เคยกรอกเบอร์จึงสะสมแต้มจากการซื้อหน้าร้านไม่ได้เลย
+            แต้มต้อนรับคือแรงจูงใจให้กรอก ไม่ใช่ของแถมเปล่า ๆ */}
+        {signedIn && !profile.phone ? (
+          <View style={styles.joinCard}>
+            <Image source={MEMBER_MASCOT} style={styles.joinMascot} contentFit="contain" />
+            <Text variant="subtitle" style={styles.joinTitle}>
+              สมัครสมาชิก รับ {WELCOME_POINTS} แต้มทันที
+            </Text>
+            <Text style={styles.joinBody}>
+              กรอกเบอร์มือถือเพื่อรับบัตรสมาชิก แล้วสะสมแต้มได้ทุกครั้งที่ซื้อของ
+            </Text>
+            <View style={styles.joinField}>
+              <Ionicons name="call-outline" size={20} color={Colors.textMuted} />
+              <TextInput
+                value={joinPhone}
+                onChangeText={(v) => {
+                  setJoinPhone(v.replace(/\D/g, '').slice(0, 10));
+                  setJoinErr(null);
+                }}
+                placeholder="เบอร์มือถือ"
+                placeholderTextColor={Colors.textMuted}
+                keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                style={styles.joinInput}
+                onSubmitEditing={join}
+                returnKeyType="done"
+              />
+            </View>
+            {joinErr ? <Text style={styles.joinErr}>{joinErr}</Text> : null}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="สมัครสมาชิก"
+              disabled={!joinValid || joining}
+              onPress={join}
+              style={[
+                styles.joinBtn,
+                { backgroundColor: joinValid && !joining ? ACCENT.strong : Colors.surfaceMuted },
+              ]}>
+              <Text
+                style={[
+                  styles.joinBtnText,
+                  { color: joinValid && !joining ? Colors.textOnPrimary : Colors.textMuted },
+                ]}>
+                {joining ? 'กำลังสมัคร…' : `สมัครและรับ ${WELCOME_POINTS} แต้ม`}
+              </Text>
+            </PressableScale>
+          </View>
+        ) : null}
+
         {/* ── โค้ดที่รอไปรับของ ── */}
         {pending.length > 0 ? (
           <View style={styles.section}>
@@ -486,6 +592,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bigCardClose: { fontSize: 12, color: Colors.textMuted, marginTop: 4 },
+
+  /* การ์ดชวนสมัคร — มาสคอตอยู่บนสุดกลางการ์ด ให้อ่านเป็นคำเชิญ ไม่ใช่แบบฟอร์ม */
+  joinCard: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: ACCENT.tint,
+    ...Shadow.card,
+  },
+  joinMascot: { width: 136, height: 136 },
+  joinTitle: { textAlign: 'center', color: ACCENT.strong },
+  joinBody: { textAlign: 'center', color: Colors.textMuted, fontSize: 13, lineHeight: 20 },
+  joinField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: Spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  joinInput: {
+    flex: 1,
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 17,
+    color: Colors.text,
+    padding: 0,
+  },
+  joinErr: { fontSize: 13, color: Colors.dangerStrong, alignSelf: 'flex-start' },
+  joinBtn: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+    borderRadius: Radius.pill,
+  },
+  joinBtnText: { fontFamily: 'Mitr_500Medium', fontSize: 16 },
 
   section: { gap: Spacing.sm },
   skRow: { borderRadius: Radius.lg },

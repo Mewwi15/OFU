@@ -44,6 +44,28 @@ export async function myPoints(): Promise<number> {
   return (data as number | null) ?? 0;
 }
 
+/** แต้มที่ได้ตอนสมัครสมาชิก — ตัวเลขจริงอยู่ใน join_membership() ที่ฐานข้อมูล */
+export const WELCOME_POINTS = 100;
+
+export type JoinResult =
+  | { ok: true; points: number; awarded: boolean }
+  /* แยกเหตุผลออกจากกัน เพราะลูกค้าต้องทำคนละอย่าง: เบอร์ผิดให้แก้เบอร์
+     เบอร์ซ้ำให้ไปเข้าบัญชีเดิม ส่วน error อื่นให้ลองใหม่ */
+  | { ok: false; reason: 'BAD_PHONE' | 'PHONE_TAKEN' | 'OTHER' };
+
+/** สมัครสมาชิกด้วยเบอร์โทร (ผูกเบอร์กับบัญชี + รับแต้มต้อนรับครั้งเดียว) */
+export async function joinMembership(phone: string): Promise<JoinResult> {
+  const { data, error } = await supabase.rpc('join_membership', { p_phone: phone });
+  if (error) {
+    const m = error.message ?? '';
+    if (m.includes('PHONE_TAKEN')) return { ok: false, reason: 'PHONE_TAKEN' };
+    if (m.includes('BAD_PHONE')) return { ok: false, reason: 'BAD_PHONE' };
+    return { ok: false, reason: 'OTHER' };
+  }
+  const d = data as { points: number; awarded: boolean };
+  return { ok: true, points: d.points, awarded: d.awarded };
+}
+
 export async function listRewards(): Promise<Reward[]> {
   const { data, error } = await supabase
     .from('member_rewards')
