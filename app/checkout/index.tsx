@@ -58,12 +58,14 @@ import {
 } from '@/lib/data/order';
 import { uploadSlip } from '@/lib/data/storage';
 import { compressForUpload } from '@/lib/images';
+import { shopHoursLabel } from '@/data/shop';
 import { useShop } from '@/store/shop';
+import { useShopOpen } from '@/lib/useShopOpen';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { type PaymentMethod } from '@/lib/payment';
 import { uuidv4 } from '@/lib/uuid';
-import { selectedAddress, useAddress } from '@/store/address';
+import { hasContactInfo, hasParcelInfo, selectedAddress, useAddress } from '@/store/address';
 import { useAuth } from '@/store/auth';
 import { cartSubtotal, selectedItems, useCart, type CartItem } from '@/store/cart';
 import { deliveryFeeFor, useFees, useMode } from '@/store/mode';
@@ -129,6 +131,8 @@ export default function CheckoutScreen() {
   const removeSelected = useCart((s) => s.removeSelected);
   const mode = useMode((s) => s.mode);
   const promptPay = useShop((s) => s.info.promptPay);
+  const shopHours = useShop((s) => s.info.hours);
+  const shopOpen = useShopOpen();
   const address = useAddress(selectedAddress);
   const userId = useAuth((s) => s.userId);
 
@@ -227,6 +231,10 @@ export default function CheckoutScreen() {
   const shownFee = placed ? placed.deliveryFee : deliveryFee;
   const shownDiscount = placed ? placed.discountAmount : estDiscount;
 
+  /* เพดานเก็บเงินปลายทาง — ฐานข้อมูลปฏิเสธอยู่แล้ว (COD_NOT_ALLOWED/เกินเพดาน) แต่ถ้า
+     ไม่บอกก่อน ลูกค้าจะกดยืนยันแล้วเจอ error ทั้งที่แก้ได้ด้วยการเปลี่ยนวิธีจ่าย */
+  const overCodCap =
+    method === 'cod' && fees.codCap != null && shownTotal > fees.codCap;
   const needsSlip = method === 'promptpay';
   // The QR is only ever drawn from a placed order's total.
   const showQr = needsSlip && !!placed;
@@ -239,7 +247,31 @@ export default function CheckoutScreen() {
     : method === 'cod'
       ? t('checkout.confirmOrder')
       : t('checkout.continueToPay');
-  const canConfirm = (awaiting ? !!slipUri : status === 'idle') && !outOfZoneKm;
+  /* ★ ด่านเดียวกับหน้าตะกร้า ต้องมีที่นี่ด้วย ★ (ตรวจทั้งระบบ 6 ก.ย. 2026 ตามที่เจ้าของ
+     สั่งให้ไล่หารูรั่วให้ครบ) — หน้าตะกร้าเป็นด่านเดียวที่เช็คเรื่องเวลาเปิดร้านกับความ
+     ครบของที่อยู่ พอเข้ามาถึงหน้านี้แล้วไม่มีใครเช็คซ้ำอีกเลย ช่องว่างที่เกิดจริง:
+       · เปิดตะกร้าตอนร้านยังเปิด กดมาหน้านี้ ร้านปิดระหว่างนั้น แล้วกดยืนยัน
+       · กลับมาต่อออเดอร์ที่ค้างไว้ (pendingAttempt) ข้ามหน้าตะกร้าไปเลย
+       · แก้ที่อยู่จากหน้านี้จนข้อมูลไม่ครบ แล้วกดยืนยัน
+     ฝั่งฐานข้อมูลไม่ได้ห้ามสั่งนอกเวลาทำการ ออเดอร์ตอนตีสามจึงเข้าจริงและร้านต้องมาตาม
+     ยกเลิกเอง */
+  const closedNow = !shopOpen;
+  const missingParcel = mode === 'online' && !hasParcelInfo(address ?? undefined);
+  const missingContact = mode === 'delivery' && !hasContactInfo(address ?? undefined);
+  const blockedReason = outOfZoneKm
+    ? `ที่อยู่นี้อยู่นอกเขตส่ง (${outOfZoneKm.toFixed(1)} กม.)`
+    : closedNow
+      ? `ตอนนี้ร้านปิดอยู่ ${shopHoursLabel(shopHours)}`
+      : missingParcel
+        ? 'ที่อยู่ยังไม่ครบสำหรับส่งพัสดุ — ต้องมีจังหวัดและรหัสไปรษณีย์'
+        : missingContact
+          ? 'ยังไม่มีชื่อผู้รับหรือเบอร์โทร'
+          : overCodCap
+            ? `เก็บเงินปลายทางได้ไม่เกิน ${money(fees.codCap ?? 0)} — เลือกโอนแทน`
+            : null;
+
+  const canConfirm =
+    (awaiting ? !!slipUri : status === 'idle') && !blockedReason;
 
   /* ----- Guard: nothing to pay for (e.g. opened with an empty selection) ----
    * `placed` exempts the awaiting-payment screen: that order is real and owed,
@@ -480,10 +512,13 @@ export default function CheckoutScreen() {
             ) : null}
           </View>
 
-          {outOfZoneKm ? (
+          {/* เหตุผลที่กดยืนยันไม่ได้ — ใช้แถบเดียวกับที่เคยมีเฉพาะเรื่องนอกเขตส่ง
+              ★ ต้องบอกเหตุผล ไม่ใช่แค่ปิดปุ่มเงียบ ๆ ★ ปุ่มจางที่กดไม่ได้โดยไม่บอกอะไร
+              ทำให้คนคิดว่าแอปค้าง แล้วกดวนอยู่อย่างนั้น */}
+          {blockedReason ? (
             <View style={styles.zoneWarnRow}>
               <Ionicons name="alert-circle" size={16} color={Colors.dangerStrong} />
-              <Text style={styles.zoneWarnText}>{t('checkout.outOfZone')}</Text>
+              <Text style={styles.zoneWarnText}>{blockedReason}</Text>
             </View>
           ) : null}
           {address ? (

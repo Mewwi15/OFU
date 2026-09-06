@@ -81,6 +81,9 @@ export function ProductListItem({
   const removeFromCart = useCart((s) => s.remove);
 
   const resolvedLineId = lineId ?? cartItemId(product.id, size);
+  /* ของที่มีจริงของตัวเลือกที่อยู่ในบรรทัดนี้ — ไม่มีขนาดก็ใช้ตัวแรก (สินค้าตัวเลือกเดียว) */
+  const available =
+    (size ? product.variants.find((v) => v.size === size) : product.variants[0])?.available ?? null;
   const open = () => router.push(`/product/${product.id}`);
   const isCart = variant === 'cart';
 
@@ -140,11 +143,16 @@ export function ProductListItem({
       </View>
 
       {/* Right: quantity stepper (delete folds into the minus button) */}
+      {/* ★ เพิ่มจำนวนได้ไม่เกินของที่มีจริง ★ (ตรวจทั้งระบบ 6 ก.ย. 2026) — เดิมกดเพิ่ม
+          ได้ไม่จำกัดในตะกร้า แล้วไปโดนปฏิเสธตอนกดสั่ง (OUT_OF_STOCK) ทั้งที่รู้ตั้งแต่
+          ตอนกดว่าเหลือเท่าไหร่ · ไม่รู้จำนวน (ยังโหลดไม่เสร็จ) ก็ไม่จำกัด ปล่อยให้
+          ฐานข้อมูลเป็นด่านสุดท้ายเหมือนเดิม ดีกว่าบล็อกลูกค้าเพราะข้อมูลยังมาไม่ถึง */}
       <QuantityStepper
         accent={accent}
         value={qty}
         onChange={(next) => setQty(resolvedLineId, next)}
         min={1}
+        max={available && available > 0 ? available : undefined}
         removable
         onRemove={onRemove ?? (() => removeFromCart(resolvedLineId))}
       />

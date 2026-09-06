@@ -88,6 +88,14 @@ export default function ProductDetailsScreen() {
   const imageHeight = Math.round(width * 0.92);
   const total = product.price * qty;
   const soldOut = product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
+  /* ★ กดเพิ่มจำนวนได้ไม่เกินของที่มีจริง ★ (ตรวจทั้งระบบ 6 ก.ย. 2026) — เดิมกดได้ถึง 99
+     ทั้งที่ร้านเหลือ 3 ชิ้น ฐานข้อมูลปฏิเสธตอนกดสั่ง (OUT_OF_STOCK) ลูกค้าจึงเลือกของ
+     ครบตะกร้าแล้วไปเจอด่านตอนจ่ายเงิน ทั้งที่บอกกันได้ตั้งแต่ตอนกด
+     เอาตัวมากสุดของทุกตัวเลือก เพราะจำนวนที่กดตรงนี้ยังไม่รู้ว่าจะลงตัวเลือกไหน */
+  const maxQty = Math.max(
+    1,
+    Math.min(99, ...[Math.max(...product.variants.map((v) => v.available ?? 0), 0), 99]),
+  );
 
   const onCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
@@ -200,7 +208,7 @@ export default function ProductDetailsScreen() {
       <Animated.View
         entering={FadeInUp.delay(120).duration(380)}
         style={[styles.actionBar, { paddingBottom: insets.bottom + Spacing.md }]}>
-        <QuantityStepper value={qty} onChange={setQty} max={99} />
+        <QuantityStepper value={qty} onChange={setQty} max={maxQty} />
         <Button onPress={handleAddToCart} disabled={soldOut} style={styles.addButton}>
           {soldOut ? 'สินค้าหมด' : `${t('product.addToCart')} · ${money(total)}`}
         </Button>
