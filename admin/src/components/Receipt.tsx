@@ -87,7 +87,7 @@ export function Receipt({
       <div
         id="pos-receipt"
         style={{ width: `${cw}mm` }}
-        className="font-mono text-[13px] text-black leading-snug pt-1 [overflow-wrap:anywhere]">
+        className="font-mono text-[11px] text-black leading-snug pt-1 [overflow-wrap:anywhere]">
         <div className="text-center mb-1">
           <img
             src="/logo-oofoo.png"
@@ -95,54 +95,61 @@ export function Receipt({
             className="h-8 mx-auto mb-1 object-contain"
             style={{ filter: 'grayscale(1) contrast(1.25)' }}
           />
-          <div className="text-[17px] font-bold leading-tight">{shop.receipt_header || shop.name}</div>
-          {cfg.phone ? <div className="text-[12px]">โทร {cfg.phone}</div> : null}
-          {cfg.address ? <div className="text-[12px]">{cfg.address}</div> : null}
+          <div className="text-[15px] font-bold leading-tight">{shop.receipt_header || shop.name}</div>
+          {cfg.phone ? <div className="text-[11px]">โทร {cfg.phone}</div> : null}
+          {cfg.address ? <div className="text-[11px]">{cfg.address}</div> : null}
           {shop.vat_registered && shop.tax_id && (
-            <div className="text-[12px]">
+            <div className="text-[11px]">
               เลขผู้เสียภาษี {shop.tax_id} ({shop.branch_code})
             </div>
           )}
-          <div className="text-[12px] mt-0.5">
+          <div className="text-[11px] mt-0.5">
             {taxInvoiceNo ? 'ใบกำกับภาษี' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ'}
           </div>
         </div>
 
-        <div className="text-[12px]">เลขที่ {saleNumber}</div>
-        <div className="text-[12px]">{at}</div>
-        {cfg.cashierName ? <div className="text-[12px]">พนักงาน {cfg.cashierName}</div> : null}
-        {taxInvoiceNo && <div className="text-[12px]">เลขใบกำกับ {taxInvoiceNo}</div>}
+        <div className="text-[11px]">เลขที่ {saleNumber}</div>
+        <div className="text-[11px]">{at}</div>
+        {cfg.cashierName ? <div className="text-[11px]">พนักงาน {cfg.cashierName}</div> : null}
+        {taxInvoiceNo && <div className="text-[11px]">เลขใบกำกับ {taxInvoiceNo}</div>}
         {taxInvoiceNo && customerName && (
-          <div className="text-[12px]">
+          <div className="text-[11px]">
             ชื่อผู้ซื้อ {customerName}
             {customerTaxId ? ` เลขผู้เสียภาษี ${customerTaxId}` : ''}
           </div>
         )}
         {offline && (
-          <div className="mt-1 text-[12px] text-center border border-dashed border-black rounded py-0.5">
+          <div className="mt-1 text-[11px] text-center border border-dashed border-black rounded py-0.5">
             บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์
           </div>
         )}
 
         <div className="border-t border-dashed border-black my-1.5" />
         {/* Item table: name | qty | amount */}
-        {/* หัวคอลัมน์เล็กกว่าเนื้อบิลสองสเต็ป — ถ้าใหญ่เท่ากัน คำว่า "จำนวน" กินที่จนตก
-            บรรทัดเป็น "จำนว/น" บนม้วน 48mm (เห็นตอนลองพิมพ์จริง 5 ก.ย. 2026) */}
-        <div className="flex gap-1 text-[11px] font-bold">
-          <div className="flex-1">สินค้า</div>
-          <div className="w-9 text-center">จำนวน</div>
+        {/* ★ ชื่อสินค้าอยู่บรรทัดของตัวเอง เต็มความกว้าง ★ (แก้ 8 ก.ย. 2026 หลังเจ้าของ
+            บอกว่าลูกค้าว่าบิลอ่านยาก) — เดิมชื่อถูกบีบอยู่ในคอลัมน์แคบ ๆ ที่เหลือจากช่อง
+            จำนวนกับช่องรวม ชื่อจริงของร้านชำอย่าง "ครีมอาบน้ำ บีไนท์ สีชมพู 400 มล"
+            เลยตกบรรทัดสี่บรรทัด กินกระดาษและอ่านไม่รู้เรื่อง
+            แบบใหม่: ชื่อเต็มบรรทัดแรก แล้วบรรทัดที่สองเป็น "จำนวน x ราคา ...... รวม"
+            ซึ่งเป็นทรงเดียวกับใบเสร็จร้านค้าทั่วไปที่คนไทยอ่านคุ้นอยู่แล้ว
+            ตัดบรรทัด "@ ราคา" แยกออกไปด้วย เพราะรวมอยู่ในบรรทัดที่สองแล้ว */}
+        <div className="flex gap-1 text-[10px] font-bold">
+          <div className="flex-1">รายการ</div>
           <div className="w-12 text-right">รวม</div>
         </div>
         <div className="border-t border-dotted border-black my-1" />
         {items.map((l, i) => (
-          <div key={i} className="flex gap-1 mb-0.5">
-            <div className="flex-1">
+          <div key={i} className="mb-1">
+            <div className="leading-tight">
               {l.name}
               {l.size ? ` (${l.size})` : ''}
-              <div className="text-[11px] text-black/70">@ {baht(l.unitPrice)}</div>
             </div>
-            <div className="w-9 text-center">{l.qty}</div>
-            <div className="w-12 text-right">{baht(l.lineTotal)}</div>
+            <div className="flex gap-1">
+              <div className="flex-1 text-black/70">
+                {l.qty} x {baht(l.unitPrice)}
+              </div>
+              <div className="w-12 text-right">{baht(l.lineTotal)}</div>
+            </div>
           </div>
         ))}
 
@@ -167,12 +174,12 @@ export function Receipt({
         {cfg.showBarcode && !offline && (
           <div className="mt-3 text-center">
             <Barcode value={saleNumber} />
-            <div className="text-[11px] mt-0.5 tracking-widest">{saleNumber}</div>
+            <div className="text-[10px] mt-0.5 tracking-widest">{saleNumber}</div>
           </div>
         )}
 
-        <div className="text-center text-[14px] mt-3 font-bold">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
-        {cfg.footerNote ? <div className="text-center text-[11px] mt-0.5">{cfg.footerNote}</div> : null}
+        <div className="text-center text-[12px] mt-3 font-bold">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
+        {cfg.footerNote ? <div className="text-center text-[10px] mt-0.5">{cfg.footerNote}</div> : null}
       </div>
     </>
   );
