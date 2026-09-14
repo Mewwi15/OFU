@@ -53,3 +53,7 @@ app-example
 /*.der
 /*.WAV
 /*.wav
+
+# บันทึกภายใน/กระดานงานที่ไม่ควรขึ้น repo สาธารณะ
+/company-vault/
+/agent-board/
