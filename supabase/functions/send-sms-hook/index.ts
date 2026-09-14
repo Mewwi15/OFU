@@ -28,6 +28,7 @@
 //   SMS_CONTENT_TYPE      - json (ค่าตั้งต้น) หรือ form
 //   SMS_API_KEY           - ยังรองรับของเดิม: ถ้าไม่ตั้ง SMS_AUTH จะใช้ค่านี้เป็น Bearer
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 import { Webhook } from 'https://esm.sh/standardwebhooks@1.0.0';
 
 const HOOK_SECRET = (Deno.env.get('SEND_SMS_HOOK_SECRET') ?? '').replace('v1,whsec_', '');
@@ -39,6 +40,25 @@ const SMS_CONTENT_TYPE = (Deno.env.get('SMS_CONTENT_TYPE') ?? 'json').toLowerCas
 /* ค่าตั้งต้นคือรูปแบบเดิมของไฟล์นี้ — โครงการที่ตั้งค่าไว้แล้วอัปเดตฟังก์ชันแล้วต้องยังส่งได้ */
 const SMS_BODY =
   Deno.env.get('SMS_BODY') ?? '{"sender":"{sender}","msisdn":"{phone}","message":"{message}"}';
+
+/**
+ * บันทึกผลการส่งลงฐานข้อมูล — หลังร้านจะได้เห็นว่าใครสมัครไม่สำเร็จ
+ *
+ * ★ ห้ามให้การบันทึกทำให้การส่งพัง ★ ถ้าเขียนฐานข้อมูลไม่ได้ (เน็ตสะดุด/ตารางยังไม่ถูก
+ * สร้าง) ต้องปล่อยผ่านเงียบ ๆ — บันทึกไม่ได้ยังดีกว่าลูกค้าล็อกอินไม่ได้
+ */
+async function note(phone: string, ok: boolean, reason: string, detail: string) {
+  try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !key) return;
+    await createClient(url, key, { auth: { persistSession: false } })
+      .from('sms_otp_attempts')
+      .insert({ phone, ok, reason, detail: detail.slice(0, 500) });
+  } catch {
+    /* ตั้งใจเงียบ */
+  }
+}
 
 function fail(message: string, status = 500): Response {
   return new Response(JSON.stringify({ error: { message, http_code: status } }), {
@@ -134,9 +154,33 @@ Deno.serve(async (req) => {
     /* ★ เก็บคำตอบของผู้ให้บริการไว้ในบันทึกเสมอ ★ ตอนตั้งค่าครั้งแรกมันคือสิ่งเดียวที่บอก
        ได้ว่าพารามิเตอร์ผิดตรงไหน — ฝั่งลูกค้าเห็นแค่ "ส่ง SMS ไม่สำเร็จ" ซึ่งไล่ต่อไม่ได้ */
     const text = (await res.text()).slice(0, 500);
-    if (!res.ok) return fail(`sms provider error ${res.status}: ${text}`);
+    if (!res.ok) {
+      await note(phone, false, 'provider_error', `${res.status}: ${text}`);
+      return fail(`sms provider error ${res.status}: ${text}`);
+    }
+
+    /* ★ http 200 ไม่ได้แปลว่าส่งถึง ★ (เจ้าของเจอเอง 14 ก.ย. 2026) เบอร์ที่ถูกบล็อก
+       ผู้ให้บริการตอบ 200 แล้วซ่อนไว้ในเนื้อคำตอบว่า block: 1, success: 0 — ของเดิม
+       เห็นแค่ 200 เลยบอกลูกค้าว่า "ส่งรหัสแล้ว" ลูกค้านั่งรอรหัสที่ไม่มีวันมา
+       เครดิตก็ถูกหักไปแล้วด้วย ต้องตอบกลับเป็นความล้มเหลวเพื่อให้แอปบอกความจริง */
+    const blocked = (() => {
+      try {
+        const d = JSON.parse(text) as { data?: { block?: number; send?: number } };
+        return (d.data?.block ?? 0) > 0 || d.data?.send === 0;
+      } catch {
+        return false; // อ่านคำตอบไม่ออก = ไม่ด่วนสรุปว่าล้มเหลว
+      }
+    })();
+
+    if (blocked) {
+      await note(phone, false, 'blocked', text);
+      return fail('sms blocked by carrier or provider blocklist', 502);
+    }
+
+    await note(phone, true, 'sent', text);
     console.log('sms sent', { to: phone, status: res.status, reply: text });
   } catch (e) {
+    await note(phone, false, 'request_failed', String(e));
     return fail(`sms request failed: ${String(e)}`);
   }
 

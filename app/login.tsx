@@ -748,6 +748,11 @@ function otpMessage(e: unknown): string {
   if (err?.status === 429 || code.includes('rate') || msg.includes('rate limit') || msg.includes('too many'))
     return 'ขอรหัสบ่อยเกินไป รอสักครู่แล้วลองใหม่';
   if (msg.includes('invalid') && msg.includes('phone')) return 'เบอร์นี้ไม่ถูกต้อง ลองตรวจดูอีกที';
+  /* ★ ส่งไม่ถึงเบอร์นี้ ≠ ระบบขัดข้อง ★ (เจอจริง 14 ก.ย. 2026) บางเบอร์ถูกค่ายหรือผู้ให้
+     บริการบล็อกไว้ ลองกี่ครั้งก็ไม่มีวันมา — บอกให้ไปทางอื่นเลยดีกว่าปล่อยให้กดส่งซ้ำ
+     จนเลิกใช้ และร้านเสียค่า SMS ทุกครั้งที่กด */
+  if (msg.includes('blocked'))
+    return 'ส่ง SMS ไปเบอร์นี้ไม่ได้ — เข้าด้วย Google หรืออีเมลแทนได้เลย';
   if (msg.includes('sms') || msg.includes('provider') || msg.includes('send'))
     return 'ส่ง SMS ไม่สำเร็จ ลองใหม่อีกครั้ง หรือเข้าด้วยวิธีอื่นก่อน';
   return 'ไม่สำเร็จ ลองใหม่อีกครั้ง';

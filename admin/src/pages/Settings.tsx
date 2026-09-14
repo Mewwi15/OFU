@@ -25,7 +25,9 @@ import {
   backOfficePinSet,
   setBackOfficePin,
   getShopSettingsFull,
+  listFailedOtp,
   updateShopSettings,
+  type FailedOtp,
   type ShopSettingsFull,
 } from '../lib/api';
 import {
@@ -34,6 +36,7 @@ import {
   type DeletionRequest,
 } from '../lib/deletionRequests';
 import { unlockBackOffice } from '../lib/backOffice';
+import { d as thDate } from '../lib/time';
 import { MIN_CONTENT_MM, contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Text } = Typography;
@@ -221,6 +224,14 @@ export function Settings() {
               ตัวหนังสือฝั่งขวาโดนตัด = ลดลง · เหลือกระดาษว่างทางขวา = เพิ่มขึ้น (กดพิมพ์ทดสอบดูได้)
             </div>
           </Card>
+
+          {/* ── เบอร์ที่สมัครไม่สำเร็จ ──
+              เจ้าของถาม 14 ก.ย. 2026 "ถ้าเบอร์อื่นสมัครแล้วติดอีกจะทำไง แล้วจะรู้หรอว่า
+              ใครสมัคร" — นี่คือคำตอบ: เห็นเบอร์ที่ส่ง OTP ไม่ถึง จะได้โทรกลับไปช่วย
+              หรือบอกให้เข้าด้วย Google ไปก่อน
+              ขึ้นเฉพาะตอนมีของจริง — การ์ดว่างที่ขึ้นทุกวันทำให้คนเลิกมอง แล้ววันที่มีจริง
+              จะไม่มีใครสังเกต */}
+          <FailedOtpCard />
 
           <Card title="ทดสอบอุปกรณ์" size="small">
             <Space direction="vertical" size={16} className="w-full">
@@ -485,6 +496,44 @@ function ShopSettingsCard({
           </Button>
         </Form>
       )}
+    </Card>
+  );
+}
+
+/**
+ * เบอร์ที่ส่ง OTP ไม่สำเร็จใน 7 วันล่าสุด
+ *
+ * รวมเป็นรายเบอร์ไม่ใช่รายครั้ง — คนเดิมกดสามรอบไม่ได้แปลว่าสามคนมีปัญหา
+ * เบอร์ที่ภายหลังส่งได้แล้วจะหลุดออกเอง (ดู failed_otp_phones ใน 0110)
+ */
+function FailedOtpCard() {
+  const [rows, setRows] = useState<FailedOtp[] | null>(null);
+
+  useEffect(() => {
+    /* ล้มเงียบ ๆ ถ้ายังไม่ได้รันไมเกรชัน — หน้าตั้งค่าต้องเปิดได้เสมอ */
+    listFailedOtp(7)
+      .then(setRows)
+      .catch(() => setRows([]));
+  }, []);
+
+  if (!rows?.length) return null;
+
+  return (
+    <Card title="เบอร์ที่รับ SMS ไม่ได้ (7 วันล่าสุด)" size="small">
+      <Text type="secondary" className="text-xs">
+        ส่งรหัสไปแล้วแต่ไม่ถึงเครื่องลูกค้า — ติดต่อกลับ หรือแนะนำให้เข้าด้วย Google/อีเมล
+      </Text>
+      <div className="mt-3 flex flex-col gap-2">
+        {rows.map((r) => (
+          <div key={r.phone} className="flex items-center justify-between text-[13px]">
+            <span className="font-mono">{r.phone.replace(/^66/, '0')}</span>
+            <span className="text-[#8a807a]">
+              {r.reason === 'blocked' ? 'ถูกบล็อก' : r.reason}
+              {r.tries > 1 ? ` · พยายาม ${r.tries} ครั้ง` : ''} · {thDate(r.last_try).format('D MMM HH:mm')}
+            </span>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }

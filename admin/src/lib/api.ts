@@ -113,6 +113,13 @@ const rpc = async <T = unknown>(fn: string, args: Record<string, unknown>): Prom
   return data as T;
 };
 
+/* ── SMS OTP ที่ส่งไม่สำเร็จ (0110) ───────────────────────────────────────────
+   ★ ผู้ให้บริการตอบ "สำเร็จ" ทั้งที่ไม่ได้ส่ง ★ เบอร์ที่ถูกบล็อกจะถูกนับเงียบ ๆ ฝั่งเขา
+   ร้านจึงไม่มีทางรู้ว่ามีคนสมัครไม่ผ่าน — รายการนี้คือทางเดียวที่จะเห็น */
+export type FailedOtp = { phone: string; tries: number; reason: string; last_try: string };
+export const listFailedOtp = (days = 7) =>
+  rpc<FailedOtp[]>('failed_otp_phones', { p_days: days });
+
 /* ── Catalog reads ─────────────────────────────────────────────────────────── */
 export async function listCategories(): Promise<Category[]> {
   const { data, error } = await supabase
