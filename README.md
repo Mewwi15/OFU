@@ -1,50 +1,179 @@
-# Welcome to your Expo app 👋
+# อู้ฟู่ (Oofoo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+ร้านของชำชุมชนบนมือถือ — ลูกค้าสั่งของผ่านแอป จ่ายด้วย PromptPay เลือกได้ว่าจะให้ไรเดอร์ของร้านไปส่ง ส่งพัสดุผ่าน Flash Express หรือมารับเองที่ร้าน ฝั่งร้านมีระบบ POS และหลังบ้านจัดการสินค้า ออเดอร์ สต๊อก และบิลขายหน้าร้านในที่เดียวกัน
 
-## Get started
+**เว็บร้าน:** [ofu-shop.vercel.app](https://ofu-shop.vercel.app) · แอป iOS/Android แจกผ่าน EAS
 
-1. Install dependencies
+> ไม่ใช่โปรเจกต์ฝึกมือ — เป็นระบบที่ร้านของชำจริงใช้ขายอยู่ทุกวัน ตั้งแต่มิถุนายน 2026
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## ทำไมถึงทำ
 
-   ```bash
-   npx expo start
-   ```
+ร้านของชำชุมชนแข่งกับร้านสะดวกซื้อเชนใหญ่ไม่ไหว เพราะไม่มีช่องทางออนไลน์และไม่มีระบบหลังร้าน ลูกค้าละแวกนั้นอยากสั่งของโดยไม่ต้องเดินทาง และคุ้นกับการจ่าย PromptPay อยู่แล้ว โปรเจกต์นี้เลยทำหน้าร้านดิจิทัลให้ร้านเล็ก พร้อมระบบหลังร้านที่เจ้าของร้านใช้เองได้จริงโดยไม่ต้องมีคนไอที
 
-In the output, you'll find options to open the app in a
+## สิ่งที่ระบบทำได้
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+**ฝั่งลูกค้า** — 38 หน้าจอ
+- เลือกได้ 2 โหมด: **เดลิเวอรี่** (ไรเดอร์ของร้าน) และ **ออนไลน์** (ส่งพัสดุ Flash Express / รับที่ร้าน) แต่ละโหมดมีแคตตาล็อก ตะกร้า และค่าส่งแยกกัน
+- เข้าสู่ระบบด้วยเบอร์ + OTP, LINE, Apple หรือ Google
+- จ่ายด้วย PromptPay QR ที่สร้างจากยอดจริงตามมาตรฐาน EMVCo แล้วแนบสลิปให้ร้านตรวจ
+- ติดตามออเดอร์แบบเรียลไทม์ — เดลิเวอรี่เห็นไรเดอร์ขยับบนแผนที่ พัสดุดึงสถานะจาก Flash
+- บัตรสมาชิกแบบบาร์โค้ด สะสมแต้ม คูปอง เครดิตร้าน และแชตกับร้าน
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+**ฝั่งร้าน** — เว็บ React + Vite
+- **POS ขายหน้าร้าน**: ยิงบาร์โค้ด เปิด/ปิดรอบขาย นับเงินในลิ้นชัก พิมพ์ใบเสร็จ และร่างบิลอัตโนมัติที่ไม่หายตอนรีเฟรช
+- จัดการแคตตาล็อก สต๊อก ราคา รูปสินค้า
+- รับออเดอร์พร้อมเสียงแจ้งเตือน ตรวจสลิป มอบหมายไรเดอร์ ดูตำแหน่งไรเดอร์บนแผนที่
+- แจ้งเตือนออเดอร์ใหม่เข้า LINE ของพนักงานได้หลายเครื่อง
+- ทำงานต่อได้ตอนเน็ตหลุด แล้วค่อยส่งขึ้นเซิร์ฟเวอร์เมื่อกลับมาออนไลน์
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## สถาปัตยกรรม
 
-```bash
-npm run reset-project
+```
+┌─────────────────────┐        ┌──────────────────────────┐
+│  แอปลูกค้า           │        │  หลังร้าน + POS           │
+│  Expo SDK 54         │        │  React + Vite (Vercel)   │
+│  expo-router 6       │        │  ทำงานออฟไลน์ได้           │
+└──────────┬──────────┘        └────────────┬─────────────┘
+           │                                │
+           └────────► Repository layer ◄────┘
+                      (lib/data/*)
+                      ที่เดียวที่รู้จัก supabase-js
+                                │
+        ╔═══════════════════════▼══════════════════════════╗
+        ║              SUPABASE (สิงคโปร์)                   ║
+        ║                                                   ║
+        ║  Auth ── PostgREST ── Realtime ── Storage         ║
+        ║              │                                    ║
+        ║  ┌───────────▼─────────────────────────────────┐  ║
+        ║  │  POSTGRES                                    │  ║
+        ║  │  62 ตาราง · 143 function · 76 RLS policy     │  ║
+        ║  │  ทุกการเขียนผ่าน SECURITY DEFINER RPC          │  ║
+        ║  │  UPDATE ตรง ๆ ถูก REVOKE บนตารางสำคัญ         │  ║
+        ║  └───────────┬─────────────────────────────────┘  ║
+        ║              │                                    ║
+        ║  ┌───────────▼─────────────────────────────────┐  ║
+        ║  │  EDGE FUNCTIONS (Deno) — 8 ตัว               │  ║
+        ║  │  line-login · line-webhook · send-line       │  ║
+        ║  │  create-flash-shipment · flash-webhook       │  ║
+        ║  │  send-push · chat-push · send-sms-hook       │  ║
+        ║  └──┬────────┬────────┬────────┬───────────────┘  ║
+        ╚═════╪════════╪════════╪════════╪══════════════════╝
+              ▼        ▼        ▼        ▼
+           LINE   Flash Express  Expo Push   SMS OTP
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### หลักการที่ยึดไว้ตั้งแต่ต้น
 
-## Learn more
+**1. ตรรกะธุรกิจอยู่ในฐานข้อมูล ไม่ใช่ในแอป**
+ทุกการเปลี่ยนสถานะ — ตัดสต๊อก ยืนยันการชำระเงิน เปลี่ยนสถานะออเดอร์ — เกิดขึ้นใน `SECURITY DEFINER` function บน Postgres และ `UPDATE` ตรง ๆ ถูก `REVOKE` บนตาราง `orders` / `payments` / `product_variants` แอปแค่สั่งงาน ฐานข้อมูลเป็นคนตัดสิน แปลว่าไคลเอนต์เวอร์ชันเก่าที่ยังไม่ได้อัปเดตก็ทำข้อมูลพังไม่ได้
 
-To learn more about developing your project with Expo, look at the following resources:
+**2. หน้าจอไม่รู้จัก Supabase**
+มีแค่ 4 ไฟล์ในโปรเจกต์ที่ `import` `@supabase/supabase-js` ที่เหลือคุยผ่าน repository ใน `lib/data/` วันที่ต้องย้ายไปแบ็กเอนด์ตัวอื่น (แผนคือ NestJS บน Postgres ก้อนเดิม) จะเป็นการเขียน repository ใหม่ ไม่ใช่รื้อทั้งแอป — เหตุผลเต็มอยู่ใน [ADR-0001](docs/adr/ADR-0001-backend-platform.md)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**3. สำรองข้อมูลทุกคืน และเข้ารหัสก่อนอัปโหลดเสมอ**
+repo นี้เป็น public ไฟล์สำรองจึงถูกเข้ารหัสก่อนขึ้น artifact ทุกครั้ง — ดู [`.github/workflows/backup.yml`](.github/workflows/backup.yml)
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## เรื่องที่ยากที่สุด
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**PromptPay QR ที่ยอดตรงกับบิลจริง**
+มาตรฐาน EMVCo กำหนดรูปแบบ payload พร้อม checksum CRC16 การใส่ยอดเงินลงไปต้องประกอบ payload ใหม่ทั้งชุดและคำนวณ checksum ใหม่ ถ้าผิดหนึ่งไบต์แอปธนาคารจะอ่านไม่ออกโดยไม่บอกว่าผิดตรงไหน — จบที่ `lib/promptpay.ts` โดยสร้าง QR ฝั่งแอปเพื่อให้ยอดกับ QR ออกมาพร้อมกันเสมอ ไม่มีจังหวะที่ลูกค้าเห็น QR ยอดเก่า
+
+**สองโหมดที่ใช้แคตตาล็อกคนละชุด**
+เดลิเวอรี่กับส่งพัสดุมีสินค้า ราคา และเงื่อนไขค่าส่งไม่เหมือนกัน (ของสดส่งพัสดุไม่ได้) แต่เป็นแอปเดียวกัน แก้ด้วยการแยก route group `app/delivery/` กับ `app/online/` ที่มี layout ตะกร้า และ store ของตัวเอง ผู้ใช้สลับโหมดได้โดยตะกร้าอีกฝั่งไม่หาย
+
+**หลังร้านต้องไม่ตายตอนเน็ตหลุด**
+ร้านอยู่ในพื้นที่ที่เน็ตไม่นิ่ง แต่ POS หยุดไม่ได้ ฝั่งหลังร้านจึงเก็บร่างบิลและตัวนับเงินไว้ในเครื่อง (`admin/src/lib/draft.ts`, `offline.ts`) แล้วค่อย sync ขึ้นเมื่อกลับมาออนไลน์ พร้อม flight recorder ไว้ไล่ย้อนว่าเกิดอะไรขึ้นตอนที่มีปัญหา
+
+**เครื่องพนักงานค้างอยู่กับเวอร์ชันเก่า**
+service worker ของเว็บหลังร้านทำให้บางเครื่องยังใช้โค้ดเวอร์ชันเก่าหลัง deploy จนออเดอร์ไม่ขึ้น แก้ด้วยการให้แอปตรวจเวอร์ชันเองแล้วล้างแคชกับ service worker เก่าทิ้ง (`admin/src/lib/newVersion.ts`)
+
+---
+
+## สแตก
+
+| ส่วน | ใช้อะไร |
+|---|---|
+| แอปลูกค้า | Expo SDK 54 · React Native 0.81 · expo-router 6 · TypeScript · Zustand |
+| หลังร้าน + POS | React 18 · Vite · TypeScript |
+| แบ็กเอนด์ | Supabase — Postgres, Auth, Realtime, Storage, Edge Functions (Deno) |
+| ชำระเงิน | PromptPay QR (EMVCo) + แนบสลิป |
+| ขนส่ง | Flash Express API + webhook |
+| แจ้งเตือน | Expo Push (FCM/APNs) · LINE Messaging API · SMS OTP |
+| แผนที่ | expo-maps · Leaflet (ฝั่งเว็บ) |
+| CI/CD | GitHub Actions — OTA update ผ่าน EAS, deploy เว็บ, สำรองฐานข้อมูลรายคืน |
+
+## โครงสร้างโปรเจกต์
+
+```
+app/                 หน้าจอแอปลูกค้า (expo-router)
+  (tabs)/            หน้าหลัก ค้นหา ตะกร้า ออเดอร์ สมาชิก บัญชี
+  delivery/          โหมดเดลิเวอรี่ — แคตตาล็อกและตะกร้าของตัวเอง
+  online/            โหมดส่งพัสดุ/รับที่ร้าน
+  checkout/  order/  product/  address/
+components/          UI ที่ใช้ซ้ำ — สินค้า ตะกร้า แผนที่ติดตาม PromptPay QR
+lib/
+  data/              repository layer — ที่เดียวที่คุยกับแบ็กเอนด์
+  supabase/          client
+  promptpay.ts       สร้าง QR ตามมาตรฐาน EMVCo
+store/               Zustand store (ตะกร้า โหมด เซสชัน แจ้งเตือน …)
+admin/               เว็บหลังร้าน + POS (React + Vite แยก package)
+supabase/
+  migrations/        108 ไฟล์ เรียงลำดับ — schema, RLS, RPC ทั้งหมด
+  functions/         edge function 8 ตัว
+docs/                spec, ADR, data model, API contract, design system
+```
+
+## รันในเครื่อง
+
+```bash
+npm install
+cp .env.example .env        # ใส่ค่า Supabase URL / anon key
+npx expo start
+```
+
+หลังร้าน:
+
+```bash
+cd admin && npm install && npm run dev
+```
+
+ฐานข้อมูล — ต้องมี [Supabase CLI](https://supabase.com/docs/guides/cli):
+
+```bash
+supabase start
+supabase db reset           # รัน migration ทั้ง 108 ไฟล์ + seed
+```
+
+## เอกสาร
+
+เอกสารออกแบบทั้งหมดอยู่ใน [`docs/`](docs/) — เขียนไว้ก่อนลงมือเขียนโค้ด
+
+| ไฟล์ | เนื้อหา |
+|---|---|
+| [01-vision-and-scope](docs/01-vision-and-scope.md) | ขอบเขต v1 และ KPI |
+| [05-architecture](docs/05-architecture.md) | สถาปัตยกรรมเต็ม + topology |
+| [06-data-model](docs/06-data-model.md) | schema, RPC, RLS, Realtime, Storage |
+| [07-api-contract](docs/07-api-contract.md) | สัญญาระหว่างไคลเอนต์กับแบ็กเอนด์ |
+| [08-design-system](docs/08-design-system.md) | design token |
+| [adr/](docs/adr/) | บันทึกเหตุผลการตัดสินใจ — เลือกแบ็กเอนด์, การชำระเงิน, การติดตามพัสดุ |
+
+---
+
+<!--
+เพิ่มภาพหน้าจอตรงนี้ — เอา 4 รูปวางใน docs/screenshots/ แล้วลบคอมเมนต์ครอบออก
+แนะนำ: หน้าแรกแอป · หน้าจ่าย PromptPay · หน้าติดตามไรเดอร์ · หน้าจอ POS
+
+## ภาพหน้าจอ
+
+| หน้าแรก | ชำระเงิน | ติดตามออเดอร์ | POS หน้าร้าน |
+|---|---|---|---|
+| ![หน้าแรก](docs/screenshots/home.png) | ![ชำระเงิน](docs/screenshots/checkout.png) | ![ติดตาม](docs/screenshots/tracking.png) | ![POS](docs/screenshots/pos.png) |
+-->
+
+**ผู้พัฒนา** — Pongsakorn Srisakat ([@Mewwi15](https://github.com/Mewwi15)) · ครุศาสตร์คอมพิวเตอร์ มจพ.
