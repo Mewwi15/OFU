@@ -25,7 +25,7 @@ import {
   backOfficePinSet,
   setBackOfficePin,
   getShopSettingsFull,
-  listFailedOtp,
+  refreshFailedOtp,
   updateShopSettings,
   type FailedOtp,
   type ShopSettingsFull,
@@ -510,8 +510,10 @@ function FailedOtpCard() {
   const [rows, setRows] = useState<FailedOtp[] | null>(null);
 
   useEffect(() => {
+    /* ★ ต้องตามผลก่อนอ่าน ★ ผู้ให้บริการอัปเดตผลจริงช้ากว่าตอนส่งราว 6 นาที ถ้าอ่านเฉย ๆ
+       ทุกแถวจะค้างเป็น "รอผล" แล้วการ์ดนี้จะไม่ขึ้นเลยสักครั้ง (อาการที่เจ้าของเจอ) */
     /* ล้มเงียบ ๆ ถ้ายังไม่ได้รันไมเกรชัน — หน้าตั้งค่าต้องเปิดได้เสมอ */
-    listFailedOtp(7)
+    refreshFailedOtp(7)
       .then(setRows)
       .catch(() => setRows([]));
   }, []);

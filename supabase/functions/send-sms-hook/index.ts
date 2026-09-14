@@ -47,14 +47,20 @@ const SMS_BODY =
  * ★ ห้ามให้การบันทึกทำให้การส่งพัง ★ ถ้าเขียนฐานข้อมูลไม่ได้ (เน็ตสะดุด/ตารางยังไม่ถูก
  * สร้าง) ต้องปล่อยผ่านเงียบ ๆ — บันทึกไม่ได้ยังดีกว่าลูกค้าล็อกอินไม่ได้
  */
-async function note(phone: string, ok: boolean, reason: string, detail: string) {
+async function note(
+  phone: string,
+  ok: boolean | null,
+  reason: string,
+  detail: string,
+  ref?: { provider_ref?: string; provider_id?: string },
+) {
   try {
     const url = Deno.env.get('SUPABASE_URL');
     const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !key) return;
     await createClient(url, key, { auth: { persistSession: false } })
       .from('sms_otp_attempts')
-      .insert({ phone, ok, reason, detail: detail.slice(0, 500) });
+      .insert({ phone, ok, reason, detail: detail.slice(0, 500), ...ref });
   } catch {
     /* ตั้งใจเงียบ */
   }
@@ -159,26 +165,40 @@ Deno.serve(async (req) => {
       return fail(`sms provider error ${res.status}: ${text}`);
     }
 
-    /* ★ http 200 ไม่ได้แปลว่าส่งถึง ★ (เจ้าของเจอเอง 14 ก.ย. 2026) เบอร์ที่ถูกบล็อก
-       ผู้ให้บริการตอบ 200 แล้วซ่อนไว้ในเนื้อคำตอบว่า block: 1, success: 0 — ของเดิม
-       เห็นแค่ 200 เลยบอกลูกค้าว่า "ส่งรหัสแล้ว" ลูกค้านั่งรอรหัสที่ไม่มีวันมา
-       เครดิตก็ถูกหักไปแล้วด้วย ต้องตอบกลับเป็นความล้มเหลวเพื่อให้แอปบอกความจริง */
-    const blocked = (() => {
+    /* ★ http 200 ไม่ได้แปลว่าส่งถึง ★ (เจ้าของเจอเอง 14 ก.ย. 2026) เบอร์ที่ถูกบล็อกก็ได้
+       200 เหมือนกัน ผลจริงมาทีหลัง — วัดกับเบอร์ที่ถูกบล็อกจริงแล้วพบว่าคำตอบตอนยิงบอกว่า
+       block: 0, send: 1 (เหมือนสำเร็จทุกประการ) แล้วผู้ให้บริการค่อยเปลี่ยนสถานะเป็น
+       blocklist ในอีกราว 6 นาที
+       บันทึกตอนนี้จึงบอกได้แค่ "ส่งออกไปแล้ว ยังไม่รู้ผล" — ถ้าฟันธงว่าสำเร็จตรงนี้
+       รายการเบอร์ที่รับไม่ได้จะว่างเปล่าตลอดกาล ซึ่งเป็นอาการที่เจ้าของเจอ ("ไม่ขึ้นครับ")
+       ตัวที่รู้ผลจริงคือ sms-reconcile ซึ่งตามไปอ่านสถานะให้ทีหลัง */
+    const sent = (() => {
       try {
-        const d = JSON.parse(text) as { data?: { block?: number; send?: number } };
-        return (d.data?.block ?? 0) > 0 || d.data?.send === 0;
+        const d = JSON.parse(text) as {
+          data?: { block?: number; send?: number; id?: string; ref_no?: string };
+        };
+        return d.data ?? {};
       } catch {
-        return false; // อ่านคำตอบไม่ออก = ไม่ด่วนสรุปว่าล้มเหลว
+        return {} as { block?: number; send?: number; id?: string; ref_no?: string };
       }
     })();
 
-    if (blocked) {
-      await note(phone, false, 'blocked', text);
+    /* บางกรณีเขาตอบว่าบล็อกมาตั้งแต่ตอนยิงจริง ๆ (เบอร์ในบัญชีดำถาวร) — อันนั้นรู้ผลเลย */
+    if ((sent.block ?? 0) > 0 || sent.send === 0) {
+      await note(phone, false, 'blocked', text, {
+        provider_ref: sent.ref_no,
+        provider_id: sent.id,
+      });
       return fail('sms blocked by carrier or provider blocklist', 502);
     }
 
-    await note(phone, true, 'sent', text);
-    console.log('sms sent', { to: phone, status: res.status, reply: text });
+    /* ★ เก็บเลขอ้างอิงไว้ ★ เป็นกุญแจเดียวที่ใช้จับคู่กับผลที่ผู้ให้บริการอัปเดตทีหลัง
+       ถ้าไม่เก็บ จะเหลือแค่เบอร์กับเวลา ซึ่งแยกไม่ออกเวลาคนเดิมกดส่งซ้ำหลายรอบ */
+    await note(phone, null, 'pending', text, {
+      provider_ref: sent.ref_no,
+      provider_id: sent.id,
+    });
+    console.log('sms sent', { to: phone, status: res.status, ref: sent.ref_no });
   } catch (e) {
     await note(phone, false, 'request_failed', String(e));
     return fail(`sms request failed: ${String(e)}`);

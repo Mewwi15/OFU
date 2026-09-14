@@ -120,6 +120,24 @@ export type FailedOtp = { phone: string; tries: number; reason: string; last_try
 export const listFailedOtp = (days = 7) =>
   rpc<FailedOtp[]>('failed_otp_phones', { p_days: days });
 
+/**
+ * ตามไปอ่านผลการส่งที่ผู้ให้บริการอัปเดตทีหลัง แล้วค่อยอ่านรายการ
+ *
+ * ★ ผลจริงมาช้ากว่าตอนส่งราว 6 นาที ★ ตอนยิง OTP เขาตอบว่าสำเร็จเสมอ แม้เบอร์นั้นจะถูก
+ * บล็อก — ถ้าอ่านรายการเฉย ๆ จะเห็นแต่ "รอผล" ตลอด ต้องสะกิดให้ไปเทียบกับฝั่งเขาก่อน
+ *
+ * ตามผลไม่ได้ก็ไม่เป็นไร (ผู้ให้บริการล่ม/ยังไม่ได้ deploy) — อ่านรายการเท่าที่รู้ผลแล้ว
+ * ดีกว่าทั้งหน้าตั้งค่าพังเพราะการ์ดใบเดียว
+ */
+export async function refreshFailedOtp(days = 7): Promise<FailedOtp[]> {
+  try {
+    await supabase.functions.invoke('sms-reconcile');
+  } catch {
+    /* ตั้งใจเงียบ */
+  }
+  return listFailedOtp(days);
+}
+
 /* ── Catalog reads ─────────────────────────────────────────────────────────── */
 export async function listCategories(): Promise<Category[]> {
   const { data, error } = await supabase
