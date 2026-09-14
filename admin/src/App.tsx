@@ -1,34 +1,42 @@
-import { useEffect } from 'react';
+import { notification } from 'antd';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { useAuth } from './auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { installFlightRecorder, recordNav } from './lib/flightRecorder';
+import { watchForNewVersion } from './lib/newVersion';
 import { installScannerGuard } from './lib/scannerGuard';
-import { AuditLog } from './pages/AuditLog';
-import { Deploys } from './pages/Deploys';
-import { Banners } from './pages/Banners';
-import { Broadcast } from './pages/Broadcast';
-import { Categories } from './pages/Categories';
-import { Chat } from './pages/Chat';
-import { DeleteAccountInfo } from './pages/DeleteAccountInfo';
-import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { Login } from './pages/Login';
-import { Orders } from './pages/Orders';
 import { Pos } from './pages/Pos';
-import { PosSales } from './pages/PosSales';
-import { Products } from './pages/Products';
-import { Receive } from './pages/Receive';
-import { Shift } from './pages/Shift';
-import { MemberRewards } from './pages/MemberRewards';
-import { Promotions } from './pages/Promotions';
-import { Reports } from './pages/Reports';
-import { Stock } from './pages/Stock';
-import { ScanLab } from './pages/ScanLab';
-import { Settings } from './pages/Settings';
-import { Staff } from './pages/Staff';
-import { StoreCredit } from './pages/StoreCredit';
+
+/* ★ โหลดหน้าที่กดเข้าไปเท่านั้น ★ (แก้อาการ "แอปอืด" ที่เจ้าของแจ้ง 14 ก.ย. 2026)
+   เดิมทุกหน้า (23 หน้า รวมรายงาน/ผังสินค้า/ห้องแชต) ถูกยัดรวมเป็นก้อนเดียว 1.5 MB
+   แล้วโหลดทั้งหมดตั้งแต่เปิดเว็บ ทั้งที่คนเปิดมาขายของใช้หน้าเดียว
+   หน้าขายกับหน้าล็อกอินยังอยู่ในก้อนแรก เพราะเป็นสองหน้าที่เปิดขึ้นมาต้องเจอทันที
+   ถ้าให้โหลดทีหลังจะเห็นจอว่างแวบหนึ่งทุกครั้งที่เปิดเครื่องขาย */
+const AuditLog = lazy(() => import('./pages/AuditLog').then((m) => ({ default: m.AuditLog })));
+const Deploys = lazy(() => import('./pages/Deploys').then((m) => ({ default: m.Deploys })));
+const Banners = lazy(() => import('./pages/Banners').then((m) => ({ default: m.Banners })));
+const Broadcast = lazy(() => import('./pages/Broadcast').then((m) => ({ default: m.Broadcast })));
+const Categories = lazy(() => import('./pages/Categories').then((m) => ({ default: m.Categories })));
+const Chat = lazy(() => import('./pages/Chat').then((m) => ({ default: m.Chat })));
+const DeleteAccountInfo = lazy(() => import('./pages/DeleteAccountInfo').then((m) => ({ default: m.DeleteAccountInfo })));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then((m) => ({ default: m.PrivacyPolicy })));
+const Orders = lazy(() => import('./pages/Orders').then((m) => ({ default: m.Orders })));
+const PosSales = lazy(() => import('./pages/PosSales').then((m) => ({ default: m.PosSales })));
+const Products = lazy(() => import('./pages/Products').then((m) => ({ default: m.Products })));
+const Receive = lazy(() => import('./pages/Receive').then((m) => ({ default: m.Receive })));
+const Shift = lazy(() => import('./pages/Shift').then((m) => ({ default: m.Shift })));
+const MemberRewards = lazy(() => import('./pages/MemberRewards').then((m) => ({ default: m.MemberRewards })));
+const Promotions = lazy(() => import('./pages/Promotions').then((m) => ({ default: m.Promotions })));
+const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.Reports })));
+const Stock = lazy(() => import('./pages/Stock').then((m) => ({ default: m.Stock })));
+const ScanLab = lazy(() => import('./pages/ScanLab').then((m) => ({ default: m.ScanLab })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Staff = lazy(() => import('./pages/Staff').then((m) => ({ default: m.Staff })));
+const StoreCredit = lazy(() => import('./pages/StoreCredit').then((m) => ({ default: m.StoreCredit })));
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { ready, session, isAdmin } = useAuth();
@@ -46,12 +54,44 @@ export default function App() {
     installFlightRecorder();
     installScannerGuard();
   }, []);
+
+  /* ── มีเวอร์ชันใหม่ขึ้นแล้ว ── (เจ้าของแจ้ง 14 ก.ย. 2026 ว่าเครื่องอื่นค้างรุ่นเก่า)
+     ★ บอกอย่างเดียว ไม่รีเฟรชให้เอง ★ เครื่องนี้อาจกำลังคีย์บิลหรือนับเงินอยู่ —
+     รีเฟรชให้เองกลางคันแย่กว่าการใช้รุ่นเก่าต่ออีกชั่วโมง
+     ค้างไว้จนกว่าจะกด (duration 0) เพราะถ้าหายไปเองคนที่เดินมาทีหลังจะไม่เคยรู้ */
+  useEffect(() => {
+    return watchForNewVersion(() => {
+      notification.info({
+        key: 'new-version',
+        message: 'มีเวอร์ชันใหม่แล้ว',
+        description: 'กดรีเฟรชเพื่อใช้รุ่นล่าสุด — บิลที่คีย์ค้างไว้จะยังอยู่',
+        placement: 'bottomRight',
+        duration: 0,
+        btn: (
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-full bg-tremor-brand px-4 py-1.5 text-white">
+            รีเฟรชตอนนี้
+          </button>
+        ),
+      });
+    });
+  }, []);
   useEffect(() => {
     recordNav(location.pathname);
   }, [location.pathname]);
 
   return (
     <ErrorBoundary>
+      {/* ข้อความสั้น ๆ ระหว่างดึงหน้าที่เพิ่งกด — ขึ้นแค่ครั้งแรกของแต่ละหน้า หลังจากนั้น
+          เบราว์เซอร์เก็บไว้ในแคชยาว (ตั้ง immutable ไว้ใน vercel.json) */}
+      <Suspense
+        fallback={
+          <div className="min-h-screen flex items-center justify-center text-tremor-content">
+            กำลังโหลด…
+          </div>
+        }>
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* Public — store compliance pages (Play Data Safety / App Store links). */}
@@ -87,6 +127,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/pos" replace />} />
       </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 }
