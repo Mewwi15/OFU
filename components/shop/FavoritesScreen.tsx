@@ -99,6 +99,10 @@ export function FavoritesScreen({ accent, shopHref }: FavoritesScreenProps) {
         data={loading ? [] : grid}
         keyExtractor={(item, index) => item?.id ?? `pad-${index}`}
         numColumns={2}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[

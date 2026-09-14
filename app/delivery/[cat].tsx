@@ -113,6 +113,16 @@ export default function DeliveryCategory() {
         data={catalogLoaded ? list : SKELETON_ROWS}
         keyExtractor={(p) => p.id}
         numColumns={2}
+        /* ★ วาดเท่าที่เห็น ★ (แก้อาการเลื่อนกระตุก 14 ก.ย. 2026) — หมวดใหญ่สุดมี 329 ชิ้น
+           ค่าตั้งต้นของ FlatList วาดเผื่อไว้มากเกินจำเป็นบนจอมือถือ
+           initialNumToRender 6 = สามแถวแรกที่เห็นพอดีตอนเปิด · windowSize 5 = เผื่อ
+           ประมาณสองจอบน-ล่าง พอสำหรับการเลื่อนปกติโดยไม่เห็นช่องว่าง
+           removeClippedSubviews ปลดการ์ดที่เลื่อนพ้นจอออกจากหน่วยความจำของเนทีฟ */
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={5}
+        removeClippedSubviews
+
         contentContainerStyle={[
           styles.list,
           { paddingBottom: TAB_BAR_CLEARANCE + insets.bottom },

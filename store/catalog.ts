@@ -5,8 +5,10 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 import type { Product } from '@/data/products';
+import { zustandStorage } from '@/lib/storage';
 import {
   loadBanners,
   loadBestsellerIds,
@@ -33,7 +35,18 @@ export type CatalogState = {
   load: (force?: boolean) => Promise<void>;
 };
 
-export const useCatalog = create<CatalogState>((set, get) => ({
+/**
+ * ★ เก็บแคตตาล็อกลงเครื่อง แล้วแสดงของเก่าไปก่อนระหว่างดึงของใหม่ ★
+ * (เจ้าของแจ้ง 14 ก.ย. 2026 ว่าแอปช้า "เปิดแอปครั้งแรก กว่าจะขึ้นหน้าแรก")
+ *
+ * ของจริงที่วัดได้: สินค้า 978 รายการ = 615 KB ทุกครั้งที่เปิดแอป — บนเน็ตมือถือคือหลาย
+ * วินาทีที่ลูกค้าเห็นแต่โครงการ์ดเปล่า ทั้งที่ของชุดเดิมเพิ่งโหลดไปเมื่อไม่กี่นาทีก่อน
+ *
+ * เก็บไว้ในเครื่องแล้ววาดทันทีที่เปิด จากนั้นค่อยดึงของใหม่มาทับเงียบ ๆ — ราคา/สต๊อกที่
+ * เห็นแวบแรกอาจเก่าไปไม่กี่นาที ซึ่งรับได้ เพราะยอดที่ลูกค้าจ่ายจริงคิดจากฝั่งเซิร์ฟเวอร์
+ * ตอนกดสั่ง (place_order) ไม่ได้เชื่อราคาที่แอปถืออยู่
+ */
+export const useCatalog = create<CatalogState>()(persist((set, get) => ({
   products: [],
   banners: [],
   categories: [],
@@ -65,6 +78,25 @@ export const useCatalog = create<CatalogState>((set, get) => ({
     } catch {
       set({ error: 'โหลดสินค้าไม่สำเร็จ', loading: false });
     }
+  },
+}), {
+  name: 'oofoo-catalog',
+  storage: zustandStorage,
+  /* เก็บเฉพาะข้อมูล ไม่เก็บสถานะกำลังโหลด/ข้อผิดพลาด — ไม่งั้นเปิดแอปมาอาจค้างที่
+     "กำลังโหลด" ของรอบก่อนที่ไม่มีวันจบ */
+  partialize: (s) => ({
+    products: s.products,
+    banners: s.banners,
+    categories: s.categories,
+    featured: s.featured,
+    bestsellerIds: s.bestsellerIds,
+    loadedAt: s.loadedAt,
+  }),
+  version: 1,
+  /* อ่านจากเครื่องเสร็จแล้วถือว่ามีของให้แสดงได้ (ถ้ามีสินค้าจริง) — หน้าจอเช็ค loaded
+     เพื่อตัดสินใจว่าจะโชว์โครงการ์ดรอหรือของจริง */
+  onRehydrateStorage: () => (state) => {
+    if (state?.products?.length) state.loaded = true;
   },
 }));
 

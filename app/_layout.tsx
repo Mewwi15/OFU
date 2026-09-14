@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { CartFlyLayer } from '@/components/shop/CartFlyLayer';
+import { UpdateGate } from '@/components/UpdateGate';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SiteShell } from '@/components/web/SiteShell';
 import { supabase } from '@/lib/supabase/client';
@@ -233,6 +234,9 @@ export default function RootLayout() {
           {/* ★ นอก Stack ★ รูปสินค้าที่บินเข้าตะกร้าต้องวาดทับทุกหน้าและไม่โดนกรอบของ
               รายการที่เลื่อนอยู่ตัดหาย — วางไว้ในนี้ชั้นเดียว ทุกหน้าใช้ร่วมกัน */}
           <CartFlyLayer />
+          {/* ป้ายบอกเมื่อโค้ดชุดใหม่ดาวน์โหลดเสร็จ — เดิมลูกค้าต้องปิดเปิดแอปสองรอบ
+              ถึงจะได้ของใหม่ โดยไม่มีอะไรบอก (เจ้าของแจ้ง 14 ก.ย. 2026) */}
+          <UpdateGate />
           </SiteShell>
           <StatusBar style="auto" />
         </ThemeProvider>

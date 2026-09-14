@@ -110,7 +110,12 @@ export function ProductCard({
 
   return (
     <Animated.View
-      entering={FadeIn.delay(Math.min(index, 8) * 55).duration(320)}
+      /* ★ ไล่จาง เฉพาะการ์ดชุดแรกที่เห็นตอนเปิดหน้า ★ (แก้อาการเลื่อนแล้วกระตุกที่เจ้าของ
+         แจ้ง 14 ก.ย. 2026) — หมวดใหญ่สุดมีสินค้า 329 ชิ้น ถ้าทุกใบมีอนิเมชันขาเข้า
+         ทุกครั้งที่เลื่อนจนการ์ดใหม่ถูกวาด จะมีงานเพิ่มขึ้นทุกเฟรมระหว่างเลื่อน
+         การ์ดแปดใบแรกยังไล่จางเหมือนเดิม (เป็นชุดที่คนเห็นตอนเปิดหน้า ซึ่งเป็นจุดที่
+         อนิเมชันให้ผลจริง) ที่เหลือโผล่มาเลย ตอนเลื่อนเร็ว ๆ ไม่มีใครทันสังเกตอยู่แล้ว */
+      entering={index < 8 ? FadeIn.delay(index * 55).duration(320) : undefined}
       style={[styles.wrapper, style]}>
       <PressableScale accessibilityRole="button" onPress={open} style={styles.card}>
         <View ref={imgRef} collapsable={false}>
