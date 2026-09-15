@@ -37,7 +37,13 @@ import {
 } from '../lib/deletionRequests';
 import { unlockBackOffice } from '../lib/backOffice';
 import { d as thDate } from '../lib/time';
-import { type AgentStatus, agentStatus, printViaAgent } from '../lib/printAgent';
+import {
+  type AgentStatus,
+  type DryRun,
+  agentStatus,
+  dryRunViaAgent,
+  printViaAgent,
+} from '../lib/printAgent';
 import { MIN_CONTENT_MM, contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Text } = Typography;
@@ -381,7 +387,18 @@ export function Settings() {
               window.print();
             })();
           }}
-          okButtonProps={{ icon: <RiPrinterLine className="w-4 h-4" /> }}>
+          okButtonProps={{ icon: <RiPrinterLine className="w-4 h-4" /> }}
+          /* ★ ตรวจได้โดยไม่เปลืองกระดาษ ★ เจ้าของขอเอง 15 ก.ย. 2026 หลังพิมพ์ทิ้งไป
+             หลายใบตอนไล่ปัญหาบรรทัดท้ายหาย — เดินทางเดียวกับการพิมพ์จริงทุกขั้น
+             ต่างแค่ไม่ส่งเข้าเครื่องพิมพ์ แล้วบอกกลับมาว่าบิลสูงกี่จุด เหลือที่ว่างท้ายบิล
+             เท่าไหร่ ซึ่งคือตัวเลขที่ตอบว่าบิลครบหรือไม่ */
+          footer={(_, { OkBtn, CancelBtn }) => (
+            <div className="flex items-center justify-end gap-2">
+              <DryRunButton port={cfg.agentPort} />
+              <CancelBtn />
+              <OkBtn />
+            </div>
+          )}>
           <Alert
             type="info"
             showIcon
@@ -558,6 +575,48 @@ function ShopSettingsCard({
  * ซึ่งแปลว่า "พิมพ์ไปที่เครื่องพิมพ์หลักเลย ไม่ต้องถาม" · ต้องตั้งที่ตัวเครื่อง เราตั้งให้
  * จากในเว็บไม่ได้ วิธีทำจึงต้องอยู่ตรงนี้ให้อ่านตอนที่กำลังจะใช้
  */
+
+/**
+ * ตรวจบิลโดยไม่พิมพ์จริง — บอกว่าบิลสูงเท่าไหร่และเหลือที่ว่างท้ายบิลกี่แถว
+ *
+ * ★ ตัวเลขท้ายบิลคือตัวชี้ขาด ★ อาการ "บรรทัดสุดท้ายหาย" ที่ไล่กันอยู่หลายรอบ
+ * (15 ก.ย. 2026) ดูจากกระดาษแล้วเถียงกับสายตาไม่จบ แต่ดูจากตัวเลขนี้จบทันที:
+ * เหลือที่ว่างเยอะ = ถ่ายบิลมาครบ · เหลือ 0-2 = ถูกตัดตั้งแต่ตอนถ่าย
+ */
+function DryRunButton({ port }: { port: number }) {
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<DryRun | null>(null);
+
+  const run = async () => {
+    const el = document.getElementById('pos-receipt');
+    if (!el) return;
+    setBusy(true);
+    setRes(await dryRunViaAgent(el, port));
+    setBusy(false);
+  };
+
+  return (
+    <span className="flex items-center gap-2 mr-auto">
+      <Button size="small" loading={busy} onClick={() => void run()}>
+        ตรวจแบบไม่ใช้กระดาษ
+      </Button>
+      {res ? (
+        res.ok ? (
+          <Text className="text-[12px]" type={(res.white_tail ?? 0) >= 20 ? 'success' : 'danger'}>
+            {(res.white_tail ?? 0) >= 20
+              ? `บิลครบ · สูง ${res.height} จุด · เว้นท้าย ${res.white_tail} แถว`
+              : `ท้ายบิลถูกตัด · เว้นท้ายแค่ ${res.white_tail} แถว`}
+          </Text>
+        ) : (
+          <Text className="text-[12px]" type="danger">
+            {res.error}
+          </Text>
+        )
+      ) : null}
+    </span>
+  );
+}
+
 function AutoPrintCard({
   autoPrint,
   agentPort,

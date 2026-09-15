@@ -122,9 +122,12 @@ def image_to_escpos(
     width_dots: int = DOTS_58MM,
     cut: bool = False,
     feed_dots: int = 200,
-) -> bytes:
+) -> tuple[bytes, dict]:
     """
     แปลงรูปบิลเป็นคำสั่งพิมพ์ภาพของ ESC/POS
+
+    คืนทั้งคำสั่งที่จะส่ง และสถิติของภาพ (สูงกี่จุด หมึกแถวสุดท้ายอยู่ไหน เหลือขาวท้ายรูป
+    กี่แถว) — สถิติคือสิ่งที่ตอบได้ว่าบิลครบไหมโดยไม่ต้องเปลืองกระดาษพิมพ์ออกมาดู
 
     ★ ต้องซอยเป็นแถบ ★ เครื่องพิมพ์ถูก ๆ หน่วยความจำน้อย ส่งภาพยาว ๆ ทีเดียวมักค้างหรือ
     พิมพ์ออกมาครึ่งใบ — ซอยทีละ 128 แถวแล้วส่งต่อกันเป็นพืด ได้ผลเหมือนกันแต่ไม่ล้ม
@@ -169,15 +172,16 @@ def image_to_escpos(
     # ขอบล่างที่เห็นอาจเป็นแค่ขอบหน้าต่างเบราว์เซอร์ (เกือบหลงมาแล้ว 15 ก.ย. 2026)
     # ตัวเลขนี้ตอบชัด: หมึกแถวสุดท้ายอยู่ตรงไหน และเหลือขาวท้ายรูปกี่แถว
     # ถ้าเหลือขาวเยอะแต่กระดาษยังไม่มีบรรทัดนั้น = ปัญหาอยู่ที่เครื่องพิมพ์แน่นอน
+    stats = {'width': img.width, 'height': img.height, 'last_ink': -1, 'white_tail': 0}
     try:
         px = img.load()
-        last_ink = -1
         for y in range(img.height - 1, -1, -1):
             if any(px[x, y] == 0 for x in range(img.width)):
-                last_ink = y
+                stats['last_ink'] = y
                 break
-        log(f'  ภาพบิล {img.width}x{img.height} จุด · หมึกแถวสุดท้าย {last_ink} '
-            f'· ขาวท้ายรูป {img.height - 1 - last_ink} แถว')
+        stats['white_tail'] = img.height - 1 - stats['last_ink']
+        log(f"  ภาพบิล {img.width}x{img.height} จุด · หมึกแถวสุดท้าย {stats['last_ink']} "
+            f"· ขาวท้ายรูป {stats['white_tail']} แถว")
     except Exception:  # noqa: BLE001 — วัดไม่ได้ก็ไม่ควรทำให้พิมพ์ไม่ได้
         pass
 
@@ -218,7 +222,7 @@ def image_to_escpos(
     out += b'\n\n'
     if cut:
         out += b'\x1dV\x42\x00'  # ตัดกระดาษ (เครื่องที่ไม่มีใบมีดจะไม่สนใจคำสั่งนี้)
-    return bytes(out)
+    return bytes(out), stats
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -231,6 +235,7 @@ class Handler(BaseHTTPRequestHandler):
     paper_dots = DOTS_58MM
     do_cut = False
     feed_dots = 200
+    dry_run = False
 
     # ปิดบันทึกอัตโนมัติของไลบรารี แล้วพิมพ์เองให้อ่านง่ายกว่า
     def log_message(self, fmt, *args):  # noqa: A003
@@ -307,9 +312,18 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(length)
 
         try:
-            data = image_to_escpos(body, self.paper_dots, self.do_cut, self.feed_dots)
+            data, stats = image_to_escpos(body, self.paper_dots, self.do_cut, self.feed_dots)
         except Exception as e:  # noqa: BLE001
             self._json(400, {'ok': False, 'error': f'อ่านรูปบิลไม่ได้: {e}'})
+            return
+
+        # ★ ตรวจได้โดยไม่เปลืองกระดาษ ★ เจ้าของถามเอง 15 ก.ย. 2026 หลังพิมพ์ทดสอบไป
+        # หลายใบระหว่างไล่ปัญหาบรรทัดท้ายหาย — แปลงบิลให้ครบทุกขั้นเหมือนพิมพ์จริง
+        # (รวมเก็บ last-print.png และวัดหมึก) แค่ไม่ส่งเข้าเครื่องพิมพ์
+        dry = self.dry_run or 'dry=1' in (self.path.split('?', 1)[1] if '?' in self.path else '')
+        if dry:
+            log(f"  ตรวจอย่างเดียว ไม่พิมพ์ · ขาวท้ายรูป {stats['white_tail']} แถว")
+            self._json(200, {'ok': True, 'printed': False, **stats})
             return
 
         try:
@@ -321,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
 
         log(f'  พิมพ์แล้ว · รูป {len(body)} ไบต์ · คำสั่ง {len(data)} ไบต์ '
             f'· ดูภาพที่พิมพ์จริงได้ที่ last-print.png')
-        self._json(200, {'ok': True})
+        self._json(200, {'ok': True, 'printed': True, **stats})
 
 
 def main() -> int:
@@ -334,6 +348,8 @@ def main() -> int:
     # 8 จุด = 1 มม. · 200 จุด = 25 มม. — 140 ยังไม่พอกับเครื่องนี้ (เจ้าของแจ้ง 15 ก.ย. 2026
     # ว่าบรรทัดท้ายสุดยังพิมพ์ไม่หมด) เสียกระดาษเพิ่มใบละ 1 ซม. แลกกับบิลที่ครบทุกใบ
     ap.add_argument('--feed', type=int, default=200, help='ระยะเลื่อนกระดาษท้ายบิล (จุด)')
+    ap.add_argument('--dry-run', action='store_true',
+                    help='ตรวจอย่างเดียว ไม่พิมพ์จริง (ดูผลที่ /last)')
     args = ap.parse_args()
 
     names = all_printers()
@@ -354,6 +370,7 @@ def main() -> int:
     Handler.paper_dots = args.dots
     Handler.do_cut = args.cut
     Handler.feed_dots = args.feed
+    Handler.dry_run = args.dry_run
 
     print('─────────────────────────────────────────────')
     print(' ตัวกลางพิมพ์บิล ร้านอู้ฟู่')
@@ -374,7 +391,8 @@ def main() -> int:
         log(f'มีตัวกลางทำงานอยู่แล้วที่พอร์ต {args.port} ({e}) — ตัวนี้ปิดตัวเอง')
         return 0
 
-    log(f'เริ่มทำงาน · เครื่องพิมพ์ {target} · พอร์ต {args.port}')
+    log(f'เริ่มทำงาน · เครื่องพิมพ์ {target} · พอร์ต {args.port}'
+        + (' · โหมดตรวจอย่างเดียว ไม่พิมพ์จริง' if args.dry_run else ''))
     try:
         server.serve_forever()
     except KeyboardInterrupt:

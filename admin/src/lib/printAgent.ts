@@ -122,3 +122,41 @@ export async function printViaAgent(
     return false;
   }
 }
+
+/** ผลการตรวจบิลแบบไม่ใช้กระดาษ — จำนวนจุด และที่ว่างท้ายบิล */
+export type DryRun = {
+  ok: boolean;
+  height?: number;
+  white_tail?: number;
+  error?: string;
+};
+
+/**
+ * ตรวจบิลโดยไม่พิมพ์จริง
+ *
+ * เจ้าของขอเอง 15 ก.ย. 2026: "อยากเทสโดยที่ไม่ต้องปริ้นกระดาษได้ไหมครับ" — ระหว่างไล่
+ * ปัญหาบรรทัดท้ายหาย เราพิมพ์ทิ้งไปหลายใบกว่าจะรู้ว่าแก้ตรงไหน
+ * เดินทางเดียวกับการพิมพ์จริงทุกขั้น (ถ่ายรูป → แปลงเป็นคำสั่ง → วัดหมึก → เก็บภาพไว้ดู)
+ * ต่างแค่ไม่ส่งเข้าเครื่องพิมพ์ ผลที่ได้จึงเชื่อได้ว่าตรงกับของที่จะออกมาจริง
+ */
+export async function dryRunViaAgent(
+  el: HTMLElement,
+  port: number,
+  dots = DOTS_58MM,
+): Promise<DryRun> {
+  try {
+    const png = await receiptToPng(el, dots);
+    const res = await fetch(url(port, '/print?dry=1'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/png' },
+      body: png,
+    });
+    const body = (await res.json()) as DryRun;
+    if (!res.ok || !body.ok) return { ok: false, error: body.error ?? 'ตัวกลางตอบไม่สำเร็จ' };
+    return body;
+  } catch (e) {
+    /* ★ บอกสาเหตุจริง ★ ต่างจากตอนพิมพ์ซึ่งถอยไปใช้เบราว์เซอร์เงียบ ๆ ได้ — ตรงนี้คนกด
+       เพราะอยากรู้ว่ามีอะไรผิด การตอบว่า "ไม่สำเร็จ" เฉย ๆ ไม่ช่วยอะไรเลย */
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
