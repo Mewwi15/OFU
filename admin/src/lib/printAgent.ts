@@ -56,7 +56,27 @@ async function receiptToPng(el: HTMLElement, dots: number): Promise<Blob> {
     backgroundColor: '#ffffff',
     logging: false,
     useCORS: true,
+    /* ★ ท้ายบิลขาด ★ (เจ้าของเจอกับกระดาษจริง 15 ก.ย. 2026) ใบเสร็จวางอยู่ในถาดที่จำกัด
+       ความสูงไว้ให้เลื่อนดูบนจอ — ตัวถ่ายรูปเคารพการตัดขอบของกล่องแม่ด้วย บิลที่ยาวเกิน
+       ถาดจึงถูกตัดหายตรงที่ตามองไม่เห็นพอดี ยิ่งบิลมีของเยอะยิ่งขาดมาก
+       แก้ในสำเนาที่ใช้ถ่ายเท่านั้น (onclone) ไม่แตะของจริงบนจอ ผู้ใช้จึงไม่เห็นอะไรกระพริบ
+       และถาดบนจอยังเลื่อนดูได้เหมือนเดิม */
+    onclone: (doc) => {
+      doc.querySelectorAll<HTMLElement>('.receipt-tray').forEach((n) => {
+        n.style.maxHeight = 'none';
+        n.style.overflow = 'visible';
+      });
+    },
   });
+  /* ★ ตรวจว่าถ่ายมาครบใบ ★ บิลที่ขาดท้ายคือของเสียที่ลูกค้าถือกลับบ้าน และไม่มีอะไรฟ้อง
+     เลยถ้าไม่ตรวจ — เทียบความสูงที่ได้กับความสูงจริงของใบเสร็จ ขาดเกิน 10% เมื่อไหร่
+     ถือว่าถ่ายไม่ผ่าน แล้วให้ผู้เรียกถอยไปพิมพ์ผ่านเบราว์เซอร์ซึ่งพิมพ์เต็มใบเสมอ
+     ดีกว่ายื่นบิลครึ่งใบให้ลูกค้าโดยไม่มีใครรู้ */
+  const expected = el.scrollHeight * scale;
+  if (expected > 0 && canvas.height < expected * 0.9) {
+    throw new Error(`ถ่ายใบเสร็จได้ไม่ครบ (${canvas.height}/${Math.round(expected)} จุด)`);
+  }
+
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   if (!blob) throw new Error('แปลงใบเสร็จเป็นรูปไม่สำเร็จ');
   return blob;
