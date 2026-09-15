@@ -90,7 +90,11 @@ type ReceiptData = {
   customerTaxId?: string;
 };
 
-const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+/* ★ เว้นวรรคบาง ๆ หลัง ฿ เสมอ ★ ฿ กับตัวเลขถูกวาดด้วยฟอนต์คนละตัว (ฟอนต์ไทยไม่มีเลข
+   อารบิกครบทุกน้ำหนัก เบราว์เซอร์จึงหยิบฟอนต์สำรองมาแทนเฉพาะตัวเลข) ระยะห่างระหว่าง
+   สองฟอนต์เลยคำนวณผิดจนตัวอักษรเบียดกัน — เห็นชัดสุดตอนตัวใหญ่ แต่ตัวเล็กก็เบียด
+   ใช้ช่องไฟแคบ (U+2009) แทนเว้นวรรคเต็ม ๆ เพื่อไม่ให้ดูหลวมเกินไป */
+const baht = (n: number) => `฿\u2009${n.toLocaleString('th-TH')}`;
 
 // ── numeric-only money inputs ───────────────────────────────────────────────
 // Block any key that isn't a digit (paste is still cleaned by moneyParser).
@@ -1011,50 +1015,19 @@ export function Pos() {
 
           {/* ยอด + วิธีจ่าย — เลื่อนได้ ส่วนปุ่มชำระเงินตรึงไว้ข้างล่างเสมอ */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {/* ── สรุปยอด ──
-                ★ ยอดที่ต้องเก็บคือตัวเลขเดียวที่ต้องอ่านไม่ผิด ★ ของเดิมทุกบรรทัดอยู่ใน
-                การ์ดสีเดียวกันหมด ยอดสุทธิเลยจมอยู่กับที่มา — แยกเป็นสองชั้น: รายละเอียด
-                ที่มาอยู่บนพื้นเทาตัวเล็ก · ยอดจริงอยู่บนแถบเข้มตัวใหญ่ มองแวบเดียวเจอ
+            {/* ── ยอดที่ต้องเก็บ ──
+                ★ กรอบนี้มียอดอย่างเดียว ★ เจ้าของสั่ง 15 ก.ย. 2026 "ตรงยอดที่ต้องเก็บเอา
+                แค่ยอดครับ ส่วนลดเอาลงมาตรงล่างรับเงินมา ตรงกรอบยอดที่ต้องเก็บเอาเลข
+                ใหญ่ๆเลย" — ที่มาของยอด (ยอดรวม/ส่วนลด/VAT) ย้ายลงไปอยู่ใต้ช่องรับเงิน
+                ตรงนี้เหลือตัวเลขเดียวที่ต้องบอกลูกค้าและอ่านไม่ผิด
                 ใช้สีเข้มไม่ใช่สีแบรนด์ เพราะปุ่มชำระเงินเป็นสีแบรนด์อยู่แล้ว สองอันสีเดียวกัน
                 จะแย่งสายตากันเอง */}
-            <div className="border-2 border-[#E8E8E8]">
-              <div className="px-3.5 py-3 bg-[#FAFAFA] border-b-2 border-[#E8E8E8] space-y-1.5">
-                <Row label="ยอดรวม" value={baht(subtotal)} />
-                {lineDiscountTotal > 0 ? (
-                  <div className="flex items-center justify-between text-[14.5px]">
-                    <span className="font-medium text-red-600">ส่วนลดรายสินค้า</span>
-                    <span className="font-bold text-red-600 tabular-nums">−{baht(lineDiscountTotal)}</span>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between">
-                  <span className="text-[14.5px] text-tremor-content">ส่วนลดทั้งบิล</span>
-                  <InputNumber
-                    min={0}
-                    max={subtotal}
-                    precision={0}
-                    controls={false}
-                    inputMode="numeric"
-                    formatter={moneyFormatter}
-                    parser={moneyParser}
-                    onKeyDown={digitsOnlyKeyDown}
-                    placeholder="฿ 0"
-                    value={discount || null}
-                    onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
-                    style={{ width: 130, borderRadius: 0 }}
-                    styles={{ input: { textAlign: 'right', fontWeight: 600, ...(discount > 0 ? { color: '#E5484D' } : {}) } }}
-                  />
-                </div>
-                {shop?.vat_registered ? (
-                  <>
-                    <Row label="ราคาก่อน VAT" value={baht(net)} subtle />
-                    <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />
-                  </>
-                ) : null}
-              </div>
-              <div className="px-3.5 py-3 bg-[#2B2320] flex items-end justify-between gap-3">
-                <span className="text-[14px] font-semibold text-white/75 pb-1">ยอดที่ต้องเก็บ</span>
-                <BigBaht value={total} className="text-[36px] font-bold text-white leading-none" />
-              </div>
+            <div className="bg-[#2B2320] px-4 py-3.5">
+              <span className="block text-[14px] font-semibold text-white/70">ยอดที่ต้องเก็บ</span>
+              <BigBaht
+                value={total}
+                className="block text-right text-[60px] font-bold text-white leading-none mt-0.5"
+              />
             </div>
 
             <Segmented
@@ -1088,6 +1061,60 @@ export function Pos() {
             {method === 'promptpay' && (
               <PromptPayPanel target={shop?.promptpay_id ?? null} amount={total} name={shop?.promptpay_name} />
             )}
+
+            {/* ── ส่วนลด + ที่มาของยอด ──
+                ย้ายลงมาจากกรอบยอดตามที่เจ้าของสั่ง — ที่นี่คือที่ของมันจริง ๆ ด้วย เพราะ
+                ส่วนลดคือสิ่งที่ "คีย์" เหมือนช่องรับเงิน ไม่ใช่ตัวเลขที่ "อ่าน" เหมือนยอดที่
+                ต้องเก็บ · บรรทัดที่มาขึ้นเฉพาะตอนมีอะไรให้ดู ไม่มีส่วนลดก็ไม่ต้องรก */}
+            <div className="border-2 border-[#E8E8E8] bg-[#FAFAFA] px-3.5 py-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[14.5px] font-semibold text-tremor-content-strong">
+                  ส่วนลดทั้งบิล
+                </span>
+                <InputNumber
+                  min={0}
+                  max={subtotal}
+                  precision={0}
+                  size="large"
+                  controls={false}
+                  inputMode="numeric"
+                  formatter={moneyFormatter}
+                  parser={moneyParser}
+                  onKeyDown={digitsOnlyKeyDown}
+                  placeholder="฿ 0"
+                  value={discount || null}
+                  onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
+                  style={{ width: 150, borderRadius: 0 }}
+                  styles={{
+                    input: {
+                      textAlign: 'right',
+                      fontSize: 18,
+                      fontWeight: 600,
+                      ...(discount > 0 ? { color: '#E5484D' } : {}),
+                    },
+                  }}
+                />
+              </div>
+              {lineDiscountTotal > 0 || discount > 0 || shop?.vat_registered ? (
+                <div className="pt-2 border-t border-[#E8E8E8] space-y-1">
+                  <Row label="ยอดรวมก่อนลด" value={baht(subtotal)} subtle />
+                  {lineDiscountTotal > 0 ? (
+                    <div className="flex items-center justify-between text-[13.5px]">
+                      <span className="text-red-600">ส่วนลดรายสินค้า</span>
+                      <span className="font-semibold text-red-600 tabular-nums">
+                        −{baht(lineDiscountTotal)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {shop?.vat_registered ? (
+                    <>
+                      <Row label="ราคาก่อน VAT" value={baht(net)} subtle />
+                      <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
             {/* ── บัตรสมาชิก ──
                 สแกนคิวอาร์จากหน้า OFU MEMBER ได้เลย (ตัวจับสแกนทั่วทั้งหน้าดักให้แล้ว)
