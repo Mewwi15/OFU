@@ -58,8 +58,24 @@ def all_printers() -> list[str]:
 
 
 def guess_printer(names: list[str]) -> str | None:
-    for n in names:
-        if 'POS' in n.upper() or '58' in n:
+    """
+    เดาว่าเครื่องไหนคือเครื่องพิมพ์บิล
+
+    ★ เรียงลำดับความมั่นใจ ไม่ใช่เจออะไรก่อนเอาอันนั้น ★ ตอนทดสอบที่เครื่องจริง
+    (15 ก.ย. 2026) เครื่องนั้นมีเครื่องพิมพ์ 17 ตัว การไล่หาคำว่า "58" เฉย ๆ ไปเจอ
+    'XP-58C' ก่อน ทั้งที่ตัวที่เจ้าของจะใช้คือ 'POS58 Printer'
+    และต้องข้ามเครื่องพิมพ์สติกเกอร์ (XP-480B / XP-233B) ให้ขาด — บิลไปโผล่ที่นั่น
+    คือเสียสติกเกอร์ทั้งม้วนโดยไม่มีใครรู้
+    """
+    upper = [(n, n.upper()) for n in names]
+    skip = ('480', '233', 'BROTHER', 'PDF', 'XPS', 'FAX', 'ONENOTE')
+    ok = [n for n, u in upper if not any(s in u for s in skip)]
+    for want in ('POS58', 'POS-58', 'POS'):
+        for n in ok:
+            if want in n.upper():
+                return n
+    for n in ok:
+        if '58' in n:
             return n
     return None
 

@@ -58,6 +58,7 @@ import { OpenShiftPanel } from '../components/OpenShiftPanel';
 import { DRAFT_KEYS, clearDraft, readDraft, writeDraft } from '../lib/draft';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
+import { agentStatus, printViaAgent } from '../lib/printAgent';
 import { promptpayPayload } from '../lib/promptpay';
 import { useReceiptConfig } from '../lib/receiptConfig';
 
@@ -1488,23 +1489,44 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
      ★ ยิงครั้งเดียวต่อบิล ★ กัน effect ทำงานซ้ำ (React 18 โหมด strict เรียกสองรอบ)
      ไม่งั้นบิลเดียวออกกระดาษสองใบ */
   const printed = useRef(false);
+
+  /**
+   * พิมพ์บิลใบนี้ — ลองทางที่ดีที่สุดก่อน แล้วค่อยถอย
+   *
+   * 1) ตัวกลางในเครื่อง (tools/pos-print-agent) — เงียบสนิท ระบุเครื่องพิมพ์ตรง ๆ
+   *    ไม่ยุ่งกับเครื่องพิมพ์หลัก ใบ A4 จึงปลอดภัย · พิสูจน์กับ POS58 ที่ร้านแล้ว
+   * 2) พิมพ์ผ่านเบราว์เซอร์แบบเดิม — เครื่องที่ยังไม่ได้ลงตัวกลางต้องพิมพ์ได้เหมือนเดิม
+   *
+   * ★ รอให้วาดเสร็จก่อนเสมอ ★ ทั้งสองทางอ่านจากสิ่งที่อยู่บนจอ โลโก้กับฟอนต์โหลดไม่ทัน
+   * เฟรมแรก ยิงเลยจะได้กระดาษที่หัวบิลหาย
+   */
+  const doPrint = useCallback(async () => {
+    try {
+      await document.fonts?.ready;
+    } catch {
+      /* เบราว์เซอร์ไม่รองรับก็พิมพ์ไปเลย */
+    }
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 150)));
+
+    const el = document.getElementById('pos-receipt');
+    if (el && (await agentStatus(cfg.agentPort)).ok) {
+      if (await printViaAgent(el, cfg.agentPort)) return;
+      /* ตัวกลางรับงานไม่สำเร็จ (กระดาษหมด/เครื่องพิมพ์หลุด) — ยังมีทางเบราว์เซอร์ให้ถอย
+         ดีกว่าเงียบไปเฉย ๆ แล้วลูกค้าไม่ได้บิล */
+    }
+    window.print();
+  }, [cfg.agentPort]);
+
+  /* ── พิมพ์เองทันทีที่จบบิล ──
+     เจ้าของสั่ง 15 ก.ย. 2026: "กดชำระแล้วปริ้นให้อัตโนมัติเลย ไม่ต้องเลือกเครื่องปริ้น
+     ตอนนี้มันหลาย step"
+     ★ ยิงครั้งเดียวต่อบิล ★ กัน effect ทำงานซ้ำ (React 18 โหมด strict เรียกสองรอบ)
+     ไม่งั้นบิลเดียวออกกระดาษสองใบ */
   useEffect(() => {
     if (!cfg.autoPrint || printed.current) return;
     printed.current = true;
-    let alive = true;
-    void (async () => {
-      try {
-        await document.fonts?.ready;
-      } catch {
-        /* เบราว์เซอร์ไม่รองรับก็พิมพ์ไปเลย */
-      }
-      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 150)));
-      if (alive) window.print();
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [cfg.autoPrint]);
+    void doPrint();
+  }, [cfg.autoPrint, doPrint]);
 
   return (
     <Modal
@@ -1521,7 +1543,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           key="print"
           size="large"
           icon={<RiPrinterLine className="w-[18px] h-[18px]" />}
-          onClick={() => window.print()}>
+          onClick={() => void doPrint()}>
           พิมพ์บิล
         </Button>,
         /* ปุ่มหลักคือ "ขายต่อ" ไม่ใช่พิมพ์ — เจ้าของเลิกพิมพ์อัตโนมัติไปตั้งแต่ ส.ค. 2026

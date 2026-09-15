@@ -37,6 +37,7 @@ import {
 } from '../lib/deletionRequests';
 import { unlockBackOffice } from '../lib/backOffice';
 import { d as thDate } from '../lib/time';
+import { type AgentStatus, agentStatus, printViaAgent } from '../lib/printAgent';
 import { MIN_CONTENT_MM, contentMm, useReceiptConfig } from '../lib/receiptConfig';
 
 const { Text } = Typography;
@@ -185,7 +186,11 @@ export function Settings() {
           </Form>
         </Card>
 
-        <AutoPrintCard autoPrint={cfg.autoPrint} onChange={(v) => update({ autoPrint: v })} />
+        <AutoPrintCard
+          autoPrint={cfg.autoPrint}
+          agentPort={cfg.agentPort}
+          onChange={(v) => update({ autoPrint: v })}
+        />
 
         {/* ── ขนาดกระดาษ + ทดสอบอุปกรณ์ + รหัสหลังร้าน ─────────────────── */}
         <Space direction="vertical" size={16} className="w-full">
@@ -341,7 +346,18 @@ export function Settings() {
           onCancel={() => setTestOpen(false)}
           okText="พิมพ์"
           cancelText="ปิด"
-          onOk={() => window.print()}
+          /* ★ ทดสอบผ่านทางเดียวกับที่ขายจริง ★ ถ้าปุ่มนี้พิมพ์ผ่านเบราว์เซอร์อย่างเดียว
+             การ "พิมพ์ทดสอบผ่าน" จะไม่ได้แปลว่าตอนจบบิลจริงจะผ่านด้วย — ต้องลองท่อ
+             เส้นเดียวกันถึงจะเชื่อผลได้ */
+          onOk={() => {
+            void (async () => {
+              const el = document.getElementById('pos-receipt');
+              if (el && (await agentStatus(cfg.agentPort)).ok) {
+                if (await printViaAgent(el, cfg.agentPort)) return;
+              }
+              window.print();
+            })();
+          }}
           okButtonProps={{ icon: <RiPrinterLine className="w-4 h-4" /> }}>
           <Alert
             type="info"
@@ -521,12 +537,26 @@ function ShopSettingsCard({
  */
 function AutoPrintCard({
   autoPrint,
+  agentPort,
   onChange,
 }: {
   autoPrint: boolean;
+  agentPort: number;
   onChange: (v: boolean) => void;
 }) {
   const [how, setHow] = useState(false);
+  /* ★ บอกสถานะจริง ไม่ใช่ให้เดา ★ ตัวกลางเป็นโปรแกรมแยกที่ปิดเมื่อไหร่ก็ได้ (เผลอปิด
+     หน้าต่าง/เครื่องรีสตาร์ตแล้วไม่ได้เปิด) ถ้าไม่มีอะไรบอก แคชเชียร์จะรู้ตัวก็ต่อเมื่อ
+     กระดาษไม่ออกกลางรอบขาย — เช็คสดทุกครั้งที่เปิดหน้านี้ */
+  const [agent, setAgent] = useState<AgentStatus | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void agentStatus(agentPort).then((s) => alive && setAgent(s));
+    return () => {
+      alive = false;
+    };
+  }, [agentPort]);
+
   return (
     <Card title="พิมพ์บิลอัตโนมัติ" size="small" className="mt-4">
       <div className="flex items-start justify-between gap-3">
@@ -544,7 +574,38 @@ function AutoPrintCard({
         />
       </div>
 
-      {autoPrint ? (
+      {/* สถานะตัวกลาง — ตัวนี้คือทางที่ดีที่สุด ถ้าต่อได้ก็ไม่ต้องอ่านเรื่อง kiosk เลย */}
+      <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
+        {agent === null ? (
+          <Text type="secondary" className="text-[13px]">
+            กำลังหาตัวกลางพิมพ์บิลในเครื่องนี้…
+          </Text>
+        ) : agent.ok ? (
+          <div className="flex items-start gap-2">
+            <Tag color="success" className="!m-0">
+              ต่อแล้ว
+            </Tag>
+            <div className="text-[13px] text-[#2B2320]">
+              พิมพ์ตรงเข้า <b>{agent.printer}</b> — ไม่ใช้เครื่องพิมพ์หลักของ Windows
+              <div className="text-[#8a807a]">
+                ใบ A4 จึงพิมพ์ได้ตามปกติ ไม่ต้องตั้งอะไรเพิ่ม
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2">
+            <Tag className="!m-0">ไม่พบตัวกลาง</Tag>
+            <div className="text-[13px] text-[#2B2320]">
+              เครื่องนี้จะพิมพ์ผ่านเบราว์เซอร์แทน
+              <div className="text-[#8a807a]">
+                ถ้าลงตัวกลางไว้แล้ว ให้เปิดหน้าต่างของมันค้างไว้ (พอร์ต {agentPort})
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {autoPrint && !agent?.ok ? (
         <div className="mt-3 bg-amber-50 border border-amber-200 px-3 py-2">
           <Text className="text-[13px] text-amber-900">
             เครื่องนี้ยัง<b>เด้งหน้าต่างเลือกเครื่องพิมพ์</b>อยู่ไหม? ถ้าใช่ ต้องเปิด Chrome

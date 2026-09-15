@@ -39,6 +39,14 @@ export type ReceiptConfig = {
    * ที่ Chrome เปิดให้สำหรับเครื่องขายหน้าร้านโดยเฉพาะ)
    */
   autoPrint: boolean;
+  /**
+   * พอร์ตของ "ตัวกลางพิมพ์บิล" ที่รันในเครื่องนี้ (tools/pos-print-agent)
+   *
+   * ★ ทางที่ดีที่สุดถ้ามีตัวกลาง ★ ส่งบิลเข้าเครื่องพิมพ์ที่ระบุชื่อไว้ตรง ๆ ไม่ต้องตั้ง
+   * เครื่องพิมพ์หลักเป็นเครื่องพิมพ์บิล ใบ A4 จึงไม่โดนลากลงม้วนกระดาษ 48 มม. ไปด้วย
+   * ถ้าไม่มีตัวกลางรันอยู่ ระบบถอยไปพิมพ์ผ่านเบราว์เซอร์ให้เอง ไม่ต้องมาสลับอะไร
+   */
+  agentPort: number;
 };
 
 const KEY = 'ofu.receiptConfig';
@@ -54,6 +62,7 @@ export const DEFAULT_CONFIG: ReceiptConfig = {
   contentWidthMm: null,
   /* ปิดไว้ก่อน — เครื่องที่ยังไม่ได้ตั้ง kiosk-printing จะโดนหน้าต่างพิมพ์เด้งทุกบิล */
   autoPrint: false,
+  agentPort: 9110,
 };
 
 export function getReceiptConfig(): ReceiptConfig {
