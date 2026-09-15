@@ -1440,13 +1440,47 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
       width={340}
       destroyOnHidden
       footer={[
-        <Button key="print" icon={<RiPrinterLine className="w-4 h-4" />} onClick={() => window.print()}>
+        <Button
+          key="print"
+          size="large"
+          icon={<RiPrinterLine className="w-[18px] h-[18px]" />}
+          onClick={() => window.print()}>
           พิมพ์บิล
         </Button>,
-        <Button key="next" type="primary" onClick={onClose}>
+        /* ปุ่มหลักคือ "ขายต่อ" ไม่ใช่พิมพ์ — เจ้าของเลิกพิมพ์อัตโนมัติไปตั้งแต่ ส.ค. 2026
+           บิลส่วนใหญ่ลูกค้าไม่เอา การจบบิลแล้วรับคนถัดไปคือทางที่เดินบ่อยกว่ามาก */
+        <Button key="next" type="primary" size="large" onClick={onClose}>
           ขายต่อ
         </Button>,
       ]}>
+      {/* ── หน้าต่างเงินทอน ──
+          เจ้าของสั่ง 15 ก.ย. 2026: "พอกดชำระจะมีหน้าต่างเงินทอนครับ"
+          ★ เงินทอนต้องอ่านได้จากระยะยืน ★ เดิมตัวเลขนี้ซ่อนอยู่ในใบเสร็จตัวจิ๋ว แคชเชียร์
+          ต้องเพ่งหาในบรรทัดเล็ก ๆ ทั้งที่มันคือสิ่งเดียวที่ต้องทำต่อทันทีหลังกดจบบิล
+          ★ no-print ★ แถบนี้เป็นของบนจอเท่านั้น ห้ามติดไปบนกระดาษ */}
+      {method === 'cash' ? (
+        <div className="no-print mb-3 border-2 border-emerald-200 bg-emerald-50 px-4 py-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[15px] font-semibold text-emerald-800">
+              {sale.change > 0 ? 'เงินทอน' : 'รับพอดี'}
+            </span>
+            <span className="text-[44px] font-extrabold text-emerald-700 tabular-nums leading-none">
+              {baht(sale.change)}
+            </span>
+          </div>
+          <div className="mt-2.5 pt-2 border-t border-emerald-200 flex items-center justify-between text-[13px] text-emerald-900/70 tabular-nums">
+            <span>รับมา {baht(sale.total + sale.change)}</span>
+            <span>ยอดบิล {baht(sale.total)}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="no-print mb-3 border-2 border-[#E8E8E8] bg-[#FAFAFA] px-4 py-3 flex items-baseline justify-between gap-2">
+          <span className="text-[15px] font-semibold text-tremor-content-strong">รับเงินพร้อมเพย์</span>
+          <span className="text-[30px] font-extrabold text-tremor-content-strong tabular-nums leading-none">
+            {baht(sale.total)}
+          </span>
+        </div>
+      )}
       {/* Scoped boundary: a throw while rendering the receipt dismisses the
           receipt instead of white-screening the till (H5). */}
       <div className="no-print mb-2 text-[12px] text-[#8a807a]">
