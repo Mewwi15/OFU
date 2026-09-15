@@ -1351,10 +1351,12 @@ function CashPay({
           </span>
         </div>
       )}
+      {/* สีเดียวกับหน้าต่างเงินทอนตอนจบบิล — ตัวเลขเดียวกันต้องหน้าตาเดียวกันทั้งสองที่
+          ไม่งั้นแคชเชียร์ต้องเรียนรู้สองแบบสำหรับเรื่องเดียว */}
       {typeof tendered === 'number' && tendered >= total && (
-        <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 px-3.5 py-3">
-          <span className="text-[15px] font-semibold text-emerald-800">เงินทอน</span>
-          <span className="text-[30px] font-extrabold text-emerald-700 tabular-nums leading-none">
+        <div className="flex items-center justify-between bg-red-50 border-2 border-red-200 px-3.5 py-3">
+          <span className="text-[15px] font-semibold text-red-800">เงินทอน</span>
+          <span className="text-[30px] font-extrabold text-red-600 tabular-nums leading-none">
             {baht(change)}
           </span>
         </div>
@@ -1459,16 +1461,18 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           ต้องเพ่งหาในบรรทัดเล็ก ๆ ทั้งที่มันคือสิ่งเดียวที่ต้องทำต่อทันทีหลังกดจบบิล
           ★ no-print ★ แถบนี้เป็นของบนจอเท่านั้น ห้ามติดไปบนกระดาษ */}
       {method === 'cash' ? (
-        <div className="no-print mb-3 border-2 border-emerald-200 bg-emerald-50 px-4 py-3">
+        {/* สีแดงตามที่เจ้าของสั่ง 15 ก.ย. 2026 ("เงินทอนเอาสีแดง") — เป็นเงินที่ต้องหยิบ
+            ออกจากลิ้นชักคืนลูกค้า ไม่ใช่ยอดที่ได้มา สีจึงเตือนให้ทำอะไรต่อ */}
+        <div className="no-print mb-3 border-2 border-red-200 bg-red-50 px-4 py-3">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[15px] font-semibold text-emerald-800">
+            <span className="text-[15px] font-semibold text-red-800">
               {sale.change > 0 ? 'เงินทอน' : 'รับพอดี'}
             </span>
-            <span className="text-[44px] font-extrabold text-emerald-700 tabular-nums leading-none">
+            <span className="text-[44px] font-extrabold text-red-600 tabular-nums leading-none">
               {baht(sale.change)}
             </span>
           </div>
-          <div className="mt-2.5 pt-2 border-t border-emerald-200 flex items-center justify-between text-[13px] text-emerald-900/70 tabular-nums">
+          <div className="mt-2.5 pt-2 border-t border-red-200 flex items-center justify-between text-[13px] text-red-900/70 tabular-nums">
             <span>รับมา {baht(sale.total + sale.change)}</span>
             <span>ยอดบิล {baht(sale.total)}</span>
           </div>
