@@ -573,10 +573,39 @@ function AutoPrintCard({
                 <b>3.</b> กลับมาที่หน้าขาย ลองขายจริงหนึ่งบิล — ต้องมีกระดาษออกมาเองโดยไม่มี
                 หน้าต่างอะไรเด้ง
               </div>
+
+              {/* ★ ข้อนี้สำคัญกว่าทุกข้อ ★ เจ้าของถามเองว่าใบ A4 จะโดนด้วยไหม — โดน
+                  ถ้าใช้หน้าต่างเดียวกัน โหมดนี้บังคับทั้งเบราว์เซอร์ ไม่ได้แยกตามหน้า */}
+              <div className="border-2 border-red-200 bg-red-50 px-3 py-2.5 mt-1">
+                <div className="font-semibold text-red-800 mb-1">
+                  ห้ามพิมพ์ใบ A4 จากหน้าต่างนี้
+                </div>
+                <div className="text-red-900/80">
+                  โหมดนี้บังคับทั้งเบราว์เซอร์ให้พิมพ์ไปที่เครื่องพิมพ์หลัก (เครื่องพิมพ์บิล)
+                  โดยไม่ถาม — ใบสั่งซื้อ/ใบจัดสินค้าที่สั่งพิมพ์จากหน้าต่างนี้จะไหลลงม้วนบิล
+                  48 มม. เป็นสิบเมตร
+                </div>
+                <div className="mt-2 text-red-900/80">
+                  <b>วิธีที่ถูก:</b> แยกเป็นสองไอคอน — ไอคอน “ขายหน้าร้าน” ใส่ธงตามข้อ 2
+                  เพิ่ม <span className="font-mono">--user-data-dir</span> ต่อท้ายด้วย ส่วนงาน
+                  หลังร้าน/ใบ A4 เปิดจากไอคอน Chrome ปกติ
+                </div>
+                <div className="mt-1.5 font-mono text-[12px] bg-white border border-red-200 px-2 py-1.5 break-all">
+                  chrome.exe --kiosk-printing --user-data-dir=&quot;C:\ofu-pos&quot;
+                  https://ofu-ivory.vercel.app/pos
+                </div>
+                <Text type="secondary" className="text-xs">
+                  ★ ต้องมี --user-data-dir ★ ถ้า Chrome เปิดค้างอยู่แล้ว การสั่งเปิดใหม่พร้อมธง
+                  จะไปเปิดเป็นหน้าต่างของตัวเดิมเฉย ๆ แล้วธงจะไม่มีผล — บรรทัดนี้บังคับให้
+                  แยกเป็นคนละตัวจริง ๆ ธงถึงจะทำงาน และหน้าต่างปกติจะไม่ติดโหมดนี้ไปด้วย
+                </Text>
+              </div>
+
               <Text type="secondary" className="text-xs block">
                 เครื่อง Mac ใช้คำสั่ง{' '}
                 <span className="font-mono">
-                  open -a &quot;Google Chrome&quot; --args --kiosk-printing
+                  open -na &quot;Google Chrome&quot; --args --kiosk-printing
+                  --user-data-dir=/tmp/ofu-pos
                 </span>
               </Text>
             </div>

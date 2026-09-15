@@ -13,6 +13,8 @@
  * (an iframe isn't a popup), so these can be called after an await.
  */
 
+import { Modal } from 'antd';
+
 import { productThumb } from './image';
 import type { Order, OrderItem } from './orders';
 import { getReceiptConfig } from './receiptConfig';
@@ -27,11 +29,37 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
   online: 'ส่งพัสดุ',
 };
 
-/** Print `html` via an off-screen iframe: fires the print dialog once the
+/**
+ * Print `html` via an off-screen iframe: fires the print dialog once the
  * content (incl. images) has loaded, then removes the iframe afterwards. No
  * visible popup window. A timeout fallback prints even if `onload` is missed
- * (e.g. a slow/broken image) and a longer one guarantees cleanup. */
+ * (e.g. a slow/broken image) and a longer one guarantees cleanup.
+ *
+ * ★ กันใบ A4 ออกที่เครื่องพิมพ์บิล ★ เจ้าของถาม 15 ก.ย. 2026 ตอนจะเปิดพิมพ์บิลอัตโนมัติ
+ * ว่า "เครื่องพิมพ์ของบิลมันเล็ก แต่กระดาษของปริ้นใบรายงานมัน A4 ถ้าเลือกเครื่องหลังจะ
+ * แย่ไหม" — แย่จริง: โหมด kiosk-printing ของ Chrome ไม่ได้แยกตามหน้า มันบังคับทั้ง
+ * เบราว์เซอร์ให้พิมพ์ไปที่เครื่องพิมพ์หลักโดยไม่ถาม ใบสั่งซื้อ A4 ที่สั่งพิมพ์จากหน้าต่าง
+ * เดียวกันจึงไหลลงม้วนกระดาษ 48 มม. เป็นสิบเมตรโดยไม่มีอะไรมาห้าม
+ * เราดูไม่ได้ว่าเครื่องเปิดโหมดนั้นอยู่ไหม (เบราว์เซอร์ไม่บอก) แต่ "เครื่องนี้เปิดพิมพ์บิล
+ * อัตโนมัติ" คือสัญญาณเดียวกันในทางปฏิบัติ — ถามก่อนหนึ่งครั้งดีกว่าเสียกระดาษทั้งม้วน
+ */
 export function printHtml(html: string) {
+  if (getReceiptConfig().autoPrint) {
+    Modal.confirm({
+      title: 'เครื่องนี้ตั้งพิมพ์บิลอัตโนมัติไว้',
+      width: 460,
+      content:
+        'ถ้าเปิด Chrome แบบพิมพ์เงียบ (kiosk-printing) ใบ A4 นี้จะไหลออกที่เครื่องพิมพ์บิล 48 มม. ทันทีโดยไม่ถาม — ให้เปิด Chrome ตัวปกติแล้วสั่งพิมพ์จากที่นั่นแทน จะเลือกเครื่องพิมพ์ A4 ได้',
+      okText: 'พิมพ์ต่อ',
+      cancelText: 'ยกเลิก',
+      onOk: () => openPrintFrame(html),
+    });
+    return;
+  }
+  openPrintFrame(html);
+}
+
+function openPrintFrame(html: string) {
   const iframe = document.createElement('iframe');
   Object.assign(iframe.style, {
     position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0',
