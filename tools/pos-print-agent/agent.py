@@ -104,6 +104,54 @@ def guess_printer(names: list[str]) -> str | None:
     return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# สถานะเครื่องพิมพ์
+#
+# ★ ส่งเข้าคิวสำเร็จ ไม่ได้แปลว่ากระดาษออก ★ (เจ้าของถามเอง 15 ก.ย. 2026 ว่า "รู้มั้ยครับ
+# ว่ามันออนอยู่หรือไม่ออน") Windows รับงานเข้าคิวให้เสมอแม้เครื่องพิมพ์ปิดอยู่ แล้วค่อย
+# พิมพ์ตอนเปิด — ฝั่งเราจึงได้ "สำเร็จ" ทุกครั้งโดยไม่รู้ความจริง
+# ตรงนี้ไปถามสถานะจาก Windows ตรง ๆ เพื่อบอกได้ว่าเครื่องพร้อมไหม มีงานค้างกี่งาน
+#
+# ★ ข้อจำกัดที่ต้องรู้ ★ เครื่องพิมพ์บิลราคาถูกที่ต่อ USB ส่วนใหญ่ไม่รายงานสถานะกลับมา
+# Windows จึงขึ้นว่า "พร้อม" แม้ปิดเครื่องอยู่ — เชื่อได้เฉพาะตอนที่มันบอกว่ามีปัญหา
+# ถ้าบอกว่าพร้อมให้ถือเป็น "ไม่มีรายงานปัญหา" ไม่ใช่การยืนยันว่ากระดาษจะออกแน่
+PRINTER_PROBLEMS = (
+    (0x00000080, 'ออฟไลน์'),
+    (0x00001000, 'ไม่พร้อมใช้งาน'),
+    (0x00000010, 'กระดาษหมด'),
+    (0x00000008, 'กระดาษติด'),
+    (0x00400000, 'ฝาเปิด'),
+    (0x00100000, 'ต้องไปดูที่เครื่อง'),
+    (0x00000002, 'เครื่องพิมพ์แจ้งข้อผิดพลาด'),
+)
+PRINTER_ATTRIBUTE_WORK_OFFLINE = 0x00000400
+
+
+def printer_state(name: str) -> dict:
+    """สถานะของเครื่องพิมพ์หนึ่งตัว — พร้อมไหม ติดปัญหาอะไร มีงานค้างกี่งาน"""
+    try:
+        handle = win32print.OpenPrinter(name)
+        try:
+            info = win32print.GetPrinter(handle, 2)
+        finally:
+            win32print.ClosePrinter(handle)
+    except Exception as e:  # noqa: BLE001
+        return {'name': name, 'ready': False, 'problems': [f'อ่านสถานะไม่ได้: {e}'], 'jobs': 0}
+
+    status = int(info.get('Status', 0) or 0)
+    attrs = int(info.get('Attributes', 0) or 0)
+    problems = [text for flag, text in PRINTER_PROBLEMS if status & flag]
+    if attrs & PRINTER_ATTRIBUTE_WORK_OFFLINE:
+        problems.append('ถูกตั้งเป็นออฟไลน์ใน Windows')
+    return {
+        'name': name,
+        'ready': not problems,
+        'problems': problems,
+        # งานค้างเยอะ = เครื่องรับงานแต่ไม่ได้พิมพ์ออกมา ซึ่งเป็นอาการของเครื่องที่ปิดอยู่
+        'jobs': int(info.get('cJobs', 0) or 0),
+    }
+
+
 def send_raw(printer_name: str, data: bytes) -> None:
     """ส่งไบต์ดิบเข้าคิวพิมพ์ — RAW = Windows ไม่แปลงอะไรเลย ส่งออกสายตรง ๆ"""
     handle = win32print.OpenPrinter(printer_name)
@@ -295,11 +343,18 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(raw)
             return
 
+        if self.path.startswith('/printers'):
+            # สถานะของทุกเครื่องในเครื่องนี้ — ใช้ตอบคำถาม "แล้ว Brother ออนอยู่ไหม"
+            # แยกจาก /ping เพราะการไล่ถามทีละเครื่องช้ากว่า และ /ping ถูกเรียกก่อนพิมพ์ทุกครั้ง
+            self._json(200, {'ok': True, 'printers': [printer_state(n) for n in all_printers()]})
+            return
+
         if self.path.startswith('/ping'):
             self._json(200, {
                 'ok': True,
                 'agent': 'ofu-pos-print',
                 'printer': self.printer_name,
+                'state': printer_state(self.printer_name),
                 'printers': all_printers(),
             })
             return
@@ -338,9 +393,15 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {'ok': False, 'error': str(e)})
             return
 
+        # ★ ถามสถานะ "หลัง" ส่ง ★ ถามก่อนส่งแล้วบล็อกไว้จะทำให้บิลไม่ออกในกรณีที่
+        # เครื่องพิมพ์แค่ไม่รายงานสถานะ (ซึ่งเป็นเรื่องปกติของเครื่องถูก ๆ) — ส่งไปก่อน
+        # แล้วค่อยบอกว่ามีอะไรผิดปกติไหม ให้หน้าเว็บตัดสินใจว่าจะเตือนคนขายหรือไม่
+        state = printer_state(self.printer_name)
+        if not state['ready']:
+            log('  ⚠ เครื่องพิมพ์แจ้ง:', ' · '.join(state['problems']))
         log(f'  พิมพ์แล้ว · รูป {len(body)} ไบต์ · คำสั่ง {len(data)} ไบต์ '
             f'· ดูภาพที่พิมพ์จริงได้ที่ last-print.png')
-        self._json(200, {'ok': True, 'printed': True, **stats})
+        self._json(200, {'ok': True, 'printed': True, 'state': state, **stats})
 
 
 def main() -> int:

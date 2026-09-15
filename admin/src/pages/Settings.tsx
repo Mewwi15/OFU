@@ -40,8 +40,10 @@ import { d as thDate } from '../lib/time';
 import {
   type AgentStatus,
   type DryRun,
+  type PrinterState,
   agentStatus,
   dryRunViaAgent,
+  listPrinters,
   printViaAgent,
 } from '../lib/printAgent';
 import { MIN_CONTENT_MM, contentMm, useReceiptConfig } from '../lib/receiptConfig';
@@ -617,6 +619,64 @@ function DryRunButton({ port }: { port: number }) {
   );
 }
 
+/**
+ * รายชื่อเครื่องพิมพ์ในเครื่องขายพร้อมสถานะ
+ *
+ * เจ้าของถาม 15 ก.ย. 2026: "แล้ว connect Brother หรือยังครับ รู้มั้ยครับว่ามันออนอยู่
+ * หรือไม่ออน" — เดิมหน้านี้บอกได้แค่ว่าบิลจะออกเครื่องไหน ไม่ได้บอกว่าเครื่องไหนพร้อม
+ *
+ * ★ ต้องบอกข้อจำกัดด้วย ★ เครื่องพิมพ์ USB ถูก ๆ ไม่รายงานสถานะกลับมา Windows จึงขึ้น
+ * ว่าพร้อมแม้ปิดอยู่ ถ้าโชว์ว่า "พร้อม" เฉย ๆ เจ้าของจะเข้าใจว่ายืนยันแล้วว่าพิมพ์ได้แน่
+ * ซึ่งไม่จริง — เขียนกำกับไว้ให้ชัดว่าเชื่อได้เฉพาะตอนที่มันแจ้งปัญหา
+ */
+function PrinterList({ port }: { port: number }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<PrinterState[] | null>(null);
+
+  useEffect(() => {
+    if (!open || rows) return;
+    let alive = true;
+    void listPrinters(port).then((r) => alive && setRows(r));
+    return () => {
+      alive = false;
+    };
+  }, [open, rows, port]);
+
+  return (
+    <div className="mt-2">
+      <Button type="link" size="small" className="!px-0" onClick={() => setOpen((v) => !v)}>
+        {open ? 'ซ่อนเครื่องพิมพ์ทั้งหมด' : 'ดูเครื่องพิมพ์ทั้งหมดในเครื่องนี้'}
+      </Button>
+      {open ? (
+        rows === null ? (
+          <Text type="secondary" className="text-xs block">
+            กำลังอ่านสถานะ…
+          </Text>
+        ) : (
+          <div className="flex flex-col gap-1 mt-1">
+            {rows.map((p) => (
+              <div key={p.name} className="flex items-start justify-between gap-2 text-[12.5px]">
+                <span className="truncate">{p.name}</span>
+                <span className={p.ready ? 'text-[#8a807a] shrink-0' : 'text-red-600 shrink-0'}>
+                  {p.ready
+                    ? p.jobs > 0
+                      ? `ค้าง ${p.jobs} งาน`
+                      : 'ไม่มีปัญหาแจ้ง'
+                    : p.problems.join(' · ')}
+                </span>
+              </div>
+            ))}
+            <Text type="secondary" className="text-[11.5px] mt-1">
+              เครื่องพิมพ์ต่อ USB ราคาถูกส่วนใหญ่ไม่รายงานสถานะ จึงขึ้นว่า “ไม่มีปัญหาแจ้ง”
+              แม้ปิดเครื่องอยู่ — เชื่อได้เต็มที่เฉพาะตอนที่ขึ้นเป็นสีแดง
+            </Text>
+          </div>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function AutoPrintCard({
   autoPrint,
   agentPort,
@@ -653,11 +713,22 @@ function AutoPrintCard({
           <Tag color="success" className="!m-0">
             พร้อม
           </Tag>
-          <div className="text-[13px] text-[#2B2320]">
+          <div className="text-[13px] text-[#2B2320] flex-1">
             <b>จบบิลแล้วพิมพ์ให้เองทันที</b> — ตรงเข้า {agent.printer}
             <div className="text-[#8a807a] mt-0.5">
               ไม่ใช้เครื่องพิมพ์หลักของ Windows ใบ A4 จึงพิมพ์ได้ตามปกติ ไม่ต้องตั้งอะไรเพิ่ม
             </div>
+            {agent.state && !agent.state.ready ? (
+              <div className="mt-1 text-red-600 font-medium">
+                ⚠ {agent.state.problems.join(' · ')}
+              </div>
+            ) : null}
+            {agent.state && agent.state.jobs > 0 ? (
+              <div className="mt-1 text-amber-700">
+                มีงานค้างในคิว {agent.state.jobs} งาน — ถ้ากระดาษไม่ออก ให้เช็คว่าเครื่องพิมพ์เปิดอยู่
+              </div>
+            ) : null}
+            <PrinterList port={agentPort} />
           </div>
         </div>
       ) : (

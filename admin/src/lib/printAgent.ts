@@ -15,8 +15,17 @@
 /** จำนวนจุดตามความกว้างหัวพิมพ์ — เครื่อง 58 มม. พิมพ์ได้จริง 48 มม. = 384 จุด */
 const DOTS_58MM = 384;
 
+/** สถานะเครื่องพิมพ์ตัวหนึ่งตามที่ Windows รายงาน */
+export type PrinterState = {
+  name: string;
+  ready: boolean;
+  problems: string[];
+  /** งานค้างในคิว — ค้างเยอะแปลว่ารับงานแต่ไม่ได้พิมพ์ออกมา (เครื่องปิดอยู่) */
+  jobs: number;
+};
+
 export type AgentStatus =
-  | { ok: true; printer: string }
+  | { ok: true; printer: string; state?: PrinterState }
   | { ok: false; reason: 'ไม่พบตัวกลาง' | 'ตัวกลางมีปัญหา' };
 
 const url = (port: number, path: string) => `http://127.0.0.1:${port}${path}`;
@@ -33,9 +42,9 @@ export async function agentStatus(port: number, timeoutMs = 1200): Promise<Agent
   try {
     const res = await fetch(url(port, '/ping'), { signal: stop.signal });
     if (!res.ok) return { ok: false, reason: 'ตัวกลางมีปัญหา' };
-    const body = (await res.json()) as { ok?: boolean; printer?: string };
+    const body = (await res.json()) as { ok?: boolean; printer?: string; state?: PrinterState };
     if (!body?.ok || !body.printer) return { ok: false, reason: 'ตัวกลางมีปัญหา' };
-    return { ok: true, printer: body.printer };
+    return { ok: true, printer: body.printer, state: body.state };
   } catch {
     /* ปิดอยู่ / Chrome บล็อก / พอร์ตผิด — ปลายทางเดียวกันคือ "ใช้ไม่ได้ตอนนี้" */
     return { ok: false, reason: 'ไม่พบตัวกลาง' };
@@ -158,5 +167,28 @@ export async function dryRunViaAgent(
     /* ★ บอกสาเหตุจริง ★ ต่างจากตอนพิมพ์ซึ่งถอยไปใช้เบราว์เซอร์เงียบ ๆ ได้ — ตรงนี้คนกด
        เพราะอยากรู้ว่ามีอะไรผิด การตอบว่า "ไม่สำเร็จ" เฉย ๆ ไม่ช่วยอะไรเลย */
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * สถานะของเครื่องพิมพ์ทุกตัวในเครื่องขาย
+ *
+ * เจ้าของถาม 15 ก.ย. 2026: "แล้ว connect Brother หรือยังครับ รู้มั้ยครับว่ามันออนอยู่
+ * หรือไม่ออน" — ตอบได้เฉพาะเครื่องที่ Windows รายงานสถานะกลับมา ซึ่งเครื่องพิมพ์บิล
+ * ต่อ USB ราคาถูกส่วนใหญ่ไม่รายงาน จึงขึ้นว่าพร้อมแม้ปิดอยู่ · เชื่อได้เต็มที่เฉพาะตอนที่
+ * มันบอกว่ามีปัญหา
+ */
+export async function listPrinters(port: number, timeoutMs = 4000): Promise<PrinterState[]> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), timeoutMs);
+  try {
+    const res = await fetch(url(port, '/printers'), { signal: stop.signal });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { printers?: PrinterState[] };
+    return body.printers ?? [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
