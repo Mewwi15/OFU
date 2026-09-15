@@ -559,51 +559,52 @@ function AutoPrintCard({
 
   return (
     <Card title="พิมพ์บิลอัตโนมัติ" size="small" className="mt-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="text-[14px] text-[#2B2320]">จบบิลแล้วพิมพ์ให้เลย</div>
-          <Text type="secondary" className="text-xs">
-            ไม่ต้องกดปุ่ม “พิมพ์บิล” อีกที
-          </Text>
-        </div>
-        <Switch
-          checked={autoPrint}
-          onChange={onChange}
-          checkedChildren="เปิด"
-          unCheckedChildren="ปิด"
-        />
-      </div>
-
-      {/* สถานะตัวกลาง — ตัวนี้คือทางที่ดีที่สุด ถ้าต่อได้ก็ไม่ต้องอ่านเรื่อง kiosk เลย */}
-      <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
-        {agent === null ? (
-          <Text type="secondary" className="text-[13px]">
-            กำลังหาตัวกลางพิมพ์บิลในเครื่องนี้…
-          </Text>
-        ) : agent.ok ? (
-          <div className="flex items-start gap-2">
-            <Tag color="success" className="!m-0">
-              ต่อแล้ว
-            </Tag>
-            <div className="text-[13px] text-[#2B2320]">
-              พิมพ์ตรงเข้า <b>{agent.printer}</b> — ไม่ใช้เครื่องพิมพ์หลักของ Windows
-              <div className="text-[#8a807a]">
-                ใบ A4 จึงพิมพ์ได้ตามปกติ ไม่ต้องตั้งอะไรเพิ่ม
-              </div>
+      {/* ★ มีตัวกลาง = จบเรื่อง ★ ไม่ต้องมีสวิตช์ให้เลือก เพราะการพิมพ์ทางนี้เงียบและระบุ
+          เครื่องพิมพ์ไว้แล้ว คนที่ลงตัวกลางก็เพราะอยากให้บิลออกเองอยู่แล้ว
+          สวิตช์มีไว้สำหรับเครื่องที่ไม่มีตัวกลางเท่านั้น ซึ่งการพิมพ์จะเด้งหน้าต่างใส่ทุกบิล */}
+      {agent === null ? (
+        <Text type="secondary" className="text-[13px]">
+          กำลังหาตัวกลางพิมพ์บิลในเครื่องนี้…
+        </Text>
+      ) : agent.ok ? (
+        <div className="flex items-start gap-2">
+          <Tag color="success" className="!m-0">
+            พร้อม
+          </Tag>
+          <div className="text-[13px] text-[#2B2320]">
+            <b>จบบิลแล้วพิมพ์ให้เองทันที</b> — ตรงเข้า {agent.printer}
+            <div className="text-[#8a807a] mt-0.5">
+              ไม่ใช้เครื่องพิมพ์หลักของ Windows ใบ A4 จึงพิมพ์ได้ตามปกติ ไม่ต้องตั้งอะไรเพิ่ม
             </div>
           </div>
-        ) : (
-          <div className="flex items-start gap-2">
+        </div>
+      ) : (
+        <>
+          <div className="flex items-start gap-2 mb-3">
             <Tag className="!m-0">ไม่พบตัวกลาง</Tag>
             <div className="text-[13px] text-[#2B2320]">
-              เครื่องนี้จะพิมพ์ผ่านเบราว์เซอร์แทน
+              เครื่องนี้จะพิมพ์ผ่านเบราว์เซอร์
               <div className="text-[#8a807a]">
                 ถ้าลงตัวกลางไว้แล้ว ให้เปิดหน้าต่างของมันค้างไว้ (พอร์ต {agentPort})
               </div>
             </div>
           </div>
-        )}
-      </div>
+          <div className="flex items-start justify-between gap-3 pt-3 border-t border-[#F0F0F0]">
+            <div className="flex-1">
+              <div className="text-[14px] text-[#2B2320]">จบบิลแล้วสั่งพิมพ์เอง</div>
+              <Text type="secondary" className="text-xs">
+                จะเด้งหน้าต่างพิมพ์ทุกบิล เว้นแต่ตั้ง Chrome แบบพิมพ์เงียบไว้
+              </Text>
+            </div>
+            <Switch
+              checked={autoPrint}
+              onChange={onChange}
+              checkedChildren="เปิด"
+              unCheckedChildren="ปิด"
+            />
+          </div>
+        </>
+      )}
 
       {autoPrint && !agent?.ok ? (
         <div className="mt-3 bg-amber-50 border border-amber-200 px-3 py-2">

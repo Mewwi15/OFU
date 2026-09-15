@@ -1481,15 +1481,6 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
   const { sale, lines, method, at, customerName, customerTaxId } = data;
   const [cfg] = useReceiptConfig();
 
-  /* ── พิมพ์เองทันทีที่จบบิล ──
-     เจ้าของสั่ง 15 ก.ย. 2026: "กดชำระแล้วปริ้นให้อัตโนมัติเลย ไม่ต้องเลือกเครื่องปริ้น
-     ตอนนี้มันหลาย step"
-     ★ ต้องรอให้วาดเสร็จก่อนสั่งพิมพ์ ★ โลโก้กับฟอนต์บิลโหลดไม่ทันเฟรมแรก ยิงพิมพ์เลย
-     จะได้กระดาษที่หัวบิลหาย · รอ fonts.ready แล้วข้ามไปอีกเฟรมหนึ่งให้ภาพขึ้นจอจริง
-     ★ ยิงครั้งเดียวต่อบิล ★ กัน effect ทำงานซ้ำ (React 18 โหมด strict เรียกสองรอบ)
-     ไม่งั้นบิลเดียวออกกระดาษสองใบ */
-  const printed = useRef(false);
-
   /**
    * พิมพ์บิลใบนี้ — ลองทางที่ดีที่สุดก่อน แล้วค่อยถอย
    *
@@ -1500,6 +1491,7 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
    * ★ รอให้วาดเสร็จก่อนเสมอ ★ ทั้งสองทางอ่านจากสิ่งที่อยู่บนจอ โลโก้กับฟอนต์โหลดไม่ทัน
    * เฟรมแรก ยิงเลยจะได้กระดาษที่หัวบิลหาย
    */
+  const [printedOnce, setPrintedOnce] = useState(false);
   const doPrint = useCallback(async () => {
     try {
       await document.fonts?.ready;
@@ -1510,23 +1502,41 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
 
     const el = document.getElementById('pos-receipt');
     if (el && (await agentStatus(cfg.agentPort)).ok) {
-      if (await printViaAgent(el, cfg.agentPort)) return;
+      if (await printViaAgent(el, cfg.agentPort)) {
+        setPrintedOnce(true);
+        return;
+      }
       /* ตัวกลางรับงานไม่สำเร็จ (กระดาษหมด/เครื่องพิมพ์หลุด) — ยังมีทางเบราว์เซอร์ให้ถอย
          ดีกว่าเงียบไปเฉย ๆ แล้วลูกค้าไม่ได้บิล */
     }
     window.print();
+    setPrintedOnce(true);
   }, [cfg.agentPort]);
 
   /* ── พิมพ์เองทันทีที่จบบิล ──
-     เจ้าของสั่ง 15 ก.ย. 2026: "กดชำระแล้วปริ้นให้อัตโนมัติเลย ไม่ต้องเลือกเครื่องปริ้น
-     ตอนนี้มันหลาย step"
+     เจ้าของสั่ง 15 ก.ย. 2026: "เราต้องกดปุ่มชำระเงินปุ้บบิลจะเด้งเลย"
+
+     ★ มีตัวกลาง = พิมพ์เองเสมอ ไม่ต้องรอสวิตช์ ★ รอบแรกผูกไว้กับสวิตช์ "พิมพ์อัตโนมัติ"
+     แล้วเจ้าของยังต้องกดปุ่มพิมพ์อยู่ดีเพราะสวิตช์ยังปิด — ซึ่งไม่สมเหตุสมผล: คนที่อุตส่าห์
+     ลงตัวกลางที่เครื่องขายก็เพราะอยากให้บิลออกเอง การพิมพ์ทางนี้เงียบสนิทและระบุเครื่อง
+     พิมพ์ไว้แล้ว ไม่มีอะไรให้เสียหาย
+     ★ ไม่มีตัวกลางถึงค่อยดูสวิตช์ ★ ทางเบราว์เซอร์จะเด้งหน้าต่างพิมพ์ใส่ทุกบิล ซึ่งบนมือถือ
+     หรือโน้ตบุ๊กที่เปิดหน้าขายดูเฉย ๆ คือการรบกวน ต้องให้เลือกเอง
      ★ ยิงครั้งเดียวต่อบิล ★ กัน effect ทำงานซ้ำ (React 18 โหมด strict เรียกสองรอบ)
      ไม่งั้นบิลเดียวออกกระดาษสองใบ */
+  const fired = useRef(false);
   useEffect(() => {
-    if (!cfg.autoPrint || printed.current) return;
-    printed.current = true;
-    void doPrint();
-  }, [cfg.autoPrint, doPrint]);
+    if (fired.current) return;
+    fired.current = true;
+    void (async () => {
+      const el = document.getElementById('pos-receipt');
+      if (el && (await agentStatus(cfg.agentPort)).ok) {
+        void doPrint();
+        return;
+      }
+      if (cfg.autoPrint) void doPrint();
+    })();
+  }, [cfg.autoPrint, cfg.agentPort, doPrint]);
 
   return (
     <Modal
@@ -1544,7 +1554,9 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           size="large"
           icon={<RiPrinterLine className="w-[18px] h-[18px]" />}
           onClick={() => void doPrint()}>
-          พิมพ์บิล
+          {/* พิมพ์ไปแล้วรอบหนึ่ง ปุ่มต้องบอกว่ากดแล้วจะได้ "อีกใบ" ไม่ใช่ชวนให้คิดว่ายัง
+              ไม่ได้พิมพ์ (เจ้าของสั่งเอง 15 ก.ย. 2026) — บิลซ้ำเกิดจากความไม่แน่ใจตรงนี้ */}
+          {printedOnce ? 'พิมพ์อีกครั้ง' : 'พิมพ์บิล'}
         </Button>,
         /* ปุ่มหลักคือ "ขายต่อ" ไม่ใช่พิมพ์ — เจ้าของเลิกพิมพ์อัตโนมัติไปตั้งแต่ ส.ค. 2026
            บิลส่วนใหญ่ลูกค้าไม่เอา การจบบิลแล้วรับคนถัดไปคือทางที่เดินบ่อยกว่ามาก */
