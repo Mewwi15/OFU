@@ -117,7 +117,12 @@ def send_raw(printer_name: str, data: bytes) -> None:
         win32print.ClosePrinter(handle)
 
 
-def image_to_escpos(png_bytes: bytes, width_dots: int = DOTS_58MM, cut: bool = False) -> bytes:
+def image_to_escpos(
+    png_bytes: bytes,
+    width_dots: int = DOTS_58MM,
+    cut: bool = False,
+    feed_dots: int = 140,
+) -> bytes:
     """
     แปลงรูปบิลเป็นคำสั่งพิมพ์ภาพของ ESC/POS
 
@@ -164,7 +169,18 @@ def image_to_escpos(png_bytes: bytes, width_dots: int = DOTS_58MM, cut: bool = F
         out += bytes([rows & 0xFF, (rows >> 8) & 0xFF])
         out += band
 
-    out += b'\n\n\n\n'  # เลื่อนกระดาษให้พ้นหัวพิมพ์ จะได้ฉีกได้
+    # ★ ท้ายบิลขาด ★ (เจ้าของเจอกับกระดาษจริง 15 ก.ย. 2026 — สองรอบ)
+    # รอบแรกผมเดาว่าเป็นที่การถ่ายรูปบิลแล้วแก้ผิดจุด · รอบนี้วัดจริงก่อน: ถ่ายรูปได้ครบ
+    # 1553 จาก 1554 จุด และมีหมึกถึงบรรทัดสุดท้าย แปลว่าข้อมูลที่ส่งไปครบทั้งใบแล้ว
+    #
+    # ที่ขาดคือ "ขาดตอนฉีด" ไม่ใช่ขาดตอนพิมพ์ — หัวพิมพ์อยู่ลึกเข้าไปจากใบมีด/ขอบฉีก
+    # ราว 1.5-2 ซม. ตัวหนังสือบรรทัดท้าย ๆ จึงยังค้างอยู่ในเครื่องตอนที่เราฉีกกระดาษ
+    # แล้วโดนฉีกขาดกลางตัว ของเดิมเลื่อนให้แค่ 4 บรรทัด (~12 มม.) ไม่พอ
+    feed = max(0, min(feed_dots, 255))
+    out += b'\x1b2'  # กลับไปใช้ระยะบรรทัดมาตรฐานก่อนเลื่อน
+    if feed:
+        out += b'\x1bJ' + bytes([feed])  # เลื่อนเป็นจำนวนจุดตรง ๆ แม่นกว่านับบรรทัด
+    out += b'\n\n'
     if cut:
         out += b'\x1dV\x42\x00'  # ตัดกระดาษ (เครื่องที่ไม่มีใบมีดจะไม่สนใจคำสั่งนี้)
     return bytes(out)
@@ -179,6 +195,7 @@ class Handler(BaseHTTPRequestHandler):
     printer_name = ''
     paper_dots = DOTS_58MM
     do_cut = False
+    feed_dots = 140
 
     # ปิดบันทึกอัตโนมัติของไลบรารี แล้วพิมพ์เองให้อ่านง่ายกว่า
     def log_message(self, fmt, *args):  # noqa: A003
@@ -235,7 +252,7 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(length)
 
         try:
-            data = image_to_escpos(body, self.paper_dots, self.do_cut)
+            data = image_to_escpos(body, self.paper_dots, self.do_cut, self.feed_dots)
         except Exception as e:  # noqa: BLE001
             self._json(400, {'ok': False, 'error': f'อ่านรูปบิลไม่ได้: {e}'})
             return
@@ -257,6 +274,10 @@ def main() -> int:
     ap.add_argument('--port', type=int, default=9110)
     ap.add_argument('--dots', type=int, default=DOTS_58MM, help='ความกว้างหัวพิมพ์เป็นจุด')
     ap.add_argument('--cut', action='store_true', help='สั่งตัดกระดาษท้ายบิล')
+    # ★ ระยะเลื่อนท้ายบิล ★ ต้องมากพอให้บรรทัดสุดท้ายพ้นขอบฉีก ไม่งั้นฉีกแล้วท้ายบิลขาด
+    # 8 จุด = 1 มม. · 140 จุด ≈ 17 มม. ซึ่งพอสำหรับเครื่อง 58 มม. ทั่วไป
+    # เครื่องที่ขอบฉีกอยู่ไกลกว่านี้ค่อยเพิ่มเอง เสียกระดาษนิดเดียวแลกกับบิลที่ครบใบ
+    ap.add_argument('--feed', type=int, default=140, help='ระยะเลื่อนกระดาษท้ายบิล (จุด)')
     args = ap.parse_args()
 
     names = all_printers()
@@ -276,6 +297,7 @@ def main() -> int:
     Handler.printer_name = target
     Handler.paper_dots = args.dots
     Handler.do_cut = args.cut
+    Handler.feed_dots = args.feed
 
     print('─────────────────────────────────────────────')
     print(' ตัวกลางพิมพ์บิล ร้านอู้ฟู่')
