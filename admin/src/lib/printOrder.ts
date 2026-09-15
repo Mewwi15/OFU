@@ -16,6 +16,7 @@
 import { Modal } from 'antd';
 
 import { productThumb } from './image';
+import { agentStatus } from './printAgent';
 import type { Order, OrderItem } from './orders';
 import { getReceiptConfig } from './receiptConfig';
 
@@ -42,9 +43,24 @@ const MODE_LABEL: Record<Order['shop_mode'], string> = {
  * เดียวกันจึงไหลลงม้วนกระดาษ 48 มม. เป็นสิบเมตรโดยไม่มีอะไรมาห้าม
  * เราดูไม่ได้ว่าเครื่องเปิดโหมดนั้นอยู่ไหม (เบราว์เซอร์ไม่บอก) แต่ "เครื่องนี้เปิดพิมพ์บิล
  * อัตโนมัติ" คือสัญญาณเดียวกันในทางปฏิบัติ — ถามก่อนหนึ่งครั้งดีกว่าเสียกระดาษทั้งม้วน
+ *
+ * ★ มีตัวกลางแล้วไม่ต้องเตือน ★ (เจ้าของเจอกล่องนี้เด้งตอนกดพิมพ์ใบจัดสินค้า 15 ก.ย. 2026
+ * แล้วถามว่าแปลว่าอะไร) ตัวกลางพิมพ์บิลส่งงานเข้าเครื่องพิมพ์ที่ระบุชื่อไว้ตรง ๆ ไม่ได้ใช้
+ * เครื่องพิมพ์หลักของ Windows เลย ใบ A4 จึงไปที่ของมันตามปกติ — คำเตือนนี้กลายเป็นเสียง
+ * รบกวนที่ขวางงานทุกครั้งโดยไม่ได้กันอะไรอีกแล้ว
  */
 export function printHtml(html: string) {
-  if (getReceiptConfig().autoPrint) {
+  void (async () => {
+    const cfg = getReceiptConfig();
+    if (!cfg.autoPrint) {
+      openPrintFrame(html);
+      return;
+    }
+    /* ต่อตัวกลางได้ = การพิมพ์บิลไม่ยุ่งกับเครื่องพิมพ์หลัก ใบ A4 ปลอดภัย ไม่ต้องถาม */
+    if ((await agentStatus(cfg.agentPort)).ok) {
+      openPrintFrame(html);
+      return;
+    }
     Modal.confirm({
       title: 'เครื่องนี้ตั้งพิมพ์บิลอัตโนมัติไว้',
       width: 460,
@@ -54,9 +70,7 @@ export function printHtml(html: string) {
       cancelText: 'ยกเลิก',
       onOk: () => openPrintFrame(html),
     });
-    return;
-  }
-  openPrintFrame(html);
+  })();
 }
 
 function openPrintFrame(html: string) {
