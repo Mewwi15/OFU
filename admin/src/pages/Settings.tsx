@@ -185,6 +185,8 @@ export function Settings() {
           </Form>
         </Card>
 
+        <AutoPrintCard autoPrint={cfg.autoPrint} onChange={(v) => update({ autoPrint: v })} />
+
         {/* ── ขนาดกระดาษ + ทดสอบอุปกรณ์ + รหัสหลังร้าน ─────────────────── */}
         <Space direction="vertical" size={16} className="w-full">
           <BackOfficePinCard />
@@ -294,7 +296,7 @@ export function Settings() {
               <Space direction="vertical" size={10} className="w-full">
                 <Text type="secondary" className="text-xs">
                   วิธีลบ: Supabase Dashboard → Authentication → ค้นอีเมล → Delete user
-                  แล้วกลับมากด "ลบแล้ว" (ต้องทำภายใน 7 วันตามที่แจ้งลูกค้า)
+                  แล้วกลับมากด &quot;ลบแล้ว&quot; (ต้องทำภายใน 7 วันตามที่แจ้งลูกค้า)
                 </Text>
                 {delReqs.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2">
@@ -506,6 +508,85 @@ function ShopSettingsCard({
  * รวมเป็นรายเบอร์ไม่ใช่รายครั้ง — คนเดิมกดสามรอบไม่ได้แปลว่าสามคนมีปัญหา
  * เบอร์ที่ภายหลังส่งได้แล้วจะหลุดออกเอง (ดู failed_otp_phones ใน 0110)
  */
+/**
+ * พิมพ์บิลอัตโนมัติเมื่อจบบิล + วิธีปิดหน้าต่างเลือกเครื่องพิมพ์
+ *
+ * เจ้าของถาม 15 ก.ย. 2026: "มีวิธีไหมครับแบบกดชำระแล้วปริ้นให้อัตโนมัติเลย ไม่ต้องเลือก
+ * เครื่องปริ้น ตอนนี้มันหลาย step"
+ *
+ * ★ เว็บสั่งพิมพ์ตรงไปที่เครื่องพิมพ์เองไม่ได้ ★ เบราว์เซอร์ทุกเจ้ากันไว้ (ไม่งั้นเว็บไหน
+ * ก็พ่นกระดาษใส่เราได้) — ทางที่ Chrome เปิดไว้ให้เครื่องขายหน้าร้านคือธง kiosk-printing
+ * ซึ่งแปลว่า "พิมพ์ไปที่เครื่องพิมพ์หลักเลย ไม่ต้องถาม" · ต้องตั้งที่ตัวเครื่อง เราตั้งให้
+ * จากในเว็บไม่ได้ วิธีทำจึงต้องอยู่ตรงนี้ให้อ่านตอนที่กำลังจะใช้
+ */
+function AutoPrintCard({
+  autoPrint,
+  onChange,
+}: {
+  autoPrint: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const [how, setHow] = useState(false);
+  return (
+    <Card title="พิมพ์บิลอัตโนมัติ" size="small" className="mt-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="text-[14px] text-[#2B2320]">จบบิลแล้วพิมพ์ให้เลย</div>
+          <Text type="secondary" className="text-xs">
+            ไม่ต้องกดปุ่ม “พิมพ์บิล” อีกที
+          </Text>
+        </div>
+        <Switch
+          checked={autoPrint}
+          onChange={onChange}
+          checkedChildren="เปิด"
+          unCheckedChildren="ปิด"
+        />
+      </div>
+
+      {autoPrint ? (
+        <div className="mt-3 bg-amber-50 border border-amber-200 px-3 py-2">
+          <Text className="text-[13px] text-amber-900">
+            เครื่องนี้ยัง<b>เด้งหน้าต่างเลือกเครื่องพิมพ์</b>อยู่ไหม? ถ้าใช่ ต้องเปิด Chrome
+            แบบพิเศษหนึ่งครั้ง แล้วจะพิมพ์เองเงียบ ๆ ทุกบิล
+          </Text>
+          <Button type="link" size="small" className="!px-0" onClick={() => setHow((v) => !v)}>
+            {how ? 'ซ่อนวิธีทำ' : 'ดูวิธีทำ'}
+          </Button>
+          {how ? (
+            <div className="text-[13px] text-[#2B2320] space-y-2 mt-1">
+              <div>
+                <b>1.</b> ตั้งเครื่องพิมพ์ใบเสร็จเป็น <b>เครื่องพิมพ์หลัก</b> ของเครื่องนี้
+                (Windows: ตั้งค่า → อุปกรณ์ → เครื่องพิมพ์ แล้วเอาติ๊ก “ให้ Windows จัดการ” ออก)
+              </div>
+              <div>
+                <b>2.</b> ปิด Chrome ให้หมดทุกหน้าต่าง แล้วเปิดใหม่ด้วยคำสั่งนี้
+                <div className="mt-1 font-mono text-[12px] bg-white border border-[#E8E8E8] px-2 py-1.5 break-all">
+                  chrome.exe --kiosk-printing https://ofu-ivory.vercel.app/pos
+                </div>
+                <Text type="secondary" className="text-xs">
+                  วิธีที่สะดวกกว่า: คลิกขวาที่ไอคอน Chrome → คุณสมบัติ → ช่อง “เป้าหมาย”
+                  เติม <span className="font-mono">--kiosk-printing</span> ต่อท้าย แล้วใช้ไอคอนนั้นเปิดทุกครั้ง
+                </Text>
+              </div>
+              <div>
+                <b>3.</b> กลับมาที่หน้าขาย ลองขายจริงหนึ่งบิล — ต้องมีกระดาษออกมาเองโดยไม่มี
+                หน้าต่างอะไรเด้ง
+              </div>
+              <Text type="secondary" className="text-xs block">
+                เครื่อง Mac ใช้คำสั่ง{' '}
+                <span className="font-mono">
+                  open -a &quot;Google Chrome&quot; --args --kiosk-printing
+                </span>
+              </Text>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 function FailedOtpCard() {
   const [rows, setRows] = useState<FailedOtp[] | null>(null);
 

@@ -30,6 +30,15 @@ export type ReceiptConfig = {
    * ให้ปรับเองแล้วกดพิมพ์ทดสอบจบในสองนาที ดีกว่าไล่แก้โค้ดทีละรอบ
    */
   contentWidthMm: number | null;
+  /**
+   * พิมพ์บิลเองทันทีที่จบบิล — ไม่ต้องกดปุ่มพิมพ์อีกที
+   *
+   * ★ ต้องเปิด Chrome ด้วยโหมด kiosk-printing ถึงจะไม่มีหน้าต่างเลือกเครื่องพิมพ์ ★
+   * ถ้าเปิด Chrome แบบปกติ ตัวเลือกนี้จะแค่เด้งหน้าต่างพิมพ์ให้เอง ยังต้องกดยืนยันอยู่ดี
+   * (เว็บสั่งพิมพ์ตรงไปที่เครื่องพิมพ์เองไม่ได้ เบราว์เซอร์กันไว้ทุกเจ้า — ธงนี้คือทาง
+   * ที่ Chrome เปิดให้สำหรับเครื่องขายหน้าร้านโดยเฉพาะ)
+   */
+  autoPrint: boolean;
 };
 
 const KEY = 'ofu.receiptConfig';
@@ -43,6 +52,8 @@ export const DEFAULT_CONFIG: ReceiptConfig = {
   showBarcode: true,
   cashierName: '',
   contentWidthMm: null,
+  /* ปิดไว้ก่อน — เครื่องที่ยังไม่ได้ตั้ง kiosk-printing จะโดนหน้าต่างพิมพ์เด้งทุกบิล */
+  autoPrint: false,
 };
 
 export function getReceiptConfig(): ReceiptConfig {

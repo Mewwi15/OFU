@@ -59,6 +59,7 @@ import { DRAFT_KEYS, clearDraft, readDraft, writeDraft } from '../lib/draft';
 import { Receipt } from '../components/Receipt';
 import { ReceiptBoundary } from '../components/ReceiptBoundary';
 import { promptpayPayload } from '../lib/promptpay';
+import { useReceiptConfig } from '../lib/receiptConfig';
 
 type Line = {
   variantId: string;
@@ -1477,6 +1478,34 @@ function VariantPicker({
 
 function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopInfo; onClose: () => void }) {
   const { sale, lines, method, at, customerName, customerTaxId } = data;
+  const [cfg] = useReceiptConfig();
+
+  /* ── พิมพ์เองทันทีที่จบบิล ──
+     เจ้าของสั่ง 15 ก.ย. 2026: "กดชำระแล้วปริ้นให้อัตโนมัติเลย ไม่ต้องเลือกเครื่องปริ้น
+     ตอนนี้มันหลาย step"
+     ★ ต้องรอให้วาดเสร็จก่อนสั่งพิมพ์ ★ โลโก้กับฟอนต์บิลโหลดไม่ทันเฟรมแรก ยิงพิมพ์เลย
+     จะได้กระดาษที่หัวบิลหาย · รอ fonts.ready แล้วข้ามไปอีกเฟรมหนึ่งให้ภาพขึ้นจอจริง
+     ★ ยิงครั้งเดียวต่อบิล ★ กัน effect ทำงานซ้ำ (React 18 โหมด strict เรียกสองรอบ)
+     ไม่งั้นบิลเดียวออกกระดาษสองใบ */
+  const printed = useRef(false);
+  useEffect(() => {
+    if (!cfg.autoPrint || printed.current) return;
+    printed.current = true;
+    let alive = true;
+    void (async () => {
+      try {
+        await document.fonts?.ready;
+      } catch {
+        /* เบราว์เซอร์ไม่รองรับก็พิมพ์ไปเลย */
+      }
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 150)));
+      if (alive) window.print();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [cfg.autoPrint]);
+
   return (
     <Modal
       open
