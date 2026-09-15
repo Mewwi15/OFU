@@ -91,7 +91,11 @@ export function Receipt({
       <div
         id="pos-receipt"
         style={{ width: `${cw}mm`, fontSize: `${cfg.fontPx}px` }}
-        className="font-mono text-black leading-snug pt-1 [overflow-wrap:anywhere]">
+        /* ★ ต้องมีที่ว่างท้ายบิลจริง ๆ ★ ไม่ใช่แค่กันพลาด — บรรทัดสุดท้ายที่ชิดขอบกล่อง
+           พอดีคือต้นเหตุที่ "สินค้าซื้อแล้วไม่รับคืน" หายไปตอนถ่ายเป็นรูป (เจ้าของเจอกับ
+           กระดาษจริง 15 ก.ย. 2026) เผื่อไว้สองบรรทัด ใครปัดเศษพลาดก็กินที่ว่างนี้แทน
+           ไม่ใช่กินตัวหนังสือ · เสียกระดาษไม่ถึงครึ่งเซนติเมตร */
+        className="font-mono text-black leading-snug pt-1 pb-[2em] [overflow-wrap:anywhere]">
         <div className="text-center mb-1">
           <img
             src="/logo-oofoo.png"

@@ -44,42 +44,59 @@ export async function agentStatus(port: number, timeoutMs = 1200): Promise<Agent
   }
 }
 
-/** แปลงใบเสร็จบนจอเป็นรูปขาวดำกว้างเท่าหัวพิมพ์ */
+/**
+ * แปลงใบเสร็จบนจอเป็นรูปขาวดำกว้างเท่าหัวพิมพ์
+ *
+ * ★ ต้องยกใบเสร็จออกมาถ่ายข้างนอก ★ (เจ้าของยืนยันกับกระดาษจริง 15 ก.ย. 2026 ว่าบรรทัด
+ * ท้ายสุดหายไปตั้งแต่ในรูป ไม่ใช่หายที่เครื่องพิมพ์) ของจริงบนจอนั่งอยู่ในหน้าต่างของ antd
+ * ซึ่งมีทั้งกล่องที่ตัดขอบและการย่อ/ขยาย (transform) ซ้อนกันหลายชั้น ตัวถ่ายรูปคำนวณ
+ * ขอบล่างพลาดไปราวหนึ่งบรรทัด — ผมไล่ปลดทีละชั้น (เริ่มจากถาดที่เลื่อนดูได้) แล้วยังขาด
+ * เพราะไม่มีทางรู้ว่าวันหน้าจะมีกล่องอะไรมาครอบเพิ่มอีก
+ * โคลนออกมาแปะไว้นอกจอแล้วถ่ายจากตรงนั้น = ไม่มีกล่องแม่ให้คำนวณพลาดตั้งแต่แรก
+ * ปัญหาทั้งตระกูลนี้จบในทีเดียว และของบนจอไม่ถูกแตะเลย ผู้ใช้ไม่เห็นอะไรกระพริบ
+ */
 async function receiptToPng(el: HTMLElement, dots: number): Promise<Blob> {
   const { default: html2canvas } = await import('html2canvas');
-  /* ★ ขยายตอนถ่าย ไม่ใช่ตอนส่ง ★ ใบเสร็จบนจอกว้างราว 150 จุด ถ้าถ่ายเท่าที่เห็นแล้วไป
-     ขยายทีหลัง ตัวหนังสือจะเบลอจนอ่านไม่ออกบนกระดาษ — บอก html2canvas ให้วาดใหม่ที่
-     ความละเอียดปลายทางเลย ตัวอักษรจึงคมเท่าที่เครื่องพิมพ์ทำได้ */
-  const scale = dots / (el.offsetWidth || 1);
-  const canvas = await html2canvas(el, {
-    scale,
-    backgroundColor: '#ffffff',
-    logging: false,
-    useCORS: true,
-    /* ★ ท้ายบิลขาด ★ (เจ้าของเจอกับกระดาษจริง 15 ก.ย. 2026) ใบเสร็จวางอยู่ในถาดที่จำกัด
-       ความสูงไว้ให้เลื่อนดูบนจอ — ตัวถ่ายรูปเคารพการตัดขอบของกล่องแม่ด้วย บิลที่ยาวเกิน
-       ถาดจึงถูกตัดหายตรงที่ตามองไม่เห็นพอดี ยิ่งบิลมีของเยอะยิ่งขาดมาก
-       แก้ในสำเนาที่ใช้ถ่ายเท่านั้น (onclone) ไม่แตะของจริงบนจอ ผู้ใช้จึงไม่เห็นอะไรกระพริบ
-       และถาดบนจอยังเลื่อนดูได้เหมือนเดิม */
-    onclone: (doc) => {
-      doc.querySelectorAll<HTMLElement>('.receipt-tray').forEach((n) => {
-        n.style.maxHeight = 'none';
-        n.style.overflow = 'visible';
-      });
-    },
-  });
-  /* ★ ตรวจว่าถ่ายมาครบใบ ★ บิลที่ขาดท้ายคือของเสียที่ลูกค้าถือกลับบ้าน และไม่มีอะไรฟ้อง
-     เลยถ้าไม่ตรวจ — เทียบความสูงที่ได้กับความสูงจริงของใบเสร็จ ขาดเกิน 10% เมื่อไหร่
-     ถือว่าถ่ายไม่ผ่าน แล้วให้ผู้เรียกถอยไปพิมพ์ผ่านเบราว์เซอร์ซึ่งพิมพ์เต็มใบเสมอ
-     ดีกว่ายื่นบิลครึ่งใบให้ลูกค้าโดยไม่มีใครรู้ */
-  const expected = el.scrollHeight * scale;
-  if (expected > 0 && canvas.height < expected * 0.9) {
-    throw new Error(`ถ่ายใบเสร็จได้ไม่ครบ (${canvas.height}/${Math.round(expected)} จุด)`);
-  }
 
-  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
-  if (!blob) throw new Error('แปลงใบเสร็จเป็นรูปไม่สำเร็จ');
-  return blob;
+  const host = document.createElement('div');
+  /* วางไว้นอกจอ แต่ต้องถูกจัดวางจริง (ห้าม display:none) ไม่งั้นความสูงเป็นศูนย์ */
+  host.style.cssText = 'position:fixed;left:-10000px;top:0;background:#fff;margin:0;padding:0;';
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.style.margin = '0';
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  try {
+    /* ★ ขยายตอนถ่าย ไม่ใช่ตอนส่ง ★ ใบเสร็จบนจอกว้างราว 150 จุด ถ้าถ่ายเท่าที่เห็นแล้วไป
+       ขยายทีหลัง ตัวหนังสือจะเบลอจนอ่านไม่ออกบนกระดาษ — วาดใหม่ที่ความละเอียดปลายทาง
+       เลย ตัวอักษรจึงคมเท่าที่เครื่องพิมพ์ทำได้ */
+    const scale = dots / (clone.offsetWidth || 1);
+    const full = clone.scrollHeight;
+    const canvas = await html2canvas(clone, {
+      scale,
+      backgroundColor: '#ffffff',
+      logging: false,
+      useCORS: true,
+      height: full,
+      windowHeight: full,
+    });
+
+    /* ★ ตรวจว่าถ่ายมาครบใบ ★ บิลที่ขาดท้ายคือของเสียที่ลูกค้าถือกลับบ้าน และไม่มีอะไร
+       ฟ้องเลยถ้าไม่ตรวจ — ขาดเกิน 2% (ราวหนึ่งบรรทัด) ถือว่าไม่ผ่าน แล้วให้ผู้เรียกถอยไป
+       พิมพ์ผ่านเบราว์เซอร์ซึ่งพิมพ์เต็มใบเสมอ
+       ★ เดิมตั้งไว้ 10% ซึ่งหลวมเกินไป ★ บิลหนึ่งใบสูงราว 1,000 จุด บรรทัดท้ายที่หายไป
+       คิดเป็นแค่ 3% จึงรอดด่านนี้ไปได้ทุกครั้ง ทั้งที่เป็นอาการที่เจ้าของเจอจริง */
+    const expected = full * scale;
+    if (expected > 0 && canvas.height < expected * 0.98) {
+      throw new Error(`ถ่ายใบเสร็จได้ไม่ครบ (${canvas.height}/${Math.round(expected)} จุด)`);
+    }
+
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+    if (!blob) throw new Error('แปลงใบเสร็จเป็นรูปไม่สำเร็จ');
+    return blob;
+  } finally {
+    host.remove();
+  }
 }
 
 /**
