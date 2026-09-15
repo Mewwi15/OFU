@@ -156,6 +156,15 @@ def image_to_escpos(
     padded.paste(img, (0, 0))
     img = padded
 
+    # ★ เก็บภาพที่จะพิมพ์ไว้ดูเสมอ ★ เวลาบิลออกมาไม่ครบ คำถามแรกคือ "หายตั้งแต่ฝั่งเว็บ
+    # หรือมาหายที่เครื่องพิมพ์" ซึ่งเดาจากกระดาษอย่างเดียวไม่ได้ (เจ้าของกับผมเสียเวลา
+    # ไล่ผิดจุดไปสองรอบแล้ว 15 ก.ย. 2026) — ไฟล์นี้คือคำตอบ: ถ้าในไฟล์มีครบแต่กระดาษ
+    # ไม่มี แปลว่าปัญหาอยู่ที่เครื่องพิมพ์ ถ้าในไฟล์ก็ไม่มี แปลว่าหายตั้งแต่ตอนถ่ายบิล
+    try:
+        img.save(os.path.join(os.path.dirname(LOG_PATH), 'last-print.png'))
+    except OSError:
+        pass  # เขียนไฟล์ไม่ได้ ห้ามทำให้การพิมพ์พัง
+
     width_bytes = (img.width + 7) // 8
     pixels = img.load()
     out = bytearray(b'\x1b@')  # ล้างค่าเครื่องพิมพ์
@@ -240,6 +249,26 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path.startswith('/last'):
+            # ★ เปิดดูจากเบราว์เซอร์ได้เลย ★ เจ้าของไม่ต้องไปงมหาไฟล์ใน C:\ofu
+            # แค่พิมพ์ 127.0.0.1:9110/last ก็เห็นว่าบิลใบล่าสุดที่ส่งเข้าเครื่องพิมพ์
+            # หน้าตาเป็นยังไง — เทียบกับกระดาษที่ออกมาได้ทันที
+            path = os.path.join(os.path.dirname(LOG_PATH), 'last-print.png')
+            try:
+                with open(path, 'rb') as f:
+                    raw = f.read()
+            except OSError:
+                self._json(404, {'ok': False, 'error': 'ยังไม่เคยพิมพ์บิลจากเครื่องนี้'})
+                return
+            self.send_response(200)
+            self._cors()
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(raw)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+
         if self.path.startswith('/ping'):
             self._json(200, {
                 'ok': True,
@@ -274,7 +303,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {'ok': False, 'error': str(e)})
             return
 
-        log(f'  พิมพ์แล้ว ({len(body)} ไบต์ → {len(data)} ไบต์คำสั่ง)')
+        log(f'  พิมพ์แล้ว · รูป {len(body)} ไบต์ · คำสั่ง {len(data)} ไบต์ '
+            f'· ดูภาพที่พิมพ์จริงได้ที่ last-print.png')
         self._json(200, {'ok': True})
 
 
