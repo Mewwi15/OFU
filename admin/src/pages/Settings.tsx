@@ -230,6 +230,29 @@ export function Settings() {
             <div className="text-xs text-gray-400 mt-1">
               ตัวหนังสือฝั่งขวาโดนตัด = ลดลง · เหลือกระดาษว่างทางขวา = เพิ่มขึ้น (กดพิมพ์ทดสอบดูได้)
             </div>
+
+            {/* ★ ขนาดตัวอักษร = ความยาวบิล ★ เจ้าของสั่งลดลง 15 ก.ย. 2026 เพื่อประหยัด
+                กระดาษ — ทุกบรรทัดในบิลวัดเป็นสัดส่วนของค่านี้ ลดทีเดียวย่อทั้งใบ
+                วางไว้คู่กับความกว้างเพราะเป็นเรื่องเดียวกัน คือบิลกินกระดาษเท่าไหร่ */}
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm shrink-0">ขนาดตัวอักษร</span>
+              <InputNumber
+                min={8}
+                max={14}
+                style={{ width: 110 }}
+                addonAfter="px"
+                value={cfg.fontPx}
+                onChange={(v) => update({ fontPx: typeof v === 'number' ? v : 10 })}
+              />
+              {cfg.fontPx !== 10 ? (
+                <Button size="small" type="link" onClick={() => update({ fontPx: 10 })}>
+                  ค่ามาตรฐาน
+                </Button>
+              ) : null}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              เล็กลง = บิลสั้นลง ประหยัดกระดาษ · เล็กเกินไปลูกค้าอ่านไม่ออกและตัวหนังสือจะติดกัน
+            </div>
           </Card>
 
           {/* ── เบอร์ที่สมัครไม่สำเร็จ ──

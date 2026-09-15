@@ -84,10 +84,14 @@ export function Receipt({
       {/* Page size follows the configured roll; margins 0 (dialog "None" still
           wins, so we tell the user, but this covers kiosk-printing). */}
       <style>{`@page{size:${cfg.paperWidth}mm 210mm;margin:0}`}</style>
+      {/* ★ ขนาดตัวอักษรคุมจากที่เดียว ★ เจ้าของสั่ง 15 ก.ย. 2026 "font ใหญ่ไปด้วยครับ
+          เราลองลดลงมาหน่อยครับเพื่อประหยัดกระดาษ" — ทุกบรรทัดในบิลวัดเป็นสัดส่วนของ
+          ขนาดนี้ (em) ไม่ใช่ตัวเลข px ตายตัว ปรับที่นี่ทีเดียวแล้วบิลย่อ/ขยายทั้งใบพร้อมกัน
+          โดยสัดส่วนหัวบิล/ยอดรวม/ตัวเล็กยังเท่าเดิม ไม่เพี้ยนไปทีละส่วน */}
       <div
         id="pos-receipt"
-        style={{ width: `${cw}mm` }}
-        className="font-mono text-[11px] text-black leading-snug pt-1 [overflow-wrap:anywhere]">
+        style={{ width: `${cw}mm`, fontSize: `${cfg.fontPx}px` }}
+        className="font-mono text-black leading-snug pt-1 [overflow-wrap:anywhere]">
         <div className="text-center mb-1">
           <img
             src="/logo-oofoo.png"
@@ -95,31 +99,31 @@ export function Receipt({
             className="h-8 mx-auto mb-1 object-contain"
             style={{ filter: 'grayscale(1) contrast(1.25)' }}
           />
-          <div className="text-[15px] font-bold leading-tight">{shop.receipt_header || shop.name}</div>
-          {cfg.phone ? <div className="text-[11px]">โทร {cfg.phone}</div> : null}
-          {cfg.address ? <div className="text-[11px]">{cfg.address}</div> : null}
+          <div className="text-[1.36em] font-bold leading-tight">{shop.receipt_header || shop.name}</div>
+          {cfg.phone ? <div className="text-[1em]">โทร {cfg.phone}</div> : null}
+          {cfg.address ? <div className="text-[1em]">{cfg.address}</div> : null}
           {shop.vat_registered && shop.tax_id && (
-            <div className="text-[11px]">
+            <div className="text-[1em]">
               เลขผู้เสียภาษี {shop.tax_id} ({shop.branch_code})
             </div>
           )}
-          <div className="text-[11px] mt-0.5">
+          <div className="text-[1em] mt-0.5">
             {taxInvoiceNo ? 'ใบกำกับภาษี' : 'ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ'}
           </div>
         </div>
 
-        <div className="text-[11px]">เลขที่ {saleNumber}</div>
-        <div className="text-[11px]">{at}</div>
-        {cfg.cashierName ? <div className="text-[11px]">พนักงาน {cfg.cashierName}</div> : null}
-        {taxInvoiceNo && <div className="text-[11px]">เลขใบกำกับ {taxInvoiceNo}</div>}
+        <div className="text-[1em]">เลขที่ {saleNumber}</div>
+        <div className="text-[1em]">{at}</div>
+        {cfg.cashierName ? <div className="text-[1em]">พนักงาน {cfg.cashierName}</div> : null}
+        {taxInvoiceNo && <div className="text-[1em]">เลขใบกำกับ {taxInvoiceNo}</div>}
         {taxInvoiceNo && customerName && (
-          <div className="text-[11px]">
+          <div className="text-[1em]">
             ชื่อผู้ซื้อ {customerName}
             {customerTaxId ? ` เลขผู้เสียภาษี ${customerTaxId}` : ''}
           </div>
         )}
         {offline && (
-          <div className="mt-1 text-[11px] text-center border border-dashed border-black rounded py-0.5">
+          <div className="mt-1 text-[1em] text-center border border-dashed border-black rounded py-0.5">
             บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์
           </div>
         )}
@@ -133,7 +137,7 @@ export function Receipt({
             แบบใหม่: ชื่อเต็มบรรทัดแรก แล้วบรรทัดที่สองเป็น "จำนวน x ราคา ...... รวม"
             ซึ่งเป็นทรงเดียวกับใบเสร็จร้านค้าทั่วไปที่คนไทยอ่านคุ้นอยู่แล้ว
             ตัดบรรทัด "@ ราคา" แยกออกไปด้วย เพราะรวมอยู่ในบรรทัดที่สองแล้ว */}
-        <div className="flex gap-1 text-[10px] font-bold">
+        <div className="flex gap-1 text-[0.91em] font-bold">
           <div className="flex-1">รายการ</div>
           <div className="w-12 text-right">รวม</div>
         </div>
@@ -174,12 +178,12 @@ export function Receipt({
         {cfg.showBarcode && !offline && (
           <div className="mt-3 text-center">
             <Barcode value={saleNumber} />
-            <div className="text-[10px] mt-0.5 tracking-widest">{saleNumber}</div>
+            <div className="text-[0.91em] mt-0.5 tracking-widest">{saleNumber}</div>
           </div>
         )}
 
-        <div className="text-center text-[12px] mt-3 font-bold">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
-        {cfg.footerNote ? <div className="text-center text-[10px] mt-0.5">{cfg.footerNote}</div> : null}
+        <div className="text-center text-[1.09em] mt-3 font-bold">{shop.receipt_footer || 'ขอบคุณที่ใช้บริการ'}</div>
+        {cfg.footerNote ? <div className="text-center text-[0.91em] mt-0.5">{cfg.footerNote}</div> : null}
       </div>
     </>
   );
