@@ -21,9 +21,7 @@ import {
   findCustomerByPhone,
   getOpenShift,
   getShopInfo,
-  listCategories,
   listPosCatalog,
-  type Category,
   type Customer,
   type PosProduct,
   type PosVariant,
@@ -32,7 +30,6 @@ import {
 } from '../lib/api';
 import {
   cacheCatalog,
-  cacheCategories,
   cacheShop,
   dismissFailedSale,
   enqueueSale,
@@ -41,13 +38,11 @@ import {
   isNetworkError,
   queueCount,
   readCachedCatalog,
-  readCachedCategories,
   readCachedShop,
   readFailedQueue,
   retryFailedSale,
 } from '../lib/offline';
 import {
-  Badge,
   Button,
   Card,
   Checkbox,
@@ -56,11 +51,9 @@ import {
   Input,
   InputNumber,
   Modal,
-  Pagination,
   Segmented,
   Space,
   Statistic,
-  Tag,
   type InputRef,
 } from 'antd';
 
@@ -140,22 +133,19 @@ function beep() {
 export function Pos() {
   const [shop, setShop] = useState<ShopInfo | null>(null);
   const [catalog, setCatalog] = useState<PosProduct[]>([]);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [cat, setCat] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
   const [picker, setPicker] = useState<PosProduct | null>(null);
 
   const [lines, setLines] = useState<Line[]>([]);
   const [discount, setDiscount] = useState(0);
   const [discountEditing, setDiscountEditing] = useState<string | null>(null);
-  // Nav ของบิลเป็น "หัวข้อ" สลับมุมมอง (เจ้าของ: ไม่ใช่ปุ่มสั่งการ):
-  // รายการ = แถวสินค้า (มีปุ่มลด/ลบท้ายแถว) · ส่วนลด = แก้ส่วนลดรวมที่เดียว ·
-  // รายละเอียด = สรุปบิลอ่านอย่างเดียว
-  const [billTab, setBillTab] = useState<'items' | 'discount' | 'detail'>('items');
+  /* แถวที่เพิ่งยิงเข้ามา — ไฮไลต์สั้น ๆ ให้ตาจับได้ว่าเมื่อกี้เข้าอันไหน (เจ้าของสั่ง
+     15 ก.ย. 2026 ให้รายการล่าสุดขึ้นก่อน เพราะยิงรัวหลายชิ้นแล้วดูไม่ทันว่าเข้าหรือยัง) */
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const removeLine = (variantId: string) => {
     setLines((prev) => prev.filter((l) => l.variantId !== variantId));
     setDiscountEditing(null);
@@ -245,22 +235,18 @@ export function Pos() {
   useEffect(() => {
     (async () => {
       try {
-        const [s, c, cats] = await Promise.all([getShopInfo(), listPosCatalog(), listCategories()]);
+        const [s, c] = await Promise.all([getShopInfo(), listPosCatalog()]);
         setShop(s);
         cacheShop(s);
         setCatalog(c);
         cacheCatalog(c);
-        setAllCategories(cats);
-        cacheCategories(cats);
       } catch (e) {
         if (isNetworkError(e)) {
-          // offline: fall back to the last cached catalog / shop / categories
+          // offline: fall back to the last cached catalog / shop
           const cc = readCachedCatalog();
           const cs = readCachedShop();
-          const ccats = readCachedCategories();
           if (cc) setCatalog(cc);
           if (cs) setShop(cs);
-          if (ccats) setAllCategories(ccats);
           setOnline(false);
           if (!cc) setError('ออฟไลน์ และยังไม่มีข้อมูลที่แคชไว้ — เชื่อมต่อครั้งแรกออนไลน์ก่อน');
         } else {
@@ -290,63 +276,51 @@ export function Pos() {
     };
   }, [doFlush]);
 
-  // Every category the shop has, not just the ones with products currently in
-  // the catalog — a freshly-created category with nothing assigned to it yet
-  // still shows up as a (0-count) filter pill instead of silently vanishing.
-  const categories = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const p of catalog) {
-      if (!p.category_id) continue;
-      counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
-    }
-    return allCategories.map((c) => ({ id: c.id, name: c.name, count: counts.get(c.id) ?? 0 }));
-  }, [catalog, allCategories]);
-
-  const shown = useMemo(() => {
+  /* ── ค้นหาสินค้า: ขึ้นเฉพาะตอนพิมพ์ ไม่ใช่ตารางสินค้าที่กางค้างไว้ ──
+     ★ เจ้าของสั่งเอาหน้าสินค้าออก 15 ก.ย. 2026 ("ไม่ได้ใช้งานเลย") ★ ของจริงคือยิง
+     บาร์โค้ด ตารางสินค้าที่กางอยู่ตลอดเลยกินพื้นที่ครึ่งจอไปเปล่า ๆ แต่ยังต้องหาด้วยมือได้
+     สำหรับของที่ไม่มีบาร์โค้ด/บาร์โค้ดขาด — จึงเหลือไว้เป็นผลค้นหาที่โผล่เมื่อพิมพ์เท่านั้น
+     ค้นทั้งชื่อ รหัส และบาร์โค้ด (พิมพ์รหัสบางส่วนก็เจอ ไม่ต้องตรงเป๊ะเหมือนตอนยิง) */
+  const SEARCH_LIMIT = 8;
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return catalog.filter((p) => {
-      if (cat && p.category_id !== cat) return false;
-      if (q && !p.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [catalog, cat, query]);
-
-  // Paginate so a big catalog stays readable (bigger cards, fewer per screen)
-  // instead of cramming every product into one long, tiny-thumbnail grid.
-  const PER_PAGE = 12;
-  const totalPages = Math.max(1, Math.ceil(shown.length / PER_PAGE));
-  const paged = useMemo(
-    () => shown.slice((page - 1) * PER_PAGE, page * PER_PAGE),
-    [shown, page],
-  );
-  // Snap back to page 1 when the filter changes...
-  useEffect(() => setPage(1), [cat, query]);
-  // ...and never strand the user past the last page after the set shrinks.
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  const qtyByVariant = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const l of lines) m.set(l.variantId, l.qty);
-    return m;
-  }, [lines]);
+    if (q.length < 2) return [];
+    return catalog
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.variants.some(
+            (v) => v.sku?.toLowerCase().includes(q) || v.barcode?.toLowerCase().includes(q),
+          ),
+      )
+      .slice(0, SEARCH_LIMIT);
+  }, [catalog, query]);
 
   /* ── cart ops ──────────────────────────────────────────────────────────── */
   function addVariant(p: PosProduct, v: PosVariant) {
     setLines((cur) => {
       const i = cur.findIndex((l) => l.variantId === v.id);
-      if (i >= 0) {
-        const next = [...cur];
-        next[i] = { ...next[i], qty: next[i].qty + 1 };
-        return next;
-      }
-      return [
-        ...cur,
-        { variantId: v.id, name: p.name, size: v.size, unitPrice: v.price, qty: 1,
-        lineDiscount: 0, image: p.image },
-      ];
+      /* ★ ยิงซ้ำ = ย้ายมาท้ายแถว ไม่ใช่บวกอยู่กับที่ ★ หน้าจอเรียงกลับด้าน (ท้ายสุด =
+         บนสุด) ของที่เพิ่งยิงจึงเด้งขึ้นไปอยู่บนเสมอ แม้เป็นชิ้นที่ยิงไปแล้วเมื่อสิบรายการก่อน
+         — ถ้าบวกอยู่กับที่ แคชเชียร์จะไม่เห็นว่ามันเข้า แล้วยิงซ้ำอีกจนจำนวนเกิน
+         ลำดับในอาเรย์ยังเป็นลำดับเวลาอยู่ ใบเสร็จจึงพิมพ์เรียงตามที่ยิงจริงเหมือนเดิม */
+      const line =
+        i >= 0
+          ? { ...cur[i], qty: cur[i].qty + 1 }
+          : {
+              variantId: v.id,
+              name: p.name,
+              size: v.size,
+              unitPrice: v.price,
+              qty: 1,
+              lineDiscount: 0,
+              image: p.image,
+            };
+      return [...cur.filter((l) => l.variantId !== v.id), line];
     });
+    setFlashId(v.id);
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashId(null), 1200);
   }
   function pick(p: PosProduct) {
     const avail = p.variants;
@@ -441,8 +415,17 @@ export function Pos() {
 
   function onSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return;
-    // In the search box a match is a scan; a miss stays as a text filter.
-    if (scan(query, false)) setQuery('');
+    // In the search box a match is a scan; a miss falls through to the search hits.
+    if (scan(query, false)) {
+      setQuery('');
+      return;
+    }
+    /* พิมพ์ชื่อแล้วกด Enter = เอาตัวแรกที่เจอ — ของที่ไม่มีบาร์โค้ดต้องขายได้เร็วพอ ๆ กับ
+       ของที่ยิงได้ ไม่ใช่ต้องละมือจากแป้นไปคลิก */
+    if (matches.length) {
+      pick(matches[0]);
+      setQuery('');
+    }
   }
 
   // Global keyboard-wedge capture: works even when the search box isn't focused,
@@ -554,7 +537,6 @@ export function Pos() {
     setCustName(d.custName ?? '');
     setCustTaxId(d.custTaxId ?? '');
     draftReady.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* เขียนร่างหลังโหลดของเก่าเสร็จแล้วเท่านั้น — ไม่งั้นสถานะว่าง ๆ ตอนเพิ่งเปิดหน้าจะไป
@@ -727,7 +709,10 @@ export function Pos() {
   return (
     <div className="-m-4 lg:-m-7 p-4 lg:p-6 bg-white min-h-[calc(100vh-4rem)]">
       <div className="lg:grid lg:grid-cols-[1fr_26rem] lg:h-[calc(100vh-6.5rem)]">
-        {/* ── left: search + categories + grid ────────────────────────────── */}
+        {/* ── ซ้าย: ช่องยิงบาร์โค้ด + รายการที่ยิงแล้ว ───────────────────────
+            เดิมครึ่งนี้เป็นตารางสินค้าให้กดเลือก เจ้าของสั่งเอาออกทั้งหมด 15 ก.ย. 2026
+            ("หน้าสินค้าที่โชว์อยู่มันไม่ได้ใช้งานเลย") — พื้นที่ทั้งหมดยกให้สิ่งที่ใช้จริง
+            คือช่องยิงกับรายการที่ยิงเข้ามา */}
         <div className="relative flex flex-col min-h-0 lg:pr-5">
           {/* Sales that already happened (cash/goods changed hands, a
               provisional receipt printed) but failed to sync for a real
@@ -767,156 +752,218 @@ export function Pos() {
             </div>
           )}
 
-          <Input
-            ref={searchRef}
-            autoFocus
-            size="large"
-            allowClear
-            // No browser autofill: Chrome remembered old scans and its suggestion
-            // popup swallowed the scan's Enter (picking a stale code).
-            autoComplete="off"
-            data-flight-log="true"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKey}
-            placeholder="ยิงบาร์โค้ด/QR หรือค้นหาสินค้า…"
-            prefix={<RiSearchLine className="w-5 h-5 text-tremor-content-subtle mr-1" />}
-            suffix={
-              <Tag
-                variant="filled"
-                icon={<RiQrScanLine className="w-3.5 h-3.5" />}
-                className="!m-0 !inline-flex !items-center !gap-1 !text-[11px] !bg-[#F5F5F5] !text-tremor-content">
-                พร้อมยิง
-              </Tag>
-            }
-            className="mb-4"
-            style={{ borderRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-          />
+          {/* ── ช่องยิงบาร์โค้ด ──
+              ★ ใหญ่จนไม่ต้องหา ★ เจ้าของสั่ง "มีบาร์สแกนบาร์โค้ดใหญ่ๆ" — เป็นทางเข้าเดียว
+              ของหน้านี้แล้ว (ตารางสินค้าถูกเอาออก) จึงต้องเห็นชัดว่าเคอร์เซอร์อยู่ตรงนี้
+              และยิงได้ทันทีโดยไม่ต้องคลิกก่อน */}
+          <div className="relative shrink-0">
+            <Input
+              ref={searchRef}
+              autoFocus
+              size="large"
+              allowClear
+              // No browser autofill: Chrome remembered old scans and its suggestion
+              // popup swallowed the scan's Enter (picking a stale code).
+              autoComplete="off"
+              data-flight-log="true"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKey}
+              placeholder="ยิงบาร์โค้ดที่นี่ หรือพิมพ์ชื่อสินค้า"
+              prefix={<RiQrScanLine className="w-7 h-7 text-tremor-brand mr-2" />}
+              suffix={
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1">
+                  {/* จุดกะพริบ = เครื่องยิงยิงเข้าช่องนี้ได้เลย ไม่ต้องคลิกก่อน */}
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  พร้อมยิง
+                </span>
+              }
+              style={{ borderRadius: 0, height: 72, borderWidth: 2 }}
+              styles={{ input: { fontSize: 20, fontWeight: 500 } }}
+            />
 
-          <div className="flex flex-wrap gap-2 mb-4 pb-4 shrink-0 border-b-2 border-[#D9D9D9]">
-            <Pill active={cat === null} onClick={() => setCat(null)} count={catalog.length}>
-              ทั้งหมด
-            </Pill>
-            {categories.map((c) => (
-              <Pill key={c.id} active={cat === c.id} onClick={() => setCat(c.id)} count={c.count}>
-                {c.name}
-              </Pill>
-            ))}
-          </div>
-
-          {/* Flexible grid: every card keeps a min width and columns auto-fill
-              to the container — cards never squish as the catalog grows; the
-              page size (not the column count) caps how many show at once. */}
-          <div
-            className="grid gap-3 lg:overflow-y-auto lg:flex-1 pr-1 pb-28 lg:pb-2 content-start"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
-            {paged.map((p) => {
-              const price = p.variants[0]?.price ?? 0;
-              const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
-              const single = p.variants.length === 1 ? p.variants[0] : null;
-              const inCart = single
-                ? qtyByVariant.get(single.id) ?? 0
-                : p.variants.reduce((s, v) => s + (qtyByVariant.get(v.id) ?? 0), 0);
-              const oos = stock <= 0;
-              return (
-                <Card
-                  key={p.id}
-                  hoverable={!oos}
-                  onClick={() => !oos && pick(p)}
-                  styles={{ body: { padding: '12px 14px 14px' } }}
-                  style={{
-                    overflow: 'hidden',
-                    cursor: oos ? 'not-allowed' : 'pointer',
-                    opacity: oos ? 0.55 : 1,
-                    borderColor: inCart > 0 ? '#5B8C6E' : '#E8E8E8',
-                  }}
-                  cover={
-                    // Native aspect-ratio (not Tailwind's aspect-square, which
-                    // wasn't producing height in prod — the box collapsed and
-                    // object-cover cropped the photo to a thin strip).
-                    <div className="relative bg-[#FAFAFA] overflow-hidden">
-                      {p.image ? (
-                        // The <img> is a square in normal flow: object-cover crops
-                        // the photo and aspect-ratio keeps the box square without
-                        // relying on the parent (Tailwind's aspect-square collapsed
-                        // in prod, leaving only a thin strip of the product).
-                        <img
-                          src={p.image}
-                          alt={p.name}
-                          className="block w-full object-cover"
-                          style={{ aspectRatio: '1 / 1' }}
-                        />
-                      ) : (
-                        // No photo yet: a per-product initial in a soft brand
-                        // circle reads as "designed" and gives each card its own
-                        // identity — a repeated generic icon on every card made
-                        // the whole grid look identical/unfinished.
-                        <div className="grid place-items-center" style={{ aspectRatio: '1 / 1' }}>
-                          <div className="w-16 h-16 rounded-full grid place-items-center" style={{ background: '#EDF3EF' }}>
-                            <span className="text-2xl font-bold" style={{ color: '#3F6B52' }}>
-                              {p.name.trim().charAt(0)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      {inCart > 0 && (
-                        <Badge
-                          count={inCart}
-                          color="#5B8C6E"
-                          style={{ position: 'absolute', top: 8, insetInlineEnd: 8, boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
-                        />
-                      )}
-                      {oos && (
-                        <Tag color="default" className="!absolute !top-2 !left-2 !m-0 !bg-black/65 !text-white !border-0">
-                          สต็อกหมด
-                        </Tag>
-                      )}
-                    </div>
-                  }>
-                  <div className="text-[15px] font-semibold text-tremor-content-strong leading-snug line-clamp-1">
-                    {p.name}
+            {/* ผลค้นหา — ลอยทับรายการ ไม่ดันของข้างล่างให้ขยับตอนพิมพ์ */}
+            {query.trim().length >= 2 && (
+              <div className="absolute inset-x-0 top-[74px] z-30 bg-white border-2 border-[#D9D9D9] shadow-lg max-h-[52vh] overflow-y-auto">
+                {matches.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-tremor-content">
+                    ไม่พบสินค้าชื่อหรือรหัสนี้
                   </div>
-                  <div className="text-xs text-tremor-content mt-0.5 line-clamp-1 min-h-[1rem]">
-                    {p.subtitle ?? p.category_name ?? ''}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[17px] font-bold text-tremor-content-strong tabular-nums">
-                      {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
-                    </span>
-                    <Button
-                      type="primary"
-                      shape="circle"
-                      size="middle"
-                      disabled={oos}
-                      icon={<RiAddLine className="w-[18px] h-[18px]" />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!oos) pick(p);
-                      }}
-                    />
-                  </div>
-                </Card>
-              );
-            })}
-            {shown.length === 0 && (
-              <div className="col-span-full py-12">
-                <Empty description="ไม่พบสินค้า" />
+                ) : (
+                  matches.map((p) => {
+                    const stock = p.variants.reduce((s, v) => s + v.stock_qty, 0);
+                    const price = p.variants[0]?.price ?? 0;
+                    const oos = stock <= 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={oos}
+                        onClick={() => {
+                          pick(p);
+                          setQuery('');
+                          searchRef.current?.focus();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 border-b border-[#F0F0F0] last:border-0 text-left hover:bg-[#FFF8F3] disabled:opacity-45 disabled:hover:bg-white transition">
+                        <RiSearchLine className="w-4 h-4 text-tremor-content-subtle shrink-0" />
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[16px] font-semibold text-tremor-content-strong truncate">
+                            {p.name}
+                          </span>
+                          <span className="block text-[13px] text-tremor-content">
+                            {p.variants.length > 1 ? `${p.variants.length} ขนาด · ` : ''}
+                            คงเหลือ {stock}
+                          </span>
+                        </span>
+                        <span className="text-[17px] font-bold tabular-nums text-tremor-content-strong shrink-0">
+                          {p.variants.length > 1 ? `${baht(price)}+` : baht(price)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             )}
           </div>
 
-          {shown.length > PER_PAGE && (
-            <div className="flex justify-center py-2 shrink-0">
-              <Pagination
-                current={page}
-                total={shown.length}
-                pageSize={PER_PAGE}
-                onChange={setPage}
-                showSizeChanger={false}
-                size="small"
-              />
+          {/* ── หัวรายการ ── */}
+          <div className="flex items-center justify-between mt-5 mb-2 pb-2 shrink-0 border-b-2 border-[#D9D9D9]">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[16px] font-semibold text-tremor-content-strong">รายการในบิล</span>
+              {lines.length > 0 && (
+                <span className="text-[14px] text-tremor-content tabular-nums">
+                  {lines.reduce((s, l) => s + l.qty, 0)} ชิ้น
+                </span>
+              )}
             </div>
-          )}
+            {lines.length > 0 && (
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<RiDeleteBin6Line className="w-3.5 h-3.5" />}
+                onClick={resetSale}>
+                ล้างบิล
+              </Button>
+            )}
+          </div>
+
+          {/* ── รายการที่ยิงแล้ว — ล่าสุดอยู่บนสุด ──
+              ★ เรียงกลับด้านตอนแสดง ★ เจ้าของสั่ง "ให้รายการที่ยิงล่าสุดขึ้นก่อน" เพราะยิง
+              รัว ๆ หลายสิบชิ้นแล้วของใหม่ไปต่อท้ายใต้จอ ต้องเลื่อนลงไปดูทุกครั้งว่าเข้าไหม
+              เก็บในอาเรย์ตามลำดับเวลาเหมือนเดิม (ใบเสร็จพิมพ์ตามที่ยิงจริง) พลิกแค่ตอนแสดง */}
+          <div className="flex-1 overflow-y-auto pb-28 lg:pb-2 border border-[#F0F0F0] border-t-0">
+            {lines.length === 0 ? (
+              <div className="h-full grid place-items-center py-16">
+                <Empty
+                  image={<RiQrScanLine className="w-14 h-14 text-[#D9D9D9] mx-auto" />}
+                  styles={{ image: { height: 56 } }}
+                  description={
+                    <span className="text-tremor-content-subtle text-[15px]">
+                      ยิงบาร์โค้ดสินค้าเพื่อเริ่มบิล
+                    </span>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="divide-y divide-[#F0F0F0]">
+                {[...lines].reverse().map((l) => {
+                  const fresh = flashId === l.variantId;
+                  return (
+                    <div
+                      key={l.variantId}
+                      className={`px-4 py-3.5 transition-colors duration-300 ${
+                        fresh ? 'bg-emerald-50' : 'hover:bg-[#FAFAFA]'
+                      }`}>
+                      <div className="flex items-start gap-3">
+                        <div className="w-14 h-14 overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
+                          {l.image ? (
+                            <img src={l.image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <RiShoppingBasket2Line className="w-6 h-6 text-tremor-brand-subtle" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <span className="flex-1 text-[17px] font-semibold text-tremor-content-strong leading-snug">
+                              {l.name}
+                              {l.size ? ` (${l.size})` : ''}
+                            </span>
+                            {fresh && (
+                              <span className="shrink-0 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5">
+                                ล่าสุด
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[14px] text-tremor-content mt-0.5 tabular-nums">
+                            {baht(l.unitPrice)} / หน่วย
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="block text-[21px] font-extrabold text-tremor-content-strong tabular-nums leading-tight">
+                            {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
+                          </span>
+                          {l.lineDiscount > 0 ? (
+                            <span className="block text-[13px] font-semibold text-red-600 tabular-nums">
+                              ลด −{baht(l.lineDiscount)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-2.5 pl-[68px]">
+                        <QtyStepper big qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))
+                            }
+                            className={`h-10 px-4 text-[14px] font-semibold border transition ${
+                              l.lineDiscount > 0 || discountEditing === l.variantId
+                                ? 'border-red-300 bg-red-50 text-red-600'
+                                : 'border-[#E8E8E8] text-[#6E625C] hover:bg-[#FFF3EC] hover:text-tremor-brand-emphasis'
+                            }`}>
+                            ลด
+                          </button>
+                          <button
+                            type="button"
+                            title="ลบรายการนี้"
+                            onClick={() => removeLine(l.variantId)}
+                            className="h-10 w-11 grid place-items-center border border-[#E8E8E8] text-[#6E625C] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition">
+                            <RiDeleteBin6Line className="w-[18px] h-[18px]" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {discountEditing === l.variantId ? (
+                        <div className="flex items-center justify-end gap-2 mt-2.5 pl-[68px]">
+                          <span className="text-[14px] text-tremor-content">ส่วนลดรายการนี้</span>
+                          <InputNumber
+                            min={0}
+                            max={l.unitPrice * l.qty}
+                            precision={0}
+                            controls={false}
+                            inputMode="numeric"
+                            autoFocus
+                            formatter={moneyFormatter}
+                            parser={moneyParser}
+                            onKeyDown={digitsOnlyKeyDown}
+                            placeholder="฿ 0"
+                            value={l.lineDiscount || null}
+                            onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
+                            onPressEnter={() => setDiscountEditing(null)}
+                            style={{ width: 120 }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
 
           {/* scan feedback — floats above the grid, never covers search/categories */}
           {scanMsg && (
@@ -948,47 +995,15 @@ export function Pos() {
           className={`flex flex-col min-h-0 bg-white shadow-sm rounded-none lg:rounded-none lg:shadow-none lg:border-l-2 lg:border-[#D9D9D9] lg:pl-5 fixed inset-y-0 right-0 z-40 w-full max-w-md transition-transform duration-300 lg:static lg:z-auto lg:w-auto lg:max-w-none ${
             cartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
           }`}>
-          <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border">
-            <div className="flex items-center gap-2">
-              <span className="text-[15px] font-semibold text-tremor-content-strong">บิลปัจจุบัน</span>
-              {lines.length > 0 && (
-                <span className="min-w-[22px] h-[22px] px-1.5 grid place-items-center rounded-none bg-tremor-brand-faint text-tremor-brand-emphasis text-xs font-bold">
-                  {lines.reduce((s, l) => s + l.qty, 0)}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {lines.length > 0 && (
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<RiDeleteBin6Line className="w-3.5 h-3.5" />}
-                  onClick={resetSale}>
-                  ล้างบิล
-                </Button>
-              )}
-              <Button
-                type="text"
-                shape="circle"
-                className="lg:hidden"
-                icon={<RiCloseLine className="w-5 h-5" />}
-                onClick={() => setCartOpen(false)}
-              />
-            </div>
-          </div>
-
-          {/* Nav หัวข้อของบิล — รายการ / ส่วนลด / รายละเอียด */}
-          <div className="px-3 pt-2.5 pb-2 border-b border-tremor-border bg-[#FAFAFA]">
-            <Segmented
-              block
-              value={billTab}
-              onChange={(v) => setBillTab(v as 'items' | 'discount' | 'detail')}
-              options={[
-                { value: 'items', label: 'รายการ' },
-                { value: 'discount', label: 'ส่วนลด' },
-                { value: 'detail', label: 'รายละเอียด' },
-              ]}
+          {/* หัวแผงชำระเงิน — ปุ่มปิดมีไว้สำหรับจอเล็กที่แผงนี้เป็นลิ้นชัก */}
+          <div className="px-5 py-4 flex items-center justify-between border-b border-tremor-border shrink-0">
+            <span className="text-[16px] font-semibold text-tremor-content-strong">ชำระเงิน</span>
+            <Button
+              type="text"
+              shape="circle"
+              className="lg:hidden"
+              icon={<RiCloseLine className="w-5 h-5" />}
+              onClick={() => setCartOpen(false)}
             />
           </div>
 
@@ -996,188 +1011,8 @@ export function Pos() {
             <div className="mx-4 mt-3 rounded-none bg-red-50 text-red-700 text-sm px-3 py-2">{error}</div>
           )}
 
-          <div className="flex-1 overflow-y-auto px-2">
-            {lines.length === 0 ? (
-              <div className="h-full grid place-items-center">
-                <Empty
-                  image={<RiShoppingBasket2Line className="w-12 h-12 text-[#D9D9D9] mx-auto" />}
-                  styles={{ image: { height: 48 } }}
-                  description={<span className="text-tremor-content-subtle">เลือกสินค้าเพื่อเริ่มบิล</span>}
-                />
-              </div>
-            ) : (
-              <>
-              {billTab === 'items' ? (
-              <div className="divide-y divide-[#F0F0F0]">
-                {lines.map((l) => (
-                  <React.Fragment key={l.variantId}>
-                  <div className="px-3 py-3 hover:bg-[#FAFAFA]">
-                    {/* ชั้นบน: รูป · ชื่อ+ราคาต่อหน่วย · ยอดบรรทัด */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="w-10 h-10 overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
-                        {l.image ? (
-                          <img src={l.image} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[15px] font-medium text-tremor-content-strong leading-snug line-clamp-2">
-                          {l.name}{l.size ? ` (${l.size})` : ''}
-                        </div>
-                        <div className="text-[13px] text-tremor-content mt-0.5">
-                          {baht(l.unitPrice)} / หน่วย
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="block text-[16px] font-bold text-tremor-content-strong tabular-nums">
-                          {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
-                        </span>
-                        {l.lineDiscount > 0 ? (
-                          <span className="block text-[12px] font-semibold text-red-600 tabular-nums">
-                            ลด −{baht(l.lineDiscount)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                    {/* ชั้นล่าง: จำนวน · ลด/ลบ */}
-                    <div className="flex items-center justify-between mt-2 pl-[50px]">
-                      <QtyStepper qty={l.qty} onChange={(qty) => setQty(l.variantId, qty)} />
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setDiscountEditing((cur) => (cur === l.variantId ? null : l.variantId))}
-                          className={`h-8 px-3 text-[13px] font-semibold border transition ${
-                            l.lineDiscount > 0 || discountEditing === l.variantId
-                              ? 'border-red-300 bg-red-50 text-red-600'
-                              : 'border-[#E8E8E8] text-[#6E625C] hover:bg-[#FFF3EC] hover:text-tremor-brand-emphasis'
-                          }`}>
-                          ลด
-                        </button>
-                        <button
-                          type="button"
-                          title="ลบรายการนี้"
-                          onClick={() => removeLine(l.variantId)}
-                          className="h-8 w-9 grid place-items-center border border-[#E8E8E8] text-[#6E625C] hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition">
-                          <RiDeleteBin6Line className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                    {discountEditing === l.variantId ? (
-                      <div className="flex items-center justify-end gap-2 mt-2 pl-[50px]">
-                        <span className="text-[13px] text-tremor-content">ส่วนลดรายการนี้</span>
-                        <InputNumber
-                          size="small"
-                          min={0}
-                          max={l.unitPrice * l.qty}
-                          precision={0}
-                          controls={false}
-                          inputMode="numeric"
-                          autoFocus
-                          placeholder="฿ 0"
-                          value={l.lineDiscount || null}
-                          onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
-                          onPressEnter={() => setDiscountEditing(null)}
-                          style={{ width: 100 }}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                  </React.Fragment>
-                ))}
-              </div>
-              ) : null}
-
-              {billTab === 'discount' ? (
-                <div className="px-3 py-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[14.5px] font-semibold text-tremor-content-strong">ส่วนลดทั้งบิล</span>
-                    <InputNumber
-                      min={0}
-                      max={subtotal}
-                      precision={0}
-                      controls={false}
-                      inputMode="numeric"
-                      formatter={moneyFormatter}
-                      parser={moneyParser}
-                      onKeyDown={digitsOnlyKeyDown}
-                      placeholder="฿ 0"
-                      value={discount || null}
-                      onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
-                      style={{ width: 120 }}
-                    />
-                  </div>
-                  <div className="border-t border-tremor-border pt-2">
-                    <div className="text-[13px] text-tremor-content mb-1.5">ส่วนลดรายสินค้า</div>
-                    <div className="space-y-2">
-                      {lines.map((l) => (
-                        <div key={l.variantId} className="flex items-center justify-between gap-2">
-                          <span className="text-[14px] text-tremor-content-strong truncate flex-1">
-                            {l.name}{l.size ? ` (${l.size})` : ''}
-                          </span>
-                          <InputNumber
-                            size="small"
-                            min={0}
-                            max={l.unitPrice * l.qty}
-                            precision={0}
-                            controls={false}
-                            inputMode="numeric"
-                            placeholder="฿ 0"
-                            value={l.lineDiscount || null}
-                            onChange={(v) => setLineDiscount(l.variantId, Math.max(0, Number(v) || 0))}
-                            style={{ width: 90 }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {lineDiscountTotal + discount > 0 ? (
-                    <div className="flex items-center justify-between border-t border-tremor-border pt-2 text-red-600">
-                      <span className="font-semibold">รวมส่วนลดทั้งหมด</span>
-                      <span className="font-bold tabular-nums">−{baht(lineDiscountTotal + discount)}</span>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {billTab === 'detail' ? (
-                <div className="px-3 py-3 space-y-2 text-[13.5px]">
-                  {lines.map((l) => {
-                    const net = Math.max(0, l.unitPrice * l.qty - l.lineDiscount);
-                    return (
-                      <div key={l.variantId} className="border-b border-[#F0F0F0] pb-2">
-                        <div className="font-semibold text-tremor-content-strong text-[14.5px]">
-                          {l.name}{l.size ? ` (${l.size})` : ''}
-                        </div>
-                        <div className="flex justify-between text-tremor-content">
-                          <span>{baht(l.unitPrice)} × {l.qty}</span>
-                          <span className="tabular-nums font-semibold text-tremor-content-strong">{baht(net)}</span>
-                        </div>
-                        {l.lineDiscount > 0 ? (
-                          <div className="flex justify-between text-red-600 text-[12.5px]">
-                            <span>ส่วนลดรายการ</span><span className="tabular-nums">−{baht(l.lineDiscount)}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                  <div className="space-y-1 pt-1">
-                    <div className="flex justify-between"><span className="text-tremor-content">ยอดรวม</span><span className="tabular-nums font-semibold">{baht(subtotal)}</span></div>
-                    {lineDiscountTotal > 0 ? <div className="flex justify-between text-red-600"><span>ส่วนลดรายสินค้า</span><span className="tabular-nums font-semibold">−{baht(lineDiscountTotal)}</span></div> : null}
-                    {discount > 0 ? <div className="flex justify-between text-red-600"><span>ส่วนลดทั้งบิล</span><span className="tabular-nums font-semibold">−{baht(discount)}</span></div> : null}
-                    <div className="flex justify-between border-t border-tremor-border pt-1.5">
-                      <span className="font-bold text-tremor-content-strong text-[15px]">ยอดสุทธิ</span>
-                      <span className="tabular-nums font-extrabold text-tremor-content-strong text-[17px]">{baht(total)}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              </>
-            )}
-          </div>
-
-          {/* totals + pay */}
-          <div className="border-t border-tremor-border p-4 space-y-3">
+          {/* ยอด + วิธีจ่าย — เลื่อนได้ ส่วนปุ่มชำระเงินตรึงไว้ข้างล่างเสมอ */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             <Card size="small" style={{ background: '#FFF8F3', borderColor: '#F3D9CB' }} styles={{ body: { padding: 14 } }}>
               <Row label="ยอดรวม" value={baht(subtotal)} />
               {lineDiscountTotal > 0 ? (
@@ -1304,7 +1139,11 @@ export function Pos() {
                 />
               </div>
             )}
+          </div>
 
+          {/* ★ ปุ่มจบบิลต้องอยู่ที่เดิมเสมอ ★ ตรึงไว้นอกส่วนที่เลื่อน — ไม่งั้นจอสั้น ๆ
+              (โน้ตบุ๊กที่เคาน์เตอร์) ต้องเลื่อนลงไปหาปุ่มทุกบิล */}
+          <div className="border-t border-tremor-border p-4 shrink-0">
             <Button
               type="primary"
               block
@@ -1330,7 +1169,7 @@ export function Pos() {
         </div>
       </div>
 
-      {/* mobile: open-cart bar */}
+      {/* จอเล็ก: แถบเปิดแผงชำระเงิน (รายการอยู่บนหน้าหลักแล้ว ไม่ต้องเปิดดู) */}
       {lines.length > 0 && !cartOpen && (
         <button
           onClick={() => setCartOpen(true)}
@@ -1339,7 +1178,7 @@ export function Pos() {
             <span className="grid place-items-center min-w-[1.5rem] h-6 px-1.5 rounded-none bg-white/25 text-xs font-bold">
               {lines.reduce((s, l) => s + l.qty, 0)}
             </span>
-            ดูบิล
+            ชำระเงิน
           </span>
           <span className="font-bold">{baht(total)}</span>
         </button>
@@ -1421,54 +1260,41 @@ function Row({ label, value, subtle }: { label: string; value: string; subtle?: 
   );
 }
 
-function Pill({
-  active,
-  onClick,
-  count,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <Button onClick={onClick} type={active ? 'primary' : 'default'} style={{ fontWeight: 500 }}>
-      {children}
-      {count != null && (
-        <Badge
-          count={count}
-          showZero
-          overflowCount={999}
-          color={active ? 'rgba(255,255,255,0.28)' : '#F0F0F0'}
-          style={{ color: active ? '#fff' : '#8C8C8C', marginInlineStart: 6, fontWeight: 600, boxShadow: 'none' }}
-        />
-      )}
-    </Button>
-  );
-}
-
 /** Quantity stepper for a cart line: one bordered group instead of two loose
  * circular buttons — reads as a single control, not two unrelated actions. */
-function QtyStepper({ qty, onChange }: { qty: number; onChange: (qty: number) => void }) {
+function QtyStepper({
+  qty,
+  onChange,
+  big,
+}: {
+  qty: number;
+  onChange: (qty: number) => void;
+  /** ขนาดใหญ่สำหรับรายการในบิล — กดด้วยนิ้วบนจอสัมผัสที่เคาน์เตอร์ได้ ไม่ต้องเล็งเมาส์ */
+  big?: boolean;
+}) {
+  const box = big ? 'w-10 h-10' : 'w-7 h-7';
+  const icon = big ? 'w-[18px] h-[18px]' : 'w-3.5 h-3.5';
   return (
     <div className="inline-flex items-center border border-[#E8E8E8] shrink-0">
       <button
         type="button"
         onClick={() => onChange(qty - 1)}
         aria-label="ลดจำนวน"
-        className="w-7 h-7 grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition">
-        <RiSubtractLine className="w-3.5 h-3.5" />
+        className={`${box} grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition`}>
+        <RiSubtractLine className={icon} />
       </button>
-      <span className="w-7 text-center text-sm font-semibold text-tremor-content-strong border-x border-[#E8E8E8]">
+      <span
+        className={`text-center font-semibold text-tremor-content-strong border-x border-[#E8E8E8] tabular-nums ${
+          big ? 'w-12 text-[17px] leading-10' : 'w-7 text-sm'
+        }`}>
         {qty}
       </span>
       <button
         type="button"
         onClick={() => onChange(qty + 1)}
         aria-label="เพิ่มจำนวน"
-        className="w-7 h-7 grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition">
-        <RiAddLine className="w-3.5 h-3.5" />
+        className={`${box} grid place-items-center text-[#6E625C] hover:bg-[#F5F5F5] active:bg-[#EDEDED] transition`}>
+        <RiAddLine className={icon} />
       </button>
     </div>
   );
