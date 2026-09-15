@@ -1439,7 +1439,11 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
     <Modal
       open
       onCancel={onClose}
-      width={340}
+      /* ★ กว้างพอให้เงินทอนอ่านจากระยะยืน ★ เจ้าของสั่ง 15 ก.ย. 2026 "หน้า modal ต้องใหญ่
+         กว่านี้ครับ" — ของเดิมกว้าง 340 เท่าใบเสร็จพอดี ทุกอย่างเลยถูกบีบตามความกว้าง
+         กระดาษ ทั้งที่ใบเสร็จเป็นแค่ตัวอย่างไว้ดู ไม่ใช่ตัวเอกของหน้าต่างนี้
+         แยกเป็นสองฝั่ง: ซ้าย = สิ่งที่ต้องทำต่อ (ทอนเท่าไหร่) · ขวา = กระดาษที่จะพิมพ์ */
+      width={760}
       destroyOnHidden
       footer={[
         <Button
@@ -1455,61 +1459,85 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           ขายต่อ
         </Button>,
       ]}>
-      {/* ── หน้าต่างเงินทอน ──
-          เจ้าของสั่ง 15 ก.ย. 2026: "พอกดชำระจะมีหน้าต่างเงินทอนครับ"
-          ★ เงินทอนต้องอ่านได้จากระยะยืน ★ เดิมตัวเลขนี้ซ่อนอยู่ในใบเสร็จตัวจิ๋ว แคชเชียร์
-          ต้องเพ่งหาในบรรทัดเล็ก ๆ ทั้งที่มันคือสิ่งเดียวที่ต้องทำต่อทันทีหลังกดจบบิล
-          ★ no-print ★ แถบนี้เป็นของบนจอเท่านั้น ห้ามติดไปบนกระดาษ
-          สีแดงตามที่เจ้าของสั่ง ("เงินทอนเอาสีแดง") — เป็นเงินที่ต้องหยิบออกจากลิ้นชัก
-          คืนลูกค้า ไม่ใช่ยอดที่ได้มา สีจึงเตือนให้ทำอะไรต่อ */}
-      {method === 'cash' ? (
-        <div className="no-print mb-3 border-2 border-red-200 bg-red-50 px-4 py-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-[15px] font-semibold text-red-800">
-              {sale.change > 0 ? 'เงินทอน' : 'รับพอดี'}
-            </span>
-            <span className="text-[44px] font-extrabold text-red-600 tabular-nums leading-none">
-              {baht(sale.change)}
-            </span>
+      <div className="receipt-stage grid gap-5 md:grid-cols-[1fr_340px]">
+        {/* ── ฝั่งซ้าย: เงินทอน ──
+            เจ้าของสั่ง 15 ก.ย. 2026: "พอกดชำระจะมีหน้าต่างเงินทอนครับ"
+            ★ เงินทอนต้องอ่านได้จากระยะยืน ★ เดิมตัวเลขนี้ซ่อนอยู่ในใบเสร็จตัวจิ๋ว แคชเชียร์
+            ต้องเพ่งหาในบรรทัดเล็ก ๆ ทั้งที่มันคือสิ่งเดียวที่ต้องทำต่อทันทีหลังกดจบบิล
+            ★ no-print ★ ทั้งฝั่งนี้เป็นของบนจอเท่านั้น ห้ามติดไปบนกระดาษ
+            สีแดงตามที่เจ้าของสั่ง ("เงินทอนเอาสีแดง") — เป็นเงินที่ต้องหยิบออกจากลิ้นชัก
+            คืนลูกค้า ไม่ใช่ยอดที่ได้มา สีจึงเตือนให้ทำอะไรต่อ */}
+        <div className="no-print">
+          {method === 'cash' ? (
+            <div className="border-2 border-red-200 bg-red-50 px-5 py-5">
+              <span className="block text-[17px] font-semibold text-red-800">
+                {sale.change > 0 ? 'เงินทอน' : 'รับพอดี ไม่ต้องทอน'}
+              </span>
+              <span className="block mt-1 text-[68px] font-extrabold text-red-600 tabular-nums leading-none">
+                {baht(sale.change)}
+              </span>
+              <div className="mt-4 pt-3 border-t-2 border-red-200 space-y-1.5 text-[15px] text-red-900/75 tabular-nums">
+                <div className="flex items-center justify-between">
+                  <span>รับมา</span>
+                  <span className="font-semibold">{baht(sale.total + sale.change)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>ยอดบิล</span>
+                  <span className="font-semibold">{baht(sale.total)}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="border-2 border-[#E8E8E8] bg-[#FAFAFA] px-5 py-5">
+              <span className="block text-[17px] font-semibold text-tremor-content-strong">
+                รับเงินพร้อมเพย์แล้ว
+              </span>
+              <span className="block mt-1 text-[52px] font-extrabold text-tremor-content-strong tabular-nums leading-none">
+                {baht(sale.total)}
+              </span>
+            </div>
+          )}
+
+          <div className="mt-3 flex items-center justify-between text-[13px] text-tremor-content">
+            <span>เลขที่บิล {sale.sale_number}</span>
+            <span>{at}</span>
           </div>
-          <div className="mt-2.5 pt-2 border-t border-red-200 flex items-center justify-between text-[13px] text-red-900/70 tabular-nums">
-            <span>รับมา {baht(sale.total + sale.change)}</span>
-            <span>ยอดบิล {baht(sale.total)}</span>
+          {data.offline ? (
+            <div className="mt-2 bg-amber-50 border border-amber-200 text-amber-800 text-[13px] px-3 py-2">
+              ออฟไลน์ — บิลนี้จะถูกส่งเข้าระบบเองเมื่อกลับมาออนไลน์
+            </div>
+          ) : null}
+          <div className="mt-3 text-[12px] text-[#8a807a]">
+            ในหน้าพิมพ์: ระยะขอบ = ไม่มี · ปรับขนาด = กำหนดเอง 100%
           </div>
         </div>
-      ) : (
-        <div className="no-print mb-3 border-2 border-[#E8E8E8] bg-[#FAFAFA] px-4 py-3 flex items-baseline justify-between gap-2">
-          <span className="text-[15px] font-semibold text-tremor-content-strong">รับเงินพร้อมเพย์</span>
-          <span className="text-[30px] font-extrabold text-tremor-content-strong tabular-nums leading-none">
-            {baht(sale.total)}
-          </span>
+
+        {/* ── ฝั่งขวา: กระดาษที่จะพิมพ์ ── */}
+        {/* Scoped boundary: a throw while rendering the receipt dismisses the
+            receipt instead of white-screening the till (H5). */}
+        <div className="receipt-paper bg-white border border-[#E8E8E8] shadow-sm p-2">
+          <ReceiptBoundary onClose={onClose}>
+            <Receipt
+              shop={shop}
+              saleNumber={sale.sale_number}
+              at={at}
+              taxInvoiceNo={sale.tax_invoice_no}
+              customerName={customerName}
+              customerTaxId={customerTaxId}
+              items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
+              subtotal={sale.subtotal}
+              discount={sale.discount}
+              vatAmount={sale.vat_amount}
+              netAmount={sale.net_amount}
+              total={sale.total}
+              paymentMethod={method}
+              cashPaid={method === 'cash' ? sale.total + sale.change : null}
+              change={method === 'cash' ? sale.change : null}
+              offline={data.offline}
+            />
+          </ReceiptBoundary>
         </div>
-      )}
-      {/* Scoped boundary: a throw while rendering the receipt dismisses the
-          receipt instead of white-screening the till (H5). */}
-      <div className="no-print mb-2 text-[12px] text-[#8a807a]">
-        ในหน้าพิมพ์: ระยะขอบ = ไม่มี · ปรับขนาด = กำหนดเอง 100%
       </div>
-      <ReceiptBoundary onClose={onClose}>
-        <Receipt
-          shop={shop}
-          saleNumber={sale.sale_number}
-          at={at}
-          taxInvoiceNo={sale.tax_invoice_no}
-          customerName={customerName}
-          customerTaxId={customerTaxId}
-          items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
-          subtotal={sale.subtotal}
-          discount={sale.discount}
-          vatAmount={sale.vat_amount}
-          netAmount={sale.net_amount}
-          total={sale.total}
-          paymentMethod={method}
-          cashPaid={method === 'cash' ? sale.total + sale.change : null}
-          change={method === 'cash' ? sale.change : null}
-          offline={data.offline}
-        />
-      </ReceiptBoundary>
     </Modal>
   );
 }
