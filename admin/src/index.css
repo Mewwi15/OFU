@@ -12,6 +12,23 @@ body {
   @apply bg-tremor-background-muted text-tremor-content-strong;
 }
 
+/* ขอบล่างแบบกระดาษฉีก — ใช้ในหน้าต่างจบบิล (เจ้าของสั่งให้ตัวอย่างใบเสร็จ "เป็นช่องดีๆ")
+   ฟันสามเหลี่ยมสีขาวต่อจากท้ายกระดาษ พาดลงบนพื้นเทาของถาด ร่องระหว่างฟันจึงกลาย
+   เป็นรอยฉีก — ไม่ได้ตัดตัวใบเสร็จจริง แค่วาดต่อท้าย ใบเสร็จจึงไม่มีทางเสียรูป */
+.receipt-tear {
+  height: 8px;
+  /* ลากเลยขอบซ้ายขวาของกระดาษ (px-3 = 12px) ให้ฟันกินเต็มความกว้างใบเสร็จ */
+  margin: 0 -12px;
+  /* ★ ต้องเป็นสีของถาด ไม่ใช่สีขาว ★ ลองครั้งแรกวาดฟันสีขาวทับกระดาษขาว = มองไม่เห็น
+     อะไรเลย · ที่ถูกคือวาดสามเหลี่ยม "สีพื้นหลัง" เซาะเข้าไปในกระดาษ ร่องที่เซาะจึงกลาย
+     เป็นรอยฉีก (สีนี้ต้องตรงกับพื้นถาดใน Pos.tsx) */
+  background:
+    linear-gradient(-45deg, #efedea 4px, transparent 0) 0 4px,
+    linear-gradient(45deg, #efedea 4px, transparent 0) 0 4px;
+  background-size: 8px 8px;
+  background-repeat: repeat-x;
+}
+
 /* POS receipt: print only the receipt, isolated from the rest of the page.
    The @page size + receipt width are injected at runtime by the Receipt
    component from the per-machine paper config (48/58mm) — see receiptConfig.ts.
@@ -65,6 +82,8 @@ body {
      และพื้นหลังพวกนี้มีไว้ให้คนดูบนจอ ถ้าปล่อยติดไปตอนพิมพ์ ใบเสร็จจะถูกดันเข้ามาจาก
      ขอบกระดาษที่กว้างแค่ 48 มม. จนตกขอบ */
   .receipt-stage,
+  .receipt-side,
+  .receipt-tray,
   .receipt-paper {
     display: block !important;
     gap: 0 !important;
@@ -73,6 +92,10 @@ body {
     border: 0 !important;
     background: #fff !important;
     box-shadow: none !important;
+    /* ถาดใบเสร็จบนจอจำกัดความสูงไว้ให้เลื่อนดู — บนกระดาษต้องปล่อยยาวเต็มใบ
+       ไม่งั้นบิลที่มีของหลายรายการจะถูกตัดหายตั้งแต่ครึ่งใบ */
+    max-height: none !important;
+    overflow: visible !important;
   }
   /* ★ พิมพ์เฉพาะกล่องที่มีใบเสร็จอยู่ข้างใน ★ ซ่อน #root อย่างเดียวไม่พอ: ลิ้นชัก/โมดัล
      ทุกตัว portal ออกมานอก #root เหมือนกันหมด พอเปิดบิลจากลิ้นชักรายละเอียดออเดอร์

@@ -897,9 +897,10 @@ export function Pos() {
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="block text-[21px] font-extrabold text-tremor-content-strong tabular-nums leading-tight">
-                            {baht(Math.max(0, l.unitPrice * l.qty - l.lineDiscount))}
-                          </span>
+                          <BigBaht
+                            value={Math.max(0, l.unitPrice * l.qty - l.lineDiscount)}
+                            className="block text-[21px] font-bold text-tremor-content-strong leading-tight"
+                          />
                           {l.lineDiscount > 0 ? (
                             <span className="block text-[13px] font-semibold text-red-600 tabular-nums">
                               ลด −{baht(l.lineDiscount)}
@@ -1052,9 +1053,7 @@ export function Pos() {
               </div>
               <div className="px-3.5 py-3 bg-[#2B2320] flex items-end justify-between gap-3">
                 <span className="text-[14px] font-semibold text-white/75 pb-1">ยอดที่ต้องเก็บ</span>
-                <span className="text-[36px] font-extrabold text-white tabular-nums leading-none">
-                  {baht(total)}
-                </span>
+                <BigBaht value={total} className="text-[36px] font-bold text-white leading-none" />
               </div>
             </div>
 
@@ -1154,7 +1153,7 @@ export function Pos() {
               disabled={!lines.length}
               style={{
                 height: 60,
-                fontWeight: 800,
+                fontWeight: 700,
                 fontSize: 22,
                 borderRadius: 0,
               }}>
@@ -1251,6 +1250,26 @@ export function Pos() {
 
 /* ── sub-components ────────────────────────────────────────────────────────── */
 
+/**
+ * ตัวเลขเงินก้อนใหญ่ — แยกสัญลักษณ์ ฿ ออกจากตัวเลขคนละกล่อง
+ *
+ * ★ ฿ ติดกับเลขจนอ่านผิดได้ ★ เจอตอนเรนเดอร์หน้าจบบิลจริง 15 ก.ย. 2026: "฿260" ขนาด
+ * 68px สัญลักษณ์ ฿ เหลื่อมทับเลข 2 จนดูเป็นตัวอื่น — เกิดจาก ฿ กับตัวเลขถูกวาดด้วยฟอนต์
+ * คนละตัว (ฟอนต์ไทยไม่มีเลขอารบิกครบทุกน้ำหนัก เบราว์เซอร์เลยไปหยิบฟอนต์สำรองมาแทน)
+ * ระยะห่างระหว่างสองฟอนต์จึงคำนวณผิด
+ * แยกเป็นคนละ span พร้อมเว้นวรรคของเราเอง = ไม่มีทางทับกันไม่ว่าจะได้ฟอนต์ไหนมา
+ * และ ฿ ตัวเล็กลงหน่อยก็อ่านง่ายกว่าเดิมด้วย เพราะตัวเลขคือสิ่งที่ต้องอ่าน
+ */
+function BigBaht({ value, className }: { value: number; className?: string }) {
+  return (
+    <span className={className}>
+      <span className="text-[0.6em] font-semibold mr-[0.14em]">฿</span>
+      <span className="tabular-nums">{value.toLocaleString('th-TH')}</span>
+    </span>
+  );
+}
+
+
 function Row({ label, value, subtle }: { label: string; value: string; subtle?: boolean }) {
   return (
     <div className={`flex items-center justify-between text-[14.5px] ${subtle ? 'text-tremor-content-subtle' : 'text-tremor-content'}`}>
@@ -1336,7 +1355,7 @@ function CashPay({
           input: {
             height: 60,
             fontSize: 30,
-            fontWeight: 800,
+            fontWeight: 700,
             textAlign: 'right',
             fontVariantNumeric: 'tabular-nums',
           },
@@ -1346,9 +1365,7 @@ function CashPay({
       {short && (
         <div className="flex items-center justify-between bg-amber-50 border-2 border-amber-200 px-3.5 py-2.5">
           <span className="text-[15px] font-semibold text-amber-800">ยังขาด</span>
-          <span className="text-[22px] font-extrabold text-amber-700 tabular-nums leading-none">
-            {baht(total - tendered)}
-          </span>
+          <BigBaht value={total - tendered} className="text-[22px] font-bold text-amber-700 leading-none" />
         </div>
       )}
       {/* สีเดียวกับหน้าต่างเงินทอนตอนจบบิล — ตัวเลขเดียวกันต้องหน้าตาเดียวกันทั้งสองที่
@@ -1356,9 +1373,7 @@ function CashPay({
       {typeof tendered === 'number' && tendered >= total && (
         <div className="flex items-center justify-between bg-red-50 border-2 border-red-200 px-3.5 py-3">
           <span className="text-[15px] font-semibold text-red-800">เงินทอน</span>
-          <span className="text-[30px] font-extrabold text-red-600 tabular-nums leading-none">
-            {baht(change)}
-          </span>
+          <BigBaht value={change} className="text-[30px] font-bold text-red-600 leading-none" />
         </div>
       )}
     </div>
@@ -1473,9 +1488,10 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
               <span className="block text-[17px] font-semibold text-red-800">
                 {sale.change > 0 ? 'เงินทอน' : 'รับพอดี ไม่ต้องทอน'}
               </span>
-              <span className="block mt-1 text-[68px] font-extrabold text-red-600 tabular-nums leading-none">
-                {baht(sale.change)}
-              </span>
+              <BigBaht
+                value={sale.change}
+                className="block mt-1 text-[68px] font-bold text-red-600 leading-none"
+              />
               <div className="mt-4 pt-3 border-t-2 border-red-200 space-y-1.5 text-[15px] text-red-900/75 tabular-nums">
                 <div className="flex items-center justify-between">
                   <span>รับมา</span>
@@ -1492,9 +1508,10 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
               <span className="block text-[17px] font-semibold text-tremor-content-strong">
                 รับเงินพร้อมเพย์แล้ว
               </span>
-              <span className="block mt-1 text-[52px] font-extrabold text-tremor-content-strong tabular-nums leading-none">
-                {baht(sale.total)}
-              </span>
+              <BigBaht
+                value={sale.total}
+                className="block mt-1 text-[52px] font-bold text-tremor-content-strong leading-none"
+              />
             </div>
           )}
 
@@ -1512,30 +1529,45 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
           </div>
         </div>
 
-        {/* ── ฝั่งขวา: กระดาษที่จะพิมพ์ ── */}
-        {/* Scoped boundary: a throw while rendering the receipt dismisses the
-            receipt instead of white-screening the till (H5). */}
-        <div className="receipt-paper bg-white border border-[#E8E8E8] shadow-sm p-2">
-          <ReceiptBoundary onClose={onClose}>
-            <Receipt
-              shop={shop}
-              saleNumber={sale.sale_number}
-              at={at}
-              taxInvoiceNo={sale.tax_invoice_no}
-              customerName={customerName}
-              customerTaxId={customerTaxId}
-              items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
-              subtotal={sale.subtotal}
-              discount={sale.discount}
-              vatAmount={sale.vat_amount}
-              netAmount={sale.net_amount}
-              total={sale.total}
-              paymentMethod={method}
-              cashPaid={method === 'cash' ? sale.total + sale.change : null}
-              change={method === 'cash' ? sale.change : null}
-              offline={data.offline}
-            />
-          </ReceiptBoundary>
+        {/* ── ฝั่งขวา: กระดาษที่จะพิมพ์ ──
+            ★ ให้ดูเป็นใบเสร็จจริง ไม่ใช่ข้อความลอย ★ เจ้าของสั่ง 15 ก.ย. 2026 "ปรับตรงบิล
+            นิดนึงครับให้เป็นช่องดีๆหน่อย" — วางกระดาษขาวมีเงาบนพื้นเทา แล้วเซาะขอบล่าง
+            เป็นฟันปลาเหมือนกระดาษที่ฉีกออกจากเครื่อง คนดูจะรู้ทันทีว่านี่คือของที่จะออกมา
+            จากเครื่องพิมพ์ ไม่ใช่กล่องข้อความอีกกล่องในหน้าเว็บ */}
+        <div className="receipt-side flex flex-col min-w-0">
+          <div className="no-print text-[13px] font-semibold text-tremor-content mb-2">
+            ตัวอย่างใบเสร็จ
+          </div>
+          <div className="receipt-tray bg-[#EFEDEA] p-5 flex justify-center items-start max-h-[58vh] overflow-y-auto">
+            {/* Scoped boundary: a throw while rendering the receipt dismisses the
+                receipt instead of white-screening the till (H5). */}
+            <div className="receipt-paper bg-white px-3 pt-3 shadow-[0_3px_12px_rgba(0,0,0,0.13)]">
+              <ReceiptBoundary onClose={onClose}>
+                <Receipt
+                  shop={shop}
+                  saleNumber={sale.sale_number}
+                  at={at}
+                  taxInvoiceNo={sale.tax_invoice_no}
+                  customerName={customerName}
+                  customerTaxId={customerTaxId}
+                  items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
+                  subtotal={sale.subtotal}
+                  discount={sale.discount}
+                  vatAmount={sale.vat_amount}
+                  netAmount={sale.net_amount}
+                  total={sale.total}
+                  paymentMethod={method}
+                  cashPaid={method === 'cash' ? sale.total + sale.change : null}
+                  change={method === 'cash' ? sale.change : null}
+                  offline={data.offline}
+                />
+              </ReceiptBoundary>
+              {/* ขอบฟันปลา — ฟันสีขาวพาดบนพื้นเทา ทำให้ปลายกระดาษดูเหมือนถูกฉีกออกมา
+                  วางเป็นชิ้นแยกใต้ใบเสร็จ ไม่ใช่ mask ทับตัวใบเสร็จ เพราะถ้าพลาดขึ้นมา
+                  จะกลายเป็นบิลหายไปทั้งใบ · no-print อยู่แล้ว ไม่มีทางติดไปบนกระดาษ */}
+              <div className="receipt-tear no-print" />
+            </div>
+          </div>
         </div>
       </div>
     </Modal>
