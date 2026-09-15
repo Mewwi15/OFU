@@ -44,16 +44,13 @@ import {
 } from '../lib/offline';
 import {
   Button,
-  Card,
   Checkbox,
-  Divider,
   Empty,
   Input,
   InputNumber,
   Modal,
   Segmented,
   Space,
-  Statistic,
   type InputRef,
 } from 'antd';
 
@@ -1013,50 +1010,53 @@ export function Pos() {
 
           {/* ยอด + วิธีจ่าย — เลื่อนได้ ส่วนปุ่มชำระเงินตรึงไว้ข้างล่างเสมอ */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            <Card size="small" style={{ background: '#FFF8F3', borderColor: '#F3D9CB' }} styles={{ body: { padding: 14 } }}>
-              <Row label="ยอดรวม" value={baht(subtotal)} />
-              {lineDiscountTotal > 0 ? (
-                <div className="flex items-center justify-between text-[14.5px] mt-1.5">
-                  <span className="font-medium text-red-600">ส่วนลดรายสินค้า</span>
-                  <span className="font-bold text-red-600 tabular-nums">−{baht(lineDiscountTotal)}</span>
+            {/* ── สรุปยอด ──
+                ★ ยอดที่ต้องเก็บคือตัวเลขเดียวที่ต้องอ่านไม่ผิด ★ ของเดิมทุกบรรทัดอยู่ใน
+                การ์ดสีเดียวกันหมด ยอดสุทธิเลยจมอยู่กับที่มา — แยกเป็นสองชั้น: รายละเอียด
+                ที่มาอยู่บนพื้นเทาตัวเล็ก · ยอดจริงอยู่บนแถบเข้มตัวใหญ่ มองแวบเดียวเจอ
+                ใช้สีเข้มไม่ใช่สีแบรนด์ เพราะปุ่มชำระเงินเป็นสีแบรนด์อยู่แล้ว สองอันสีเดียวกัน
+                จะแย่งสายตากันเอง */}
+            <div className="border-2 border-[#E8E8E8]">
+              <div className="px-3.5 py-3 bg-[#FAFAFA] border-b-2 border-[#E8E8E8] space-y-1.5">
+                <Row label="ยอดรวม" value={baht(subtotal)} />
+                {lineDiscountTotal > 0 ? (
+                  <div className="flex items-center justify-between text-[14.5px]">
+                    <span className="font-medium text-red-600">ส่วนลดรายสินค้า</span>
+                    <span className="font-bold text-red-600 tabular-nums">−{baht(lineDiscountTotal)}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-[14.5px] text-tremor-content">ส่วนลดทั้งบิล</span>
+                  <InputNumber
+                    min={0}
+                    max={subtotal}
+                    precision={0}
+                    controls={false}
+                    inputMode="numeric"
+                    formatter={moneyFormatter}
+                    parser={moneyParser}
+                    onKeyDown={digitsOnlyKeyDown}
+                    placeholder="฿ 0"
+                    value={discount || null}
+                    onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
+                    style={{ width: 130, borderRadius: 0 }}
+                    styles={{ input: { textAlign: 'right', fontWeight: 600, ...(discount > 0 ? { color: '#E5484D' } : {}) } }}
+                  />
                 </div>
-              ) : null}
-              <div className="flex items-center justify-between text-sm mt-2">
-                <span className="text-tremor-content">ส่วนลดทั้งบิล</span>
-                <InputNumber
-                  min={0}
-                  max={subtotal}
-                  precision={0}
-                  size="small"
-                  controls={false}
-                  inputMode="numeric"
-                  formatter={moneyFormatter}
-                  parser={moneyParser}
-                  onKeyDown={digitsOnlyKeyDown}
-                  placeholder="฿ 0"
-                  value={discount || null}
-                  onChange={(v) => setDiscount(Math.min(subtotal, Math.max(0, Number(v) || 0)))}
-                  style={{ width: 120 }}
-                />
+                {shop?.vat_registered ? (
+                  <>
+                    <Row label="ราคาก่อน VAT" value={baht(net)} subtle />
+                    <Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle />
+                  </>
+                ) : null}
               </div>
-              {discount > 0 ? (
-                <div className="flex items-center justify-between text-[14.5px] mt-1.5">
-                  <span className="font-medium text-red-600">ส่วนลด</span>
-                  <span className="font-bold text-red-600 tabular-nums">−{baht(discount)}</span>
-                </div>
-              ) : null}
-              {shop?.vat_registered && <div className="mt-2"><Row label="ราคาก่อน VAT" value={baht(net)} subtle /></div>}
-              {shop?.vat_registered && <div className="mt-1"><Row label={`VAT ${shop.vat_rate}%`} value={baht(vat)} subtle /></div>}
-              <Divider style={{ margin: '12px 0' }} />
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-tremor-content-strong">ยอดสุทธิ</span>
-                <Statistic
-                  value={total}
-                  prefix="฿"
-                  styles={{ content: { color: '#241F1B', fontWeight: 800, fontSize: 34, lineHeight: 1, fontVariantNumeric: 'tabular-nums' } }}
-                />
+              <div className="px-3.5 py-3 bg-[#2B2320] flex items-end justify-between gap-3">
+                <span className="text-[14px] font-semibold text-white/75 pb-1">ยอดที่ต้องเก็บ</span>
+                <span className="text-[36px] font-extrabold text-white tabular-nums leading-none">
+                  {baht(total)}
+                </span>
               </div>
-            </Card>
+            </div>
 
             <Segmented
               block
@@ -1311,36 +1311,52 @@ function CashPay({
   setTendered: (n: number | '') => void;
   change: number;
 }) {
-  const quick = [total, 100, 500, 1000].filter((v, i, a) => a.indexOf(v) === i && v >= total).slice(0, 4);
+  /* ★ ไม่มีปุ่มจำนวนสำเร็จรูป ★ เจ้าของสั่งเอาออก 15 ก.ย. 2026 ("ไม่ต้องมีรับพอดี 100 200
+     หรอกครับ") — ลูกค้ายื่นเงินมาเท่าไหร่ก็พิมพ์เท่านั้น ปุ่มเดาจำนวนไม่ได้ช่วยอะไร
+     มีแต่จะกดพลาดแล้วได้ยอดรับเงินที่ไม่ตรงกับเงินในลิ้นชักจริง */
+  const short = typeof tendered === 'number' && tendered > 0 && tendered < total;
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-tremor-content">รับเงิน</span>
-        <InputNumber
-          controls={false}
-          min={0}
-          precision={0}
-          inputMode="numeric"
-          formatter={moneyFormatter}
-          parser={moneyParser}
-          onKeyDown={digitsOnlyKeyDown}
-          placeholder="฿ 0"
-          value={tendered === '' ? null : tendered}
-          onChange={(v) => setTendered(v == null ? '' : Math.max(0, Number(v)))}
-          style={{ width: 140 }}
-        />
-      </div>
-      <div className="grid grid-cols-4 gap-1.5">
-        {quick.map((v, i) => (
-          <Button key={i} onClick={() => setTendered(v)} style={{ padding: '0 4px' }}>
-            {v === total ? 'พอดี' : baht(v)}
-          </Button>
-        ))}
-      </div>
+      <div className="text-[14.5px] font-semibold text-tremor-content-strong">รับเงินมา</div>
+      {/* ★ ช่องใหญ่ ★ เป็นช่องเดียวที่แคชเชียร์ต้องพิมพ์ตอนรับเงิน — ตัวเลขต้องอ่านออก
+          จากระยะยืน และชิดขวาเพื่อให้หลักตรงกับยอดที่ต้องเก็บด้านบน */}
+      <InputNumber
+        controls={false}
+        min={0}
+        precision={0}
+        inputMode="numeric"
+        formatter={moneyFormatter}
+        parser={moneyParser}
+        onKeyDown={digitsOnlyKeyDown}
+        placeholder="฿ 0"
+        value={tendered === '' ? null : tendered}
+        onChange={(v) => setTendered(v == null ? '' : Math.max(0, Number(v)))}
+        style={{ width: '100%', height: 64, borderRadius: 0, borderWidth: 2 }}
+        styles={{
+          input: {
+            height: 60,
+            fontSize: 30,
+            fontWeight: 800,
+            textAlign: 'right',
+            fontVariantNumeric: 'tabular-nums',
+          },
+        }}
+      />
+      {/* เงินไม่พอ — บอกตรงนี้เลยว่าขาดเท่าไหร่ ดีกว่าให้ไปเจอตอนกดชำระเงินแล้วเด้ง error */}
+      {short && (
+        <div className="flex items-center justify-between bg-amber-50 border-2 border-amber-200 px-3.5 py-2.5">
+          <span className="text-[15px] font-semibold text-amber-800">ยังขาด</span>
+          <span className="text-[22px] font-extrabold text-amber-700 tabular-nums leading-none">
+            {baht(total - tendered)}
+          </span>
+        </div>
+      )}
       {typeof tendered === 'number' && tendered >= total && (
-        <div className="flex items-center justify-between rounded-none bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+        <div className="flex items-center justify-between bg-emerald-50 border-2 border-emerald-200 px-3.5 py-3">
           <span className="text-[15px] font-semibold text-emerald-800">เงินทอน</span>
-          <span className="text-[24px] font-extrabold text-emerald-700 tabular-nums leading-none">{baht(change)}</span>
+          <span className="text-[30px] font-extrabold text-emerald-700 tabular-nums leading-none">
+            {baht(change)}
+          </span>
         </div>
       )}
     </div>
