@@ -27,10 +27,34 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import io
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# ─────────────────────────────────────────────────────────────────────────────
+# บันทึกลงไฟล์
+#
+# ★ รันแบบไม่มีหน้าต่างแล้วจะตาบอด ★ ตอนเปิดเองพร้อมเครื่อง เราใช้ pythonw ซึ่งไม่มี
+# หน้าจอดำให้ดูเลย ข้อความที่ print ออกไปหายหมด — วันที่บิลไม่ออกแล้วไม่มีอะไรให้ดูเลย
+# คือวันที่ไล่ปัญหาไม่ได้ เขียนลงไฟล์ข้าง ๆ ตัวโปรแกรมไว้เสมอ
+# ─────────────────────────────────────────────────────────────────────────────
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'agent.log')
+
+
+def log(*parts: object) -> None:
+    line = f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S} ' + ' '.join(str(p) for p in parts)
+    print(line)
+    try:
+        # ตัดไฟล์ทิ้งเมื่อโตเกิน 1 MB — ปล่อยไว้เป็นปีจะกินดิสก์โดยไม่มีใครดู
+        if os.path.exists(LOG_PATH) and os.path.getsize(LOG_PATH) > 1_000_000:
+            os.remove(LOG_PATH)
+        with open(LOG_PATH, 'a', encoding='utf-8') as f:
+            f.write(line + '\n')
+    except OSError:
+        pass  # เขียนบันทึกไม่ได้ ห้ามทำให้การพิมพ์พัง
 
 try:
     import win32print
@@ -219,11 +243,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             send_raw(self.printer_name, data)
         except Exception as e:  # noqa: BLE001
-            print('  พิมพ์ไม่สำเร็จ:', e)
+            log('  พิมพ์ไม่สำเร็จ:', e)
             self._json(500, {'ok': False, 'error': str(e)})
             return
 
-        print(f'  พิมพ์แล้ว ({len(body)} ไบต์ → {len(data)} ไบต์คำสั่ง)')
+        log(f'  พิมพ์แล้ว ({len(body)} ไบต์ → {len(data)} ไบต์คำสั่ง)')
         self._json(200, {'ok': True})
 
 
@@ -263,7 +287,16 @@ def main() -> int:
     print()
 
     # ผูกกับ 127.0.0.1 เท่านั้น — เครื่องอื่นในวงแลนสั่งพิมพ์ไม่ได้
-    server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
+    try:
+        server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
+    except OSError as e:
+        # ★ เปิดซ้ำไม่ใช่ความผิดพลาด ★ ตัวนี้เปิดเองตอนล็อกอิน ถ้าเจ้าของกดเปิดเองอีกที
+        # หรือล็อกอินซ้อน จะมีตัวที่สองมาแย่งพอร์ต — ตัวแรกทำงานอยู่แล้ว ตัวที่สองแค่ถอย
+        # ออกเงียบ ๆ ดีกว่าขึ้น error ให้ตกใจว่าระบบพัง
+        log(f'มีตัวกลางทำงานอยู่แล้วที่พอร์ต {args.port} ({e}) — ตัวนี้ปิดตัวเอง')
+        return 0
+
+    log(f'เริ่มทำงาน · เครื่องพิมพ์ {target} · พอร์ต {args.port}')
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -41,15 +41,20 @@ python agent.py --printer "POS58 Printer"
 
 ตรวจว่ารันอยู่: เปิด <http://127.0.0.1:9110/ping>
 
-## ให้เปิดเองตอนเปิดเครื่อง
+## ให้เปิดเองตอนเปิดเครื่อง (แนะนำ — ติดตั้งครั้งเดียวจบ)
 
-1. กด `Win + R` พิมพ์ `shell:startup` แล้ว Enter
-2. สร้างไฟล์ `พิมพ์บิล.bat` ในโฟลเดอร์นั้น เนื้อหา:
-   ```bat
-   @echo off
-   cd /d "C:\ofu\pos-print-agent"
-   python agent.py
-   ```
+เปิด **PowerShell** แล้ววางบรรทัดเดียวนี้:
+
+```powershell
+[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm https://raw.githubusercontent.com/Mewwi15/OFU/main/tools/pos-print-agent/setup.ps1 | iex
+```
+
+ตัวติดตั้งจะทำให้ทั้งหมดนี้: ลงส่วนเสริม → วางไฟล์ที่ `C:\ofu` → ตั้งให้เปิดเองตอนล็อกอิน
+→ เปิดให้เลยตอนนี้ → ตรวจว่าตอบจริงแล้วบอกว่าจะพิมพ์ออกเครื่องไหน
+
+**ไอคอนเว็บบนหน้าจอไม่ต้องแก้อะไร** — ตัวกลางรออยู่ก่อนแล้ว เปิดหน้าขายแล้วขายได้เลย
+
+> อยากเลิกใช้: กด `Win + R` พิมพ์ `shell:startup` แล้วลบทางลัด "OFU Print Agent" ทิ้ง
 
 ---
 
