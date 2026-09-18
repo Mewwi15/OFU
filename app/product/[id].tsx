@@ -23,7 +23,7 @@ import { money } from '@/lib/format';
 import { DesktopProduct } from '@/components/web/DesktopProduct';
 import { useT } from '@/lib/i18n';
 import { useAppWidth, useIsDesktopWeb } from '@/lib/useAppWidth';
-import { useCart } from '@/store/cart';
+import { resolveVariant, useCart } from '@/store/cart';
 import { findProduct, useCatalog } from '@/store/catalog';
 
 /** At-a-glance promises shown under the price. */
@@ -86,7 +86,13 @@ export default function ProductDetailsScreen() {
   if (isDesktopWeb) return <DesktopProduct key={product.id} product={product} />;
 
   const imageHeight = Math.round(width * 0.92);
-  const total = product.price * qty;
+  /* ★ ราคาที่โชว์ต้องเป็นราคาของตัวเลือกที่จะได้จริง ★ (แก้ 18 ก.ย. 2026 ก่อนขึ้นจริง)
+     product.price คือราคาตัวเลือกถูกสุดเสมอ ส่วนตะกร้าหยิบ "ตัวเลือกแรกที่ยังมีของ" —
+     ถ้าตัวถูกสุดหมดแต่ตัวใหญ่ยังมี ลูกค้าจะเห็น ฿20 บนปุ่มแล้วโดนคิด ฿35 ในตะกร้า
+     ใช้ฟังก์ชันตัวเดียวกับที่ตะกร้าใช้ ราคาที่โฆษณากับราคาที่เก็บจึงเป็นเลขเดียวกันเสมอ */
+  const picked = resolveVariant(product);
+  const unitPrice = picked?.price ?? product.price;
+  const total = unitPrice * qty;
   const soldOut = product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
   /* ★ กดเพิ่มจำนวนได้ไม่เกินของที่มีจริง ★ (ตรวจทั้งระบบ 6 ก.ย. 2026) — เดิมกดได้ถึง 99
      ทั้งที่ร้านเหลือ 3 ชิ้น ฐานข้อมูลปฏิเสธตอนกดสั่ง (OUT_OF_STOCK) ลูกค้าจึงเลือกของ
@@ -165,7 +171,7 @@ export default function ProductDetailsScreen() {
             </Text>
           ) : null}
 
-          <Text style={styles.price}>{money(product.price)}</Text>
+          <Text style={styles.price}>{money(unitPrice)}</Text>
 
           {/* Perks */}
           <View style={styles.perks}>

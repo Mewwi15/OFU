@@ -90,10 +90,23 @@ export function cartItemId(productId: string, size?: string): string {
   return `${productId}-${size ?? 'default'}`;
 }
 
-/** The variant matching a chosen size (falls back to the first/cheapest). */
-function resolveVariant(product: Product, size?: string) {
+/**
+ * ตัวเลือกที่จะถูกใส่ลงตะกร้าจริงเมื่อลูกค้ากด "เพิ่มลงตะกร้า"
+ *
+ * ★ ต้อง export ★ หน้าสินค้าต้องโชว์ราคาของตัวเลือกที่จะได้จริง ไม่ใช่ราคาถูกสุดของสินค้า
+ * (product.price = ราคาตัวเลือกถูกสุดเสมอ — lib/data/catalog.ts) ถ้าสองที่นี้ใช้คนละกฎ
+ * ลูกค้าจะเห็นเลขหนึ่งแล้วโดนเก็บอีกเลขหนึ่ง
+ */
+export function resolveVariant(product: Product, size?: string) {
   const match = size ? product.variants.find((v) => v.size === size) : undefined;
-  return match ?? product.variants[0];
+  if (match) return match;
+  /* ★ ไม่ระบุขนาด = เอาตัวที่ยังมีของ ★ (แก้ 18 ก.ย. 2026 — เจ้าของเจอเอง "เลือกอยู่
+     เพลิน ๆ พอจะจ่ายเงินบอกสินค้าหมด") สินค้าหลายขนาดจะเรียงตามราคาถูกสุดก่อน ของเดิม
+     หยิบตัวแรกเสมอ ถ้าขนาดนั้นหมดแต่ขนาดอื่นยังมี ลูกค้าจะได้ของที่หมดลงตะกร้าโดยไม่รู้ตัว
+     แล้วไปตายตอนกดจ่ายเงิน — ทั้งที่ร้านมีของขายอยู่แท้ ๆ แค่คนละขนาด
+     ★ ไม่มีของสักขนาดก็คืนตัวแรกตามเดิม ★ หน้าสินค้ากันไม่ให้กดอยู่แล้ว และการคืนค่าว่าง
+     จะทำให้บรรทัดในตะกร้าไม่มีรหัสตัวเลือก ซึ่งพังกว่าเดิม */
+  return product.variants.find((v) => (v.available ?? 0) > 0) ?? product.variants[0];
 }
 
 /** Sum of unit price * qty across all cart lines. */

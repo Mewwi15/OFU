@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter, useSegments } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   FadeInUp,
@@ -198,6 +198,7 @@ export default function CartScreen() {
   const selectAll = useCart((s) => s.selectAll);
   const removeSelected = useCart((s) => s.removeSelected);
   const removeLine = useCart((s) => s.remove);
+  const setQty = useCart((s) => s.setQty);
   const add = useCart((s) => s.add);
   const mode = useMode((s) => s.mode);
   const address = useAddress(selectedAddress);
@@ -247,15 +248,57 @@ export default function CartScreen() {
      "ค่อยกรอกชื่อ/เบอร์ตอนสั่ง" จึงต้องกันที่นี่ — ปล่อยผ่านไปฐานข้อมูลจะปฏิเสธเอง
      (recipient_name/recipient_phone เป็น not null) ซึ่งลูกค้าจะเจอเป็น error ดิบ ๆ */
   const needsContact = mode === 'delivery' && !!address && !hasContactInfo(address);
+  /* รายการสินค้าทั้งร้าน — ใช้สองอย่าง: เช็คของในตะกร้าว่ายังมีอยู่ไหม (ด้านล่าง)
+     และทำ "สินค้าแนะนำ" ท้ายตะกร้า */
+  const products = useCatalog((s) => s.products);
+
+  /* ── ของในตะกร้ายังมีอยู่จริงไหม ──
+     เจ้าของแจ้ง 18 ก.ย. 2026: "เวลาสินค้าหมดมันไม่บอกว่าหมด เวลากดสั่งในตะกร้าและจะ
+     จ่ายเงินเพิ่งบอกว่าหมด แบบเลือกอยู่เพลินๆ พอจะจ่ายเงินบอกสินค้าหมด"
+
+     ★ ข้อมูลอยู่ในมืออยู่แล้ว แค่ไม่เคยเอามาใช้ ★ หน้านี้ดึงรายการสินค้าทั้งร้านมาตั้งแต่
+     แรกเพื่อทำ "สินค้าแนะนำ" ซึ่งมีจำนวนคงเหลือติดมาด้วยทุกตัว — เทียบกับของในตะกร้า
+     ก็รู้ทันทีว่าอันไหนหมดแล้ว แต่เดิมปล่อยให้ไปตายเอาที่ฐานข้อมูลตอนกดจ่ายเงิน ซึ่งเป็น
+     จังหวะที่แย่ที่สุด: ลูกค้าเลือกของมาทั้งตะกร้า กรอกที่อยู่ เลือกวิธีจ่าย แล้วค่อยรู้
+
+     ★ ดูจากตัวเลือกที่ซื้อจริง ไม่ใช่ทั้งสินค้า ★ สินค้าที่มีหลายขนาด ขนาดที่ลูกค้าเลือก
+     อาจหมดทั้งที่ขนาดอื่นยังมี — ถ้าดูรวมทั้งสินค้าจะบอกว่ายังมีของ แล้วพอกดจ่ายก็เด้ง
+     เหมือนเดิม ไม่ได้แก้อะไรเลย */
+  const stockById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of products) for (const v of p.variants) m.set(v.id, v.available ?? 0);
+    return m;
+  }, [products]);
+
+  /** ของในตะกร้าที่มีไม่พอ — เก็บจำนวนที่เหลือจริงไว้บอกลูกค้าด้วย */
+  const shortages = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const it of items) {
+      /* ★ ไม่รู้จัก = ไม่ตัดสิน ★ รายการสินค้ายังโหลดไม่เสร็จ (เพิ่งเปิดแอป) หรือสินค้า
+         ถูกเลิกขายไปแล้ว — กรณีแรกถ้าฟันว่าหมดจะขึ้นเตือนผิดทุกครั้งที่เปิดตะกร้า
+         ปล่อยให้ฐานข้อมูลเป็นคนตัดสินตอนกดจ่ายเหมือนเดิมดีกว่า */
+      const left = stockById.get(it.variantId);
+      if (left === undefined) continue;
+      if (left < it.qty) out.set(it.id, Math.max(0, left));
+    }
+    return out;
+  }, [items, stockById]);
+
+  /* นับเฉพาะรายการที่ติ๊กไว้ — ของที่หมดแต่ไม่ได้ติ๊กไม่ควรขวางการจ่ายเงิน ลูกค้าอาจ
+     ตั้งใจเก็บไว้ซื้อรอบหน้า */
+  const blockedCount = useMemo(
+    () => items.filter((it) => selectedIds.includes(it.id) && shortages.has(it.id)).length,
+    [items, selectedIds, shortages],
+  );
+
   const canCheckout =
-    !nothingSelected && shopOpen && !belowMin && !needsParcel && !needsContact;
+    !nothingSelected && shopOpen && !belowMin && !needsParcel && !needsContact && blockedCount === 0;
 
   const checkoutVerb = mode === 'delivery' ? t('cart.checkoutOrder') : t('cart.checkoutPay');
   const checkoutLabel =
     selectedCount > 0 ? `${checkoutVerb} (${selectedCount})` : checkoutVerb;
 
   // Suggestions = catalog products not already in the cart.
-  const products = useCatalog((s) => s.products);
   const inCart = new Set(items.map((i) => i.product.id));
   const suggestions = products.filter((p) => !inCart.has(p.id)).slice(0, 8);
 
@@ -270,6 +313,11 @@ export default function CartScreen() {
      แล้วกลับมาที่นี่ทันที ถ้าแคชไว้จะไม่เห็นใบที่เพิ่งเก็บ */
   useFocusEffect(
     useCallback(() => {
+      /* ★ ดึงสต๊อกสดทุกครั้งที่เปิดตะกร้า ★ ปกติรายการสินค้ารีเฟรชทุก 60 วินาที ซึ่งพอ
+         สำหรับหน้าร้าน แต่ไม่พอสำหรับตะกร้า — นี่คือจังหวะสุดท้ายก่อนลูกค้าจ่ายเงิน
+         ของที่ขายหมดไปเมื่อสองนาทีก่อนต้องขึ้นเตือนตรงนี้ ไม่ใช่ไปเด้งตอนกดจ่าย */
+      void useCatalog.getState().load(true);
+
       let alive = true;
       void listClaimedCoupons()
         .then((cs) => alive && setMyCoupons(cs))
@@ -593,25 +641,53 @@ export default function CartScreen() {
               <View style={styles.fullHairline} />
 
               {/* Lines */}
-              {items.map((item, i) => (
-                <View key={item.id}>
-                  {i > 0 ? <View style={styles.insetHairline} /> : null}
-                  <ProductListItem
-                    product={item.product}
-                    variant="cart"
-                    embedded
-                    cartItemId={item.id}
-                    size={item.size}
-                    color={item.color}
-                    qty={item.qty}
-                    selectable
-                    selected={selectedIds.includes(item.id)}
-                    onToggleSelect={() => toggleSelect(item.id)}
-                    onRemove={() => confirmRemoveLine(item)}
-                    accent={A}
-                  />
-                </View>
-              ))}
+              {items.map((item, i) => {
+                const left = shortages.get(item.id);
+                return (
+                  <View key={item.id}>
+                    {i > 0 ? <View style={styles.insetHairline} /> : null}
+                    <ProductListItem
+                      product={item.product}
+                      variant="cart"
+                      embedded
+                      cartItemId={item.id}
+                      size={item.size}
+                      color={item.color}
+                      qty={item.qty}
+                      selectable
+                      selected={selectedIds.includes(item.id)}
+                      onToggleSelect={() => toggleSelect(item.id)}
+                      onRemove={() => confirmRemoveLine(item)}
+                      accent={A}
+                    />
+                    {/* ★ บอกตรงรายการที่มีปัญหา ★ ไม่ใช่ข้อความรวมที่ท้ายตะกร้า — ตะกร้า
+                        ยาว ๆ ลูกค้าต้องไล่หาเองว่าตัวไหน · มีปุ่มแก้ให้ในตัวเลย เพราะการ
+                        บอกว่าผิดแล้วปล่อยให้ไปหาทางแก้เองคือการโยนงานให้ลูกค้า */}
+                    {left !== undefined ? (
+                      <View style={styles.stockWarn}>
+                        <Ionicons name="alert-circle" size={17} color={Colors.danger} />
+                        <Text style={styles.stockWarnText}>
+                          {left === 0 ? 'สินค้าหมดแล้ว' : `เหลือ ${left} ชิ้น (เลือกไว้ ${item.qty})`}
+                        </Text>
+                        <PressableScale
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => {
+                            if (Platform.OS !== 'web') Haptics.selectionAsync();
+                            /* setQty ไม่ใช่ add — add() บวกทับของเดิม ซึ่งจะยิ่งเกิน
+                               ส่วน setQty(0) ลบทั้งบรรทัดให้เองอยู่แล้ว */
+                            setQty(item.id, left);
+                          }}
+                          style={styles.stockWarnFix}>
+                          <Text style={styles.stockWarnFixText}>
+                            {left === 0 ? 'เอาออก' : `ปรับเหลือ ${left}`}
+                          </Text>
+                        </PressableScale>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
 
             {/* Upsell rail */}
@@ -915,6 +991,39 @@ const styles = StyleSheet.create({
   /* แถวที่อยู่ของดีไซน์เก่าฝั่งเดลิเวอรี่ (deliveryCard/addrRow/addrTile/...) ถูกลบทิ้ง
      พร้อมกับที่รวมการ์ดที่อยู่เป็นโครงเดียวกันสองโหมด — สไตล์ที่ไม่มีใครใช้แล้วทิ้งไว้
      คนอ่านทีหลังจะไม่รู้ว่าอันไหนของจริง */
+  /* แถบเตือนของหมด — แดงอ่อนเต็มความกว้างใต้รายการนั้น ไม่ใช่ข้อความเล็ก ๆ ท้ายชื่อ
+     สินค้า เพราะลูกค้าเลื่อนผ่านตะกร้าเร็ว ต้องสะดุดตาพอที่จะหยุดมือ */
+  stockWarn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.dangerTint,
+  },
+  stockWarnText: {
+    flex: 1,
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 13.5,
+    /* ★ ไม่ใช้ Colors.danger กับตัวหนังสือ ★ โทเคนกำกับไว้ว่าสีนั้นผ่านเกณฑ์แค่ 3.91:1
+       ใช้ได้กับไอคอน/กราฟิกเท่านั้น ส่วนตัวหนังสือต้อง dangerStrong (5.55:1)
+       ข้อความเตือนที่อ่านไม่ชัดคือข้อความที่ไม่ได้เตือนอะไรเลย */
+    color: Colors.dangerStrong,
+  },
+  stockWarnFix: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.dangerStrong,
+  },
+  stockWarnFixText: {
+    fontFamily: 'Mitr_500Medium',
+    fontSize: 12.5,
+    color: Colors.textOnPrimary,
+  },
   insetHairline: {
     height: 1,
     backgroundColor: Colors.border,
