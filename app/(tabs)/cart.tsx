@@ -52,6 +52,7 @@ import { useShop } from '@/store/shop';
 import {
   cartCount,
   cartSubtotal,
+  resolveVariant,
   selectedItems,
   useCart,
   type CartItem,
@@ -166,7 +167,9 @@ function AddOnRail({
               {p.name}
             </Text>
             <View style={styles.addonBottom}>
-              <Text style={[styles.addonPrice, { color: accent.strong }]}>{money(p.price)}</Text>
+              <Text style={[styles.addonPrice, { color: accent.strong }]}>
+                {money(resolveVariant(p)?.price ?? p.price)}
+              </Text>
               <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel={`${t('cart.addProductA11yPrefix')} ${p.name} ${t('cart.addProductA11ySuffix')}`}

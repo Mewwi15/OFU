@@ -186,7 +186,11 @@ export function CheckoutSheet({
                   {it.product.name}
                   <Text style={styles.lineQty}>{`  × ${it.qty}`}</Text>
                 </Text>
-                <Text style={styles.lineValue}>{money(it.product.price * it.qty)}</Text>
+                {/* ★ ราคาที่แช่ไว้ในบรรทัด ไม่ใช่ราคาถูกสุดของสินค้า ★ นี่คือจอสุดท้ายก่อนลูกค้ากด
+                    ยืนยันเสียเงิน ตัวเลขตรงนี้ต้องเป็นตัวเดียวกับที่ระบบเก็บจริง */}
+                <Text style={styles.lineValue}>
+                  {money((it.unitPrice ?? it.product.price) * it.qty)}
+                </Text>
               </View>
             ))}
           </View>

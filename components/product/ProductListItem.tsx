@@ -27,7 +27,7 @@ import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { productThumb } from '@/lib/image';
-import { cartItemId, useCart } from '@/store/cart';
+import { cartItemId, resolveVariant, useCart } from '@/store/cart';
 
 export type ProductListItemVariant = 'cart';
 
@@ -81,6 +81,15 @@ export function ProductListItem({
   const removeFromCart = useCart((s) => s.remove);
 
   const resolvedLineId = lineId ?? cartItemId(product.id, size);
+  /* ★ ราคาที่โชว์ในบรรทัดตะกร้าต้องเป็นราคาที่จะถูกเก็บจริง ★ product.price คือราคา
+     ตัวเลือกถูกสุดของสินค้านั้นเสมอ ส่วนยอดรวมคิดจาก unitPrice ที่แช่ไว้ตอนกดเพิ่ม —
+     บรรทัดที่ซื้อขนาดอื่นจึงโชว์เลขหนึ่งแต่ถูกบวกอีกเลขหนึ่ง ลูกค้าบวกเองแล้วไม่ตรง
+     นอกตะกร้า (การ์ดแนะนำ/ผลค้นหา) ไม่มีบรรทัดในตะกร้าให้อ้าง ใช้ตัวเลือกที่จะได้จริงแทน */
+  const lineUnitPrice = useCart(
+    (s) => s.items.find((i) => i.id === resolvedLineId)?.unitPrice,
+  );
+  const shownPrice =
+    lineUnitPrice ?? resolveVariant(product, size)?.price ?? product.price;
   /* ของที่มีจริงของตัวเลือกที่อยู่ในบรรทัดนี้ — ไม่มีขนาดก็ใช้ตัวแรก (สินค้าตัวเลือกเดียว) */
   const available =
     (size ? product.variants.find((v) => v.size === size) : product.variants[0])?.available ?? null;
@@ -139,7 +148,7 @@ export function ProductListItem({
           </View>
         ) : null}
 
-        <Text style={[styles.price, { color: accent.strong }]}>{money(product.price)}</Text>
+        <Text style={[styles.price, { color: accent.strong }]}>{money(shownPrice)}</Text>
       </View>
 
       {/* Right: quantity stepper (delete folds into the minus button) */}

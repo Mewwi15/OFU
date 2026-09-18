@@ -21,7 +21,7 @@ import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { productThumb } from '@/lib/image';
-import { useCart } from '@/store/cart';
+import { resolveVariant, useCart } from '@/store/cart';
 
 const PERKS = [
   { icon: 'bicycle-outline', label: 'product.perkFast' },
@@ -43,7 +43,9 @@ export function DesktopProduct({ product }: Props) {
 
   const soldOut =
     product.variants.length > 0 && product.variants.every((v) => (v.available ?? 0) <= 0);
-  const total = product.price * qty;
+  /* ราคาต้องมาจากตัวเลือกที่จะได้จริง เหมือนฝั่งมือถือ — จอใหญ่กับจอเล็กต้องบอกเลขเดียวกัน */
+  const unitPrice = resolveVariant(product)?.price ?? product.price;
+  const total = unitPrice * qty;
   const mainImage = product.images[activeImage] ?? product.images[0];
 
   const handleAdd = () => {
@@ -120,7 +122,7 @@ export function DesktopProduct({ product }: Props) {
               {product.subtitle ? (
                 <Text style={styles.subtitle}>{product.subtitle}</Text>
               ) : null}
-              <Text style={styles.price}>{money(product.price)}</Text>
+              <Text style={styles.price}>{money(unitPrice)}</Text>
 
               <View style={styles.perks}>
                 {PERKS.map((perk) => (

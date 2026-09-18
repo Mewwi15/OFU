@@ -13,6 +13,7 @@ import { PressableScale } from '@/components/ui/PressableScale';
 import { Text } from '@/components/ui/text';
 import { Colors, Radius, Shadow, Spacing, Typography } from '@/constants/theme';
 import type { Product } from '@/data/products';
+import { resolveVariant } from '@/store/cart';
 import { money } from '@/lib/format';
 import { useT } from '@/lib/i18n';
 import { productThumb } from '@/lib/image';
@@ -67,7 +68,7 @@ export function DesktopProductCard({ product, style }: Props) {
             {product.subtitle}
           </Text>
         ) : null}
-        <Text style={styles.price}>{money(product.price)}</Text>
+        <Text style={styles.price}>{money(resolveVariant(product)?.price ?? product.price)}</Text>
       </View>
     </PressableScale>
   );

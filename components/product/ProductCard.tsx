@@ -40,7 +40,7 @@ import { Colors, Radius, Shadow, Spacing } from '@/constants/theme';
 import type { Product } from '@/data/products';
 import { money } from '@/lib/format';
 import { productThumb } from '@/lib/image';
-import { useCart } from '@/store/cart';
+import { resolveVariant, useCart } from '@/store/cart';
 import { useCartFly } from '@/store/cartFly';
 import { useFavorites } from '@/store/favorites';
 
@@ -167,7 +167,13 @@ export function ProductCard({
             {product.name}
           </Text>
 
-          <Text style={[styles.price, { color: accent.strong }]}>{money(product.price)}</Text>
+          {/* ★ ราคาที่โชว์ = ราคาของตัวเลือกที่จะถูกใส่ลงตะกร้าจริง ★ product.price คือราคา
+              ตัวเลือกถูกสุดเสมอ แต่ตะกร้าหยิบ "ตัวแรกที่ยังมีของ" — ถ้าตัวถูกสุดหมดแต่ตัวใหญ่
+              ยังมี ป้ายราคาจะเป็นคนละเลขกับที่เก็บจริง ลูกค้าเห็น ฿20 แล้วโดนคิด ฿35
+              ต้องใช้ฟังก์ชันตัวเดียวกับตะกร้า ไม่งั้นสองที่นี้จะเพี้ยนกันอีกเมื่อกฎเปลี่ยน */}
+          <Text style={[styles.price, { color: accent.strong }]}>
+            {money(resolveVariant(product)?.price ?? product.price)}
+          </Text>
         </View>
       </PressableScale>
     </Animated.View>
