@@ -87,6 +87,25 @@ const RESEND_COOLDOWN = 60;
  */
 const PHONE_LOGIN_ENABLED = true;
 
+/**
+ * แปลงสิ่งที่ลูกค้าพิมพ์/วางลงช่องเบอร์ ให้เป็นเบอร์ไทย 10 หลักขึ้นต้นด้วย 0
+ *
+ * ★ ต้องรับรูปแบบสากลด้วย ★ (พิสูจน์บนซิม 18 ก.ย. 2569) คีย์บอร์ดไอโฟนเสนอเบอร์จาก
+ * รายชื่อเป็นรูปแบบ +66 81-234-5678 และเบอร์ที่ก๊อปมาจากแชตส่วนใหญ่ก็ขึ้นต้นด้วย +66
+ * ของเดิมตัดอักขระที่ไม่ใช่ตัวเลขทิ้งแล้วเอา 10 ตัวแรก จึงได้ "6681234567" ซึ่งไม่ใช่เบอร์
+ * ของใครเลย แล้วขึ้นว่า "เบอร์มือถือไทยขึ้นต้นด้วย 06 08 หรือ 09" พร้อมปุ่มส่งที่กดไม่ได้
+ * ลูกค้าจะงงว่าเบอร์ตัวเองผิดตรงไหน ทั้งที่พิมพ์ถูก
+ *
+ * ★ ตัดหลังแปลง ไม่ใช่ก่อน ★ ถ้าตัดเหลือ 10 หลักก่อนแล้วค่อยแปลง เบอร์ +66 จะถูกตัดหาง
+ * ทิ้งไปหนึ่งหลักตั้งแต่ต้น แปลงยังไงก็ไม่กลับมา
+ */
+function localPhone(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  const local = d.startsWith('66') ? `0${d.slice(2)}` : d;
+  return local.slice(0, 10);
+}
+
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const t = useT();
@@ -423,7 +442,7 @@ export default function LoginScreen() {
                   <Ionicons name="call-outline" size={20} color={Colors.textMuted} />
                   <TextInput
                     value={phone}
-                    onChangeText={(v) => setPhone(v.replace(/\D/g, '').slice(0, 10))}
+                    onChangeText={(v) => setPhone(localPhone(v))}
                     placeholder="เบอร์มือถือ"
                     placeholderTextColor={Colors.textMuted}
                     keyboardType="phone-pad"
