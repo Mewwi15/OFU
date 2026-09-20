@@ -546,6 +546,7 @@ export function PosSales() {
                 qty: i.qty,
                 unitPrice: i.unit_price,
                 lineTotal: i.line_total,
+                lineDiscount: i.line_discount,
                 refundedQty: i.refunded_qty,
               }))}
               subtotal={detail.total + detail.discount}

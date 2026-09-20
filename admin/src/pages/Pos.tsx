@@ -1834,7 +1834,14 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
                   taxInvoiceNo={sale.tax_invoice_no}
                   customerName={customerName}
                   customerTaxId={customerTaxId}
-                  items={lines.map((l) => ({ name: l.name, size: l.size, qty: l.qty, unitPrice: l.unitPrice, lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount) }))}
+                  items={lines.map((l) => ({
+                    name: l.name,
+                    size: l.size,
+                    qty: l.qty,
+                    unitPrice: l.unitPrice,
+                    lineTotal: Math.max(0, l.unitPrice * l.qty - l.lineDiscount),
+                    lineDiscount: l.lineDiscount,
+                  }))}
                   subtotal={sale.subtotal}
                   discount={sale.discount}
                   vatAmount={sale.vat_amount}

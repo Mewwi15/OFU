@@ -962,11 +962,11 @@ export async function listPosSales(opts?: {
   if (error) throw error;
   return data as PosSale[];
 }
-export type PosSaleItem = { id: string; product_name: string; size: string | null; unit_price: number; qty: number; line_total: number; refunded_qty: number };
+export type PosSaleItem = { id: string; product_name: string; size: string | null; unit_price: number; qty: number; line_discount: number; line_total: number; refunded_qty: number };
 export async function getPosSaleItems(saleId: string): Promise<PosSaleItem[]> {
   const { data, error } = await supabase
     .from('pos_sale_items')
-    .select('id, product_name, size, unit_price, qty, line_total, refunded_qty')
+    .select('id, product_name, size, unit_price, qty, line_discount, line_total, refunded_qty')
     .eq('sale_id', saleId);
   if (error) throw error;
   return data as PosSaleItem[];
