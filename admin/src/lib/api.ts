@@ -62,6 +62,9 @@ export function apiError(e: unknown): string {
     UNKNOWN_STAFF_CODE: 'ไม่มีรหัสพนักงานนี้ในระบบ',
     DUPLICATE_STAFF_CODE: 'รหัสนี้มีพนักงานใช้อยู่แล้ว',
     BREAKDOWN_MISMATCH: 'ยอดที่นับแยกชนิดรวมแล้วไม่เท่ากับยอดรวม — นับใหม่อีกครั้ง',
+    /* ★ ฐานข้อมูลส่งชื่อสินค้ามาใน detail แล้ว ★ (เจ้าของแจ้ง 20 ก.ย. 2569 ว่า
+       "ข้อความไม่บอกว่าตัวไหน") ตัวเติมชื่อทำอยู่ที่ apiError ด้านล่าง ข้อความนี้เป็น
+       ตัวสำรองตอนที่ฐานข้อมูลไม่ได้ส่งชื่อมา */
     OUT_OF_STOCK: 'สินค้าบางรายการมีไม่พอ',
     INSUFFICIENT_CASH: 'เงินที่รับมาไม่พอ',
     INSUFFICIENT_CREDIT: 'เครดิตร้านไม่พอ',
@@ -69,6 +72,14 @@ export function apiError(e: unknown): string {
     CUSTOMER_REQUIRED: 'ต้องเลือกลูกค้าสำหรับเครดิตร้าน',
     DUPLICATE_PROMO_CODE: 'มีโค้ดส่วนลดนี้อยู่แล้ว',
   };
+  /* ★ บอกให้ได้ว่าตัวไหน ★ (เจ้าของแจ้ง 20 ก.ย. 2569 "ข้อความไม่บอกว่าตัวไหน")
+     ฟังก์ชันฝั่งฐานข้อมูลแนบชื่อสินค้ามากับ detail อยู่แล้ว แต่เดิมเราทิ้ง แคชเชียร์จึงได้
+     แต่ "สินค้าบางรายการมีไม่พอ" แล้วต้องไล่เดาเองว่าชิ้นไหนจากบิลยี่สิบรายการ
+     ★ เติมเฉพาะรหัสที่รู้ว่า detail เป็นชื่อสินค้า ★ ถ้าเติมให้ทุกรหัส ข้อความอื่นจะมี
+     ศัพท์เทคนิคอังกฤษห้อยท้ายเต็มไปหมด ซึ่งอ่านแล้วยิ่งงงกว่าเดิม */
+  if ((msg === 'OUT_OF_STOCK' || msg === 'INSUFFICIENT_STOCK') && err?.details) {
+    return `${th[msg]} — ${err.details}`;
+  }
   return th[msg] ?? msg;
 }
 
@@ -654,6 +665,9 @@ export type PosSaleInput = {
   tax_invoice?: boolean;
   payments?: { method: 'cash' | 'promptpay'; amount: number }[]; // split tender
 };
+/** รายการที่ขายเกินจำนวนที่ระบบมี — create_pos_sale ส่งกลับมาหลังบันทึกบิล (0117) */
+export type Oversold = { name: string; size: string | null; want: number; have: number };
+
 export type SaleResult = {
   id: string;
   sale_number: string;
@@ -665,6 +679,9 @@ export type SaleResult = {
   net_amount: number;
   change: number;
   replay: boolean;
+  /* ★ ว่างไว้ได้ ★ ฐานข้อมูลรุ่นก่อน 0117 ไม่ส่งช่องนี้มา หน้าจอจึงต้องอ่านแบบไม่มีก็ได้
+     ไม่งั้นบิลแรกหลังอัปเดตหน้าเว็บ (ก่อนรันไมเกรชัน) จะพังทั้งหน้า */
+  oversold?: Oversold[];
 };
 
 export type ShopInfo = {

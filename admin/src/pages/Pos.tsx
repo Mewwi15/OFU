@@ -299,6 +299,32 @@ export function Pos() {
       .slice(0, SEARCH_LIMIT);
   }, [catalog, query]);
 
+  /* ── ของไม่พอ ──
+     เจ้าของแจ้งปัญหาจริงสามข้อ 20 ก.ย. 2569: "ข้อความไม่บอกว่าตัวไหน · เจอตอนกดชำระเงิน
+     แล้ว · หน้าขายไม่กันตั้งแต่ตอนยิง"
+
+     ★ ข้อมูลอยู่ในมืออยู่แล้ว ★ หน้านี้โหลดสินค้าทั้งร้านมาตั้งแต่เปิด (ไว้ค้นหา/ยิงบาร์โค้ด)
+     ซึ่งมีจำนวนคงเหลือติดมาทุกตัว แค่ไม่เคยเอามาเทียบกับบิลที่กำลังคีย์อยู่
+     ของเดิมเช็คแค่ "หมดเกลี้ยง" (stock_qty <= 0) ตอนยิง — ของเหลือ 2 แต่ยิงไป 5 จึงเงียบ
+     สนิทจนไปโผล่ตอนกดชำระเงิน */
+  const stockByVariant = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of catalog) for (const v of p.variants) m.set(v.id, v.stock_qty);
+    return m;
+  }, [catalog]);
+
+  /** แถวที่จำนวนในบิลเกินของที่เหลือ — เก็บจำนวนคงเหลือจริงไว้บอกแคชเชียร์ */
+  const shortLines = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const l of lines) {
+      const have = stockByVariant.get(l.variantId);
+      /* ไม่รู้จัก = ไม่ตัดสิน (รายการสินค้ายังโหลดไม่เสร็จ) ปล่อยให้ฐานข้อมูลว่าตอนปิดบิล */
+      if (have === undefined) continue;
+      if (have < l.qty) out.set(l.variantId, Math.max(0, have));
+    }
+    return out;
+  }, [lines, stockByVariant]);
+
   /* ── cart ops ──────────────────────────────────────────────────────────── */
   function addVariant(p: PosProduct, v: PosVariant) {
     setLines((cur) => {
@@ -392,9 +418,17 @@ export function Pos() {
     const hit = findByCode(raw);
     if (hit) {
       addVariant(hit.p, hit.v);
-      const oos = hit.v.stock_qty <= 0;
       const label = `${hit.p.name}${hit.v.size ? ' · ' + hit.v.size : ''}`;
-      flashScan(oos ? `${label} — สต็อกหมด` : label, oos ? 'warn' : 'ok');
+      /* ★ เทียบกับจำนวนหลังใส่ ไม่ใช่แค่ว่าหมดเกลี้ยงหรือยัง ★ ของเดิมดู stock_qty <= 0
+         อย่างเดียว ของเหลือ 2 แต่ยิงไปชิ้นที่ 3 จึงไม่เตือนอะไรเลย แล้วไปโผล่ตอนกดชำระเงิน
+         ซึ่งเป็นจังหวะที่แย่ที่สุด — ลูกค้ายืนรอ ของถูกแพ็คใส่ถุงไปแล้ว */
+      const have = hit.v.stock_qty;
+      const after = (lines.find((l) => l.variantId === hit.v.id)?.qty ?? 0) + 1;
+      if (after > have) {
+        flashScan(`${label} — เหลือ ${Math.max(0, have)} ใส่ไปแล้ว ${after}`, 'warn');
+      } else {
+        flashScan(label, 'ok');
+      }
       return true;
     }
     /* ★ ไม่ใช่สินค้า → ลองเป็นคิวอาร์สมาชิกก่อนค่อยบอกว่าไม่พบ ★ คิวอาร์บนหน้า OFU
@@ -925,6 +959,7 @@ export function Pos() {
               <div className="divide-y divide-[#F0F0F0]">
                 {[...lines].reverse().map((l) => {
                   const fresh = flashId === l.variantId;
+                  const have = shortLines.get(l.variantId);
                   return (
                     <div
                       key={l.variantId}
@@ -992,6 +1027,28 @@ export function Pos() {
                           </button>
                         </div>
                       </div>
+
+                      {/* ★ เตือนตรงแถวที่มีปัญหา ★ ไม่ใช่ข้อความรวมตอนกดชำระเงิน — บิลยาว ๆ
+                          แคชเชียร์ต้องไล่หาเองว่าตัวไหน และตอนนั้นของแพ็คใส่ถุงไปแล้ว
+                          ★ ไม่ห้ามขาย ★ (เจ้าของเลือกทาง B 20 ก.ย. 2569) ของบนชั้นสำคัญกว่า
+                          ตัวเลขในระบบ — บอกให้รู้แล้วให้คนหน้าเครื่องตัดสิน พร้อมปุ่มปรับให้
+                          เท่าที่มีจริงถ้าเป็นการยิงเกินโดยไม่ตั้งใจ */}
+                      {have !== undefined ? (
+                        <div className="flex items-center gap-2 mt-2.5 ml-[68px] px-3 py-2 bg-amber-50 border border-amber-200">
+                          <RiErrorWarningLine className="w-[17px] h-[17px] text-amber-700 shrink-0" />
+                          <span className="flex-1 text-[13.5px] font-medium text-amber-800">
+                            {have === 0
+                              ? `ระบบว่าหมดแล้ว แต่ใส่ไป ${l.qty}`
+                              : `เหลือ ${have} ใส่ไป ${l.qty}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setQty(l.variantId, have)}
+                            className="shrink-0 px-3 py-1 text-[12.5px] font-semibold text-white bg-amber-700 hover:bg-amber-800 transition">
+                            {have === 0 ? 'เอาออก' : `ปรับเหลือ ${have}`}
+                          </button>
+                        </div>
+                      ) : null}
 
                       {discountEditing === l.variantId ? (
                         <div className="flex items-center justify-end gap-2 mt-2.5 pl-[68px]">
@@ -1259,6 +1316,17 @@ export function Pos() {
                 </span>
               )}
             </Button>
+            {/* ★ บอกก่อนกด ไม่ใช่หลังกด ★ ปุ่มเดิมดูปกติทุกประการแล้วไปเด้ง error ตอนท้าย
+                — ตรงนี้บอกตั้งแต่ยังไม่กดว่าบิลนี้มีของเกินสต๊อกกี่รายการ
+                ไม่ปิดปุ่ม เพราะเจ้าของเลือกให้ขายได้ (ของบนชั้นสำคัญกว่าตัวเลขในระบบ) */}
+            {shortLines.size > 0 ? (
+              <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200">
+                <RiErrorWarningLine className="w-[17px] h-[17px] text-amber-700 shrink-0" />
+                <span className="text-[13px] text-amber-800">
+                  มี {shortLines.size} รายการเกินสต๊อกที่ระบบมี — ขายได้ แต่สต๊อกจะติดลบ
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1639,7 +1707,34 @@ function ReceiptModal({ data, shop, onClose }: { data: ReceiptData; shop: ShopIn
             สีแดงตามที่เจ้าของสั่ง ("เงินทอนเอาสีแดง") — เป็นเงินที่ต้องหยิบออกจากลิ้นชัก
             คืนลูกค้า ไม่ใช่ยอดที่ได้มา สีจึงเตือนให้ทำอะไรต่อ */}
         <div className="no-print">
-          {method === 'cash' ? (
+          {/* ★ ขายเกินสต๊อกแล้วต้องไม่เงียบ ★ (เจ้าของเลือกทาง B 20 ก.ย. 2569 — ขายได้ แต่ต้อง
+          รู้) ฐานข้อมูลส่งรายการที่เกินกลับมาหลังบันทึกบิล ถ้าไม่เอามาแสดงตรงนี้ ของที่สต๊อก
+          ติดลบจะไม่มีใครรู้จนกว่าจะไปเปิดหน้าสต๊อกเอง ซึ่งไม่มีใครเปิดระหว่างขาย
+          ★ no-print ★ เป็นเรื่องของร้าน ไม่ใช่ของลูกค้า ห้ามติดไปบนใบเสร็จ */}
+      {sale.oversold && sale.oversold.length > 0 ? (
+        <div className="no-print mb-3 border-2 border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="text-[15px] font-semibold text-amber-900">
+            ขายเกินจำนวนที่ระบบมี {sale.oversold.length} รายการ — สต๊อกติดลบแล้ว
+          </div>
+          <div className="mt-1.5 flex flex-col gap-1">
+            {sale.oversold.map((o, i) => (
+              <div key={i} className="flex items-baseline justify-between text-[13.5px] text-amber-900/85">
+                <span>
+                  {o.name}
+                  {o.size ? ` (${o.size})` : ''}
+                </span>
+                <span className="tabular-nums">
+                  ขาย {o.want} · ระบบมี {o.have}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 pt-2 border-t border-amber-200 text-[12.5px] text-amber-900/70">
+            ของพวกนี้ต้องไปนับใหม่แล้วแก้สต๊อกให้ตรง
+          </div>
+        </div>
+      ) : null}
+      {method === 'cash' ? (
             <div className="border-2 border-red-200 bg-red-50 px-5 py-5">
               <span className="block text-[17px] font-semibold text-red-800">
                 {sale.change > 0 ? 'เงินทอน' : 'รับพอดี ไม่ต้องทอน'}
