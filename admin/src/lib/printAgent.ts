@@ -12,8 +12,26 @@
  * และมีที่ให้แก้หน้าตาบิลอยู่ที่เดียวคือ Receipt.tsx ไม่ต้องเขียนเลย์เอาต์ซ้ำในฝั่ง Python
  */
 
-/** จำนวนจุดตามความกว้างหัวพิมพ์ — เครื่อง 58 มม. พิมพ์ได้จริง 48 มม. = 384 จุด */
-const DOTS_58MM = 384;
+import { notification } from 'antd';
+
+import { contentMm, getReceiptConfig } from './receiptConfig';
+
+/** หัวพิมพ์ความร้อน 203 dpi = 8 จุดต่อมิลลิเมตร — เท่ากันทุกรุ่นที่ร้านใช้ */
+const DOTS_PER_MM = 8;
+
+/**
+ * ความกว้างของรูปบิลที่จะส่งไปพิมพ์ — คิดจากค่าที่ตั้งไว้ ไม่ใช่เต็มหัวพิมพ์เสมอ
+ *
+ * ★ ต้องผูกกับค่าตั้ง ไม่งั้นช่อง "ความกว้างเนื้อบิล" ไม่มีความหมาย ★ ของเดิมตายตัวที่
+ * 384 จุด (48 มม.) แล้วตัวถ่ายรูปคิดสเกลเป็น "ความกว้างที่เห็นบนจอ → 384 จุด" ผลคือบิล
+ * ถูกยืดเป็น 48 มม. ทุกใบ ไม่ว่าจะตั้งไว้เท่าไหร่ · เจ้าของไล่ปรับค่านี้เพื่อแก้ขอบขวา
+ * โดนตัดเมื่อ 5 ก.ย. 2026 แล้วเห็นแค่ตัวหนังสือโตขึ้น/เล็กลง ขอบที่โดนตัดไม่หาย
+ * เพราะความกว้างจริงบนกระดาษไม่เคยเปลี่ยนตามเลยสักครั้ง
+ */
+function configuredDots(): number {
+  const cfg = getReceiptConfig();
+  return Math.round(contentMm(cfg.paperWidth, cfg.contentWidthMm) * DOTS_PER_MM);
+}
 
 /** สถานะเครื่องพิมพ์ตัวหนึ่งตามที่ Windows รายงาน */
 export type PrinterState = {
@@ -109,26 +127,108 @@ async function receiptToPng(el: HTMLElement, dots: number): Promise<Blob> {
 }
 
 /**
+ * เตือนเมื่อเครื่องพิมพ์รับงานไว้แต่กระดาษไม่น่าจะออก
+ *
+ * ★ "ส่งเข้าคิวสำเร็จ" ไม่ใช่ "ลูกค้าได้บิล" ★ Windows รับงานเข้าคิวเสมอแม้เครื่องพิมพ์
+ * ปิดอยู่ ตัวกลางจึงตอบ 200 ทุกครั้ง — ของเดิมอ่านแค่รหัส HTTP แล้วทิ้ง body ทั้งก้อน
+ * ทั้งที่ตัวกลางอุตส่าห์ไปถามสถานะจริงมาแนบให้ หน้าจบบิลเลยขึ้นว่าพิมพ์แล้วทั้งที่
+ * กระดาษหมด/เครื่องปิด · ลูกค้ารับเงินทอนแล้วเดินกลับโดยไม่มีบิล แล้ววันหลังพอเปิด
+ * เครื่องพิมพ์ บิลที่ค้างคิวจะพ่นออกมาพรวดเดียวทั้งกอง
+ *
+ * ★ ทำไมต้องถึงสามงาน ★ ตัวกลางถามสถานะทันทีหลังส่ง ขณะที่บิลใบนี้ยังไหลอยู่ในคิว
+ * มันจึงนับตัวเองรวมไปด้วยหนึ่งงานเสมอ — เตือนที่ jobs > 0 คือเตือนหลอกทุกใบ แล้วคน
+ * หน้าเครื่องจะเลิกอ่านแถบเตือนภายในวันเดียว · สามงาน = มีของเก่าค้างอยู่จริงสองใบ
+ */
+function warnIfPrinterStuck(state: PrinterState) {
+  const piled = state.jobs >= 3;
+  if (state.ready && !piled) return;
+  const bits = [...state.problems];
+  if (piled) bits.push(`ค้างในคิว ${state.jobs} งาน`);
+  notification.error({
+    /* คีย์เดียวกันทุกครั้ง — ขายรัว ๆ แล้วมีปัญหาจริง ต้องไม่กลายเป็นกล่องเตือนซ้อนกันเป็นตั้ง */
+    key: 'pos-printer-stuck',
+    message: 'บิลอาจไม่ออกจากเครื่องพิมพ์',
+    description: `${bits.join(' · ') || 'เครื่องพิมพ์ไม่พร้อม'} — เช็คเครื่องพิมพ์แล้วกดพิมพ์อีกครั้ง`,
+    placement: 'topRight',
+    duration: 0, // ค้างไว้จนกว่าจะกดปิด: เงินทอนออกไปแล้ว บิลยังไม่ออก
+  });
+}
+
+/** เวลาจำกัดของการส่งบิล — ตัวกลางในเครื่องเดียวกันใช้เวลาไม่ถึงสองวินาทีแม้บิลยาว ๆ */
+const PRINT_TIMEOUT_MS = 8000;
+
+/* ★ กดซ้ำระหว่างที่ยังพิมพ์ไม่เสร็จ ต้องไม่ได้กระดาษใบที่สอง ★ ทางตัวกลางใช้เวลาหลาย
+   ร้อยมิลลิวินาที (รอฟอนต์ + ถ่ายรูปใหม่ที่ความละเอียดปลายทาง + ฝั่ง Python วนบิตทีละจุด)
+   ระหว่างนั้นปุ่มยังอ่านว่า "พิมพ์บิล" เฉย ๆ แคชเชียร์ที่ยังไม่เห็นกระดาษจะกดซ้ำตาม
+   สัญชาตญาณ · คนที่มาทีหลังใช้ผลของงานที่กำลังวิ่งอยู่ ไม่เปิดงานใหม่ — และห้ามคืน false
+   ในกรณีนี้ เพราะผู้เรียกจะถอยไป window.print() แล้วได้หน้าต่างพิมพ์เด้งใส่แทน */
+let inFlight: Promise<boolean> | null = null;
+
+/**
  * พิมพ์ใบเสร็จผ่านตัวกลาง — คืน true เมื่อกระดาษถูกส่งเข้าเครื่องพิมพ์แล้ว
  *
  * ไม่โยน error ออกไป: ผู้เรียกต้องถอยไปใช้การพิมพ์ผ่านเบราว์เซอร์ได้เสมอ การพิมพ์บิล
  * ห้ามล้มทั้งกระบวนการเพราะตัวกลางปิดอยู่
  */
-export async function printViaAgent(
-  el: HTMLElement,
-  port: number,
-  dots = DOTS_58MM,
-): Promise<boolean> {
+export function printViaAgent(el: HTMLElement, port: number, dots?: number): Promise<boolean> {
+  if (inFlight) return inFlight;
+  const job = sendToAgent(el, port, dots).finally(() => {
+    inFlight = null;
+  });
+  inFlight = job;
+  return job;
+}
+
+async function sendToAgent(el: HTMLElement, port: number, dots?: number): Promise<boolean> {
   try {
-    const png = await receiptToPng(el, dots);
-    const res = await fetch(url(port, '/print'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'image/png' },
-      body: png,
-    });
-    return res.ok;
+    const png = await receiptToPng(el, dots ?? configuredDots());
+    /* ★ ต้องมีเวลาจำกัด ★ ถ้าตัวกลางค้าง (คิวพิมพ์ของ Windows ล็อกอยู่) คำขอนี้ไม่มีวัน
+       จบเอง หน้าจบบิลจะนิ่งไปเฉย ๆ โดยไม่มีอะไรบอก — ล้มเร็วแล้วถอยไปทางเบราว์เซอร์
+       ดีกว่าค้างตอนลูกค้ายืนรอ · หมายเหตุ: การยกเลิกฝั่งเราไม่ได้ยกเลิกงานที่ส่งไปแล้ว
+       ถ้าตัวกลางฟื้นทีหลัง กระดาษยังออกได้ จึงต้องตั้งให้นานพอที่จะไม่ตัดงานปกติทิ้ง */
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), PRINT_TIMEOUT_MS);
+    try {
+      const res = await fetch(url(port, '/print'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/png' },
+        body: png,
+        signal: stop.signal,
+      });
+      if (!res.ok) return false;
+      /* สถานะจริงของเครื่องพิมพ์มากับ body ของงานที่เพิ่งส่ง — อ่านตรงนี้ที่เดียว
+         หน้าอื่นไม่ต้องรู้เรื่อง แค่เรียกพิมพ์เหมือนเดิมก็ได้คำเตือนไปด้วย */
+      const body = (await res.json().catch(() => null)) as { state?: PrinterState } | null;
+      if (body?.state) warnIfPrinterStuck(body.state);
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
     return false;
+  }
+}
+
+/**
+ * เปิดลิ้นชักโดยไม่พิมพ์อะไร — คืน true เมื่อตัวกลางสั่งเปิดให้แล้ว
+ *
+ * ★ สลิปที่มีหน้าที่ "ทำให้ลิ้นชักเด้ง" ต้องไม่ฝากชีวิตไว้กับไดรเวอร์ ★ ใบเปิดรอบ ใบนับเงิน
+ * และสลิปเปิดลิ้นชักเปล่า พิมพ์ผ่านเบราว์เซอร์ = ไปที่เครื่องพิมพ์หลักของ Windows ซึ่งอาจ
+ * เป็น Brother A4 ตามที่คู่มือตัวกลางบอกให้ตั้งได้ ลิ้นชักจึงไม่เด้งเลย ทั้งที่ระบบบันทึกไป
+ * แล้วว่าเปิด — แล้วแคชเชียร์ต้องกดซ้ำ ซึ่งบันทึก "เติมเงินทอน/เก็บเงินออก" ซ้ำไปด้วย
+ * ทางนี้ยิงคำสั่งเข้าเครื่องพิมพ์บิลตรง ๆ ไม่เกี่ยวกับเครื่องพิมพ์หลักเลย
+ */
+export async function openDrawerViaAgent(port: number, timeoutMs = 2500): Promise<boolean> {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), timeoutMs);
+  try {
+    const res = await fetch(url(port, '/drawer'), { method: 'POST', signal: stop.signal });
+    return res.ok;
+  } catch {
+    /* ไม่มีตัวกลางในเครื่องนี้ — ยังมีสลิปที่พิมพ์ผ่านเบราว์เซอร์เป็นทางเดิมให้ลิ้นชักเด้ง */
+    return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -151,10 +251,11 @@ export type DryRun = {
 export async function dryRunViaAgent(
   el: HTMLElement,
   port: number,
-  dots = DOTS_58MM,
+  dots?: number,
 ): Promise<DryRun> {
   try {
-    const png = await receiptToPng(el, dots);
+    /* ต้องกว้างเท่าตอนพิมพ์จริงเป๊ะ ไม่งั้นตัวเลขที่ได้ตอบแทนกระดาษจริงไม่ได้ */
+    const png = await receiptToPng(el, dots ?? configuredDots());
     const res = await fetch(url(port, '/print?dry=1'), {
       method: 'POST',
       headers: { 'Content-Type': 'image/png' },

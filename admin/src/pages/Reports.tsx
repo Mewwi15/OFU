@@ -72,6 +72,11 @@ export function Reports() {
 
   const totalGross = useMemo(() => (data ? data.onsite.gross + data.online.gross : 0), [data]);
   const pct = (v: number, t: number) => (t > 0 ? Math.round((v / t) * 100) : 0);
+  /* ★ ช่อง cash จาก pos_dashboard รวมเงินสด COD ของออเดอร์ส่งเข้ามาด้วย (0077:179) ★
+     การ์ดข้างล่างพาดหัวว่า "หน้าร้าน" ถ้าไม่หัก COD ออก บรรทัดเงินสดจะใหญ่กว่าเงินสด
+     หน้าร้านจริง สามบรรทัดบวกกันไม่เท่ายอดหน้าร้าน และเคยเห็น % ทะลุ 100 มาแล้ว
+     (type Dashboard ใน lib/api.ts ยังไม่มีช่องนี้ — อ่านแคบ ๆ ตรงจุดใช้งานพอ) */
+  const codCash = (data?.onsite as (Dashboard['onsite'] & { cod_cash?: number }) | undefined)?.cod_cash ?? 0;
 
   return (
     <>
@@ -122,9 +127,18 @@ export function Reports() {
                 <ChannelBar Icon={RiStore2Line} label="หน้าร้าน (POS)" amount={data.onsite.gross} count={data.onsite.count} pct={pct(data.onsite.gross, totalGross)} stroke="#5B8C6E" />
                 <ChannelBar Icon={RiShoppingBag3Line} label="ออนไลน์" amount={data.online.gross} count={data.online.count} pct={pct(data.online.gross, totalGross)} stroke="#1E9E5C" />
                 {data.onsite.refunds > 0 && (
-                  <div className="flex items-center gap-2 text-sm" style={{ color: '#E5484D' }}>
-                    <RiRefund2Line className="w-4 h-4" />
-                    คืนเงิน {baht(data.onsite.refunds)}
+                  <div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: '#E5484D' }}>
+                      <RiRefund2Line className="w-4 h-4" />
+                      คืนเงิน {baht(data.onsite.refunds)}
+                    </div>
+                    {/* ★ ยอดนี้เอาไปลบจากยอดขายด้านบนไม่ได้ ★ มันรวมบิลที่คืนทั้งใบซึ่งถูกตัด
+                        ออกจากยอดขายไปแล้ว (0077:184 บวก refunded_amount ทุกบิล ส่วน gross
+                        นับเฉพาะบิล completed) ลบเองจะกลายเป็นหักซ้ำ — ยอดสุทธิที่ถูกต้อง
+                        อยู่ที่การ์ดกำไรขั้นต้น ซึ่งหักของที่คืนไว้ให้แล้ว */}
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      รวมบิลที่คืนทั้งใบซึ่งถูกตัดออกจากยอดขายแล้ว · ยอดสุทธิดูที่การ์ดกำไรขั้นต้น
+                    </Text>
                   </div>
                 )}
               </div>
@@ -135,13 +149,21 @@ export function Reports() {
           <Card title="วิธีชำระ (หน้าร้าน)" loading={loading}>
             {data && (
               <div className="space-y-3">
-                <PayRow label="เงินสด" value={data.onsite.cash} pct={pct(data.onsite.cash, data.onsite.gross)} />
+                <PayRow label="เงินสด" value={data.onsite.cash - codCash} pct={pct(data.onsite.cash - codCash, data.onsite.gross)} />
                 <PayRow label="พร้อมเพย์" value={data.onsite.promptpay} pct={pct(data.onsite.promptpay, data.onsite.gross)} />
                 <PayRow label="เครดิตร้าน" value={data.onsite.store_credit} pct={pct(data.onsite.store_credit, data.onsite.gross)} />
                 <div className="flex items-center justify-between text-sm pt-2 border-t" style={{ borderColor: '#E8E8E8' }}>
                   <Text type="secondary">ส่วนลดที่ให้</Text>
                   <span className="font-medium">{baht(data.onsite.discount)}</span>
                 </div>
+                {/* เงินสดที่ไรเดอร์เก็บมา — เข้าลิ้นชักเหมือนกันแต่ไม่ใช่การขายหน้าร้าน
+                    จึงอยู่ใต้เส้น ไม่คิด % รวมกับสามบรรทัดบน */}
+                {codCash > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <Text type="secondary">เงินสด COD (ออเดอร์ส่ง)</Text>
+                    <span className="font-medium">{baht(codCash)}</span>
+                  </div>
+                )}
               </div>
             )}
           </Card>
@@ -153,13 +175,17 @@ export function Reports() {
           {(() => {
             const revenue = profit.pos.revenue + profit.online.revenue;
             const cost = profit.pos.cost + profit.online.cost;
-            const billDisc = profit.pos.bill_discount ?? 0;
+            /* ★ ส่วนลดต้องรวมฝั่งออนไลน์ด้วย ★ revenue ของออนไลน์คือยอดสินค้า "ก่อน" หัก
+               โค้ดส่วนลด (order_items.line_total) ถ้าหักแต่ส่วนลดท้ายบิลหน้าร้านอย่างเดิม
+               กำไรจะบวมเท่าโค้ดที่แจกไปทั้งหมด — ยิ่งจัดโปรฯ แรงยิ่งหลอกตา
+               (0112 เติมช่อง bill_discount ฝั่งออนไลน์ให้แล้ว นับเฉพาะโค้ดที่ลดยอดสินค้า) */
+            const billDisc = (profit.pos.bill_discount ?? 0) + (profit.online.bill_discount ?? 0);
             const gp = revenue - billDisc - cost;
             const pctGp = revenue - billDisc > 0 ? (gp / (revenue - billDisc)) * 100 : 0;
             return (
               <>
                 <Row gutter={[16, 16]}>
-                  <Col xs={12} lg={6}><Statistic title="ยอดขาย (หลังส่วนลด)" value={revenue - billDisc} prefix="฿" /></Col>
+                  <Col xs={12} lg={6}><Statistic title="ยอดขายสุทธิ (หักคืน·ส่วนลด)" value={revenue - billDisc} prefix="฿" /></Col>
                   <Col xs={12} lg={6}><Statistic title="ต้นทุนของที่ขาย" value={cost} prefix="฿" /></Col>
                   <Col xs={12} lg={6}>
                     <Statistic title="กำไรขั้นต้น" value={gp} prefix="฿"
@@ -203,7 +229,9 @@ export function Reports() {
                   ]}
                 />
                 <Text type="secondary" style={{ fontSize: 12.5 }}>
-                  รายสินค้าคิดก่อนหักส่วนลดท้ายบิล · แถวสีแดง = ขายต่ำกว่าทุน ควรเช็คราคา
+                  รายสินค้าคิดก่อนหักส่วนลดท้ายบิล · ทุกตัวเลขในการ์ดนี้หักของที่ลูกค้าคืนแล้ว ·
+                  ยอดออนไลน์ตรงนี้เป็นค่าสินค้าล้วน ไม่รวมค่าส่ง จึงไม่เท่ากับการ์ดยอดออนไลน์ด้านบน ·
+                  แถวสีแดง = ขายต่ำกว่าทุน ควรเช็คราคา
                 </Text>
               </>
             );

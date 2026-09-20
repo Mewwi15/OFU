@@ -130,9 +130,15 @@ export function Receive() {
   // วันที่รับจริง — ย้อนหลังได้ (เคสคีย์ตามหลัง เช่นใบค้างจาก ETS)
   const [receivedAt, setReceivedAt] = useState<Dayjs>(dayjs());
   // ผลการ import ไฟล์: แถวที่จับคู่ไม่ได้ต้องเห็นตรง ๆ ห้ามหายเงียบ (บทเรียน M4)
+  // ★ สองกองแยกกันเด็ดขาด ★ unmatchedRows = ไม่ได้เข้าตารางร่าง ต้องจัดการเอง
+  // warnRows = เข้าตารางร่างไปแล้ว แต่ยอดในไฟล์ดูไม่ตรง แค่ให้ตรวจก่อนบันทึก
+  // เคยรวมเป็นกองเดียวแล้วหัวข้อ Alert ประกาศว่า "ไม่ถูกนำเข้า" ทั้งที่แถวนั้นเข้าไปแล้ว —
+  // คนรับของก็ไปตามเก็บด้วยการอัปโหลดไฟล์เดิมซ้ำ ซึ่งตัวรวมไฟล์บวกทับแถวเดิม
+  // (`ex.qty += nl.qty` ใน beforeUpload) ไม่มีอะไรกันไว้เลย = ของเข้าสองเท่า
   const [importReport, setImportReport] = useState<{
     matched: number;
     unmatchedRows: UnmatchedRow[];
+    warnRows: UnmatchedRow[];
   } | null>(null);
   const [creatingDrafts, setCreatingDrafts] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null); // 'เลขที่เอกสาร: ขนม' จากหัวไฟล์
@@ -649,8 +655,8 @@ export function Receive() {
                   if (res.head.docDate) { setReceivedAt(dayjs(res.head.docDate)); filled.push(`วันที่ ${dayjs(res.head.docDate).format('DD/MM/YYYY')}`); }
                   if (res.head.refText) setImportNote(`อ้างอิง ETS: ${res.head.refText}`);
                   if (filled.length) message.info(`ดึงหัวใบจากไฟล์: ${filled.join(' · ')}`);
-                  setImportReport({ matched: res.matched, unmatchedRows: res.unmatchedRows });
-                  if (res.unmatchedRows.length === 0)
+                  setImportReport({ matched: res.matched, unmatchedRows: res.unmatchedRows, warnRows: res.warnRows });
+                  if (res.unmatchedRows.length === 0 && res.warnRows.length === 0)
                     message.success(`นำเข้า ${res.matched} รายการ ครบทุกแถว — ตรวจในตารางแล้วกดบันทึก`);
                 } catch {
                   message.error('อ่านไฟล์ไม่สำเร็จ — เช็คว่าเป็น .csv/.xls/.xlsx');
@@ -665,26 +671,59 @@ export function Receive() {
         {importReport ? (
           <Alert
             className="mb-3"
-            type={importReport.unmatchedRows.length ? 'warning' : 'success'}
+            type={importReport.unmatchedRows.length || importReport.warnRows.length ? 'warning' : 'success'}
             showIcon
             closable
             onClose={() => setImportReport(null)}
             message={
-              importReport.unmatchedRows.length
-                ? `นำเข้าได้ ${importReport.matched} รายการ · ไม่ได้ ${importReport.unmatchedRows.length} แถว (ไม่ถูกนำเข้า — ดูรายการด้านล่าง)`
-                : `นำเข้าครบ ${importReport.matched} รายการ`
+              // ★ หัวข้อนับเฉพาะแถวที่ไม่ถูกนำเข้าจริง ★ แถวยอดไม่ตรงอยู่ในตารางร่างแล้ว
+              // ต้องพูดคนละประโยค ไม่งั้นคนรับของอ่านว่า "ไม่ถูกนำเข้า" แล้วไปตามเก็บซ้ำ
+              [
+                `นำเข้าได้ ${importReport.matched} รายการ`,
+                importReport.unmatchedRows.length
+                  ? `ไม่ได้ ${importReport.unmatchedRows.length} แถว (ไม่ถูกนำเข้า — ดูรายการด้านล่าง)`
+                  : null,
+                importReport.warnRows.length
+                  ? `ยอดไม่ตรง ${importReport.warnRows.length} แถว (อยู่ในตารางร่างแล้ว — ตรวจก่อนบันทึก)`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')
             }
             description={
-              importReport.unmatchedRows.length ? (
+              importReport.unmatchedRows.length || importReport.warnRows.length ? (
                 <div>
-                  <div className="max-h-40 overflow-y-auto text-[13px]">
-                    {importReport.unmatchedRows.map((u) => (
-                      <div key={`${u.row}-${u.text}`}>
-                        แถว {u.row} · <span className="font-mono">{u.text}</span>
-                        {u.name ? ` · ${u.name}` : ''} — {u.why}
+                  {importReport.unmatchedRows.length ? (
+                    <div className="max-h-40 overflow-y-auto text-[13px]">
+                      {importReport.unmatchedRows.map((u) => (
+                        <div key={`u-${u.row}-${u.text}`}>
+                          แถว {u.row} · <span className="font-mono">{u.text}</span>
+                          {u.name ? ` · ${u.name}` : ''} — {u.why}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {importReport.warnRows.length ? (
+                    <div className="mt-2 text-[13px]">
+                      <div className="font-medium">
+                        แถวพวกนี้อยู่ในตารางร่างแล้ว — แก้จำนวน/ทุนในตารางได้เลย อย่าคีย์เพิ่มและอย่าอัปโหลดไฟล์เดิมซ้ำ
                       </div>
-                    ))}
-                  </div>
+                      {/* ทั้งใบยอดไม่ตรงหมด = ไม่ใช่ส่วนลดรายแถว แต่เป็นรายงานคนละหน้าตา
+                          (มีคอลัมน์ตัวเลขแทรก ตัวที่สามจึงไม่ใช่ยอดสุทธิ) — ต้องบอกให้ตรวจทั้งใบ */}
+                      {importReport.warnRows.length >= 3 && importReport.warnRows.length >= importReport.matched ? (
+                        <div>
+                          ทุกแถวยอดไม่ตรง — รายงานใบนี้อาจมีคอลัมน์ตัวเลขไม่เหมือนใบอื่น ให้เทียบจำนวน/ทุนกับกระดาษทั้งใบก่อนบันทึก
+                        </div>
+                      ) : null}
+                      <div className="max-h-40 overflow-y-auto">
+                        {importReport.warnRows.map((u) => (
+                          <div key={`w-${u.row}-${u.text}`}>
+                            แถว {u.row} · <span className="font-mono">{u.text}</span> — {u.why}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {importReport.unmatchedRows.some((u) => u.qty && u.qty > 0) ? (
                     <Button
                       className="mt-2"
@@ -990,10 +1029,10 @@ export type FileHead = {
 export function parseReceiveFile(
   wb: XLSX.WorkBook,
   items: PickItem[],
-): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[]; head: FileHead } {
+): { lines: DraftLine[]; matched: number; unmatchedRows: UnmatchedRow[]; warnRows: UnmatchedRow[]; head: FileHead } {
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1, raw: false, defval: '' });
-  if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [], head: {} };
+  if (!rows.length) return { lines: [], matched: 0, unmatchedRows: [], warnRows: [], head: {} };
 
   const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
   const BARCODE_H = ['บาร์โค้ด', 'barcode', 'รหัส', 'รหัสสินค้า', 'sku', 'code'];
@@ -1011,7 +1050,7 @@ export function parseReceiveFile(
     }
   }
   if (headRow < 0) {
-    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }], head: {} };
+    return { lines: [], matched: 0, unmatchedRows: [{ row: 1, text: '-', why: 'ไม่พบหัวตาราง (ต้องมีคอลัมน์ รหัสสินค้า/บาร์โค้ด และ จำนวน)' }], warnRows: [], head: {} };
   }
 
   /* หัวใบเหนือหัวตาราง (เจ้าของทัก: "ผู้ขาย เลขเอกสาร ก็มีในไฟล์ ทำไมไม่ทำ"):
@@ -1056,6 +1095,8 @@ export function parseReceiveFile(
 
   const acc = new Map<string, DraftLine>();
   const unmatchedRows: UnmatchedRow[] = [];
+  /* แถวที่ "เข้าตารางร่างไปแล้ว แต่ยอดในไฟล์ดูไม่ตรง" — คนละกองกับแถวที่ไม่ถูกนำเข้า */
+  const warnRows: UnmatchedRow[] = [];
   for (let r = headRow + 1; r < rows.length; r++) {
     const cells = rows[r];
     // หาช่องรหัส: ตำแหน่งหัวตารางก่อน · เยื้องได้ ±2 ช่อง (นิสัย Crystal)
@@ -1111,13 +1152,15 @@ export function parseReceiveFile(
     }
     const cost = nums.length >= 2 ? nums[1] : null;
     // ตรวจทานตัวเอง: จำนวน×ราคา ต้องตรงยอดสุทธิในไฟล์ (เผื่อเศษปัดทศนิยม)
+    // ★ ลงกอง warnRows ไม่ใช่ unmatchedRows ★ แถวนี้เดินต่อไปเข้า acc คือถูกนำเข้าจริง
+    // ถ้าปนไปกับกองที่ "ไม่ถูกนำเข้า" หัวข้อ Alert จะโกหกแล้วคนรับของไปคีย์/อัปโหลดซ้ำ
     if (cost != null && nums.length >= 3) {
       const expect = qty * cost;
       if (Math.abs(expect - nums[2]) > Math.max(0.5, expect * 0.01)) {
-        unmatchedRows.push({
+        warnRows.push({
           row: r + 1,
           text: rawBar,
-          why: `เช็คยอด: ${qty}×${cost} = ${expect.toFixed(2)} ไม่ตรงยอดในไฟล์ ${nums[2]} — นำเข้าแล้ว โปรดตรวจ`,
+          why: `เช็คยอด: ${qty}×${cost} = ${expect.toFixed(2)} ไม่ตรงยอดในไฟล์ ${nums[2]}`,
         });
       }
     }
@@ -1129,7 +1172,7 @@ export function parseReceiveFile(
       acc.set(item.variantId, { ...item, qty, unitCost: cost ?? item.cost });
     }
   }
-  return { lines: [...acc.values()], matched: acc.size, unmatchedRows, head };
+  return { lines: [...acc.values()], matched: acc.size, unmatchedRows, warnRows, head };
 }
 
 /* ═══ พิมพ์ใบรับเข้า — iframe ซ่อน (ธรรมเนียมเดียวกับ printOrder: ไม่มีหน้าต่างเด้ง) ═══ */

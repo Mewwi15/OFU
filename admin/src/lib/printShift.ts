@@ -41,6 +41,12 @@ export type ShiftReport = {
   recon: CashSummary | null;
   /* รายงานการขายของรอบ (0091) — ขายอะไรไปบ้าง สต๊อกขยับเท่าไหร่ กำไรเท่าไหร่ */
   sales: ShiftSalesReport | null;
+  /* ★ true = ดึงยอดขาย (pos_dashboard) ตอนกดพิมพ์ไม่สำเร็จ ★ ท่อน "ยอดขายในรอบ" ต้อง
+     เว้น "—" ห้ามพิมพ์ ฿0 — เคยออกใบที่ท่อนบนขึ้น "0 บิล · ยอดขายรวม ฿0" ขณะที่ท่อน
+     "กำไรในรอบ"/"สินค้าที่ขายในรอบ" ข้างล่าง (ดึงสดด้วย shift_id คนละทางกัน) มีรายการ
+     เต็มหน้า กระดาษแผ่นเดียวจึงขัดกันเอง และมันถูกเก็บเข้าแฟ้มไปแล้วแก้ไม่ได้
+     ศูนย์ที่พิมพ์ผิดอ่านเหมือนยอดจริง แต่ "—" อ่านออกทันทีว่าไม่มีข้อมูล ไม่ใช่ขายไม่ได้ */
+  salesMissing?: boolean;
   openingBreakdown: CashLine[] | null;
   closingBreakdown: CashLine[] | null;
   top: { name: string; qty: number; amount: number }[];
@@ -103,6 +109,14 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
       <td class="num">${baht(t.amount)}</td>
     </tr>`).join('');
 
+  /* ยอดที่มาจาก pos_dashboard เท่านั้น — ถ้าดึงไม่ได้ให้เว้นไว้ ไม่ใช่พิมพ์ศูนย์ (ดู salesMissing) */
+  const sold = (value: string) => (r.salesMissing ? '—' : value);
+
+  /* ช่อง "เงินสด" ของ pos_dashboard บวกเงินสด COD เข้ามาด้วย (0077:179) จึงไม่มีทางเท่ากับ
+     บรรทัด "+ ขายรับเป็นเงินสด" ของตารางลิ้นชักข้างล่างที่แยก COD เป็นบรรทัดของมันเอง
+     ไม่ใช่ตัวเลขผิด แต่คนละนิยาม — บอกไว้บนหัวบรรทัดจะได้ไม่มีใครนั่งไล่หาว่าทำไมสองเลขไม่ตรง */
+  const cashLabel = (r.recon?.cod ?? 0) !== 0 ? 'เงินสด (รวมเงินสด COD)' : 'เงินสด';
+
   const line = (label: string, value: string, strong = false) => `
     <tr class="${strong ? 'strong' : ''}">
       <td class="lbl">${label}</td><td class="val">${value}</td>
@@ -149,14 +163,18 @@ export function printShiftReport(r: ShiftReport, shopName: string) {
     </div>
 
     <h2>ยอดขายในรอบ</h2>
+    ${r.salesMissing ? `<p style="font-size:13px;color:#B3261E;margin:0 0 6px">
+      ดึงยอดขายจากระบบไม่สำเร็จตอนพิมพ์ใบนี้ — ช่องข้างล่างจึงเว้นไว้ ไม่ได้แปลว่ารอบนี้ขายไม่ได้
+      (ยอดลิ้นชักและรายการสินค้าในหน้าถัดไปมาจากอีกทาง ยังใช้ได้ตามปกติ) กดพิมพ์ซ้ำจากตารางประวัติรอบได้เมื่อเน็ตกลับมา
+    </p>` : ''}
     <table class="kv">
-      ${line('จำนวนบิล', `${r.bills} บิล`)}
-      ${line('เงินสด', baht(r.cash))}
-      ${line('โอน / PromptPay', baht(r.promptpay))}
-      ${line('เครดิตร้าน', baht(r.storeCredit))}
-      ${line('ส่วนลด', `- ${baht(r.discount)}`)}
-      ${line('คืนเงิน', `- ${baht(r.refunds)}`)}
-      ${line('ยอดขายรวม', baht(r.gross), true)}
+      ${line('จำนวนบิล', sold(`${r.bills} บิล`))}
+      ${line(cashLabel, sold(baht(r.cash)))}
+      ${line('โอน / PromptPay', sold(baht(r.promptpay)))}
+      ${line('เครดิตร้าน', sold(baht(r.storeCredit)))}
+      ${line('ส่วนลด', sold(`- ${baht(r.discount)}`))}
+      ${line('คืนเงิน', sold(`- ${baht(r.refunds)}`))}
+      ${line('ยอดขายรวม', sold(baht(r.gross)), true)}
     </table>
 
     <h2>ลิ้นชักเงิน — ที่มาของยอด "ควรมี" ทีละบรรทัด</h2>

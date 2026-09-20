@@ -72,6 +72,20 @@ except ImportError:
 DOTS_58MM = 384
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ★ ลิ้นชักต้องเด้งจากตรงนี้เท่านั้น ★
+#
+# ลิ้นชักไม่ได้ต่อกับคอม มันเสียบที่ช่อง RJ11 ท้ายเครื่องพิมพ์บิล เดิมมันเด้งเพราะไดรเวอร์
+# ของเครื่องพิมพ์ถูกตั้งเป็น "เปิดลิ้นชักตอนพิมพ์" (ดู printDrawer.ts) — แต่เราส่งงานแบบ RAW
+# ซึ่งสปูลเลอร์ยิงไบต์ตรงไปที่พอร์ตโดยไม่ผ่านไดรเวอร์เลย ไดรเวอร์จึงไม่มีโอกาสแทรกคำสั่งนี้
+# ผลคือตั้งแต่ตัวกลางมาเป็นทางหลัก (15 ก.ย. 2026) บิลออกสวยแต่ลิ้นชักนิ่งสนิททุกใบ
+# แคชเชียร์ต้องไปกด "เปิดลิ้นชักเปล่า" ซึ่งเขียน audit_log ทุกครั้ง = หลักฐานไล่เงินหาย
+# เต็มไปด้วยรายการปลอม เราจึงต้องยิงคำสั่งนี้เองในทุกงานที่ส่งออกไป
+#
+# ESC p 0 25 250 — กระตุกสลักช่องที่ 1 เปิด 50 มิลลิวินาที เว้น 500 มิลลิวินาที
+# เครื่องที่ไม่มีลิ้นชักเสียบอยู่จะไม่สนใจคำสั่งนี้ ไม่มีผลข้างเคียง
+DRAWER_KICK = b'\x1bp\x00\x19\xfa'
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ฝั่งเครื่องพิมพ์
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -170,6 +184,7 @@ def image_to_escpos(
     width_dots: int = DOTS_58MM,
     cut: bool = False,
     feed_dots: int = 120,
+    drawer: bool = True,
 ) -> tuple[bytes, dict]:
     """
     แปลงรูปบิลเป็นคำสั่งพิมพ์ภาพของ ESC/POS
@@ -190,7 +205,13 @@ def image_to_escpos(
         img = bg
 
     img = img.convert('L')
-    if img.width != width_dots:
+    # ★ แคบกว่าหัวพิมพ์ได้ ห้ามยืดให้เต็มเสมอ ★ เดิมเช็ค != แล้วขยายทุกกรณี ผลคือบิลถูกยืด
+    # เป็น 48 มม. ทุกใบไม่ว่าหน้าเว็บจะตั้ง "ความกว้างเนื้อบิล" ไว้เท่าไหร่ (เจ้าของไล่ปรับค่านี้
+    # เพื่อแก้ขอบขวาโดนตัดเมื่อ 5 ก.ย. 2026 แล้วงงว่าทำไมปรับแล้วไม่มีอะไรเปลี่ยน — เพราะ
+    # โดนยืดกลับมาเท่าเดิมตรงบรรทัดนี้ และตัวอักษรก็ใหญ่กว่าที่ตั้งไว้ราว 20%)
+    # ความกว้างของรูปที่ส่งมาคือความกว้างที่ต้องการอยู่แล้ว · รูปที่แคบกว่าหัวพิมพ์จะพิมพ์
+    # ชิดซ้ายเองโดยปริยาย · ย่อเฉพาะตอนที่กว้างเกินหัวพิมพ์ ไม่งั้นข้อมูลล้นขอบหายไปเลย
+    if img.width > width_dots:
         h = max(1, round(img.height * width_dots / img.width))
         img = img.resize((width_dots, h), Image.LANCZOS)
 
@@ -236,6 +257,10 @@ def image_to_escpos(
     width_bytes = (img.width + 7) // 8
     pixels = img.load()
     out = bytearray(b'\x1b@')  # ล้างค่าเครื่องพิมพ์
+    # ★ เด้งลิ้นชักก่อนพิมพ์ ไม่ใช่หลังพิมพ์ ★ บิลหนึ่งใบใช้เวลาไหลออกมาสองสามวินาที
+    # ถ้าไปเด้งท้ายชุดคำสั่ง แคชเชียร์ต้องยืนรอกระดาษก่อนถึงจะหยิบเงินทอนได้ทุกบิล
+    if drawer:
+        out += DRAWER_KICK
 
     CHUNK = 128
     for top in range(0, img.height, CHUNK):
@@ -289,6 +314,7 @@ class Handler(BaseHTTPRequestHandler):
     do_cut = False
     feed_dots = 120
     dry_run = False
+    drawer = True
 
     # ปิดบันทึกอัตโนมัติของไลบรารี แล้วพิมพ์เองให้อ่านง่ายกว่า
     def log_message(self, fmt, *args):  # noqa: A003
@@ -361,6 +387,22 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {'ok': False, 'error': 'not found'})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path.startswith('/drawer'):
+            # ★ เปิดลิ้นชักโดยไม่ต้องพิมพ์อะไร ★ สลิปของหน้ารอบขาย (ใบเปิดรอบ/ใบนับเงิน/
+            # สลิปเปิดลิ้นชักเปล่า) เป็น HTML ที่ไม่เคยถูกวาดลงจอ จึงถ่ายรูปส่งมาทางนี้ไม่ได้
+            # เหมือนใบเสร็จ — แต่หน้าที่จริงของมันคือ "ทำให้ลิ้นชักเด้ง" ซึ่งทำได้ตรง ๆ
+            # ตรงนี้ · ของเดิมฝากความหวังไว้กับไดรเวอร์ ถ้าเครื่องพิมพ์หลักเป็น Brother
+            # สลิปจะไปออกเป็น A4 แล้วลิ้นชักไม่เด้งเลย ทั้งที่ระบบบันทึกไปแล้วว่าเปิด
+            try:
+                send_raw(self.printer_name, DRAWER_KICK)
+            except Exception as e:  # noqa: BLE001
+                log('  เปิดลิ้นชักไม่สำเร็จ:', e)
+                self._json(500, {'ok': False, 'error': str(e)})
+                return
+            log('  เปิดลิ้นชัก (ไม่พิมพ์)')
+            self._json(200, {'ok': True, 'drawer': True})
+            return
+
         if not self.path.startswith('/print'):
             self._json(404, {'ok': False, 'error': 'not found'})
             return
@@ -371,8 +413,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         body = self.rfile.read(length)
 
+        query = self.path.split('?', 1)[1] if '?' in self.path else ''
+        # ★ เด้งลิ้นชักเป็นค่าเริ่มต้น ★ เพราะนี่คือพฤติกรรมเดิมที่ร้านใช้มาตลอด (ไดรเวอร์
+        # เด้งให้ทุกงานพิมพ์) การเงียบไว้ก่อนแปลว่าบิลเงินสดเปิดลิ้นชักไม่ได้ ซึ่งแย่กว่า
+        # บิลโอน/QR ที่ลิ้นชักเด้งเกินมา · ปิดรายใบด้วย ?drawer=0 (เช่นบิลโอน) ปิดทั้งเครื่อง
+        # ด้วย --no-drawer สำหรับเครื่องที่ตั้งให้ไดรเวอร์เด้งเองอยู่แล้ว ไม่งั้นจะเด้งซ้อนสองที
+        drawer = self.drawer and 'drawer=0' not in query
+
         try:
-            data, stats = image_to_escpos(body, self.paper_dots, self.do_cut, self.feed_dots)
+            data, stats = image_to_escpos(
+                body, self.paper_dots, self.do_cut, self.feed_dots, drawer=drawer
+            )
         except Exception as e:  # noqa: BLE001
             self._json(400, {'ok': False, 'error': f'อ่านรูปบิลไม่ได้: {e}'})
             return
@@ -380,7 +431,7 @@ class Handler(BaseHTTPRequestHandler):
         # ★ ตรวจได้โดยไม่เปลืองกระดาษ ★ เจ้าของถามเอง 15 ก.ย. 2026 หลังพิมพ์ทดสอบไป
         # หลายใบระหว่างไล่ปัญหาบรรทัดท้ายหาย — แปลงบิลให้ครบทุกขั้นเหมือนพิมพ์จริง
         # (รวมเก็บ last-print.png และวัดหมึก) แค่ไม่ส่งเข้าเครื่องพิมพ์
-        dry = self.dry_run or 'dry=1' in (self.path.split('?', 1)[1] if '?' in self.path else '')
+        dry = self.dry_run or 'dry=1' in query
         if dry:
             log(f"  ตรวจอย่างเดียว ไม่พิมพ์ · ขาวท้ายรูป {stats['white_tail']} แถว")
             self._json(200, {'ok': True, 'printed': False, **stats})
@@ -414,6 +465,8 @@ def main() -> int:
     # 8 จุด = 1 มม. · 120 จุด = 15 มม. ซึ่งเท่าระยะจากหัวพิมพ์ถึงขอบฉีกของเครื่องทั่วไป
     # น้อยกว่านี้บรรทัดท้ายจะยังค้างในเครื่องแล้วโดนฉีกขาด · มากกว่านี้คือทิ้งกระดาษเปล่า
     ap.add_argument('--feed', type=int, default=120, help='ระยะเลื่อนกระดาษท้ายบิล (จุด)')
+    ap.add_argument('--no-drawer', action='store_true',
+                    help='ไม่ต้องสั่งเปิดลิ้นชักตอนพิมพ์ (ใช้กับเครื่องที่ไดรเวอร์เด้งให้อยู่แล้ว)')
     ap.add_argument('--dry-run', action='store_true',
                     help='ตรวจอย่างเดียว ไม่พิมพ์จริง (ดูผลที่ /last)')
     args = ap.parse_args()
@@ -437,6 +490,7 @@ def main() -> int:
     Handler.do_cut = args.cut
     Handler.feed_dots = args.feed
     Handler.dry_run = args.dry_run
+    Handler.drawer = not args.no_drawer
 
     print('─────────────────────────────────────────────')
     print(' ตัวกลางพิมพ์บิล ร้านอู้ฟู่')
@@ -458,7 +512,9 @@ def main() -> int:
         return 0
 
     log(f'เริ่มทำงาน · เครื่องพิมพ์ {target} · พอร์ต {args.port}'
-        + (' · โหมดตรวจอย่างเดียว ไม่พิมพ์จริง' if args.dry_run else ''))
+        + (' · โหมดตรวจอย่างเดียว ไม่พิมพ์จริง' if args.dry_run else '')
+        # วันที่ลิ้นชักไม่เด้ง คำถามแรกคือ "ตัวกลางสั่งเปิดอยู่ไหม" — ให้บันทึกตอบได้เลย
+        + ('' if Handler.drawer else ' · ไม่สั่งเปิดลิ้นชัก'))
     try:
         server.serve_forever()
     except KeyboardInterrupt:

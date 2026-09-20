@@ -1,5 +1,6 @@
 import { RiPrinterLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
 import {
+  Alert,
   App,
   Button,
   Card,
@@ -20,7 +21,7 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
   advanceOrder,
@@ -32,7 +33,9 @@ import {
   getShopName,
   getSlipUrl,
   listOrders,
+  listOwedRefunds,
   markOrderPrinted,
+  markRefundSent,
   nextStatus,
   rejectSlip,
   orderRiders,
@@ -41,6 +44,7 @@ import {
   type Order,
   type OrderItem,
   type OrderStatus,
+  type OwedRefund,
   type PaymentStatus,
   type ShopMode,
   type SlipRejectReason,
@@ -225,28 +229,67 @@ export function Orders() {
   const [mode, setMode] = useState<string>('all');
   const [printFilter, setPrintFilter] = useState<string>('all');
   const [riders, setRiders] = useState<Map<string, { name: string; state: string }>>(new Map());
+  const [refunds, setRefunds] = useState<OwedRefund[]>([]);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
+  /** silent = รอบดึงเอง (poll/Realtime) — ห้ามหมุน spinner ทับมือคนที่กำลังทำงานอยู่
+   *  และห้ามเด้ง error ซ้ำ ๆ ทุก 45 วินาทีตอนเน็ตร้านสะดุด */
+  async function load(silent?: boolean) {
+    if (!silent) setLoading(true);
     try {
       const data = await listOrders();
       setOrders(data);
       orderRiders().then(setRiders).catch(() => {});
-      setSelected((cur) => (cur ? data.find((o) => o.id === cur.id) ?? null : null));
+      /* ★ กลืน error ของรายการรอคืนเงินเงียบ ๆ ★ หลังร้านขึ้นเว็บคนละรอบกับไมเกรชัน
+         (0115) ถ้า RPC ยังไม่มีบนเซิร์ฟเวอร์ ห้ามให้หน้าออเดอร์ทั้งหน้าพัง — แถบเตือน
+         แค่ไม่ขึ้นจนกว่าไมเกรชันจะรัน แต่ Modal ตอนกดยกเลิกยังเตือนเรื่องเงินอยู่ */
+      listOwedRefunds().then(setRefunds).catch(() => {});
+      setSelected((cur) => {
+        if (!cur) return null;
+        const found = data.find((o) => o.id === cur.id) ?? null;
+        /* ★ ข้อมูลเท่าเดิมต้องคืนอ็อบเจ็กต์ตัวเดิม ★ ลิ้นชักโหลดรายการ/เซ็นลิงก์สลิปใหม่
+           ทุกครั้งที่ prop `order` เปลี่ยนตัว ถ้าคืนตัวใหม่ทุกรอบ poll รูปสลิปที่แคชเชียร์
+           กำลังจ้องอยู่จะกะพริบทุก 45 วินาที */
+        return found && JSON.stringify(found) === JSON.stringify(cur) ? cur : found;
+      });
     } catch (e) {
-      message.error(apiError(e));
+      if (!silent) message.error(apiError(e));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
   useEffect(() => {
     void load();
     // Live refresh when OrderAlerts sees an order INSERT/UPDATE via Realtime.
-    const onChanged = () => void load();
+    const onChanged = () => void load(true);
     window.addEventListener(ORDERS_CHANGED_EVT, onChanged);
-    return () => window.removeEventListener(ORDERS_CHANGED_EVT, onChanged);
+    /* ★ ตัวสำรองเวลา Realtime หลุด ★ ช่องสัญญาณ postgres_changes ไม่เล่นเหตุการณ์
+       ช่วงที่ขาดย้อนหลังให้ ออเดอร์ที่เข้ามาตอนเน็ตกระตุก/ปิดฝาโน้ตบุ๊กจึงไม่โผล่ในตาราง
+       จนกว่าจะมีคนกดรีเฟรชเอง · ดึงเองทุก 45 วิ แบบเดียวกับหน้ารอบขาย (Shift.tsx:186) */
+    const t = setInterval(() => void load(true), 45_000);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener(ORDERS_CHANGED_EVT, onChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const owedTotal = useMemo(() => refunds.reduce((s, r) => s + r.amount, 0), [refunds]);
+  /* ปิดงานคืนเงินหนึ่งราย — เวลา/คนโอนถูกบันทึกฝั่งเซิร์ฟเวอร์ (mark_refund_sent, 0115)
+     กดซ้ำไม่ทับของเดิม เพราะมันคือหลักฐานตอนเคลียร์กับลูกค้า */
+  const markSent = async (r: OwedRefund) => {
+    setRefundBusy(r.id);
+    try {
+      await markRefundSent(r.id);
+      message.success(`บันทึกว่าโอนคืน ${baht(r.amount)} แล้ว`);
+      await load(true);
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setRefundBusy(null);
+    }
+  };
 
   const summary = useMemo(() => {
     let slip = 0,
@@ -431,6 +474,24 @@ export function Orders() {
         </Button>
       </div>
 
+      {/* ★ เงินของลูกค้าที่ยังอยู่ในมือร้าน ★ ยกเลิกใบที่จ่ายเงินมาแล้ว ระบบจะตั้งหนี้คืนเงิน
+          ไว้ในตาราง refunds ทุกครั้ง (cancel_order, 0067) แต่เดิมไม่มีหน้าจอไหนอ่านเลย
+          หนี้ก้อนนั้นจึงเงียบสนิทจนกว่าลูกค้าจะทวง — แถบนี้คือที่เดียวที่มันโผล่ */}
+      {refunds.length ? (
+        <Alert
+          type="error"
+          showIcon
+          className="mb-4"
+          title={`ต้องโอนเงินคืนลูกค้า ${refunds.length} ราย · รวม ${baht(owedTotal)}`}
+          description="ออเดอร์ที่ยกเลิกหลังลูกค้าโอนเงินมาแล้ว — เงินยังอยู่ที่ร้านจนกว่าจะโอนคืนและกดยืนยัน"
+          action={
+            <Button size="small" danger onClick={() => setRefundOpen(true)}>
+              ดูรายการ
+            </Button>
+          }
+        />
+      ) : null}
+
       {/* summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
@@ -513,6 +574,77 @@ export function Orders() {
         }}
       />
 
+      <Modal
+        open={refundOpen}
+        title="รอโอนเงินคืนลูกค้า"
+        width={640}
+        onCancel={() => setRefundOpen(false)}
+        footer={<Button onClick={() => setRefundOpen(false)}>ปิด</Button>}
+        destroyOnHidden>
+        <Table<OwedRefund>
+          size="small"
+          rowKey="id"
+          pagination={false}
+          dataSource={refunds}
+          locale={{ emptyText: 'ไม่มีรายการค้างคืนเงิน' }}
+          columns={[
+            {
+              title: 'ออเดอร์',
+              key: 'order_number',
+              render: (_, r) => (
+                <div className="leading-tight">
+                  <div className="font-semibold text-[#2B2320]">{r.order_number}</div>
+                  <Text type="secondary" className="text-xs">
+                    ยกเลิก {fmtTime(r.created_at)}
+                  </Text>
+                </div>
+              ),
+            },
+            {
+              title: 'โอนคืนให้',
+              key: 'recipient',
+              render: (_, r) => (
+                <div className="leading-tight">
+                  <div className="text-[#2B2320]">{r.ship_recipient ?? '—'}</div>
+                  {/* เบอร์คือทางเดียวที่ร้านติดต่อกลับไปขอเลขพร้อมเพย์ได้ ต้องอยู่ในตาราง
+                      ไม่ใช่ให้ไปเปิดออเดอร์หาทีละใบ */}
+                  <Text type="secondary" className="text-xs">
+                    {r.ship_phone ?? 'ไม่มีเบอร์'}
+                  </Text>
+                </div>
+              ),
+            },
+            {
+              title: 'ยอดคืน',
+              key: 'amount',
+              width: 110,
+              align: 'right',
+              render: (_, r) => (
+                <span className="font-semibold text-[#E5484D]">{baht(r.amount)}</span>
+              ),
+            },
+            {
+              title: '',
+              key: 'action',
+              width: 120,
+              align: 'right',
+              render: (_, r) => (
+                <Popconfirm
+                  title="โอนคืนแล้ว?"
+                  description={`ยืนยันว่าโอน ${baht(r.amount)} คืน ${r.ship_recipient ?? 'ลูกค้า'} แล้วจริง`}
+                  okText="ยืนยัน"
+                  cancelText="ยังไม่โอน"
+                  onConfirm={() => void markSent(r)}>
+                  <Button size="small" type="primary" loading={refundBusy === r.id}>
+                    โอนคืนแล้ว
+                  </Button>
+                </Popconfirm>
+              ),
+            },
+          ]}
+        />
+      </Modal>
+
       <OrderDrawer order={selected} onClose={() => setSelected(null)} onChanged={load} />
     </>
   );
@@ -527,9 +659,13 @@ function OrderDrawer({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [items, setItems] = useState<OrderItem[]>([]);
   const [slipUrl, setSlipUrl] = useState<string | null>(null);
+  /* เซ็นลิงก์สลิปไม่ผ่าน ≠ ลูกค้าไม่ได้แนบสลิป — สองเคสนี้ต้องแยกให้คนกดปุ่มเห็น
+     ไม่งั้นจะอ่านว่า "ไม่มีสลิป" แล้วตัดสินใจเรื่องเงินจากข้อมูลผิด */
+  const [slipErr, setSlipErr] = useState<string | null>(null);
+  const [slipBusy, setSlipBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -552,6 +688,7 @@ function OrderDrawer({
     if (!order) {
       setItems([]);
       setSlipUrl(null);
+      setSlipErr(null);
       setTrackingNo(null);
       return;
     }
@@ -569,8 +706,20 @@ function OrderDrawer({
         // waiting on a decision — approving used to make the shop's only proof
         // of payment vanish from the screen. getSlipUrl returns null when there
         // is no slip (e.g. cash on delivery), so the section just won't render.
-        const url = await getSlipUrl(order.id).catch(() => null);
-        if (alive) setSlipUrl(url);
+        /* ★ อย่ากลืน error ของการเซ็นลิงก์ ★ เดิม .catch(() => null) ทำให้ "เซ็นลิงก์ไม่ผ่าน"
+           หน้าตาเหมือน "ลูกค้ายังไม่แนบสลิป" เป๊ะ ๆ แล้วปุ่มอนุมัติสีหลักก็ยังกดได้ตามปกติ */
+        try {
+          const url = await getSlipUrl(order.id);
+          if (alive) {
+            setSlipUrl(url);
+            setSlipErr(null);
+          }
+        } catch (e) {
+          if (alive) {
+            setSlipUrl(null);
+            setSlipErr(apiError(e));
+          }
+        }
       } catch (e) {
         message.error(apiError(e));
       } finally {
@@ -598,6 +747,31 @@ function OrderDrawer({
   };
 
   const next = nextStatus(order.shop_mode, order.order_status);
+
+  /* ลองเซ็นลิงก์สลิปใหม่ — ลิงก์มีอายุ 10 นาที (orders.ts:155) เปิดลิ้นชักค้างไว้นาน ๆ
+     แล้วค่อยกลับมาดู รูปก็หมดอายุไปแล้ว ต้องมีทางขอใหม่โดยไม่ต้องปิดเปิดลิ้นชัก */
+  const retrySlip = async () => {
+    setSlipBusy(true);
+    try {
+      setSlipUrl(await getSlipUrl(order.id));
+      setSlipErr(null);
+    } catch (e) {
+      setSlipUrl(null);
+      setSlipErr(apiError(e));
+    } finally {
+      setSlipBusy(false);
+    }
+  };
+
+  /* ★ ของออกจากร้านไปแล้ว ★ cancel_order บวกสต๊อกคืนทุกบรรทัดแบบไม่มีเงื่อนไข (0067:657-678)
+     ซึ่งถูกเฉพาะตอนของยังอยู่ในร้าน · พอกล่องไปอยู่กับขนส่งแล้วกดยกเลิก สต๊อกจะเด้งกลับ
+     ทั้งที่ของไม่ได้อยู่ที่ร้าน แล้วถ้าของตีกลับมาจริงแล้วรับเข้าอีกรอบ ยอดจะบวกซ้ำสองเท่า
+     ยังไม่มีปุ่ม "ตีกลับ/ส่งไม่สำเร็จ" ให้กด (advance_order ไม่รับสองสถานะนั้น) จึงเตือนไว้
+     ตรงหน้าปุ่มก่อน ไม่ใช่ปล่อยให้รู้ทีหลังตอนนับสต๊อกไม่ตรง */
+  const shippedOut = ['assigned_to_rider', 'picked_up', 'in_transit', 'out_for_delivery'].includes(
+    order.order_status,
+  );
+  const totalQty = items.reduce((s, it) => s + it.qty, 0);
 
   return (
     <Drawer
@@ -785,23 +959,49 @@ function OrderDrawer({
             สลิปการชำระเงิน
           </Divider>
           {slipUrl ? (
-            <Image src={slipUrl} alt="สลิป" style={{ borderRadius: 0, maxHeight: 360 }} />
+            <Image
+              src={slipUrl}
+              alt="สลิป"
+              style={{ borderRadius: 0, maxHeight: 360 }}
+              /* รูปโหลดไม่ขึ้นทีหลัง (ลิงก์หมดอายุ/เน็ตหลุดกลางทาง) ต้องกลับไปสถานะ
+                 "ยังไม่ได้เห็นสลิป" ด้วย ไม่ใช่ปล่อยกรอบว่างแล้วปุ่มอนุมัติยังกดได้ */
+              onError={() => {
+                setSlipUrl(null);
+                setSlipErr('โหลดรูปสลิปไม่สำเร็จ (ลิงก์อาจหมดอายุ)');
+              }}
+            />
+          ) : slipErr ? (
+            <Alert type="warning" showIcon title="เปิดดูสลิปไม่ได้" description={slipErr} />
           ) : (
-            <Text type="secondary">ไม่พบรูปสลิป (อาจยังไม่แนบ หรือเปิดดูไม่ได้)</Text>
+            <Text type="secondary">ยังไม่มีสลิปแนบมาในออเดอร์นี้</Text>
           )}
           {isSlipPending(order) ? (
-            <Space className="mt-3" style={{ width: '100%' }}>
-              <Button
-                type="primary"
-                loading={busy}
-                onClick={() =>
+            <Space className="mt-3" style={{ width: '100%' }} wrap>
+              {/* ★ ไม่เห็นสลิป = อนุมัติไม่ได้ ★ เดิมปุ่มนี้ผูกกับสถานะอย่างเดียว ไม่ได้ผูกกับ
+                  รูป เวลาเซ็นลิงก์ไม่ผ่านจอจะขึ้นว่าไม่พบสลิปแล้ววางปุ่มสีหลักไว้ใต้ข้อความ
+                  นั้นพอดี กดแล้วออเดอร์เป็น paid + confirmed โดยไม่มีใครเห็นหลักฐานการโอน
+                  และไม่มี RPC ถอนการอนุมัติ ทางกลับมีทางเดียวคือยกเลิกแล้วโอนเงินคืน */}
+              <Popconfirm
+                title={`ยืนยันว่าได้รับเงิน ${baht(order.total)} จริง`}
+                description="อนุมัติแล้วถอนกลับไม่ได้ — ต้องยกเลิกออเดอร์แล้วโอนเงินคืนเท่านั้น"
+                okText="ได้รับเงินแล้ว"
+                cancelText="ยังไม่ใช่"
+                disabled={!slipUrl}
+                onConfirm={() =>
                   void runAction(() => approveSlip(order.id, order.row_version), 'อนุมัติสลิปแล้ว')
                 }>
-                อนุมัติสลิป
-              </Button>
+                <Button type="primary" loading={busy} disabled={!slipUrl}>
+                  อนุมัติสลิป
+                </Button>
+              </Popconfirm>
               <Button danger loading={busy} onClick={() => setRejectOpen(true)}>
                 ปฏิเสธสลิป
               </Button>
+              {!slipUrl ? (
+                <Button loading={slipBusy} onClick={() => void retrySlip()}>
+                  ลองโหลดรูปใหม่
+                </Button>
+              ) : null}
             </Space>
           ) : (
             // Decided already — keep the slip on screen as the record of what was
@@ -927,13 +1127,55 @@ function OrderDrawer({
         okText="ยกเลิกออเดอร์"
         danger
         options={CANCEL_OPTIONS}
+        warning={
+          shippedOut ? (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 16 }}
+              title={`ของออกจากร้านไปแล้ว (${ORDER_STATUS[order.order_status].label})`}
+              description={`ยกเลิกแล้วระบบจะคืนสต๊อก${totalQty ? ` ${totalQty} ชิ้น` : 'ทุกบรรทัดในใบนี้'}เข้าระบบทันที ถ้าของยังไม่กลับมาถึงร้าน ตัวเลขสต๊อกจะเกินจริง · เมื่อพัสดุตีกลับมาแล้วอย่ารับเข้าซ้ำ ไม่งั้นยอดจะบวกสองเท่า`}
+            />
+          ) : null
+        }
         onClose={() => setCancelOpen(false)}
         onSubmit={async (reason, note) => {
           setCancelOpen(false);
-          await runAction(
-            () => cancelOrder(order.id, reason as CancelReason, note, order.row_version),
-            'ยกเลิกออเดอร์แล้ว',
-          );
+          await runAction(async () => {
+            const res = (await cancelOrder(
+              order.id,
+              reason as CancelReason,
+              note,
+              order.row_version,
+            )) as { refund_owed?: boolean } | null;
+            /* ★ ยกเลิกใบที่ลูกค้าโอนเงินมาแล้ว = ร้านติดหนี้ทันที ★ cancel_order ตั้งแถว
+               refunds ให้เงียบ ๆ แล้วคืน refund_owed มาเป็น true/false (ยอดเงินไม่ได้มาด้วย
+               — เท่ากับยอดเต็มของใบนี้) เดิมหน้าจอทิ้งค่านี้ทั้งก้อนแล้วขึ้นแค่ "ยกเลิกออเดอร์
+               แล้ว" คนกดจึงไม่มีทางรู้ว่ายังถือเงินลูกค้าอยู่ · ต้องค้างจอให้กดรับทราบ ไม่ใช่
+               toast ที่หายไปเองใน 3 วินาที */
+            if (res?.refund_owed) {
+              modal.warning({
+                title: 'ต้องโอนเงินคืนลูกค้า',
+                width: 440,
+                okText: 'รับทราบ',
+                content: (
+                  <div className="mt-2">
+                    <div>
+                      ออเดอร์ {order.order_number} รับเงินมาแล้ว — ต้องโอนคืน{' '}
+                      <span className="font-semibold text-[#E5484D]">{baht(order.total)}</span>
+                    </div>
+                    <div className="mt-1">
+                      {order.ship_recipient ?? 'ลูกค้า'} · {order.ship_phone ?? 'ไม่มีเบอร์ติดต่อ'}
+                    </div>
+                    <div className="mt-2 text-[13px] text-[#8a807a]">
+                      รายการนี้ไปรออยู่ในแถบแดง “ต้องโอนเงินคืนลูกค้า” ด้านบนหน้าออเดอร์ ·
+                      โอนคืนแล้วกลับมากดยืนยันด้วย
+                    </div>
+                  </div>
+                ),
+              });
+            }
+          }, 'ยกเลิกออเดอร์แล้ว');
         }}
       />
     </Drawer>
@@ -957,6 +1199,7 @@ function ReasonModal({
   okText,
   danger,
   options,
+  warning,
   onClose,
   onSubmit,
 }: {
@@ -965,6 +1208,8 @@ function ReasonModal({
   okText: string;
   danger?: boolean;
   options: { value: string; label: string }[];
+  /** คำเตือนที่ต้องอ่านก่อนกดยืนยัน (ถ้ามี) — วางไว้เหนือฟอร์ม ไม่ใช่ใต้ปุ่ม */
+  warning?: ReactNode;
   onClose: () => void;
   onSubmit: (reason: string, note?: string) => Promise<void>;
 }) {
@@ -989,6 +1234,7 @@ function ReasonModal({
       cancelText="ยกเลิก"
       okButtonProps={{ danger }}
       destroyOnHidden>
+      {warning}
       <Form form={form} layout="vertical" requiredMark={false} className="mt-2">
         <Form.Item name="reason" label="เหตุผล" rules={[{ required: true, message: 'เลือกเหตุผล' }]}>
           <Select placeholder="เลือกเหตุผล" options={options} />

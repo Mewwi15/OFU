@@ -2,7 +2,17 @@ import type { ShopInfo } from '../lib/api';
 import { contentMm, useReceiptConfig } from '../lib/receiptConfig';
 import { Barcode } from './Barcode';
 
-export type ReceiptLine = { name: string; size: string | null; qty: number; unitPrice: number; lineTotal: number };
+export type ReceiptLine = {
+  name: string;
+  size: string | null;
+  qty: number;
+  unitPrice: number;
+  lineTotal: number;
+  /* จำนวนที่ลูกค้าเอามาคืนแล้วของบรรทัดนี้ — มีเฉพาะตอนพิมพ์ซ้ำจากหน้าบิลขาย
+     (ตอนขายยังไม่มีใครคืน) จำนวนและยอดของบรรทัดยังเป็นของ "ตอนซื้อ" เสมอ
+     เพราะใบเสร็จต้องเล่าเรื่องที่เกิดขึ้นจริงทั้งสองครั้ง ไม่ใช่เขียนประวัติใหม่ */
+  refundedQty?: number;
+};
 
 export type ReceiptProps = {
   shop: ShopInfo;
@@ -28,6 +38,12 @@ export type ReceiptProps = {
   cashPaid?: number | null; // amount tendered (only known right after a cash sale)
   change?: number | null;
   offline?: boolean;
+  /* ★ ยอดที่คืนไปแล้วของบิลนี้ ★ ไม่มีตัวนี้แล้วใบที่พิมพ์ซ้ำจะเหมือนใบต้นฉบับทุกตัวอักษร
+     ทั้งที่รับของคืนและจ่ายเงินคืนไปแล้ว — pos_sales.total ไม่เคยถูกลด มีแต่ refunded_amount
+     ที่เพิ่มขึ้น (0077:97-98) กระดาษจึงเป็นเอกสารที่บอกยอดผิดและร้านดูไม่ออก */
+  refundedAmount?: number | null;
+  /* ใบนี้พิมพ์ซ้ำ ไม่ใช่ใบที่ออกตอนจ่ายเงิน — ตีตรา "สำเนา" ให้แยกออกจากใบจริง */
+  reprint?: boolean;
 };
 
 const PAY_LABEL: Record<string, string> = {
@@ -73,11 +89,15 @@ export function Receipt({
   cashPaid,
   change,
   offline,
+  refundedAmount,
+  reprint,
 }: ReceiptProps) {
   const [cfg] = useReceiptConfig();
   const payLabel = PAY_LABEL[paymentMethod] ?? paymentMethod;
   const payValue = paymentMethod === 'cash' && cashPaid != null ? cashPaid : total;
   const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
+  const refunded = refundedAmount ?? 0;
+  const fullyRefunded = refunded > 0 && refunded >= (total ?? 0);
 
   return (
     <>
@@ -132,6 +152,19 @@ export function Receipt({
             บิลออฟไลน์ — จะออกเลขที่จริงเมื่อซิงค์
           </div>
         )}
+        {/* ★ ตราต้องอยู่ในกล่องนี้เท่านั้น ★ ป้ายที่หัวลิ้นชักของหน้าบิลขายไม่ติดกระดาษ
+            เพราะ print CSS ซ่อน .ant-drawer-header ทิ้งทั้งอัน (index.css) — อะไรที่คน
+            ต้องเห็นบนกระดาษต้องอยู่ใน #pos-receipt */}
+        {(reprint || refunded > 0) && (
+          <div className="mt-1 text-[1em] text-center border border-black py-0.5 font-bold">
+            {[
+              reprint ? 'สำเนา (พิมพ์ซ้ำ)' : null,
+              refunded > 0 ? (fullyRefunded ? 'คืนเงินแล้วทั้งใบ' : 'คืนเงินบางส่วน') : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </div>
+        )}
 
         <div className="border-t border-dashed border-black my-1.5" />
         {/* Item table: name | qty | amount */}
@@ -159,6 +192,11 @@ export function Receipt({
               </div>
               <div className="w-12 text-right">{baht(l.lineTotal)}</div>
             </div>
+            {(l.refundedQty ?? 0) > 0 && (
+              <div className="text-[0.91em] font-bold">
+                คืนแล้ว {l.refundedQty} · เหลือ {l.qty - (l.refundedQty ?? 0)}
+              </div>
+            )}
           </div>
         ))}
 
@@ -176,6 +214,17 @@ export function Receipt({
         <div className="border-t border-dashed border-black my-1.5" />
         <Line2 label={payLabel} value={payValue} />
         {paymentMethod === 'cash' && change != null && <Line2 label="เงินทอน" value={change} />}
+
+        {/* บรรทัดจ่ายเงินข้างบนคือสิ่งที่เกิดตอนซื้อ ของจริงที่เคยเกิดขึ้น ไม่แก้ย้อนหลัง —
+            การคืนเป็นเหตุการณ์ที่สองจึงต่อท้ายเป็นบล็อกของตัวเอง แล้วปิดท้ายด้วย
+            "คงเหลือสุทธิ" ซึ่งคือตัวเลขที่คนอ่านกระดาษใบนี้ต้องเชื่อ */}
+        {refunded > 0 && (
+          <>
+            <div className="border-t border-dashed border-black my-1.5" />
+            <Line2 label="คืนเงินแล้ว" value={-refunded} />
+            <Line2 label="คงเหลือสุทธิ" value={(total ?? 0) - refunded} bold />
+          </>
+        )}
 
         {/* No barcode for an offline provisional receipt — saleNumber is the
             Thai placeholder "ออฟไลน์" (a real number is issued on sync), which

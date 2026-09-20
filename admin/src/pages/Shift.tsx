@@ -35,7 +35,6 @@ import {
   shiftSalesReport,
   posDashboard,
   type CashSummary,
-  type Dashboard,
   type CashLine,
   type DrawerOpen,
   type Staff,
@@ -83,10 +82,34 @@ const NO_SALE_REASONS = [
   { label: 'ตรวจนับเงินระหว่างรอบ', dir: null },
 ] as const satisfies readonly { label: string; dir: 'in' | 'out' | null }[];
 
-function ShiftHistory({ rows, nameOf }: { rows: ShiftRow[]; nameOf: (c: string | null) => string | null }) {
+function ShiftHistory({
+  rows, nameOf, onPrint,
+}: {
+  rows: ShiftRow[];
+  nameOf: (c: string | null) => string | null;
+  /* ★ ปุ่มพิมพ์ต้องอยู่ที่ตารางนี้ด้วย ไม่ใช่มีแต่บนการ์ดหลังกดปิดรอบ ★
+     การ์ดนั้นอยู่ใน state อย่างเดียว — กระดาษหมด เครื่องพิมพ์ค้าง กดยกเลิกในกล่องพิมพ์
+     เผลอรีเฟรช หรือแค่เปิดรอบถัดไป (onOpened สั่ง setDone(null)) ใบของรอบนั้นก็พิมพ์
+     ไม่ได้อีกเลย ต้องไปไล่ยอดจากหน้ารายงานเอง ทั้งที่ข้อมูลครบอยู่ในฐานข้อมูล */
+  onPrint: (row: ShiftRow) => Promise<void>;
+}) {
+  const [printing, setPrinting] = useState<string | null>(null);
   const closed = rows.filter((r) => r.closed_at);
   if (closed.length === 0) return null;
   const off = closed.filter((r) => (r.over_short ?? 0) !== 0).length;
+
+  /* ★ เงินหาย/เกินช่วงที่ไม่มีรอบเปิด ต้องย้อนดูได้ ไม่ใช่เห็นแวบเดียวตอนเปิดรอบ ★
+     หน้าเปิดรอบมีกล่องแดงบอกว่ายอดนับเช้านี้ต่างจากยอดปิดรอบที่แล้วเท่าไหร่ (OpenShiftPanel)
+     แต่ค่านั้นไม่ได้ถูกเก็บไว้ที่ไหนเลย คนเปิดรอบเห็นคนเดียวไม่กี่วินาทีแล้วกดผ่านไป เจ้าของ
+     ย้อนดูทีหลังไม่มีทางรู้ว่าคืนไหนหายไปเท่าไหร่ หรือหายซ้ำทุกคืนของกะใคร
+     ไม่ต้องเก็บเพิ่มในฐานข้อมูล — มันคือ (เงินตั้งต้นของรอบถัดไป ซึ่งมาจากการนับมือทุกรอบ)
+     ลบ (ยอดที่นับได้ตอนปิดรอบนี้) สองเลขนี้อยู่บน pos_shifts ครบอยู่แล้ว
+     ยังบันทึก "เหตุผล" ไม่ได้ (เอาไปฝากธนาคาร/เก็บกลับบ้าน) เพราะต้องแก้ที่หน้าเปิดรอบ */
+  const handover = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const next = rows[i - 1];   // listShifts เรียงใหม่→เก่า รอบถัดไปจึงอยู่ก่อนหน้าหนึ่งช่อง
+    if (next && r.closed_at) handover.set(r.id, next.opening_float - (r.counted_cash ?? 0));
+  });
   return (
     <Card
       title="ประวัติรอบที่ผ่านมา"
@@ -114,6 +137,15 @@ function ShiftHistory({ rows, nameOf }: { rows: ShiftRow[]; nameOf: (c: string |
                   {d(r.opened_at).format('HH:mm')}–{r.closed_at ? d(r.closed_at).format('HH:mm') : ''}
                   {r.cashier_code ? ` · ${nameOf(r.cashier_code) ?? r.cashier_code}` : ''}
                 </div>
+                {/* โผล่เฉพาะตอนไม่ตรง — ตรงแล้วไม่ต้องมีบรรทัด ไม่งั้นตารางเต็มไปด้วยศูนย์ */}
+                {(handover.get(r.id) ?? 0) !== 0 && (
+                  <div
+                    style={{ fontSize: 12, fontWeight: 600, color: overShort(handover.get(r.id) ?? 0).color, ...num }}
+                    title="เทียบยอดที่นับได้ตอนปิดรอบนี้ กับยอดที่นับได้ตอนเปิดรอบถัดไป — เงินที่หายหรือเกินตอนที่ไม่มีรอบเปิด"
+                  >
+                    ก่อนรอบถัดไป {overShort(handover.get(r.id) ?? 0).text}
+                  </div>
+                )}
               </div>
             ),
           },
@@ -135,6 +167,22 @@ function ShiftHistory({ rows, nameOf }: { rows: ShiftRow[]; nameOf: (c: string |
               return <span style={{ fontSize: T.body, fontWeight: 600, color: v.color, ...num }}>{v.text}</span>;
             },
           },
+          {
+            /* ไอคอนเปล่า ๆ ไม่มีหัวคอลัมน์ — ตารางนี้กว้าง 400px พอดีตัว เติมคำว่า "พิมพ์"
+               เข้าไปจะดันจนตารางเลื่อนแนวนอนเหมือนตอนที่วันเวลาอยู่บรรทัดเดียว */
+            title: '', align: 'center' as const, width: 44,
+            render: (_: unknown, r: ShiftRow) => (
+              <Button
+                type="text" size="small" title="พิมพ์ใบสรุปปิดรอบของรอบนี้"
+                icon={<RiPrinterLine className="w-4 h-4" />}
+                loading={printing === r.id}
+                onClick={() => {
+                  setPrinting(r.id);
+                  void onPrint(r).finally(() => setPrinting(null));
+                }}
+              />
+            ),
+          },
         ] as ColumnsType<ShiftRow>)}
       />
     </Card>
@@ -143,7 +191,6 @@ function ShiftHistory({ rows, nameOf }: { rows: ShiftRow[]; nameOf: (c: string |
 
 export function Shift() {
   const [shift, setShift] = useState<ShiftRow | null | undefined>(undefined); // undefined = loading
-  const [dash, setDash] = useState<Dashboard | null>(null);
   const [cash, setCash] = useState<CashSummary | null>(null);   // สูตรกลางจาก 0089
   const [history, setHistory] = useState<ShiftRow[]>([]);
   const [amount, setAmount] = useState<number | ''>('');   // ใช้ทั้งตอนเปิดและตอนปิด
@@ -151,7 +198,9 @@ export function Shift() {
   const [busy, setBusy] = useState(false);
   const [closing, setClosing] = useState(false);           // เปิดหน้าต่างนับเงินปิดรอบ
   const [counter, setCounter] = useState(false);           // เปิดตัวนับเงินทีละใบ
-  const [done, setDone] = useState<{ row: ShiftRow; dash: Dashboard | null } | null>(null);
+  /* เก็บแค่แถวรอบที่เพิ่งปิด — เดิมพ่วง snapshot ของยอดขายมาด้วยแล้วเอาไปพิมพ์
+     ซึ่งเป็นต้นเหตุที่ใบพิมพ์ออกมาเป็นยอดค้าง/ศูนย์ ตอนนี้ doPrint ดึงสดเองทุกครั้ง */
+  const [done, setDone] = useState<ShiftRow | null>(null);
   const [noSale, setNoSale] = useState(false);             // หน้าต่างถามเหตุผลเปิดลิ้นชักเปล่า
   const [drawerLog, setDrawerLog] = useState(false);       // หน้าต่างดูประวัติเปิดเปล่าของรอบ
   const [drawerOpens, setDrawerOpens] = useState<DrawerOpen[]>([]);
@@ -171,7 +220,6 @@ export function Shift() {
     const s = await getOpenShift().catch(() => null);
     setShift(s);
     if (s) {
-      setDash(await posDashboard(s.opened_at, new Date().toISOString()).catch(() => null));
       setDrawerOpens(await listDrawerOpens(s.id).catch(() => []));
       setCash(await shiftCashSummary(s.id).catch(() => null));
     } else {
@@ -199,10 +247,9 @@ export function Shift() {
     setBusy(true);
     try {
       const row = await closeShift(shift.id, Number(amount), code, countLines);
-      setDone({ row, dash });
+      setDone(row);
       setCode('');
       setShift(null);
-      setDash(null);
       setAmount('');
       setClosing(false);
       listShifts().then(setHistory).catch(() => {});
@@ -213,19 +260,29 @@ export function Shift() {
     }
   };
 
-  const doPrint = async (row: ShiftRow, d: Dashboard | null) => {
-    const o = d?.onsite;
+  /* ★ ใบปิดรอบต้องดึงยอดขายสดตอนกดพิมพ์ ห้ามพิมพ์จาก state ★
+   * เดิมท่อน "ยอดขายในรอบ" มาจาก dash ที่ poll ทุก 30 วิ แล้ว doClose จับค่านั้นติดไปกับ
+   * ปุ่มพิมพ์ — บิลที่ขายหลัง poll สำเร็จครั้งสุดท้ายจึงหายจากกระดาษ และถ้า poll ครั้งนั้น
+   * พลาด (เน็ตสะดุด แล้วโดน .catch(() => null) กลืน) ใบจะพิมพ์ "0 บิล · ยอดขายรวม ฿0"
+   * ทั้งที่ท่อนล่างซึ่งดึงสดด้วย shift_id มีรายการสินค้าเต็มหน้า = เอกสารที่ขัดกันเองในใบเดียว
+   * ดึงตรงนี้ทีเดียวยังทำให้พิมพ์ซ้ำรอบเก่าได้ตัวเลขของรอบนั้นจริงด้วย เพราะใช้ช่วงเวลาของแถว
+   * ไม่ใช่ช่วงของรอบที่เปิดอยู่ */
+  const doPrint = async (row: ShiftRow) => {
+    const dash = await posDashboard(row.opened_at, row.closed_at ?? new Date().toISOString()).catch(() => null);
+    if (!dash) message.warning('ดึงยอดขายไม่สำเร็จ ใบนี้จะเว้นช่องยอดขายไว้ — กดพิมพ์ซ้ำได้จากตารางประวัติรอบ');
+    const o = dash?.onsite;
     printShiftReport(
       {
         openedAt: row.opened_at, closedAt: row.closed_at, openingFloat: row.opening_float,
         cash: o?.cash ?? 0, promptpay: o?.promptpay ?? 0, storeCredit: o?.store_credit ?? 0,
         refunds: o?.refunds ?? 0, discount: o?.discount ?? 0, bills: o?.count ?? 0, gross: o?.gross ?? 0,
+        salesMissing: dash === null,
         expected: row.expected_cash ?? 0, counted: row.counted_cash ?? 0, overShort: row.over_short ?? 0,
         openedBy: withName(row.cashier_code), closedBy: withName(row.closed_by_code),
         recon: await shiftCashSummary(row.id).catch(() => null),
         sales: await shiftSalesReport(row.id).catch(() => null),
         openingBreakdown: row.opening_breakdown, closingBreakdown: row.closing_breakdown,
-        top: d?.top ?? [],
+        top: dash?.top ?? [],
       },
       await getShopName().catch(() => 'ร้านอู้ฟู่'),
     );
@@ -414,17 +471,17 @@ export function Shift() {
         <span
           style={{
             fontSize: 40, fontWeight: 700, lineHeight: 1.2, marginTop: 4,
-            color: overShort(done.row.over_short ?? 0).color, ...num,
+            color: overShort(done.over_short ?? 0).color, ...num,
           }}
         >
-          {overShort(done.row.over_short ?? 0).text}
+          {overShort(done.over_short ?? 0).text}
         </span>
         <span style={{ fontSize: T.lbl, color: INK.mute, marginTop: 2, ...num }}>
-          ควรมี {baht(done.row.expected_cash ?? 0)} · นับได้ {baht(done.row.counted_cash ?? 0)}
+          ควรมี {baht(done.expected_cash ?? 0)} · นับได้ {baht(done.counted_cash ?? 0)}
         </span>
       </div>
       <div className="px-6 py-4" style={{ borderTop: `1px solid ${INK.hair}` }}>
-        <Button block size="large" icon={<RiPrinterLine className="w-4 h-4" />} onClick={() => void doPrint(done.row, done.dash)}>
+        <Button block size="large" icon={<RiPrinterLine className="w-4 h-4" />} onClick={() => void doPrint(done)}>
           พิมพ์เอกสารปิดรอบ
         </Button>
       </div>
@@ -439,7 +496,7 @@ export function Shift() {
         {doneCard}
         <OpenShiftPanel onOpened={() => { setDone(null); void refresh(); }} />
         </div>
-        <ShiftHistory rows={history} nameOf={nameOf} />
+        <ShiftHistory rows={history} nameOf={nameOf} onPrint={doPrint} />
         {counterModal}
       </div>
     );
@@ -501,7 +558,7 @@ export function Shift() {
             {([
               ['เปิดร้าน', cash?.opening ?? shift.opening_float, '+'],
               ['ขายได้', cash?.sales ?? 0, '+'],
-              ['COD', cash?.cod ?? 0, '+'],
+              ['COD คนส่งเก็บมา', cash?.cod ?? 0, '+'],
               ['คืนเงิน', cash?.refunds ?? 0, '−'],
               ['นำเงินเข้า', cash?.paid_in ?? 0, '+'],
               ['นำเงินออก', cash?.paid_out ?? 0, '−'],
@@ -514,6 +571,26 @@ export function Shift() {
                 </span>
               ))}
           </span>
+          {/* ★ ยอด COD เข้าสมการตั้งแต่คนส่งกดรับเงินหน้าบ้านลูกค้า ไม่ใช่ตอนเงินถึงลิ้นชัก ★
+              mark_cod_collected ปั๊ม cod_collected_at = now() ตอนกดปุ่มที่หน้าบ้านลูกค้า (0071)
+              และ shift_cash_summary บวกก้อนนั้นเข้า "ควรมี" ทันที (0089) — ปกติคนส่งกลับมาถึงร้าน
+              ก่อนปิดรอบ เงินเลยตรงพอดี แต่ถ้าปิดรอบตอนเงินยังอยู่บนรถ (รอบส่งสุดท้าย/คนส่งกับ
+              คนปิดรอบคนละคน) จอจะฟ้องว่า "ขาด" เท่ายอดนี้เป๊ะ ๆ แล้วคนที่โดนถามคือแคชเชียร์ที่
+              เฝ้าเคาน์เตอร์ ทั้งที่ไม่ได้แตะเงินก้อนนั้นเลย
+              ยังไม่ถอด COD ออกจากสูตรตรงนี้ เพราะถ้าถอดแล้วไม่มีขั้นตอน "รับเงินจากคนส่ง" มารับช่วง
+              วันปกติที่เงินเข้าลิ้นชักเรียบร้อยจะกลายเป็น "เกิน" ทุกวันแทน ซึ่งแย่กว่าเดิม —
+              เป็นเรื่องที่ต้องให้เจ้าของตัดสินใจก่อน ระหว่างนี้บอกที่มาของเงินให้ชัดแทน */}
+          {(cash?.cod ?? 0) > 0 && (
+            <span
+              className="mt-2 px-8 text-center"
+              style={{ fontSize: T.lbl, color: C.warn, lineHeight: 1.5 }}
+            >
+              ยอดนี้รวมเงิน COD <b style={{ ...num }}>{baht(cash?.cod ?? 0)}</b> ที่คนส่งเก็บจากลูกค้าแล้ว
+              — ถ้าเงินยังไม่ถึงลิ้นชัก ตอนปิดรอบจะขึ้นว่าขาดเท่ากับยอดนี้
+              <br />
+              ตอนรับเงินคืนจากคนส่ง ห้ามบันทึกเป็น &quot;เติมเงินทอน&quot; ระบบบวกให้แล้ว จะกลายเป็นนับซ้ำสองรอบ
+            </span>
+          )}
         </div>
 
         {/* เปิดเปล่าไปกี่ครั้งแล้วในรอบนี้ — โผล่เฉพาะตอนมีจริง ไม่งั้นเป็นบรรทัด
@@ -549,7 +626,7 @@ export function Shift() {
       </Card>
 
       </div>
-      <ShiftHistory rows={history} nameOf={nameOf} />
+      <ShiftHistory rows={history} nameOf={nameOf} onPrint={doPrint} />
 
       {noSaleModal}
       <Modal
@@ -604,6 +681,15 @@ export function Shift() {
           นับเงินในลิ้นชักทีละใบ — ระบบจะเทียบกับ{' '}
           <b style={{ color: INK.strong, ...num }}>{baht(inDrawer)}</b> ที่ควรมี
         </div>
+        {/* เตือนตรงจุดที่กำลังจะตัดสินว่าเงินขาด — ถ้าเงิน COD ยังไม่เข้าลิ้นชัก ยอด "ขาด"
+            ที่กำลังจะถูกบันทึกลงรอบไม่ใช่เงินหาย ให้ไปเอาเงินมาใส่ก่อนแล้วค่อยนับ */}
+        {(cash?.cod ?? 0) > 0 && (
+          <Alert
+            type="warning" showIcon style={{ marginBottom: 14 }}
+            message={`ยอดที่ควรมีรวมเงิน COD ${baht(cash?.cod ?? 0)} ไว้ด้วย`}
+            description="ถ้าคนส่งยังไม่ได้เอาเงินก้อนนี้มาใส่ลิ้นชัก รอบนี้จะขึ้นว่าขาดเท่ากับยอดนั้น — เก็บเงินเข้าลิ้นชักให้ครบก่อนแล้วค่อยนับ"
+          />
+        )}
         {countedBlock(inDrawer)}
         <div className="mt-4">{codeField}</div>
       </Modal>

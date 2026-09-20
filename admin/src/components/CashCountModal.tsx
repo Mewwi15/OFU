@@ -10,9 +10,9 @@
  */
 
 import { Button, Modal, Typography } from 'antd';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { DRAFT_KEYS, clearDraft, readDraft, writeDraft } from '../lib/draft';
+import { DRAFT_KEYS, clearDraft, draftSavedAt, readDraft, writeDraft } from '../lib/draft';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
@@ -42,16 +42,35 @@ export function CashCountModal({
   const [counts, setCounts] = useState<number[]>(
     () => readDraft<number[]>(DRAFT_KEYS.shiftCount) ?? DENOMS.map(() => 0),
   );
+  /* ★ รอบแรกหลัง mount ห้ามเขียนร่างทับ ★ counts รอบแรกคือค่าที่เพิ่งอ่านมาจากร่างเอง
+     เขียนกลับลงไปเท่ากับปั๊ม savedAt ใหม่ทุกครั้งที่เปิดหน้า — นาฬิกาของร่างจะถูกรีเซ็ต
+     เป็นศูนย์เรื่อย ๆ จนอายุ 24 ชม. ไม่มีวันหมด และเวลา "ค้างไว้เมื่อ …" ที่โชว์ให้คนนับดู
+     จะกลายเป็นเวลาที่เปิดหน้า ไม่ใช่เวลาที่นับจริง */
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) { mounted.current = true; return; }
     /* ยังไม่ได้นับอะไรเลยก็ไม่ต้องเก็บ — ไม่งั้นเปิดตัวนับแล้วปิดทิ้งจะทิ้งร่างเปล่าไว้ */
     if (counts.some((c) => c > 0)) writeDraft(DRAFT_KEYS.shiftCount, counts);
     else clearDraft(DRAFT_KEYS.shiftCount);
   }, [counts]);
   const [active, setActive] = useState(0);
+  /* เวลาที่ร่างถูกเก็บไว้ล่าสุด (null = ไม่ได้นับต่อของเก่า) — ต้องบอกให้เห็นว่ายอดที่ขึ้นมา
+     ไม่ใช่ของที่เพิ่งนับ ไม่งั้นคนนับจะนับทับของเดิมโดยไม่ทันสังเกต */
+  const [resumedAt, setResumedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
-      setCounts(DENOMS.map(() => 0));
+      /* ★ เปิดตัวนับต้องได้ร่างที่ค้างไว้คืน ไม่ใช่ล้างทิ้งทุกครั้ง ★
+         เดิมบรรทัดนี้สั่ง setCounts(ศูนย์ทั้งแถว) ทำให้ effect [counts] ข้างบนเห็นว่าไม่มีอะไร
+         ถูกนับเลย แล้วสั่ง clearDraft ตามมาทันที — ร่างที่อุตส่าห์เก็บไว้จึงถูกลบก่อนได้ใช้
+         แม้แต่ครั้งเดียว อาการจริงคือ นับไปครึ่งลิ้นชักแล้วโดนรีโหลด (F5 / แถบเวอร์ชันใหม่ /
+         แท็บถูกคืนหน่วยความจำ) กลับมาต้องรื้อนับใหม่ตั้งแต่แบงก์พันใบแรก
+         คืนร่างให้เลยแล้วขึ้นแถบบอกว่าเป็นของค้าง พร้อมปุ่มเริ่มใหม่ — ไม่เด้งกล่องถามก่อนนับ
+         เพราะคนนับยืนอยู่หน้าลิ้นชักถือเงินอยู่ ด่านถามคือสิ่งที่ขวางงานจริง */
+      const draft = readDraft<number[]>(DRAFT_KEYS.shiftCount);
+      const usable = draft?.length === DENOMS.length && draft.some((c) => c > 0) ? draft : null;
+      setCounts(usable ?? DENOMS.map(() => 0));
+      setResumedAt(usable ? draftSavedAt(DRAFT_KEYS.shiftCount) : null);
       setActive(0);
     }
   }, [open]);
@@ -122,6 +141,28 @@ export function CashCountModal({
           </div>
         </div>
       }>
+      {resumedAt !== null && (
+        <div
+          className="mb-3 flex items-center justify-between gap-3 px-3 py-2"
+          style={{
+            background: 'var(--ant-color-warning-bg)',
+            border: '1px solid var(--ant-color-warning-border)',
+          }}>
+          <span style={{ fontSize: 13 }}>
+            ยอดข้างล่างเป็นของที่นับค้างไว้เมื่อ{' '}
+            {new Date(resumedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น. — นับต่อได้เลย
+          </span>
+          <Button
+            size="small"
+            onClick={() => {
+              setCounts(DENOMS.map(() => 0));
+              setActive(0);
+              setResumedAt(null);
+            }}>
+            เริ่มนับใหม่
+          </Button>
+        </div>
+      )}
       <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 190px' }}>
         {/* ตารางชนิดเงิน */}
         <div className="border rounded overflow-hidden" style={{ borderColor: 'var(--ant-color-border)' }}>

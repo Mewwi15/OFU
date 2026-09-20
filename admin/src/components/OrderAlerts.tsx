@@ -113,6 +113,11 @@ export function OrderAlerts() {
       /* no speech engine — announcements degrade to chime + notification */
     }
 
+    /* ปิดหน้า/ออกจากระบบ = removeChannel ยิงสถานะ CLOSED กลับมาเป็นเรื่องปกติ
+       ต้องกันไว้ ไม่งั้นทุกครั้งที่ออกจากหลังร้านจะขึ้นป้าย "สัญญาณหลุด" หลอก */
+    let disposed = false;
+    let down = false;
+
     const channel = supabase
       .channel('admin-order-alerts')
       .on(
@@ -177,8 +182,44 @@ export function OrderAlerts() {
           window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));
         },
       )
-      .subscribe();
+      /* ★ ช่องสัญญาณหลุดแล้วเหตุการณ์ช่วงนั้นหายถาวร ★ Realtime ไม่เล่นย้อนหลังให้ตอน
+         ต่อกลับ และเดิม .subscribe() ไม่รับ callback เลย ร้านจึงไม่มีทางรู้ว่าเงียบเพราะ
+         ไม่มีออเดอร์ หรือเงียบเพราะสายหลุด — เน็ตกระตุกไม่กี่สิบวินาทีตอนลูกค้าสั่งของ
+         ก็ไม่มีเสียง ไม่มีกล่องเตือน จนกว่าจะมีคนเผลอไปกดรีเฟรช
+         ตัวไคลเอนต์ต่อกลับเองอยู่แล้ว สิ่งที่ขาดคือ "ดึงย้อนหลัง" ตอนต่อติด จึงยิง
+         ORDERS_CHANGED_EVT ทุกครั้งที่ SUBSCRIBED (ทั้งครั้งแรกและตอนรีจอยน์)
+         · รับ status เป็น string เพราะชนิดจริงเป็น enum ของ realtime-js ที่เทียบกับ
+         สตริงตรง ๆ ไม่ได้ในทางชนิดข้อมูล ทั้งที่ค่าที่ส่งมาคือสตริงพวกนี้เป๊ะ ๆ */
+      .subscribe((status: string) => {
+        if (disposed) return;
+        if (status === 'SUBSCRIBED') {
+          if (down) {
+            down = false;
+            notification.destroy('realtime-down');
+            notification.success({
+              key: 'realtime-back',
+              message: 'การเชื่อมต่อกลับมาแล้ว',
+              description: 'ดึงออเดอร์ช่วงที่ขาดหายเข้ามาให้แล้ว',
+              placement: 'topRight',
+              duration: 4,
+            });
+          }
+          window.dispatchEvent(new Event(ORDERS_CHANGED_EVT));
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (down) return;
+          down = true;
+          notification.error({
+            key: 'realtime-down',
+            message: 'การเชื่อมต่อแจ้งเตือนหลุด',
+            description:
+              'ออเดอร์ใหม่จะไม่มีเสียงเตือนจนกว่าจะต่อกลับ — หน้าออเดอร์ยังดึงรายการเองทุก 45 วินาที',
+            placement: 'topRight',
+            duration: 0, // ค้างไว้จนกว่าจะต่อกลับได้จริง
+          });
+        }
+      });
     return () => {
+      disposed = true;
       void supabase.removeChannel(channel);
       // Drop any speech still queued so nothing is announced after logout.
       announceQueue.dispose();

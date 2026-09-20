@@ -175,8 +175,12 @@ const rpc = async <T = unknown>(fn: string, args: Record<string, unknown>): Prom
 const claimSlip = async (orderId: string) => {
   try {
     await rpc('claim_slip', { p_order_id: orderId });
-  } catch {
-    /* already verifying — proceed */
+  } catch (e) {
+    /* ★ กลืนได้เฉพาะ "มีคนจับไปตรวจอยู่แล้ว" ★ claim_slip เด้ง NOT_IN_SLIP_UPLOADED
+       เมื่อใบนั้นถูก claim ไปแล้ว (0007:19-21) เคสเดียวนี้เดินต่อได้จริง · เดิมกลืน
+       ทุก error แล้วไหลไปเรียก approve ต่อ พอ claim พังเพราะสิทธิ์หรือเน็ต หน้าจอจะขึ้น
+       NOT_IN_VERIFYING ซึ่งชี้ผิดทางทั้งหมด คนขายไล่หาสาเหตุไม่เจอ */
+    if ((e as { message?: string })?.message !== 'NOT_IN_SLIP_UPLOADED') throw e;
   }
 };
 
@@ -213,6 +217,34 @@ export const cancelOrder = (orderId: string, reason: CancelReason, note?: string
     p_note: note ?? undefined,
     p_expected_row_version: rowVersion ?? undefined,
   });
+
+/* ── หนี้ค้างคืนเงิน (refunds, 0115) ─────────────────────────────────────────── */
+/**
+ * ★ cancel_order ตั้งหนี้ให้เงียบ ๆ ★ ยกเลิกใบที่ลูกค้าโอนเงินมาแล้ว = มีแถว
+ * refunds status='owed' โผล่ขึ้นมาทันที (0067:693-703) แต่เดิมไม่มีหน้าจอไหนอ่าน
+ * ตารางนี้เลย เงินลูกค้าจึงค้างที่ร้านโดยไม่มีใครรู้ · refund_owed ที่ RPC คืนมาเป็นแค่
+ * true/false — ยอดเงินอยู่ในแถว refunds (เท่ากับยอดเต็มของใบนั้น) ต้องอ่านจากที่นี่
+ */
+export type OwedRefund = {
+  id: string;
+  order_id: string;
+  order_number: string;
+  amount: number;
+  reason: string;
+  created_at: string;
+  ship_recipient: string | null;
+  ship_phone: string | null;
+};
+
+export async function listOwedRefunds(): Promise<OwedRefund[]> {
+  const { data, error } = await supabase.rpc('list_owed_refunds');
+  if (error) throw error;
+  return (data ?? []) as OwedRefund[];
+}
+
+/** โอนคืนลูกค้าแล้ว — owed → sent (กดซ้ำไม่ทับเวลา/คนโอนของเดิม, 0115) */
+export const markRefundSent = (refundId: string, ref?: string) =>
+  rpc('mark_refund_sent', { p_refund_id: refundId, p_ref: ref ?? undefined });
 
 /* ── Forward-only state machine (matches advance_order in 0007_admin_orders) ──── */
 const NEXT_DELIVERY: Partial<Record<OrderStatus, OrderStatus>> = {

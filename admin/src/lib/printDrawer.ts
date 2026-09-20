@@ -6,6 +6,11 @@
  * กระตุกสลักให้เปิดเอง — เราจึงไม่ต้องยิง ESC/POS เอง (ซึ่งเบราว์เซอร์ทำไม่ได้อยู่แล้ว)
  * แค่ "มีอะไรพิมพ์" ก็พอ
  *
+ * ★ ข้อความข้างบนใช้ไม่ได้แล้วตั้งแต่มีตัวกลางพิมพ์บิล (20 ก.ย. 2026) ★ สลิปพวกนี้พิมพ์
+ * ผ่านเบราว์เซอร์ = ไปที่เครื่องพิมพ์หลักของ Windows ซึ่งตอนนี้ตั้งเป็น Brother ได้แล้ว
+ * ไดรเวอร์ของเครื่องพิมพ์บิลจึงไม่ได้เห็นงานนั้นเลย ลิ้นชักไม่เด้ง — ทุกใบเลยต้องสั่งเปิด
+ * ลิ้นชักผ่านตัวกลางเองด้วย kickDrawer() ข้างล่าง (อย่าถอดออกเพราะเชื่อย่อหน้าข้างบน)
+ *
  * ตอนขายเงินสดลิ้นชักเปิดอยู่แล้วเพราะมีใบเสร็จออก แต่ตอนกดเปิดรอบเดิมไม่มีอะไร
  * พิมพ์เลย ลิ้นชักเลยไม่เด้ง ทั้งที่เป็นจังหวะที่ต้องเอาเงินทอนใส่ — ใบนี้มาอุดตรงนั้น
  * และได้ของแถมเป็นหลักฐานว่าใครเปิดรอบ ตั้งต้นเท่าไหร่ ติดไว้กับม้วนใบเสร็จของวันนั้น
@@ -15,11 +20,28 @@
  */
 
 import type { CountLine } from '../components/CashCountModal';
+import { openDrawerViaAgent } from './printAgent';
 import { printHtml } from './printOrder';
 import { contentMm, getReceiptConfig } from './receiptConfig';
 import { d } from './time';
 
 const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
+
+/**
+ * สั่งเปิดลิ้นชักผ่านตัวกลางก่อนพิมพ์สลิป
+ *
+ * ★ อย่าฝากลิ้นชักไว้กับไดรเวอร์อย่างเดียว ★ วิธีเดิม (พิมพ์อะไรก็ได้ให้ไดรเวอร์กระตุก
+ * สลักให้) ใช้ได้เฉพาะตอนที่งานพิมพ์วิ่งเข้าเครื่องพิมพ์บิลจริง ๆ — แต่สลิปพวกนี้ไปตาม
+ * เครื่องพิมพ์หลักของ Windows ซึ่งคู่มือตัวกลางบอกให้ตั้งเป็น Brother ได้แล้ว กลายเป็นว่า
+ * กด "เริ่มนับ" หรือกดเปิดลิ้นชักเปล่าแล้วลิ้นชักไม่เด้ง ทั้งที่ระบบบันทึกไปแล้วว่าเปิด
+ * (แล้วคนหน้าเครื่องต้องกดซ้ำ ซึ่งบันทึกเติม/เก็บเงินทอนซ้ำไปด้วย ยอดปิดรอบเพี้ยนตาม)
+ *
+ * ยิงแบบไม่ต้องรอผล: ถ้าไม่มีตัวกลางในเครื่องนี้ก็ยังเหลือทางเดิมคือสลิปที่พิมพ์ตามหลัง
+ * และสลิปยังต้องพิมพ์เหมือนเดิมทุกใบ เพราะกระดาษในม้วนคือหลักฐานที่แก้ย้อนหลังไม่ได้
+ */
+const kickDrawer = (port: number) => {
+  void openDrawerViaAgent(port);
+};
 
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -86,6 +108,7 @@ export type OpenSlip = {
 export function printShiftOpenSlip(s: OpenSlip) {
   const cfg = getReceiptConfig();
   const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
+  kickDrawer(cfg.agentPort);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบเปิดรอบ</title>
@@ -107,7 +130,7 @@ export function printShiftOpenSlip(s: OpenSlip) {
     </div>
     <div class="note">เก็บใบนี้ไว้กับม้วนใบเสร็จของรอบ</div>
     <div class="sign">ผู้เปิดรอบ</div>
-  </body></html>`);
+  </body></html>`, 'thermal');
 }
 
 export type NoSaleSlip = {
@@ -129,6 +152,7 @@ export type NoSaleSlip = {
 export function printNoSaleSlip(s: NoSaleSlip) {
   const cfg = getReceiptConfig();
   const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
+  kickDrawer(cfg.agentPort);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>เปิดลิ้นชัก</title>
@@ -146,7 +170,7 @@ export function printNoSaleSlip(s: NoSaleSlip) {
     <div class="why">${esc(s.reason) || 'ไม่ระบุเหตุผล'}</div>
     <div class="note">บันทึกไว้ในระบบแล้ว</div>
     <div class="sign">ผู้เปิดลิ้นชัก</div>
-  </body></html>`);
+  </body></html>`, 'thermal');
 }
 
 /**
@@ -163,6 +187,7 @@ export function printCountKickSlip(shopName: string, cashier: string) {
   const cfg = getReceiptConfig();
   const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
   const at = new Date().toISOString();
+  kickDrawer(cfg.agentPort);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>นับเงินเปิดรอบ</title>
@@ -173,7 +198,7 @@ export function printCountKickSlip(shopName: string, cashier: string) {
     <div class="doc">นับเงินเปิดรอบ</div>
     ${row('เวลา', `${d(at).format('DD/MM HH:mm')} น.`)}
     ${cashier ? row('ผู้นับ', esc(cashier)) : ''}
-  </body></html>`);
+  </body></html>`, 'thermal');
 }
 
 /**
@@ -194,6 +219,7 @@ export function printCashCountSheet(p: {
 }) {
   const cfg = getReceiptConfig();
   const cw = contentMm(cfg.paperWidth, cfg.contentWidthMm);
+  kickDrawer(cfg.agentPort);
 
   printHtml(`<!doctype html><html lang="th"><head><meta charset="utf-8">
   <title>ใบนับเงินในลิ้นชัก</title>
@@ -213,5 +239,5 @@ export function printCashCountSheet(p: {
       <span class="n">${baht(p.total)}</span>
     </div>
     <div class="sign">ผู้นับเงิน</div>
-  </body></html>`);
+  </body></html>`, 'thermal');
 }

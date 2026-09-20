@@ -334,7 +334,7 @@ function matchItem(items: Item[], cells: Record<string, string>): Item | null {
 /* ═════════════════════════════════════════════════════════════════════════ */
 
 export function Stock() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -563,16 +563,28 @@ export function Stock() {
         message.success(`ปรับสต๊อก ${itemLabel(item)} ${delta > 0 ? '+' : ''}${delta} (เป็น ${actionQty})`);
       } else {
         const { upsertVariant } = await import('../lib/api');
+        // ★ ต้องอ่านค่าสดจากเซิร์ฟเวอร์ก่อนส่งเสมอ ★ upsert_variant เขียนทับ
+        // size/price/sku/barcode/cost_price แบบตรง ๆ (0093:139-144) มีแต่เกณฑ์
+        // เตือนกับหน่วยที่ coalesce — ถ้าส่งค่าจาก items ที่ถ่ายภาพไว้ตอนโหลดหน้า
+        // ครั้งล่าสุด อะไรที่เปลี่ยนหลังจากนั้นจะถูกย้อนกลับเป็นค่าเก่า
+        // เกิดจริงจากการใช้งานปกติของร้าน: หน้าสต๊อกเปิดค้างทั้งวันข้างเครื่องขาย
+        // อีกแท็บ/อีกเครื่องรับของเข้า (ทุนเปลี่ยน) หรือแก้ราคา/บาร์โค้ดที่หน้าสินค้า
+        // แล้วมากดตั้งเตือนที่แถวนั้นตอนเย็น → ทุนที่รับเข้าทั้งวันหายกลับเป็นค่าเดิม
+        // หรือถูกเขียนเป็น null ซึ่งทำให้ล็อตที่รับหลังจากนั้นคิดทุน 0 (รายงานกำไรพอง)
+        const fresh = (await listProducts(true))
+          .flatMap((p) => p.product_variants)
+          .find((v) => v.id === item.variantId);
+        if (!fresh) throw new Error('ไม่พบสินค้านี้แล้ว — ลองเปิดหน้าใหม่อีกครั้ง');
         await upsertVariant({
           id: item.variantId,
           product_id: item.productId,
-          size: item.size,
-          price: item.price,
+          size: fresh.size,
+          price: fresh.price,
           low_stock_threshold: actionQty,
-          sku: item.sku,
-          barcode: item.barcode,
-          cost_price: item.cost,
-          unit: item.unit,
+          sku: fresh.sku,
+          barcode: fresh.barcode,
+          cost_price: fresh.cost_price,
+          unit: fresh.unit,
         });
         message.success(`ตั้งเกณฑ์เตือน ${itemLabel(item)} = ${actionQty}`);
       }
@@ -748,10 +760,42 @@ export function Stock() {
     (r) => r.item && Number.isFinite(r.qty) && r.qty >= 0 && (importMode === 'set' || r.qty > 0),
   );
 
+  /** ยอดรวมชิ้นของแถวที่จะถูกนำเข้าจริง — ตารางตัวอย่างโชว์ทีละ 8 แถว คนกดจึงไม่เคย
+   *  เห็นยอดรวมทั้งไฟล์ก่อนลงมือ ต้องสรุปให้เห็นทั้งบนปุ่มและในกล่องยืนยัน */
+  const importPieces = importReady.reduce((s, r) => s + r.qty, 0);
+
+  /**
+   * ★ ด่านยืนยันก่อนนำเข้าชุดใหญ่ ★ โหมด "รับของเข้า" บวกทับยอดเดิมและย้อนกลับไม่ได้
+   * เส้นทางที่พังจริงคือ: ครั้งก่อนใช้โหมดรับของเข้า อีกวันเอาไฟล์จากปุ่ม "ส่งออก Excel"
+   * (คอลัมน์ "คงเหลือ" = ยอดปัจจุบัน) มานับสต๊อก แล้วกดโดยไม่ทันดูวงกลมโหมด
+   * → ทุกแถวถูกบวกทับยอดตัวเอง สต๊อกทั้งร้านเป็นสองเท่าในคลิกเดียว
+   * กล่องนี้คือจุดเดียวที่โหมดกับยอดรวมถูกพูดพร้อมกันก่อนลงมือ
+   * ชุดเล็กในโหมดนับสต๊อก (ค่าสัมบูรณ์ แก้ซ้ำได้) ไม่ต้องผ่านด่าน จะได้ไม่ขวางงานประจำ
+   */
+  const confirmImport = () => {
+    if (importMode === 'set' && importReady.length <= 50) {
+      void runImport();
+      return;
+    }
+    modal.confirm({
+      title: importMode === 'receive' ? 'รับของเข้าตามไฟล์' : 'ตั้งคงเหลือตามไฟล์',
+      content:
+        importMode === 'receive'
+          ? `บวกเพิ่มรวม ${importPieces.toLocaleString('th-TH')} ชิ้น ใน ${importReady.length} รายการ — ทำแล้วย้อนกลับไม่ได้`
+          : `ตั้งคงเหลือตามไฟล์รวม ${importPieces.toLocaleString('th-TH')} ชิ้น ใน ${importReady.length} รายการ — ยอดเดิมของแถวพวกนี้จะถูกเขียนทับ`,
+      okText: 'นำเข้าเลย',
+      cancelText: 'ยกเลิก',
+      onOk: () => runImport(),
+    });
+  };
+
   const runImport = async () => {
     setImportBusy(true);
     let ok = 0;
     let failed = 0;
+    /** เก็บชื่อแถวที่ล้ม — ข้อความเดิมบอกแค่จำนวน คนรับของจึงเหลือทางเดียวคือ
+     *  อัปโหลดไฟล์เดิมซ้ำ ซึ่งในโหมดรับของเข้า = บวกซ้ำให้แถวที่สำเร็จไปแล้ว */
+    const failedLabels: string[] = [];
     // Each row is an independent RPC call (server-side atomic update per
     // variant, safe under concurrency) — batch them instead of one at a time,
     // a large CSV otherwise took one network round-trip per row in sequence.
@@ -765,17 +809,40 @@ export function Stock() {
             : receiveStock(r.item!.variantId, r.qty, 'นำเข้าไฟล์ (รับของ)'),
         ),
       );
-      for (const r of results) {
+      results.forEach((r, k) => {
         if (r.status === 'fulfilled') ok++;
-        else failed++;
-      }
+        else {
+          failed++;
+          failedLabels.push(batch[k].label);
+        }
+      });
     }
     setImportBusy(false);
     setImportOpen(false);
     setImportRows([]);
-    message[failed ? 'warning' : 'success'](
-      `นำเข้าสำเร็จ ${ok} รายการ${failed ? ` · ล้มเหลว ${failed}` : ''}`,
-    );
+    if (failed) {
+      // กล่องค้างจอ ไม่ใช่ toast ที่หายไปเอง — รายชื่อนี้คือสิ่งเดียวที่กันไม่ให้
+      // คนรับของยิงไฟล์เดิมซ้ำทั้งใบเพื่อตามเก็บไม่กี่แถวที่ล้ม
+      modal.warning({
+        title: `นำเข้าสำเร็จ ${ok} รายการ · ล้มเหลว ${failed} รายการ`,
+        width: 480,
+        okText: 'เข้าใจแล้ว',
+        content: (
+          <div>
+            <div style={{ marginBottom: 8 }}>
+              แถวที่ยังไม่ถูกนำเข้า — แก้เฉพาะแถวพวกนี้แล้วนำเข้าใหม่ อย่ายิงไฟล์เดิมซ้ำทั้งใบ
+            </div>
+            <ul style={{ paddingLeft: 18, margin: 0, maxHeight: 220, overflowY: 'auto' }}>
+              {failedLabels.map((l, k) => (
+                <li key={k}>{l}</li>
+              ))}
+            </ul>
+          </div>
+        ),
+      });
+    } else {
+      message.success(`นำเข้าสำเร็จ ${ok} รายการ`);
+    }
     void reload(true);
   };
 
@@ -815,6 +882,11 @@ export function Stock() {
         </div>
         <Space>
           <Upload accept=".csv" showUploadList={false} beforeUpload={(f) => {
+            // ★ รีเซ็ตโหมดทุกครั้งที่เปิด ★ ไฟล์ถูกอ่านตั้งแต่ก่อน modal เปิด คนใช้จึง
+            // เลือกไฟล์ก่อนแล้วค่อยเห็นโหมด — โหมดที่เห็นเคยเป็นโหมดของครั้งก่อนที่ค้างไว้
+            // ค่าเริ่มต้นต้องเป็น "นับสต๊อก" (ค่าสัมบูรณ์ แก้ซ้ำได้) เสมอ ไม่ใช่
+            // "รับของเข้า" ที่บวกทับแล้วย้อนไม่ได้
+            setImportMode('set');
             setImportOpen(true);
             return onImportFile(f);
           }}>
@@ -1353,8 +1425,10 @@ export function Stock() {
             type="primary"
             disabled={!importReady.length}
             loading={importBusy}
-            onClick={() => void runImport()}>
-            นำเข้า {importReady.length} รายการ
+            onClick={confirmImport}>
+            {importMode === 'receive'
+              ? `รับเข้าเพิ่ม ${importPieces.toLocaleString('th-TH')} ชิ้น (${importReady.length} รายการ)`
+              : `ตั้งคงเหลือ ${importReady.length} รายการ (รวม ${importPieces.toLocaleString('th-TH')} ชิ้น)`}
           </Button>,
         ]}>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -1367,8 +1441,8 @@ export function Stock() {
             ]}
           />
           <Text type="secondary">
-            ใช้ไฟล์จากปุ่ม "ส่งออก Excel" เป็นแม่แบบ แก้คอลัมน์ "คงเหลือ" (หรือเพิ่มคอลัมน์
-            "จำนวน") แล้วบันทึกเป็น .csv — ระบบจับคู่สินค้าจากบาร์โค้ด / SKU / ชื่อ
+            ใช้ไฟล์จากปุ่ม &quot;ส่งออก Excel&quot; เป็นแม่แบบ แก้คอลัมน์ &quot;คงเหลือ&quot; (หรือเพิ่มคอลัมน์
+            &quot;จำนวน&quot;) แล้วบันทึกเป็น .csv — ระบบจับคู่สินค้าจากบาร์โค้ด / SKU / ชื่อ
           </Text>
           {importRows.length ? (
             <Table
