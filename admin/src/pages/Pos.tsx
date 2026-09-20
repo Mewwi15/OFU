@@ -8,7 +8,6 @@ import {
   RiPrinterLine,
   RiQrCodeLine,
   RiQrScanLine,
-  RiSearchLine,
   RiShoppingBasket2Line,
   RiSubtractLine,
 } from '@remixicon/react';
@@ -885,24 +884,42 @@ export function Pos() {
                     const price = p.variants[0]?.price ?? 0;
                     const oos = stock <= 0;
                     return (
+                      /* ★ ของหมดต้องยังกดได้ ★ เหมือนหน้าต่างเลือกขนาด — ยิงบาร์โค้ดของ
+                         ชิ้นนี้ขายได้อยู่แล้ว ถ้าค้นหาแล้วกดไม่ลงก็กลายเป็นสองมาตรฐาน */
                       <button
                         key={p.id}
                         type="button"
-                        disabled={oos}
                         onClick={() => {
                           pick(p);
                           setQuery('');
                           searchRef.current?.focus();
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-3 border-b border-[#F0F0F0] last:border-0 text-left hover:bg-[#FFF8F3] disabled:opacity-45 disabled:hover:bg-white transition">
-                        <RiSearchLine className="w-4 h-4 text-tremor-content-subtle shrink-0" />
+                        className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-[#F0F0F0] last:border-0 text-left hover:bg-[#FFF8F3] transition">
+                        {/* ★ รูปสินค้า ★ (เจ้าของสั่ง 20 ก.ย. 2569 "ตรงที่ค้นหาของมันไม่มีภาพ")
+                            รูปโหลดมากับรายการสินค้าตั้งแต่เปิดหน้าอยู่แล้ว ค้างไว้ไม่ได้ใช้
+                            ตั้งแต่ตอนเอาตารางสินค้าออก — ของในร้านชำหลายตัวชื่อใกล้กันมาก
+                            (ยี่ห้อเดียวกันคนละขนาด) อ่านชื่อเทียบทีละบรรทัดช้ากว่าเห็นรูป
+                            ใช้กรอบเดียวกับรูปในบิลด้านล่าง ต่างแค่ขนาด จะได้อ่านเป็นชุดเดียวกัน */}
+                        <span className="w-12 h-12 overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
+                          {p.image ? (
+                            <img src={p.image} alt="" loading="lazy" className="w-full h-full object-cover" />
+                          ) : (
+                            <RiShoppingBasket2Line className="w-5 h-5 text-tremor-brand-subtle" />
+                          )}
+                        </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-[16px] font-semibold text-tremor-content-strong truncate">
                             {p.name}
                           </span>
                           <span className="block text-[13px] text-tremor-content">
                             {p.variants.length > 1 ? `${p.variants.length} ขนาด · ` : ''}
-                            คงเหลือ {stock}
+                            {oos ? (
+                              <span className="font-medium text-amber-700">
+                                {stock < 0 ? `ติดลบ ${Math.abs(stock)}` : 'หมดแล้ว'}
+                              </span>
+                            ) : (
+                              `คงเหลือ ${stock}`
+                            )}
                           </span>
                         </span>
                         <span className="text-[17px] font-bold tabular-nums text-tremor-content-strong shrink-0">
