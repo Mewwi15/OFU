@@ -995,10 +995,22 @@ export function Pos() {
 
                       {discountEditing === l.variantId ? (
                         <div className="flex items-center justify-end gap-2 mt-2.5 pl-[68px]">
-                          <span className="text-[14px] text-tremor-content">ส่วนลดรายการนี้</span>
+                          <span className="text-[14px] text-tremor-content">
+                            ส่วนลดรายการนี้
+                            <span className="text-[12.5px] text-tremor-content-subtle ml-1.5">
+                              สูงสุด {baht(l.unitPrice * l.qty)}
+                            </span>
+                          </span>
+                          {/* ★ ห้ามใส่ max ให้ช่องนี้ ★ (เจ้าของเจอเอง 20 ก.ย. 2569 "กดลดราคา
+                              บางสินค้าลด บางสินค้าไม่ลด") ช่องกรอกตัวเลขของ antd จะไม่ส่งค่า
+                              กลับมาเลยถ้าสิ่งที่พิมพ์เกินเพดาน — มันรอหนีบค่าตอนคลิกออก/กด Enter
+                              เท่านั้น แต่ onPressEnter ของเราพับแถวปิดทันที ช่องถูกถอดออกก่อน
+                              จะได้หนีบ ค่าที่พิมพ์จึงหายทั้งก้อน · ลด 20 บาทกับของ 35 บาทได้
+                              แต่กับของ 14 บาทเงียบสนิท ซึ่งแคชเชียร์อ่านว่า "ปุ่มลดพัง"
+                              เราหนีบเองใน setLineDiscount อยู่แล้ว ค่าจึงไม่มีทางเกินราคาแถว
+                              และพอพิมพ์เกินมันจะเด้งกลับให้เห็นทันทีว่าลดได้มากสุดเท่าไหร่ */}
                           <InputNumber
                             min={0}
-                            max={l.unitPrice * l.qty}
                             precision={0}
                             controls={false}
                             inputMode="numeric"
@@ -1126,9 +1138,10 @@ export function Pos() {
                 <span className="text-[14.5px] font-semibold text-tremor-content-strong">
                   ส่วนลดทั้งบิล
                 </span>
+                {/* โรคเดียวกับส่วนลดรายชิ้น: พิมพ์เกินยอดบิลแล้วช่องเงียบ ไม่ส่งค่ากลับมา
+                    — เราหนีบเองใน onChange อยู่แล้ว ไม่ต้องพึ่ง max ของช่อง */}
                 <InputNumber
                   min={0}
-                  max={subtotal}
                   precision={0}
                   size="large"
                   controls={false}
