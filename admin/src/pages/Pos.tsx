@@ -452,8 +452,43 @@ export function Pos() {
       if (!n?.tagName) return false;
       return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable;
     }
+    /* ช่องยิงบาร์โค้ดเอง — ปล่อยให้ onSearchKey จัดการตามเดิม ไม่งั้นจะทำงานซ้อนกัน */
+    function isScanBox(el: EventTarget | null) {
+      const input = searchRef.current?.input;
+      return !!input && el === input;
+    }
+    /**
+     * คืนค่าเดิมให้ช่องที่โดนบาร์โค้ดพิมพ์ใส่
+     *
+     * ★ ต้องยิงผ่าน setter ของ DOM ★ ช่องพวกนี้เป็น antd InputNumber ที่ค่าถูกคุมด้วย
+     * React การไปตั้ง el.value ตรง ๆ หน้าจอจะเปลี่ยนแต่ค่าจริงในระบบไม่เปลี่ยน พอ React
+     * วาดรอบถัดไปก็เด้งกลับมาเป็นเลขบาร์โค้ดอีก — ต้องหลอกให้มันเห็นเป็นการพิมพ์จริง
+     */
+    function restoreField(el: HTMLInputElement, value: string) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    /* ค่าเดิมของช่องที่กำลังโดนยิงใส่ — จำไว้ตั้งแต่ตัวอักษรแรกของชุด */
+    const hijack: { el: HTMLInputElement | null; value: string } = { el: null, value: '' };
+
     function onKey(e: KeyboardEvent) {
-      if (editable(e.target)) return; // let the focused field (incl. search box) handle it
+      if (isScanBox(e.target)) return; // ช่องยิงจัดการเองอยู่แล้ว
+      /**
+       * ★ ยิงบาร์โค้ดตอนเคอร์เซอร์อยู่ในช่องเงิน = ขายฟรี ★ (ตรวจเจอ 20 ก.ย. 2569)
+       *
+       * ของเดิมเจอว่าโฟกัสอยู่ในช่องกรอกก็ถอยออกทันที เลขบาร์โค้ดจึงไหลลงช่องนั้นแทนที่
+       * จะเข้าบิล เกิดสองอย่างพร้อมกัน: สินค้าที่ยิงไม่เข้าบิล (ของออกจากร้านฟรี) และ
+       * ตัวเลขบาร์โค้ดกลายเป็นยอดในช่องนั้น — ถ้าเป็นช่องส่วนลด Enter ท้ายบาร์โค้ดจะสั่งให้
+       * antd หั่นค่าลงมาเท่าเพดาน (max = ยอดบิล) พอดี ยอดที่ต้องเก็บจึงเหลือ ฿0 และระบบ
+       * บันทึกบิล ฿0 นั้นจริง ๆ · เกิดง่ายมากหน้าเคาน์เตอร์: ลูกค้าหยิบของเพิ่มตอนแคชเชียร์
+       * พิมพ์เงินไปแล้ว แคชเชียร์ยิงต่อโดยไม่ได้คลิกกลับไปที่ช่องยิง
+       *
+       * ★ ไม่กันตัวอักษรระหว่างทาง ★ เรายังไม่รู้ว่าเป็นเครื่องยิงจนกว่าจะจบชุด ถ้าดักไว้
+       * ก่อนแล้วเดาผิด แคชเชียร์ที่พิมพ์เร็วจะพิมพ์เงินไม่เข้า ซึ่งแย่กว่าเดิม — ปล่อยให้
+       * ตัวเลขลงช่องไปก่อน แล้วค่อยคืนค่าเดิมตอนที่มั่นใจแล้วว่าเป็นการยิง
+       */
+      const inField = editable(e.target);
       const now = e.timeStamp;
       if (e.key === 'Alt') {
         finalizeAlt(now);
@@ -465,17 +500,35 @@ export function Pos() {
         buf.last = now;
         return;
       }
-      if (now - buf.last > 120) buf.chars = ''; // slow gap → not a scan burst
+      if (now - buf.last > 120) {
+        buf.chars = ''; // slow gap → not a scan burst
+        /* เริ่มชุดใหม่ = จำค่าเดิมของช่องไว้ ณ ตอนนี้ (ตัวอักษรแรกยังไม่ลงช่อง เพราะเรา
+           ดักในจังหวะ capture ซึ่งมาก่อนช่องเสมอ) */
+        hijack.el = inField ? (e.target as HTMLInputElement) : null;
+        hijack.value = hijack.el?.value ?? '';
+      }
       buf.last = now;
       if (e.key === 'Enter') {
         finalizeAlt(now);
         const code = buf.chars;
         buf.chars = '';
-        if (code.length >= 3) {
+        /* ★ อยู่ในช่องกรอกต้องมั่นใจกว่า ★ นอกช่อง 3 ตัวก็พอ เพราะไม่มีอะไรให้เสียหาย
+           แต่ในช่องเงิน การเดาผิดแปลว่าลบสิ่งที่แคชเชียร์พิมพ์ไปแล้วทิ้ง — บาร์โค้ดสินค้า
+           สั้นสุดที่ใช้จริงคือ 8 หลัก ส่วนคนพิมพ์เลข 6 หลักรวดเดียวโดยไม่มีจังหวะห่างเกิน
+           120 มิลลิวินาทีสักครั้ง แทบเป็นไปไม่ได้ */
+        const enough = inField ? code.length >= 6 : code.length >= 3;
+        if (enough) {
           // Swallow the scan's Enter before the focused element sees it — a
           // focused button/menu item would otherwise be "clicked" by the scan.
+          // ในช่องเงิน Enter ตัวนี้คือตัวที่สั่ง antd หั่นค่าลงมาเท่าเพดาน ต้องกันให้ได้
           e.preventDefault();
           e.stopPropagation();
+          if (hijack.el) {
+            restoreField(hijack.el, hijack.value);
+            /* ดึงโฟกัสกลับช่องยิง — ไม่งั้นการยิงครั้งถัดไปก็ลงช่องเงินอีก วนอยู่อย่างนั้น */
+            searchRef.current?.focus();
+          }
+          hijack.el = null;
           scanRef.current(code, true);
         }
         return;
