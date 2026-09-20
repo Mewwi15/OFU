@@ -978,10 +978,20 @@ export function Pos() {
                   const fresh = flashId === l.variantId;
                   const have = shortLines.get(l.variantId);
                   return (
+                    /* ★ แถวที่ของไม่พอ ย้อมทั้งแถว ★ (เจ้าของสั่ง 20 ก.ย. 2569 "ทำสีด้วย
+                       แบบทั้งแถวเลย") ของเดิมเป็นกล่องเตือนแปะใต้แถว ซึ่งกินที่สองบรรทัด
+                       ต่อหนึ่งรายการ บิลยี่สิบรายการก็ยาวขึ้นเท่าตัว และตาต้องหาว่ากล่องนี้
+                       เป็นของแถวไหน · ย้อมทั้งแถวเห็นตั้งแต่กวาดตาผ่าน ไม่ต้องอ่าน
+                       ★ สีเหลืองชนะไฟกะพริบเขียว ★ แถวที่เพิ่งยิงแล้วของไม่พอ ต้องอ่านว่า
+                       "มีปัญหา" ไม่ใช่ "เข้าแล้วเรียบร้อย" */
                     <div
                       key={l.variantId}
                       className={`px-4 py-3.5 transition-colors duration-300 ${
-                        fresh ? 'bg-emerald-50' : 'hover:bg-[#FAFAFA]'
+                        have !== undefined
+                          ? 'bg-amber-100'
+                          : fresh
+                            ? 'bg-emerald-50'
+                            : 'hover:bg-[#FAFAFA]'
                       }`}>
                       <div className="flex items-start gap-3">
                         <div className="w-14 h-14 overflow-hidden bg-[#F5F5F5] border border-[#E8E8E8] grid place-items-center shrink-0">
@@ -997,11 +1007,30 @@ export function Pos() {
                               {l.name}
                               {l.size ? ` (${l.size})` : ''}
                             </span>
-                            {fresh && (
+                            {/* ★ บอกสั้น ๆ ตรงที่ตามองอยู่ ★ (เจ้าของสั่ง "เอาไว้ข้างๆเลย
+                                บอกว่าเหลือสต๊อกเท่าไหร่ เอาสั้นๆไม่ต้องยาว") ตัวเลขที่
+                                แคชเชียร์ต้องรู้มีตัวเดียวคือเหลือเท่าไหร่ ที่เหลือเดาเองได้
+                                ★ กดได้ ★ กดแล้วปรับจำนวนลงมาเท่าที่มีจริง เผื่อยิงเกินโดย
+                                ไม่ตั้งใจ — ปุ่มแยกอีกปุ่มไม่ต้องมี */}
+                            {have !== undefined ? (
+                              have > 0 ? (
+                                <button
+                                  type="button"
+                                  title={`กดเพื่อปรับเหลือ ${have}`}
+                                  onClick={() => setQty(l.variantId, have)}
+                                  className="shrink-0 text-[12px] font-bold text-amber-900 bg-amber-200 hover:bg-amber-300 px-2 py-0.5 transition tabular-nums">
+                                  เหลือ {have}
+                                </button>
+                              ) : (
+                                <span className="shrink-0 text-[12px] font-bold text-amber-900 bg-amber-200 px-2 py-0.5">
+                                  หมด
+                                </span>
+                              )
+                            ) : fresh ? (
                               <span className="shrink-0 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5">
                                 ล่าสุด
                               </span>
-                            )}
+                            ) : null}
                           </div>
                           <div className="text-[14px] text-tremor-content mt-0.5 tabular-nums">
                             {baht(l.unitPrice)} / หน่วย
@@ -1044,28 +1073,6 @@ export function Pos() {
                           </button>
                         </div>
                       </div>
-
-                      {/* ★ เตือนตรงแถวที่มีปัญหา ★ ไม่ใช่ข้อความรวมตอนกดชำระเงิน — บิลยาว ๆ
-                          แคชเชียร์ต้องไล่หาเองว่าตัวไหน และตอนนั้นของแพ็คใส่ถุงไปแล้ว
-                          ★ ไม่ห้ามขาย ★ (เจ้าของเลือกทาง B 20 ก.ย. 2569) ของบนชั้นสำคัญกว่า
-                          ตัวเลขในระบบ — บอกให้รู้แล้วให้คนหน้าเครื่องตัดสิน พร้อมปุ่มปรับให้
-                          เท่าที่มีจริงถ้าเป็นการยิงเกินโดยไม่ตั้งใจ */}
-                      {have !== undefined ? (
-                        <div className="flex items-center gap-2 mt-2.5 ml-[68px] px-3 py-2 bg-amber-50 border border-amber-200">
-                          <RiErrorWarningLine className="w-[17px] h-[17px] text-amber-700 shrink-0" />
-                          <span className="flex-1 text-[13.5px] font-medium text-amber-800">
-                            {have === 0
-                              ? `ระบบว่าหมดแล้ว แต่ใส่ไป ${l.qty}`
-                              : `เหลือ ${have} ใส่ไป ${l.qty}`}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setQty(l.variantId, have)}
-                            className="shrink-0 px-3 py-1 text-[12.5px] font-semibold text-white bg-amber-700 hover:bg-amber-800 transition">
-                            {have === 0 ? 'เอาออก' : `ปรับเหลือ ${have}`}
-                          </button>
-                        </div>
-                      ) : null}
 
                       {discountEditing === l.variantId ? (
                         <div className="flex items-center justify-end gap-2 mt-2.5 pl-[68px]">
@@ -1340,7 +1347,7 @@ export function Pos() {
               <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200">
                 <RiErrorWarningLine className="w-[17px] h-[17px] text-amber-700 shrink-0" />
                 <span className="text-[13px] text-amber-800">
-                  มี {shortLines.size} รายการเกินสต๊อกที่ระบบมี — ขายได้ แต่สต๊อกจะติดลบ
+                  ของไม่พอ {shortLines.size} รายการ · ขายได้ สต๊อกจะติดลบ
                 </span>
               </div>
             ) : null}
