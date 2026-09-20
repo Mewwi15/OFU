@@ -391,7 +391,7 @@ export function Stock() {
   const [query, setQuery] = useState('');
   // Opens on the buy list, not the catalogue: 58 rows to act on beats 832 rows
   // to scroll. "ทั้งหมด" is one click away for lookups.
-  const [statusFilter, setStatusFilter] = useState<'all' | Urgency>('buy');
+  const [statusFilter, setStatusFilter] = useState<'all' | Urgency | 'neg'>('buy');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const categories = useMemo(
@@ -402,7 +402,9 @@ export function Stock() {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = items.filter((i) => {
-      if (statusFilter !== 'all' && urgencyOf(i) !== statusFilter) return false;
+      if (statusFilter === 'neg') {
+        if (i.stock >= 0) return false;
+      } else if (statusFilter !== 'all' && urgencyOf(i) !== statusFilter) return false;
       if (categoryFilter && i.category !== categoryFilter) return false;
       if (!q) return true;
       return (
@@ -419,8 +421,17 @@ export function Stock() {
   }, [items, query, statusFilter, categoryFilter]);
 
   const totals = useMemo(() => {
-    const pieces = items.reduce((s, i) => s + i.stock, 0);
-    const outCount = items.filter((i) => i.stock === 0).length;
+    /* ★ ตัวติดลบต้องไม่ไปหักยอดรวม ★ ของที่ติดลบแปลว่าไม่รู้ว่าบนชั้นเหลือเท่าไหร่จริง
+       (รู้แค่ว่าน้อยกว่าที่ระบบคิด) เอา -3 ไปลบออกจากยอดรวมคือเดาว่ามันติดลบจริง ๆ
+       ซึ่งของจริงติดลบไม่ได้ — นับเป็น 0 ตรงไปตรงมากว่า */
+    const pieces = items.reduce((s, i) => s + Math.max(0, i.stock), 0);
+    /* ★ ติดลบก็คือหมด ★ (ตั้งแต่ 0117 หน้าขายปล่อยให้ขายเกินสต๊อกได้ตามที่เจ้าของสั่ง)
+       เดิมนับเฉพาะที่เป็น 0 เป๊ะ ของที่เหลือ 2 แล้วขายไป 5 จะกลายเป็น -3 แล้วหลุดจาก
+       การนับไปเลย — การ์ด "หมดแล้ว" จะบอกน้อยกว่าความจริงเรื่อย ๆ โดยไม่มีใครรู้ */
+    const outCount = items.filter((i) => i.stock <= 0).length;
+    /* ของที่ติดลบ = ตัวเลขในระบบไม่ตรงกับของจริงแน่ ๆ ต้องไปนับของบนชั้นใหม่
+       แยกนับไว้เพราะมันไม่ใช่ "ของหมด" ธรรมดา แต่เป็นงานที่ต้องตามเก็บ */
+    const negCount = items.filter((i) => i.stock < 0).length;
     /* ต้นทุนของที่นอนอยู่บนชั้น (เจ้าของสั่งเพิ่ม 3 ก.ย. 2026)
      *
      * นับเฉพาะรายการที่มีต้นทุนบันทึกไว้ และบอกจำนวนที่ยังไม่ได้ใส่ต้นทุนกำกับด้วย
@@ -432,7 +443,7 @@ export function Stock() {
     const noCost = items.filter((i) => i.stock > 0 && i.cost == null);
     // เก็บตัวรายการไว้ด้วย ไม่ใช่แค่จำนวน — เจ้าของต้องกดดูได้ว่าตัวไหนบ้าง
     const costValue = withCost.reduce((s, i) => s + (i.cost ?? 0) * i.stock, 0);
-    return { pieces, outCount, costValue, noCostCount: noCost.length, noCost };
+    return { pieces, outCount, negCount, costValue, noCostCount: noCost.length, noCost };
   }, [items]);
 
   /* ต้นทุนแยกตามหมวด — โดนัทใบที่สองตอบว่า "เงินจมอยู่ที่หมวดไหน" ซึ่งการ์ดตัวเลข
@@ -657,7 +668,9 @@ export function Stock() {
         // Plain now — urgency moved to เหลืออีก, which is the number that
         // actually decides whether to buy. No reserved/sellable sub-line: this
         // shop deducts stock on order, there is no reservation hold.
-        <Text strong style={{ fontSize: 17 }}>
+        /* ★ ติดลบต้องอ่านออกว่าผิดปกติ ★ ตัวเลขติดลบแปลว่าของบนชั้นกับในระบบไม่ตรงกัน
+           ถ้าพิมพ์สีเดียวกับตัวอื่น มันจะกลมกลืนไปกับ "3" "12" จนเลื่อนผ่าน */
+        <Text strong style={{ fontSize: 17, color: s < 0 ? URGENCY_COLOR.buy : undefined }}>
           {s}
           <Text type="secondary" style={{ fontSize: 12 }}> {i.unit ?? 'ชิ้น'}</Text>
         </Text>
@@ -958,8 +971,19 @@ export function Stock() {
               <StatTile
                 label="หมดแล้ว"
                 value={`${totals.outCount} รายการ`}
-                hint="ไม่เหลือบนชั้นเลย"
+                /* ★ ของติดลบต้องเด้งออกมาให้เห็น ★ มันคือรายการที่ตัวเลขในระบบเพี้ยน
+                   จากของจริงแน่นอน ถ้าไม่บอกตรงนี้ เจ้าของไม่มีทางรู้ว่าต้องไปนับตัวไหน */
+                hint={
+                  totals.negCount > 0
+                    ? `ในนั้นติดลบ ${totals.negCount} รายการ — กดดูเพื่อไปนับใหม่`
+                    : 'ไม่เหลือบนชั้นเลย'
+                }
                 accent={totals.outCount > 0 ? URGENCY_COLOR.buy : undefined}
+                onClick={
+                  totals.negCount > 0
+                    ? () => setStatusFilter(statusFilter === 'neg' ? 'all' : 'neg')
+                    : undefined
+                }
               />
               {/* Same source as the ไม่ขยับ filter below, so the tile and the
                   chip can never disagree. Now that empty shelves count as a
@@ -1155,8 +1179,13 @@ export function Stock() {
               <Segmented
                 value={statusFilter}
                 onChange={(v) => setStatusFilter(v as typeof statusFilter)}
+                /* ชิป "ติดลบ" โผล่เฉพาะตอนที่มีของติดลบจริง — วันปกติหน้าจอหน้าตาเหมือนเดิม
+                   ไม่ได้เพิ่มปุ่มค้างไว้ให้อ่านผ่านทุกวันทั้งที่กดไปก็ว่าง */
                 options={[
                   { label: `${URGENCY_LABEL.buy} (${buckets.buy})`, value: 'buy' },
+                  ...(totals.negCount > 0
+                    ? [{ label: `ติดลบ (${totals.negCount})`, value: 'neg' }]
+                    : []),
                   { label: `ทั้งหมด (${items.length})`, value: 'all' },
                   { label: `${URGENCY_LABEL.idle} (${buckets.idle})`, value: 'idle' },
                 ]}

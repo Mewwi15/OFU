@@ -1594,15 +1594,24 @@ function VariantPicker({
     <Modal open title={`${product.name} · เลือกขนาด`} onCancel={onClose} footer={null} destroyOnHidden width={400}>
       <div className="space-y-2 mt-1">
         {product.variants.map((v) => (
+          /* ★ ของหมดต้องยังกดได้ ★ เดิมปิดปุ่มทิ้งเมื่อ stock_qty <= 0 ซึ่งขัดกับทางที่
+             เจ้าของเลือกไว้ (20 ก.ย. 2569 — ขายได้ เตือนเอา) และขัดกับทางยิงบาร์โค้ด
+             ที่ปล่อยผ่านอยู่แล้ว กลายเป็นว่าของชิ้นเดียวกันยิงขายได้ แต่กดเลือกเองไม่ได้
+             ลูกค้าถือของยืนรออยู่ตรงหน้า แต่แคชเชียร์กดปุ่มไม่ลง — บอกว่าไม่พอก็พอแล้ว */
           <button
             key={v.id}
-            disabled={v.stock_qty <= 0}
             onClick={() => onPick(v)}
-            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#5B8C6E] disabled:opacity-40 transition">
+            className="w-full flex items-center justify-between px-4 py-3 rounded-none border border-[#E8E8E8] hover:border-[#5B8C6E] transition">
             <span className="text-sm font-medium text-[#2B2320]">{v.size ?? 'ปกติ'}</span>
             <span className="text-sm">
               <span className="font-semibold text-[#2B2320]">{baht(v.price)}</span>
-              <span className="text-xs text-gray-400 ml-2">คงเหลือ {v.stock_qty}</span>
+              {v.stock_qty <= 0 ? (
+                <span className="text-xs font-medium text-amber-700 ml-2">
+                  {v.stock_qty < 0 ? `ติดลบ ${Math.abs(v.stock_qty)}` : 'หมดแล้ว'}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-400 ml-2">คงเหลือ {v.stock_qty}</span>
+              )}
             </span>
           </button>
         ))}
