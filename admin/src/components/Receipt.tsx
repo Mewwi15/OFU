@@ -61,7 +61,28 @@ const PAY_LABEL: Record<string, string> = {
 };
 // Null-safe: `undefined.toLocaleString()` is exactly what blanked the whole POS
 // on a receipt replay (H5). A missing amount prints as 0 rather than throwing.
-const baht = (n: number | null | undefined) => (n ?? 0).toLocaleString('th-TH');
+const baht = (n: number | null | undefined) =>
+  Number.isInteger(n ?? 0)
+    ? (n ?? 0).toLocaleString('th-TH')
+    : /* เศษสตางค์โผล่ได้ทางเดียวคือหารส่วนลดรายชิ้นลงมาต่อหน่วย — ปัดเป็นสองตำแหน่ง
+         ตามที่คนอ่านบิลคุ้น ไม่ใช่ 26.5 โทน ๆ */
+      (n ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * ราคาต่อหน่วยที่จะพิมพ์ลงกระดาษ — ลดแล้วก็คือราคาที่ลดแล้ว
+ *
+ * ★ ทำไมไม่พิมพ์ราคาตั้งแล้วค่อยบอกว่าลดเท่าไหร่ ★ เจ้าของสั่งไว้ชัด (20 ก.ย. 2569)
+ * ว่าให้แสดงราคาที่ลดแล้วไปเลย ไม่ต้องมีคำอธิบาย ซึ่งตรงกับที่ลูกค้าอ่านบิลจริง ๆ
+ * คือไล่ดูว่าแต่ละตัวกี่บาทแล้วบวกกัน ไม่มีใครมานั่งหักลบส่วนลดตาม
+ *
+ * ★ ส่วนลดเป็นของทั้งบรรทัด ไม่ใช่ของต่อชิ้น ★ หารลงมาแล้วบางทีไม่ลงตัว (ลด 7 บาท
+ * กับของ 3 ชิ้น) กรณีนั้นกระดาษจะเพี้ยนไปได้มากสุด 1 สตางค์ ซึ่งไม่มีใครคูณเจอ —
+ * เทียบกับของเดิมที่พิมพ์ "2 x ฿30" แล้วเก็บ ฿53 คือเพี้ยน 7 บาทเต็ม ๆ ต่อหน้าลูกค้า
+ */
+const unitAfterDiscount = (l: ReceiptLine) =>
+  (l.lineDiscount ?? 0) > 0 && l.qty > 0
+    ? Math.round((l.lineTotal / l.qty) * 100) / 100
+    : l.unitPrice;
 
 function Line2({ label, value, bold }: { label: string; value: number | null | undefined; bold?: boolean }) {
   return (
@@ -192,13 +213,13 @@ export function Receipt({
               {l.size ? ` (${l.size})` : ''}
             </div>
             <div className="flex gap-1">
+              {/* ★ ลดแล้วให้พิมพ์ราคาที่ลดแล้วไปเลย ★ (เจ้าของสั่ง 20 ก.ย. 2569 "ในบิล
+                  แสดงลดราคาเลย ไม่ต้องบอกว่าลด แต่ถ้าไม่ลดก็แสดงอันเดิม")
+                  ที่ต้องแตะเพราะเดิมกระดาษขัดแย้งกับตัวเอง — พิมพ์ "2 x ฿30" แต่ยอดขวา
+                  เป็น ฿53 ลูกค้าคูณตามแล้วไม่ตรง อ่านได้อย่างเดียวว่าร้านคิดเงินผิด
+                  ตอนนี้เลขคูณกันได้ลงตัวบนกระดาษ ไม่ต้องมีคำอธิบายห้อยท้าย */}
               <div className="flex-1 text-black/70">
-                {l.qty} x {baht(l.unitPrice)}
-                {/* ต่อท้ายบรรทัดเดิม ไม่ขึ้นบรรทัดใหม่ — เจ้าของสั่งเรื่องประหยัดกระดาษไว้
-                    ("ขอบกระดาษเหลือเยอะเกิน") บิลที่ไม่ได้ลดจึงยาวเท่าเดิมเป๊ะ */}
-                {(l.lineDiscount ?? 0) > 0 ? (
-                  <span className="font-bold text-black"> ลด {baht(-(l.lineDiscount ?? 0))}</span>
-                ) : null}
+                {l.qty} x {baht(unitAfterDiscount(l))}
               </div>
               <div className="w-12 text-right">{baht(l.lineTotal)}</div>
             </div>
