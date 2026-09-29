@@ -159,6 +159,35 @@ export async function listCategories(): Promise<Category[]> {
   return data as Category[];
 }
 
+/**
+ * ดึงข้อมูลให้ครบทุกแถว ไม่ใช่แค่หน้าแรก
+ *
+ * ★ เซิร์ฟเวอร์ตัดให้เหลือ 1,000 แถวเงียบ ๆ ★ (เจ้าของเจอเอง 29 ก.ย. 2569 "ยิงบาร์โค้ด
+ * ในหน้าสต๊อกไม่ขึ้น") PostgREST มีเพดานจำนวนแถวต่อหนึ่งคำขอ เกินกว่านั้นมันตัดทิ้ง
+ * แล้วตอบ 200 เหมือนสำเร็จปกติ ไม่มี error ไม่มีคำเตือนอะไรเลย
+ *
+ * ร้านมีสินค้า 1,032 รายการ หน้าหลังร้านเรียงจากใหม่ไปเก่า ของ 32 รายการที่เก่าที่สุด
+ * จึงไม่เคยเดินทางมาถึงเบราว์เซอร์เลยสักครั้ง ค้นก็ไม่เจอ ยิงบาร์โค้ดก็ไม่เจอ
+ * ทั้งที่ของอยู่ในฐานข้อมูลครบและขายที่หน้าร้านได้ปกติ
+ *
+ * ★ อาการจะโตขึ้นเรื่อย ๆ ★ ทุกครั้งที่เพิ่มสินค้าใหม่ ของเก่าจะหล่นออกไปอีกหนึ่งตัว
+ * เงียบ ๆ แบบนี้ไปตลอด — ต้องไล่ดึงทีละหน้าจนหมดเท่านั้น
+ */
+const PAGE_ROWS = 1000;
+
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const { data, error } = await page(from, from + PAGE_ROWS - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_ROWS) return out;
+  }
+}
+
 /** Cached across navigations (Products/Stock/Categories/Featured all list the
  * same catalog) — a bare mount-time call reuses a fetch from the last 30s
  * instead of re-querying the full nested product/variant/image tree on every
@@ -180,17 +209,19 @@ export async function listProducts(force = false): Promise<Product[]> {
   // was readable by anyone holding the anon key, which ships inside the web
   // shop and the app. It now comes from admin_variant_costs(), which checks
   // admin_shop() first (0069a/0069b).
-  const [{ data, error }, costs] = await Promise.all([
-    supabase
-      .from('products')
-      .select(
-        'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, unit, archived_at), product_images(id, storage_path, is_primary)',
-      )
-      .is('archived_at', null)
-      .order('created_at', { ascending: false }),
+  const [data, costs] = await Promise.all([
+    fetchAllRows<Product>((from, to) =>
+      supabase
+        .from('products')
+        .select(
+          'id, name, subtitle, description, brand, rating, publish_state, archived_at, category_id, row_version, orderable_delivery, orderable_online, categories(name), product_variants(id, size, price, stock_qty, reserved_qty, available_qty, low_stock_threshold, sku, barcode, unit, archived_at), product_images(id, storage_path, is_primary)',
+        )
+        .is('archived_at', null)
+        .order('created_at', { ascending: false })
+        .range(from, to),
+    ),
     variantCosts(),
   ]);
-  if (error) throw error;
   // Hide archived (retired size) variants — 1 product = 1 live stock row.
   const products = (data as unknown as Product[]).map((p) => ({
     ...p,
@@ -205,18 +236,21 @@ export async function listProducts(force = false): Promise<Product[]> {
 /** ต้นทุนต่อ variant สำหรับแอดมิน — คนละคำขอกับแคตตาล็อก เพราะคอลัมน์นี้ถูกซ่อน
  *  จาก anon/authenticated แล้ว (0069b) อ่านได้ผ่าน RPC ที่เช็คสิทธิ์แอดมินเท่านั้น */
 async function variantCosts(): Promise<Map<string, number | null>> {
-  const { data, error } = await supabase.rpc('admin_variant_costs');
-  if (error) throw error;
-  const rows = (data ?? []) as { variant_id: string; cost_price: number | null }[];
+  /* ★ เพดาน 1,000 แถวใช้กับฟังก์ชันฐานข้อมูลด้วย ★ ร้านมีสินค้าแยกขนาด 1,030 รายการ
+     ถ้าดึงทีเดียว ต้นทุนของ 30 รายการท้ายสุดจะหายไปเงียบ ๆ แล้วหน้าสต๊อกจะรายงานว่า
+     ของพวกนั้น "ยังไม่ได้ใส่ต้นทุน" ทั้งที่ใส่ไว้แล้ว และมูลค่าสต๊อกรวมจะต่ำกว่าจริง */
+  const rows = await fetchAllRows<{ variant_id: string; cost_price: number | null }>((from, to) =>
+    supabase.rpc('admin_variant_costs').range(from, to),
+  );
   return new Map(rows.map((r) => [r.variant_id, r.cost_price]));
 }
 
 /** Just enough to count products per category — Categories.tsx only needs a
  * tally, not the full nested variant/image tree listProducts() fetches. */
 export async function listProductCategoryIds(): Promise<{ category_id: string | null }[]> {
-  const { data, error } = await supabase.from('products').select('category_id').is('archived_at', null);
-  if (error) throw error;
-  return data as { category_id: string | null }[];
+  return fetchAllRows<{ category_id: string | null }>((from, to) =>
+    supabase.from('products').select('category_id').is('archived_at', null).range(from, to),
+  );
 }
 
 /* ── Catalog mutations (0006 RPCs) ─────────────────────────────────────────── */
@@ -572,15 +606,21 @@ export type PosProduct = {
 
 /** Published products + variants (with barcode + live stock) for the sell grid. */
 export async function listPosCatalog(): Promise<PosProduct[]> {
-  const { data, error } = await supabase
-    .from('products')
-    .select(
-      'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku, archived_at)',
-    )
-    .is('archived_at', null)
-    .eq('publish_state', 'published')
-    .order('name');
-  if (error) throw error;
+  /* ★ ต้องไล่ดึงให้ครบทุกหน้า ★ ของที่ขายอยู่ตอนนี้ 979 รายการ ห่างจากเพดาน 1,000 แถว
+     ต่อคำขอแค่ 21 รายการ ถ้าไม่แก้ไว้ก่อน วันที่เปิดขายสินค้ารายการที่ 1,001 ของที่เก่า
+     ที่สุดจะหลุดออกจากแคตตาล็อกหน้าขายเงียบ ๆ ยิงบาร์โค้ดแล้วขึ้นว่าไม่พบสินค้า
+     ทั้งที่ของวางอยู่บนชั้น — แบบเดียวกับที่เพิ่งเกิดกับหน้าสต๊อก */
+  const data = await fetchAllRows<unknown>((from, to) =>
+    supabase
+      .from('products')
+      .select(
+        'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku, archived_at)',
+      )
+      .is('archived_at', null)
+      .eq('publish_state', 'published')
+      .order('name')
+      .range(from, to),
+  );
   type Row = {
     id: string;
     name: string;
