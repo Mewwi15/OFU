@@ -42,13 +42,17 @@ function resolveAvatarUrl(p: string | null | undefined): string | null {
 }
 
 export async function listThreads(): Promise<ChatThread[]> {
+  /* เพดาน 1,000 แถวต่อคำขอ — ห้องแชทโตตามจำนวนลูกค้าที่ทักมา วันหนึ่งจะเกิน
+     ใส่ขอบเขตไว้ให้ชัดว่าเอา 1,000 ห้องล่าสุด ดีกว่าปล่อยให้เซิร์ฟเวอร์ตัดเงียบ ๆ
+     แล้วเข้าใจผิดว่านี่คือห้องทั้งหมดที่มี */
   const { data, error } = await supabase
     .from('chat_threads')
     .select(
       'id, user_id, last_message_at, last_message_preview, admin_unread, customer:app_users(display_name, avatar_path)',
     )
     .not('last_message_at', 'is', null)
-    .order('last_message_at', { ascending: false });
+    .order('last_message_at', { ascending: false })
+    .limit(1000);
   if (error) throw error;
   return ((data ?? []) as unknown as ChatThread[]).map((t) => ({
     ...t,

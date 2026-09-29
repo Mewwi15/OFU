@@ -27,6 +27,32 @@ const SELECT =
   'product_variants(id, size, price, available_qty, archived_at), ' +
   'product_images(storage_path, is_primary, display_order)';
 
+/**
+ * ★ เซิร์ฟเวอร์ตัดให้เหลือ 1,000 แถวเงียบ ๆ ★ (เจอกับหลังร้าน 29 ก.ย. 2569)
+ *
+ * PostgREST มีเพดานจำนวนแถวต่อหนึ่งคำขอ เกินกว่านั้นตัดทิ้งแล้วตอบ 200 เหมือนสำเร็จ
+ * ไม่มี error ไม่มีคำเตือน · หลังร้านเจออาการนี้จริงแล้ว สินค้า 32 รายการที่เก่าที่สุด
+ * หายไปจากหน้าจอทั้งที่อยู่ในฐานข้อมูลครบ
+ *
+ * ★ ฝั่งลูกค้าอันตรายกว่า ★ ตรงนี้เรียงจากเก่าไปใหม่ พอสินค้าที่เผยแพร่แตะ 1,000 รายการ
+ * ของที่ถูกตัดทิ้งคือ "ของที่เพิ่งลงขายล่าสุด" ซึ่งแปลว่าเปิดขายสินค้าใหม่แล้วลูกค้า
+ * ไม่เห็นเลยสักคน และไม่มีอะไรฟ้อง · ตอนนี้เผยแพร่อยู่ 979 รายการ ห่างเพดาน 21 รายการ
+ */
+const PAGE_ROWS = 1000;
+
+async function fetchAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE_ROWS) {
+    const { data, error } = await page(from, from + PAGE_ROWS - 1);
+    if (error) throw error;
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE_ROWS) return out;
+  }
+}
+
 function mapProduct(r: Row): Product {
   const variants: ProductVariant[] = (r.product_variants ?? [])
     .filter((v) => !v.archived_at) // retired size rows stay for history but never surface
@@ -63,15 +89,17 @@ export async function loadBestsellerIds(limit = 12): Promise<string[]> {
 
 /** Load all published, non-archived products (with variants + images). */
 export async function loadCatalog(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from('products')
-    .select(SELECT)
-    .eq('publish_state', 'published')
-    .is('archived_at', null)
-    .order('created_at');
-  if (error) throw error;
+  const data = await fetchAllRows<Row>((from, to) =>
+    supabase
+      .from('products')
+      .select(SELECT)
+      .eq('publish_state', 'published')
+      .is('archived_at', null)
+      .order('created_at')
+      .range(from, to),
+  );
   // Only surface products that have at least one purchasable variant.
-  return ((data ?? []) as unknown as Row[]).map(mapProduct).filter((p) => p.variants.length > 0);
+  return data.map(mapProduct).filter((p) => p.variants.length > 0);
 }
 
 /** A published home-hero banner (managed by the admin web's Banners page). */
