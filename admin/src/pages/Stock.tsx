@@ -48,8 +48,9 @@ import {
   Typography,
   Upload,
 } from 'antd';
+import type { InputRef } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { ACTION_COLOR } from '../lib/actionColors';
@@ -389,6 +390,54 @@ export function Stock() {
 
   /* ── filters ─────────────────────────────────────────────────────────── */
   const [query, setQuery] = useState('');
+  const searchRef = useRef<InputRef>(null);
+
+  /**
+   * ตัวดักเครื่องยิงบาร์โค้ดของหน้าสต๊อก
+   *
+   * ★ ทำไมหน้านี้ต้องมีด้วย ★ (เจ้าของเจอเอง 29 ก.ย. 2569) หน้าขายมีตัวดักนี้อยู่แล้ว
+   * แต่หน้าสต๊อกไม่มี เลขที่ยิงจึงไหลเข้าช่องค้นหาแบบพิมพ์มือธรรมดา ถ้าเคอร์เซอร์ไม่ได้
+   * อยู่ในช่องนั้นพอดี ตัวเลขก็หายไปเฉย ๆ ไม่มีอะไรเกิดขึ้นบนจอเลย — คนยิงอ่านว่า
+   * "ระบบหาไม่เจอ" ทั้งที่ระบบไม่เคยได้รับเลขนั้นด้วยซ้ำ
+   *
+   * ★ ตัวนี้ง่ายกว่าของหน้าขายมาก ★ หน้าขายต้องกู้ค่าเดิมของช่องเงินที่โดนบาร์โค้ดพิมพ์ทับ
+   * เพราะเดาผิดแล้วบิลเสียหาย · หน้านี้ยิงผิดอย่างมากก็แค่ค้นหาผิดคำ กดล้างแล้วยิงใหม่ได้
+   * จึงดักเฉพาะตอนที่เคอร์เซอร์ไม่ได้อยู่ในช่องกรอกใด ๆ ไม่ไปยุ่งกับการพิมพ์ของคน
+   */
+  useEffect(() => {
+    const buf = { chars: '', last: 0 };
+    const typing = (el: EventTarget | null) => {
+      const n = el as HTMLElement | null;
+      if (!n?.tagName) return false;
+      return n.tagName === 'INPUT' || n.tagName === 'TEXTAREA' || n.tagName === 'SELECT' || n.isContentEditable;
+    };
+    function onKey(e: KeyboardEvent) {
+      if (typing(e.target)) return; // คนกำลังพิมพ์อยู่ อย่าไปแย่ง
+      const now = e.timeStamp;
+      if (now - buf.last > 120) buf.chars = ''; // จังหวะห่าง = ไม่ใช่การยิง
+      buf.last = now;
+      if (e.key === 'Enter') {
+        const code = buf.chars;
+        buf.chars = '';
+        if (code.length >= 3) {
+          e.preventDefault();
+          setQuery(code);
+          /* ใส่ค่าให้ช่องค้นหาเห็นด้วย ไม่งั้นคนยิงจะไม่รู้ว่าระบบกำลังค้นด้วยเลขอะไรอยู่
+             และกดล้างไม่ได้เพราะช่องดูเหมือนยังว่าง */
+          const input = searchRef.current?.input;
+          if (input) {
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+            setter?.call(input, code);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        return;
+      }
+      if (e.key.length === 1) buf.chars += e.key;
+    }
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, []);
   // Opens on the buy list, not the catalogue: 58 rows to act on beats 832 rows
   // to scroll. "ทั้งหมด" is one click away for lookups.
   const [statusFilter, setStatusFilter] = useState<'all' | Urgency | 'neg'>('buy');
@@ -402,16 +451,25 @@ export function Stock() {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = items.filter((i) => {
+      /* ★ ค้นหาแล้วต้องเจอ ★ (เจ้าของเจอเอง 29 ก.ย. 2569 "ยิงบาร์โค้ดในหน้าสต๊อกไม่ขึ้น
+         แต่ยิงหน้าขายขึ้น") ของเดิมกรองตามสถานะก่อนแล้วค่อยเอาคำค้นมาหา ซึ่งแปลว่า
+         ของที่ไม่เข้าเกณฑ์ตัวกรองจะไม่มีทางถูกค้นเจอเลย · หน้านี้เปิดมาตั้งตัวกรองไว้ที่
+         "ต้องซื้อ" (เหลือน้อยกว่า 3) เสมอ ของที่เหลือ 40 ชิ้นจึงหายไปตั้งแต่ก่อนค้น
+         ตารางขึ้นว่างเปล่า ซึ่งอ่านได้อย่างเดียวว่า "ไม่มีของชิ้นนี้ในระบบ" ทั้งที่มีอยู่
+         ★ คนยิงบาร์โค้ดคือคนที่ถือของชิ้นนั้นอยู่ในมือ ★ เจตนาชัดว่าอยากเห็นของชิ้นนี้
+         ไม่ใช่อยากเห็นเฉพาะของที่ต้องซื้อ — พอมีคำค้น ตัวกรองทุกตัวจึงต้องหลบให้ */
+      if (q) {
+        return (
+          i.productName.toLowerCase().includes(q) ||
+          (i.barcode ?? '').includes(q) ||
+          (i.sku ?? '').toLowerCase().includes(q)
+        );
+      }
       if (statusFilter === 'neg') {
         if (i.stock >= 0) return false;
       } else if (statusFilter !== 'all' && urgencyOf(i) !== statusFilter) return false;
       if (categoryFilter && i.category !== categoryFilter) return false;
-      if (!q) return true;
-      return (
-        i.productName.toLowerCase().includes(q) ||
-        (i.barcode ?? '').includes(q) ||
-        (i.sku ?? '').toLowerCase().includes(q)
-      );
+      return true;
     });
     // Emptiest shelf first, so the top of the table IS the shopping list, and
     // sorted by the same number the rule reads — no second concept to follow.
@@ -1170,8 +1228,9 @@ export function Stock() {
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Space wrap>
               <Input.Search
+                ref={searchRef}
                 allowClear
-                placeholder="ค้นหาชื่อ / บาร์โค้ด / SKU"
+                placeholder="ยิงบาร์โค้ดได้เลย หรือพิมพ์ชื่อ / SKU"
                 style={{ width: 320 }}
                 onSearch={setQuery}
                 onChange={(e) => !e.target.value && setQuery('')}
@@ -1215,10 +1274,13 @@ export function Stock() {
               loading={loading}
               pagination={{ pageSize: 50, showSizeChanger: false }}
               scroll={{ x: 720 }}
+              /* ★ ว่างเพราะอะไรต้องบอก ★ ข้อความเดิม "ไม่พบสินค้าที่ตรงกับตัวกรอง" ใช้
+                 ร่วมกันทั้งกรณีค้นไม่เจอและกรณีโดนตัวกรองบัง คนอ่านแยกไม่ออก */
               locale={{
-                emptyText:
-                  query || statusFilter !== 'all' || categoryFilter
-                    ? 'ไม่พบสินค้าที่ตรงกับตัวกรอง'
+                emptyText: query
+                  ? `ไม่พบสินค้าที่ตรงกับ "${query}" — ลองตรวจบาร์โค้ดหรือพิมพ์ชื่อบางส่วนดู`
+                  : statusFilter !== 'all' || categoryFilter
+                    ? 'ไม่มีสินค้าในตัวกรองนี้ — กด "ทั้งหมด" เพื่อดูสินค้าทุกรายการ'
                     : 'ยังไม่มีสินค้าในระบบ',
               }}
               // No row tint. Sorting already puts the urgent rows on top, so
