@@ -87,7 +87,8 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
     if (opt.showBarcode && r.barcode) bits.push(esc(r.barcode));
     bits.push(baht(r.price));
     if (opt.showCost && r.cost != null) bits.push(`ทุน ${baht(r.cost)}`);
-    if (r.threshold > 0) bits.push(`เตือน ${r.threshold}`);
+    /* ★ ไม่พิมพ์เกณฑ์เตือน ★ (เจ้าของสั่ง 2 ต.ค. 2569 "เอาเตือนออก") เป็นเลขสำหรับ
+       ตัดสินใจสั่งของ ไม่ได้ใช้ตอนนับ มีแต่ทำให้บรรทัดรกขึ้นเปล่า ๆ */
     return bits.length ? `<div class="bc">${bits.join(' · ')}</div>` : '';
   };
 
