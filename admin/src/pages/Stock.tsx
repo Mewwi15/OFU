@@ -599,7 +599,11 @@ export function Stock() {
   const [countOpen, setCountOpen] = useState(false);
   const [countScope, setCountScope] = useState<'all' | 'instock' | 'cat'>('all');
   const [countCat, setCountCat] = useState<string | null>(null);
-  const [countBlind, setCountBlind] = useState(false);
+  /* ★ เก็บเป็น "พิมพ์" ไม่ใช่ "ซ่อน" ★ (เจ้าของแจ้ง 2 ต.ค. 2569 "ไม่เห็นมีสต๊อกในระบบ
+     มาโชว์เลย" ทั้งที่โค้ดถูกและขึ้นเว็บแล้ว) ของเดิมผมตั้งชื่อช่องติ๊กว่า "ซ่อนยอดในระบบ"
+     ซึ่งเป็นตรรกะกลับด้าน — ติ๊กแล้วได้น้อยลง ทั้งที่การติ๊กช่องสื่อว่า "เอาอันนี้ด้วย"
+     เปลี่ยนเป็น "พิมพ์สต๊อกเดิม" ติ๊กไว้ตั้งแต่แรก ติ๊กออกถึงจะหาย อ่านผิดไม่ได้แล้ว */
+  const [countShowStock, setCountShowStock] = useState(true);
   const [countBarcode, setCountBarcode] = useState(true);
   const [countImage, setCountImage] = useState(true);
   const [countCost, setCountCost] = useState(false);
@@ -646,7 +650,7 @@ export function Stock() {
           threshold: i.threshold,
         })),
         shopName,
-        { blind: countBlind, showBarcode: countBarcode, showImage: countImage, showCost: countCost },
+        { blind: !countShowStock, showBarcode: countBarcode, showImage: countImage, showCost: countCost },
       );
     } catch (e) {
       message.error(apiError(e));
@@ -1467,9 +1471,9 @@ export function Stock() {
               มันมีตัวหนังสือเยอะไปหมดเลย") เหตุผลยังต้องมี เพราะโหมดซ่อนยอดไม่ใช่สิ่งที่
               เดาออกเองว่ามีไว้ทำไม แต่ไม่ต้องกางให้อ่านทุกครั้งที่เปิดหน้าต่าง */}
           <Space size="large">
-            <Tooltip title="เห็นเลขเดิมอยู่ข้าง ๆ แล้วมักเผลอนับให้ตรงเลขนั้น ของที่หายจริงเลยไม่ถูกจับได้ — ถ้าให้คนอื่นช่วยนับ ควรติ๊ก">
-              <Checkbox checked={countBlind} onChange={(e) => setCountBlind(e.target.checked)}>
-                ซ่อนยอดในระบบ
+            <Tooltip title="ติ๊กออก = ไม่พิมพ์เลขเดิมลงกระดาษ · เห็นเลขเดิมอยู่ข้าง ๆ แล้วมักเผลอนับให้ตรงเลขนั้น ของที่หายจริงเลยไม่ถูกจับได้ ถ้าให้คนอื่นช่วยนับควรติ๊กออก">
+              <Checkbox checked={countShowStock} onChange={(e) => setCountShowStock(e.target.checked)}>
+                สต๊อกเดิม
               </Checkbox>
             </Tooltip>
             <Tooltip title="ไว้ยืนยันตอนเจอของชื่อคล้ายกันวางติดกัน">
