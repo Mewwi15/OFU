@@ -33,6 +33,11 @@ export type CountRow = {
   category: string;
   unit: string | null;
   stock: number;
+  /** รูปสินค้า — เจ้าของสั่งเพิ่ม 2 ต.ค. 2569 "เอารูปด้วยนะครับ" */
+  image: string | undefined;
+  price: number;
+  cost: number | null;
+  threshold: number;
 };
 
 export type CountSheetOptions = {
@@ -48,7 +53,13 @@ export type CountSheetOptions = {
   blind: boolean;
   /** ใส่บาร์โค้ดใต้ชื่อ — ไว้ยืนยันตอนเจอของชื่อคล้ายกันวางติดกัน */
   showBarcode: boolean;
+  /** รูปสินค้าหน้าแถว — หาของบนชั้นได้เร็วกว่าอ่านชื่อ โดยเฉพาะของที่ชื่อคล้ายกัน */
+  showImage: boolean;
+  /** ต้นทุนต่อหน่วย — ใบที่มีต้นทุนไม่ควรวางทิ้งไว้ให้ใครก็อ่านได้ จึงปิดไว้ก่อน */
+  showCost: boolean;
 };
+
+const baht = (n: number) => `฿${n.toLocaleString('th-TH')}`;
 
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -68,16 +79,29 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
   const cats = [...byCat.entries()].sort((a, b) => a[0].localeCompare(b[0], 'th'));
   for (const [, list] of cats) list.sort((a, b) => a.name.localeCompare(b.name, 'th'));
 
+  /* บรรทัดรายละเอียดใต้ชื่อ — บาร์โค้ด ราคา ต้นทุน เกณฑ์เตือน เท่าที่เปิดไว้
+     ★ ยัดในบรรทัดเดียว ★ แยกเป็นคอลัมน์ละอย่างจะกินความกว้างจนชื่อสินค้าตกบรรทัด
+     ซึ่งทำให้กระดาษยาวขึ้นโดยไม่ได้อะไรกลับมา */
+  const detail = (r: CountRow) => {
+    const bits: string[] = [];
+    if (opt.showBarcode && r.barcode) bits.push(esc(r.barcode));
+    bits.push(baht(r.price));
+    if (opt.showCost && r.cost != null) bits.push(`ทุน ${baht(r.cost)}`);
+    if (r.threshold > 0) bits.push(`เตือน ${r.threshold}`);
+    return bits.length ? `<div class="bc">${bits.join(' · ')}</div>` : '';
+  };
+
   const line = (r: CountRow, n: number) => `<tr>
     <td class="no">${n}</td>
-    <td class="nm">${esc(r.name)}${r.size ? ` <span class="sz">(${esc(r.size)})</span>` : ''}${
-      opt.showBarcode && r.barcode ? `<div class="bc">${esc(r.barcode)}</div>` : ''
-    }</td>
-    ${opt.blind ? '' : `<td class="sys">${r.stock}</td>`}
+    ${opt.showImage
+      ? `<td class="img">${r.image ? `<img src="${esc(r.image)}" alt="">` : ''}</td>`
+      : ''}
+    <td class="nm">${esc(r.name)}${r.size ? ` <span class="sz">(${esc(r.size)})</span>` : ''}${detail(r)}</td>
+    ${opt.blind ? '' : `<td class="sys">${r.stock}<span class="u">${esc(r.unit ?? '')}</span></td>`}
     <td class="box"></td>
   </tr>`;
 
-  const headCells = `<th class="no">#</th><th class="nm">สินค้า</th>${
+  const headCells = `<th class="no">#</th>${opt.showImage ? '<th class="img"></th>' : ''}<th class="nm">สินค้า</th>${
     opt.blind ? '' : '<th class="sys">ระบบ</th>'
   }<th class="box">นับได้</th>`;
 
@@ -91,7 +115,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
      ★ จำนวนต่อหน้าได้จากการวัดกระดาษจริง ★ ไม่ได้เดา — เรนเดอร์ของทั้งร้าน 1,043 รายการ
      ออกเป็น PDF แล้วนับว่าหนึ่งคอลัมน์รับได้กี่บรรทัดก่อนขึ้นหน้าใหม่ · มีบาร์โค้ดใต้ชื่อ
      แถวจะสูงขึ้น จึงรับได้น้อยกว่า · เผื่อไว้เล็กน้อยกันชื่อสินค้ายาวที่ตกไปสองบรรทัด */
-  const perCol = opt.showBarcode ? 28 : 40;
+  const perCol = opt.showImage ? 27 : opt.showBarcode ? 28 : 40;
   const perPage = perCol * 2;
 
   const table = (items: CountRow[], offset: number) =>
@@ -155,15 +179,21 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border: 0.6px solid #666; padding: 2.5px 4px; }
     th { background: #efefef; font-size: 9.5px; font-weight: 700; text-align: center; }
-    td.no  { width: 22px; text-align: right; color: #666; font-size: 9px; }
-    th.no  { width: 22px; }
+    td.no  { width: 20px; text-align: right; color: #666; font-size: 9px; }
+    th.no  { width: 20px; }
+    /* รูปเล็กแต่พอให้จำของได้ — ใหญ่กว่านี้กินบรรทัดจนกระดาษยาวขึ้นเท่าตัว */
+    td.img { width: 30px; padding: 1.5px; text-align: center; }
+    th.img { width: 30px; }
+    td.img img { width: 26px; height: 26px; object-fit: cover; display: block; margin: 0 auto;
+                 border: 0.5px solid #ccc; }
     td.nm  { font-size: 11px; line-height: 1.25; word-break: break-word; }
     td.nm .sz { font-size: 9.5px; color: #444; }
-    td.nm .bc { font-size: 8.5px; color: #777; letter-spacing: 0.2px; }
+    td.nm .bc { font-size: 8.5px; color: #777; }
     th.nm, td.nm { text-align: left; }
     /* ยอดในระบบ — จงใจให้จางและเล็ก ไม่ให้แย่งสายตาไปจากช่องที่ต้องเขียน */
-    td.sys { width: 30px; text-align: center; font-size: 10px; color: #777; }
-    th.sys { width: 30px; }
+    td.sys { width: 36px; text-align: center; font-size: 10px; color: #777; }
+    th.sys { width: 36px; }
+    td.sys .u { font-size: 7.5px; color: #999; display: block; line-height: 1; }
     /* ช่องเขียน — ต้องสูงพอให้เขียนเลขด้วยปากกาได้สบาย คือของจริงที่ใบนี้มีไว้ทำ */
     td.box { width: 42px; height: 20px; background: #fff; }
     th.box { width: 42px; }

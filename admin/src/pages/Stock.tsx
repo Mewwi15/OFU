@@ -601,6 +601,8 @@ export function Stock() {
   const [countCat, setCountCat] = useState<string | null>(null);
   const [countBlind, setCountBlind] = useState(false);
   const [countBarcode, setCountBarcode] = useState(true);
+  const [countImage, setCountImage] = useState(true);
+  const [countCost, setCountCost] = useState(false);
 
   const countRows = useMemo(() => {
     let list = items;
@@ -611,6 +613,20 @@ export function Stock() {
     if (countScope === 'cat' && countCat) list = list.filter((i) => i.category === countCat);
     return list;
   }, [items, countScope, countCat]);
+
+  /* จำนวนแผ่นต้องตรงกับที่พิมพ์ออกมาจริง — ใช้ตัวเลขชุดเดียวกับ countSheetHtml.ts
+     (บรรทัดต่อคอลัมน์ 28 เมื่อมีบาร์โค้ด 40 เมื่อไม่มี · สองคอลัมน์ต่อหน้า · แยกหน้าตามหมวด) */
+  const countPages = useMemo(() => {
+    const perPage = (countImage ? 27 : countBarcode ? 28 : 40) * 2;
+    const cats = new Set(countRows.map((i) => i.category));
+    return Math.max(
+      1,
+      [...cats].reduce(
+        (n, c) => n + Math.ceil(countRows.filter((i) => i.category === c).length / perPage),
+        0,
+      ),
+    );
+  }, [countRows, countBarcode, countImage]);
 
   const doPrintCountSheet = async () => {
     setPrinting(true);
@@ -624,9 +640,13 @@ export function Stock() {
           category: i.category,
           unit: i.unit,
           stock: i.stock,
+          image: i.image,
+          price: i.price,
+          cost: i.cost,
+          threshold: i.threshold,
         })),
         shopName,
-        { blind: countBlind, showBarcode: countBarcode },
+        { blind: countBlind, showBarcode: countBarcode, showImage: countImage, showCost: countCost },
       );
     } catch (e) {
       message.error(apiError(e));
@@ -1419,76 +1439,59 @@ export function Stock() {
         ]}
       >
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <Text strong>นับส่วนไหน</Text>
-            <div className="mt-1.5">
-              <Segmented
-                value={countScope}
-                onChange={(v) => setCountScope(v as typeof countScope)}
-                options={[
-                  { label: `ทั้งร้าน (${items.length})`, value: 'all' },
-                  { label: `เฉพาะที่ระบบว่ามีของ (${items.filter((i) => i.stock > 0).length})`, value: 'instock' },
-                  { label: 'เลือกหมวด', value: 'cat' },
-                ]}
-              />
-            </div>
-            {countScope === 'cat' && (
-              <Select
-                className="mt-2"
-                allowClear
-                placeholder="เลือกหมวดที่จะนับ"
-                style={{ width: '100%' }}
-                value={countCat}
-                onChange={(v) => setCountCat(v ?? null)}
-                options={categories.map((c) => ({
-                  value: c,
-                  label: `${c} (${items.filter((i) => i.category === c).length})`,
-                }))}
-              />
-            )}
-          </div>
+          <Segmented
+            block
+            value={countScope}
+            onChange={(v) => setCountScope(v as typeof countScope)}
+            options={[
+              { label: `ทั้งร้าน (${items.length})`, value: 'all' },
+              { label: `เฉพาะที่มีของ (${items.filter((i) => i.stock > 0).length})`, value: 'instock' },
+              { label: 'เลือกหมวด', value: 'cat' },
+            ]}
+          />
+          {countScope === 'cat' && (
+            <Select
+              allowClear
+              placeholder="เลือกหมวด"
+              style={{ width: '100%' }}
+              value={countCat}
+              onChange={(v) => setCountCat(v ?? null)}
+              options={categories.map((c) => ({
+                value: c,
+                label: `${c} (${items.filter((i) => i.category === c).length})`,
+              }))}
+            />
+          )}
 
-          <div>
-            <Checkbox checked={countBlind} onChange={(e) => setCountBlind(e.target.checked)}>
-              ไม่ต้องพิมพ์ยอดในระบบ
-            </Checkbox>
-            <div className="text-[12px] text-tremor-content ml-6">
-              เห็นเลขเดิมอยู่ข้าง ๆ แล้วมักเผลอนับให้ตรงเลขนั้น ของที่หายจริงเลยไม่ถูกจับได้
-              — ถ้าให้คนอื่นช่วยนับ หรือสงสัยว่าของหาย ให้ติ๊กช่องนี้
-            </div>
-          </div>
+          {/* ★ คำอธิบายย้ายไปอยู่ในป้ายชี้ ★ (เจ้าของตีกลับ 2 ต.ค. 2569 "ตรงที่ให้เลือก
+              มันมีตัวหนังสือเยอะไปหมดเลย") เหตุผลยังต้องมี เพราะโหมดซ่อนยอดไม่ใช่สิ่งที่
+              เดาออกเองว่ามีไว้ทำไม แต่ไม่ต้องกางให้อ่านทุกครั้งที่เปิดหน้าต่าง */}
+          <Space size="large">
+            <Tooltip title="เห็นเลขเดิมอยู่ข้าง ๆ แล้วมักเผลอนับให้ตรงเลขนั้น ของที่หายจริงเลยไม่ถูกจับได้ — ถ้าให้คนอื่นช่วยนับ ควรติ๊ก">
+              <Checkbox checked={countBlind} onChange={(e) => setCountBlind(e.target.checked)}>
+                ซ่อนยอดในระบบ
+              </Checkbox>
+            </Tooltip>
+            <Tooltip title="ไว้ยืนยันตอนเจอของชื่อคล้ายกันวางติดกัน">
+              <Checkbox checked={countBarcode} onChange={(e) => setCountBarcode(e.target.checked)}>
+                บาร์โค้ด
+              </Checkbox>
+            </Tooltip>
+            <Tooltip title="หาของบนชั้นได้เร็วกว่าอ่านชื่อ แต่กระดาษจะเพิ่มขึ้นราวหนึ่งเท่า">
+              <Checkbox checked={countImage} onChange={(e) => setCountImage(e.target.checked)}>
+                รูปสินค้า
+              </Checkbox>
+            </Tooltip>
+            <Tooltip title="ใบที่มีต้นทุนไม่ควรวางทิ้งไว้ให้ใครก็อ่านได้">
+              <Checkbox checked={countCost} onChange={(e) => setCountCost(e.target.checked)}>
+                ต้นทุน
+              </Checkbox>
+            </Tooltip>
+          </Space>
 
-          <div>
-            <Checkbox checked={countBarcode} onChange={(e) => setCountBarcode(e.target.checked)}>
-              พิมพ์บาร์โค้ดใต้ชื่อสินค้า
-            </Checkbox>
-            <div className="text-[12px] text-tremor-content ml-6">
-              ไว้ยืนยันตอนเจอของชื่อคล้ายกันวางติดกัน เช่น ไฮยีนคนละกลิ่นคนละขนาด
-            </div>
-          </div>
-
-          <div className="border border-[#E8E8E8] bg-[#FAFAFA] px-3 py-2">
-            <Text style={{ fontSize: 13 }}>
-              จะพิมพ์ <Text strong>{countRows.length.toLocaleString('th-TH')} รายการ</Text>
-              {' · '}
-              {new Set(countRows.map((i) => i.category)).size} หมวด
-              {' · ประมาณ '}
-              <Text strong>
-                {Math.max(
-                  1,
-                  [...new Set(countRows.map((i) => i.category))].reduce(
-                    (pages, c) =>
-                      pages + Math.ceil(countRows.filter((i) => i.category === c).length / 64),
-                    0,
-                  ),
-                )}{' '}
-                แผ่น
-              </Text>
-            </Text>
-            <div className="text-[12px] text-tremor-content mt-0.5">
-              แยกหน้าตามหมวด ฉีกแจกกันนับคนละหมวดได้ · หน้าละ 2 คอลัมน์ ราว 64 บรรทัด
-            </div>
-          </div>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            {countRows.length.toLocaleString('th-TH')} รายการ · {countPages} แผ่น
+          </Text>
         </Space>
       </Modal>
 
