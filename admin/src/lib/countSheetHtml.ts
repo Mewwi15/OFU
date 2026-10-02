@@ -103,7 +103,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
   </tr>`;
 
   const headCells = `<th class="no">#</th>${opt.showImage ? '<th class="img"></th>' : ''}<th class="nm">สินค้า</th>${
-    opt.blind ? '' : '<th class="sys">ระบบ</th>'
+    opt.blind ? '' : '<th class="sys">สต๊อกเดิม</th>'
   }<th class="box">นับได้</th>`;
 
   /* ★ ตัดเป็นหน้า ๆ เอง ไม่ปล่อยให้ไหลเอง ★ (ตรวจจากกระดาษจริงที่พิมพ์ออกมา 2 ต.ค. 2569)
@@ -116,7 +116,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
      ★ จำนวนต่อหน้าได้จากการวัดกระดาษจริง ★ ไม่ได้เดา — เรนเดอร์ของทั้งร้าน 1,043 รายการ
      ออกเป็น PDF แล้วนับว่าหนึ่งคอลัมน์รับได้กี่บรรทัดก่อนขึ้นหน้าใหม่ · มีบาร์โค้ดใต้ชื่อ
      แถวจะสูงขึ้น จึงรับได้น้อยกว่า · เผื่อไว้เล็กน้อยกันชื่อสินค้ายาวที่ตกไปสองบรรทัด */
-  const perCol = opt.showImage ? 27 : opt.showBarcode ? 28 : 40;
+  const perCol = opt.showImage ? 22 : opt.showBarcode ? 24 : 32;
   const perPage = perCol * 2;
 
   const table = (items: CountRow[], offset: number) =>
@@ -155,14 +155,14 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
   <style>
     ${BASE_CSS}
     @page { size: A4 portrait; margin: 10mm 9mm; }
-    body { font-size: 10.5px; }
+    body { font-size: 12px; }
 
     .head { display: flex; justify-content: space-between; align-items: flex-end;
             border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
     .shop { font-size: 13px; font-weight: 700; }
     .doc { font-size: 20px; font-weight: 800; line-height: 1.1; }
     .when { text-align: right; font-size: 10px; line-height: 1.6; color: #333; }
-    .note { font-size: 10px; color: #444; margin-bottom: 8px; }
+    .note { font-size: 11px; color: #444; margin-bottom: 8px; }
     .note b { color: #000; }
 
     /* ขึ้นหน้าใหม่ทุกหมวด — ฉีกแจกกันนับคนละหมวดได้ */
@@ -170,7 +170,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
     section.cat:first-of-type { break-before: auto; }
     .cathead { display: flex; align-items: baseline; gap: 10px;
                border-bottom: 1.5px solid #000; padding-bottom: 3px; margin-bottom: 5px; }
-    .catname { font-size: 14px; font-weight: 800; }
+    .catname { font-size: 16px; font-weight: 800; }
     .catcount { font-size: 10px; color: #555; }
     .catsign { margin-left: auto; font-size: 10px; color: #333; }
 
@@ -178,26 +178,29 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
     .col { flex: 1 1 0; min-width: 0; }
 
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 0.6px solid #666; padding: 2.5px 4px; }
-    th { background: #efefef; font-size: 9.5px; font-weight: 700; text-align: center; }
-    td.no  { width: 20px; text-align: right; color: #666; font-size: 9px; }
-    th.no  { width: 20px; }
+    th, td { border: 0.6px solid #666; padding: 3.5px 5px; }
+    th { background: #efefef; font-size: 11px; font-weight: 700; text-align: center; }
+    td.no  { width: 22px; text-align: right; color: #666; font-size: 10px; }
+    th.no  { width: 22px; }
     /* รูปเล็กแต่พอให้จำของได้ — ใหญ่กว่านี้กินบรรทัดจนกระดาษยาวขึ้นเท่าตัว */
-    td.img { width: 30px; padding: 1.5px; text-align: center; }
-    th.img { width: 30px; }
-    td.img img { width: 26px; height: 26px; object-fit: cover; display: block; margin: 0 auto;
+    td.img { width: 34px; padding: 1.5px; text-align: center; }
+    th.img { width: 34px; }
+    td.img img { width: 30px; height: 30px; object-fit: cover; display: block; margin: 0 auto;
                  border: 0.5px solid #ccc; }
-    td.nm  { font-size: 11px; line-height: 1.25; word-break: break-word; }
-    td.nm .sz { font-size: 9.5px; color: #444; }
-    td.nm .bc { font-size: 8.5px; color: #777; }
+    td.nm  { font-size: 13.5px; line-height: 1.25; word-break: break-word; }
+    td.nm .sz { font-size: 11.5px; color: #444; }
+    td.nm .bc { font-size: 10px; color: #777; }
     th.nm, td.nm { text-align: left; }
-    /* ยอดในระบบ — จงใจให้จางและเล็ก ไม่ให้แย่งสายตาไปจากช่องที่ต้องเขียน */
-    td.sys { width: 36px; text-align: center; font-size: 10px; color: #777; }
-    th.sys { width: 36px; }
-    td.sys .u { font-size: 7.5px; color: #999; display: block; line-height: 1; }
+    /* ★ สต๊อกเดิมต้องอ่านออกตอนยืนนับ ★ (เจ้าของสั่ง 2 ต.ค. 2569 "ขอความใหญ่เพิ่ม
+       เอาช่องสต๊อกเดิมมาทำในตารางด้วย") เดิมผมตั้งใจทำให้เล็กและจางเพื่อไม่ให้แย่ง
+       สายตาจากช่องที่ต้องเขียน แต่ผลคืออ่านไม่ออกจากระยะที่ยืนถือกระดาษอยู่หน้าชั้น
+       ซึ่งทำให้เทียบกับของจริงตรงนั้นไม่ได้เลย — เป็นคอลัมน์เต็มตัว อ่านได้ */
+    td.sys { width: 46px; text-align: center; font-size: 17px; font-weight: 700; color: #000; }
+    th.sys { width: 46px; }
+    td.sys .u { font-size: 9px; font-weight: 400; color: #777; display: block; line-height: 1; }
     /* ช่องเขียน — ต้องสูงพอให้เขียนเลขด้วยปากกาได้สบาย คือของจริงที่ใบนี้มีไว้ทำ */
-    td.box { width: 42px; height: 20px; background: #fff; }
-    th.box { width: 42px; }
+    td.box { width: 48px; height: 26px; background: #fff; }
+    th.box { width: 48px; }
 
     tr { break-inside: avoid; }
     thead { display: table-header-group; }
@@ -217,7 +220,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
       เขียนจำนวนที่นับได้จริงลงช่อง <b>นับได้</b> ทุกบรรทัด
       ${opt.blind
         ? '· <b>ใบนี้ไม่แสดงยอดในระบบ</b> เพื่อไม่ให้เผลอนับตามตัวเลขเดิม'
-        : '· ช่อง <b>ระบบ</b> คือยอดที่ระบบคิดว่ามี ถ้านับได้ไม่ตรงให้เขียนเลขที่นับได้ลงไปตามจริง'}
+        : '· ช่อง <b>สต๊อกเดิม</b> คือยอดที่ระบบคิดว่ามี ถ้านับได้ไม่ตรงให้เขียนเลขที่นับได้ลงไปตามจริง'}
       · นับไม่เจอของเลยให้เขียน <b>0</b> อย่าเว้นว่าง เพราะช่องว่างแปลว่ายังไม่ได้นับ
     </div>
 

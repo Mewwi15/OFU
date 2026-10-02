@@ -617,7 +617,7 @@ export function Stock() {
   /* จำนวนแผ่นต้องตรงกับที่พิมพ์ออกมาจริง — ใช้ตัวเลขชุดเดียวกับ countSheetHtml.ts
      (บรรทัดต่อคอลัมน์ 28 เมื่อมีบาร์โค้ด 40 เมื่อไม่มี · สองคอลัมน์ต่อหน้า · แยกหน้าตามหมวด) */
   const countPages = useMemo(() => {
-    const perPage = (countImage ? 27 : countBarcode ? 28 : 40) * 2;
+    const perPage = (countImage ? 22 : countBarcode ? 24 : 32) * 2;
     const cats = new Set(countRows.map((i) => i.category));
     return Math.max(
       1,
