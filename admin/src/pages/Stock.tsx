@@ -32,6 +32,7 @@ import {
   Avatar,
   Button,
   Card,
+  Checkbox,
   Col,
   Dropdown,
   Empty,
@@ -70,6 +71,7 @@ import {
 import { productThumb } from '../lib/image';
 import { getShopName } from '../lib/orders';
 import { printBuyList } from '../lib/printBuyList';
+import { printCountSheet } from '../lib/printCountSheet';
 import { d } from '../lib/time';
 
 const { Text } = Typography;
@@ -583,6 +585,48 @@ export function Stock() {
         })),
         shopName,
         coverDays,
+      );
+    } catch (e) {
+      message.error(apiError(e));
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  /* ── ใบนับสต๊อก ──────────────────────────────────────────────────────────
+     เจ้าของสั่ง 2 ต.ค. 2569 "อยากทำใบรายการหน้าสต๊อก พอดีจะนับสต๊อกด้วยมือ เป็นใบ A4
+     แต่รายละเอียดไม่ต้องใหญ่เหมือนใบออเดอร์" — คนละงานกับใบสั่งซื้อ จึงเป็นคนละใบ */
+  const [countOpen, setCountOpen] = useState(false);
+  const [countScope, setCountScope] = useState<'all' | 'instock' | 'cat'>('all');
+  const [countCat, setCountCat] = useState<string | null>(null);
+  const [countBlind, setCountBlind] = useState(false);
+  const [countBarcode, setCountBarcode] = useState(true);
+
+  const countRows = useMemo(() => {
+    let list = items;
+    /* ★ ของที่ระบบว่าหมดก็ต้องนับ ★ ไม่งั้นของที่ "ระบบว่าหมดแต่จริง ๆ ยังมี" จะไม่มี
+       วันถูกจับได้เลย ซึ่งเป็นความคลาดเคลื่อนที่เสียหายพอ ๆ กับของหาย — ตัวเลือก
+       "เฉพาะที่ระบบว่ามีของ" จึงเป็นทางลัดสำหรับวันที่เวลาไม่พอ ไม่ใช่ค่าเริ่มต้น */
+    if (countScope === 'instock') list = list.filter((i) => i.stock > 0);
+    if (countScope === 'cat' && countCat) list = list.filter((i) => i.category === countCat);
+    return list;
+  }, [items, countScope, countCat]);
+
+  const doPrintCountSheet = async () => {
+    setPrinting(true);
+    try {
+      const shopName = await getShopName();
+      printCountSheet(
+        countRows.map((i) => ({
+          name: i.productName,
+          size: i.size,
+          barcode: i.barcode,
+          category: i.category,
+          unit: i.unit,
+          stock: i.stock,
+        })),
+        shopName,
+        { blind: countBlind, showBarcode: countBarcode },
       );
     } catch (e) {
       message.error(apiError(e));
@@ -1257,6 +1301,14 @@ export function Stock() {
                 onChange={(v) => setCategoryFilter(v ?? null)}
                 options={categories.map((c) => ({ value: c, label: c }))}
               />
+              {/* ใบนับสต๊อก — อยู่ข้างตัวกรอง เพราะเป็นงาน "เอาของทั้งร้านออกมาเป็นกระดาษ"
+                  ไม่ใช่งานที่ทำกับแถวใดแถวหนึ่งในตาราง */}
+              <Button
+                icon={<RiPrinterLine className="w-4 h-4" />}
+                onClick={() => setCountOpen(true)}
+              >
+                ใบนับสต๊อก
+              </Button>
             </Space>
             {/* Trust line — after the auto-triage-sort, tell the owner nothing
                 actionable is hidden below the fold. */}
@@ -1343,6 +1395,101 @@ export function Stock() {
             },
           ]}
         />
+      </Modal>
+
+      {/* ใบนับสต๊อก — ตั้งค่าก่อนพิมพ์ เพราะของทั้งร้าน 1,000 กว่ารายการนับรวดเดียวไม่ไหว
+          ต้องเลือกได้ว่าจะนับส่วนไหนวันนี้ */}
+      <Modal
+        open={countOpen}
+        onCancel={() => setCountOpen(false)}
+        title="ใบนับสต๊อก"
+        width={560}
+        footer={[
+          <Button key="close" onClick={() => setCountOpen(false)}>ปิด</Button>,
+          <Button
+            key="print"
+            type="primary"
+            loading={printing}
+            disabled={countRows.length === 0}
+            icon={<RiPrinterLine className="w-4 h-4" />}
+            onClick={doPrintCountSheet}
+          >
+            พิมพ์ / บันทึก PDF
+          </Button>,
+        ]}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <div>
+            <Text strong>นับส่วนไหน</Text>
+            <div className="mt-1.5">
+              <Segmented
+                value={countScope}
+                onChange={(v) => setCountScope(v as typeof countScope)}
+                options={[
+                  { label: `ทั้งร้าน (${items.length})`, value: 'all' },
+                  { label: `เฉพาะที่ระบบว่ามีของ (${items.filter((i) => i.stock > 0).length})`, value: 'instock' },
+                  { label: 'เลือกหมวด', value: 'cat' },
+                ]}
+              />
+            </div>
+            {countScope === 'cat' && (
+              <Select
+                className="mt-2"
+                allowClear
+                placeholder="เลือกหมวดที่จะนับ"
+                style={{ width: '100%' }}
+                value={countCat}
+                onChange={(v) => setCountCat(v ?? null)}
+                options={categories.map((c) => ({
+                  value: c,
+                  label: `${c} (${items.filter((i) => i.category === c).length})`,
+                }))}
+              />
+            )}
+          </div>
+
+          <div>
+            <Checkbox checked={countBlind} onChange={(e) => setCountBlind(e.target.checked)}>
+              ไม่ต้องพิมพ์ยอดในระบบ
+            </Checkbox>
+            <div className="text-[12px] text-tremor-content ml-6">
+              เห็นเลขเดิมอยู่ข้าง ๆ แล้วมักเผลอนับให้ตรงเลขนั้น ของที่หายจริงเลยไม่ถูกจับได้
+              — ถ้าให้คนอื่นช่วยนับ หรือสงสัยว่าของหาย ให้ติ๊กช่องนี้
+            </div>
+          </div>
+
+          <div>
+            <Checkbox checked={countBarcode} onChange={(e) => setCountBarcode(e.target.checked)}>
+              พิมพ์บาร์โค้ดใต้ชื่อสินค้า
+            </Checkbox>
+            <div className="text-[12px] text-tremor-content ml-6">
+              ไว้ยืนยันตอนเจอของชื่อคล้ายกันวางติดกัน เช่น ไฮยีนคนละกลิ่นคนละขนาด
+            </div>
+          </div>
+
+          <div className="border border-[#E8E8E8] bg-[#FAFAFA] px-3 py-2">
+            <Text style={{ fontSize: 13 }}>
+              จะพิมพ์ <Text strong>{countRows.length.toLocaleString('th-TH')} รายการ</Text>
+              {' · '}
+              {new Set(countRows.map((i) => i.category)).size} หมวด
+              {' · ประมาณ '}
+              <Text strong>
+                {Math.max(
+                  1,
+                  [...new Set(countRows.map((i) => i.category))].reduce(
+                    (pages, c) =>
+                      pages + Math.ceil(countRows.filter((i) => i.category === c).length / 64),
+                    0,
+                  ),
+                )}{' '}
+                แผ่น
+              </Text>
+            </Text>
+            <div className="text-[12px] text-tremor-content mt-0.5">
+              แยกหน้าตามหมวด ฉีกแจกกันนับคนละหมวดได้ · หน้าละ 2 คอลัมน์ ราว 64 บรรทัด
+            </div>
+          </div>
+        </Space>
       </Modal>
 
       {/* ใบสั่งซื้อของ — on screen for checking, printable for the trip.
