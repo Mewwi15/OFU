@@ -98,7 +98,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
       ? `<td class="img">${r.image ? `<img src="${esc(r.image)}" alt="">` : ''}</td>`
       : ''}
     <td class="nm">${esc(r.name)}${r.size ? ` <span class="sz">(${esc(r.size)})</span>` : ''}${detail(r)}</td>
-    ${opt.blind ? '' : `<td class="sys">${r.stock}<span class="u">${esc(r.unit ?? '')}</span></td>`}
+    ${opt.blind ? '' : `<td class="sys">${r.stock}</td>`}
     <td class="box"></td>
   </tr>`;
 
@@ -198,7 +198,6 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
     td.sys { width: 52px; text-align: center; font-size: 26px; font-weight: 800; color: #000;
              line-height: 1.05; border-left: 1.5px solid #000; }
     th.sys { width: 52px; border-left: 1.5px solid #000; }
-    td.sys .u { font-size: 9px; font-weight: 400; color: #777; display: block; line-height: 1; }
     /* ช่องเขียน — ต้องสูงพอให้เขียนเลขด้วยปากกาได้สบาย คือของจริงที่ใบนี้มีไว้ทำ */
     /* ★ เลขเดิมกับช่องเขียนต้องอยู่ติดกันและใหญ่พอกัน ★ (เจ้าของสั่ง 2 ต.ค. 2569
        "ให้มันอยู่ข้างๆช่องนับได้เลยตัวใหญ่ๆ") ยืนหน้าชั้นแล้วต้องเห็นพร้อมกันในสายตา
