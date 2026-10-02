@@ -116,7 +116,7 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
      ★ จำนวนต่อหน้าได้จากการวัดกระดาษจริง ★ ไม่ได้เดา — เรนเดอร์ของทั้งร้าน 1,043 รายการ
      ออกเป็น PDF แล้วนับว่าหนึ่งคอลัมน์รับได้กี่บรรทัดก่อนขึ้นหน้าใหม่ · มีบาร์โค้ดใต้ชื่อ
      แถวจะสูงขึ้น จึงรับได้น้อยกว่า · เผื่อไว้เล็กน้อยกันชื่อสินค้ายาวที่ตกไปสองบรรทัด */
-  const perCol = opt.showImage ? 22 : opt.showBarcode ? 24 : 32;
+  const perCol = opt.showImage ? 19 : opt.showBarcode ? 21 : 26;
   const perPage = perCol * 2;
 
   const table = (items: CountRow[], offset: number) =>
@@ -195,12 +195,17 @@ export function buildCountSheetHtml(rows: CountRow[], shopName: string, opt: Cou
        เอาช่องสต๊อกเดิมมาทำในตารางด้วย") เดิมผมตั้งใจทำให้เล็กและจางเพื่อไม่ให้แย่ง
        สายตาจากช่องที่ต้องเขียน แต่ผลคืออ่านไม่ออกจากระยะที่ยืนถือกระดาษอยู่หน้าชั้น
        ซึ่งทำให้เทียบกับของจริงตรงนั้นไม่ได้เลย — เป็นคอลัมน์เต็มตัว อ่านได้ */
-    td.sys { width: 46px; text-align: center; font-size: 17px; font-weight: 700; color: #000; }
-    th.sys { width: 46px; }
+    td.sys { width: 52px; text-align: center; font-size: 26px; font-weight: 800; color: #000;
+             line-height: 1.05; border-left: 1.5px solid #000; }
+    th.sys { width: 52px; border-left: 1.5px solid #000; }
     td.sys .u { font-size: 9px; font-weight: 400; color: #777; display: block; line-height: 1; }
     /* ช่องเขียน — ต้องสูงพอให้เขียนเลขด้วยปากกาได้สบาย คือของจริงที่ใบนี้มีไว้ทำ */
-    td.box { width: 48px; height: 26px; background: #fff; }
-    th.box { width: 48px; }
+    /* ★ เลขเดิมกับช่องเขียนต้องอยู่ติดกันและใหญ่พอกัน ★ (เจ้าของสั่ง 2 ต.ค. 2569
+       "ให้มันอยู่ข้างๆช่องนับได้เลยตัวใหญ่ๆ") ยืนหน้าชั้นแล้วต้องเห็นพร้อมกันในสายตา
+       เดียวว่าระบบว่ามีเท่าไหร่ แล้วเขียนที่นับได้ลงช่องข้าง ๆ ทันที ไม่ต้องกวาดตา
+       ข้ามไปอีกฝั่งของบรรทัด · ขีดเส้นหนาคั่นจากชื่อสินค้า ให้สองช่องนี้อ่านเป็นคู่ */
+    td.box { width: 56px; height: 34px; background: #fff; }
+    th.box { width: 56px; }
 
     tr { break-inside: avoid; }
     thead { display: table-header-group; }
