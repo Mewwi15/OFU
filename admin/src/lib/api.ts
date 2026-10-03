@@ -1296,8 +1296,11 @@ export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   if (error) throw error;
   return (data ?? []) as GoodsReceipt[];
 }
+/** รายการที่ถอนคืนแล้วสต๊อกติดลบ — ฐานข้อมูลส่งกลับมาหลังลบใบ (0118) */
+export type VoidNegative = { name: string; size: string | null; after: number };
+
 export const voidGoodsReceipt = (receiptId: string, reason?: string) =>
-  rpc<{ receipt_number: string; replay: boolean }>('void_goods_receipt', {
+  rpc<{ receipt_number: string; replay: boolean; negative?: VoidNegative[] }>('void_goods_receipt', {
     p_receipt_id: receiptId,
     p_reason: reason ?? null,
   });

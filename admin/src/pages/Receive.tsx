@@ -270,15 +270,41 @@ export function Receive() {
       title: thenEdit ? `แก้ไขใบ ${r.receipt_number}?` : `ลบใบ ${r.receipt_number}?`,
       content: thenEdit
         ? 'ใบเดิมจะถูกลบ (สต๊อกถอนคืน) แล้วดึงรายการกลับมาแก้ในฟอร์ม — บันทึกใหม่ได้เลขใบใหม่'
-        : 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
+        : 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ถ้าของถูกขายไปแล้ว สต๊อกจะติดลบ และระบบจะบอกว่าตัวไหน · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
       okText: thenEdit ? 'ลบใบเดิมและแก้ไข' : 'ลบใบ',
       okButtonProps: { danger: true },
       cancelText: 'ไม่ทำ',
       onOk: async () => {
         try {
           const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
-          await voidGoodsReceipt(r.id, thenEdit ? 'แก้ไขใบ' : undefined);
-          message.success(`ลบใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
+          const res = await voidGoodsReceipt(r.id, thenEdit ? 'แก้ไขใบ' : undefined);
+          /* ★ ลบได้เสมอแล้ว แต่ต้องไม่เงียบ ★ (เจ้าของตัดสิน 3 ต.ค. 2569 "ยอมให้ติดลบเลย
+             ลบใบเก่าได้เสมอ") ของที่ขายไปแล้วพอถอนคืนจะทำให้สต๊อกติดลบ ซึ่งแปลว่าตัวเลข
+             ของตัวนั้นเชื่อไม่ได้แล้ว ต้องไปนับใหม่ · ถ้าไม่บอกตรงนี้ จะไม่มีใครรู้จนกว่า
+             จะบังเอิญไปเปิดหน้าสต๊อกเจอเอง */
+          const neg = res?.negative ?? [];
+          if (neg.length > 0) {
+            Modal.warning({
+              title: `ลบใบ ${r.receipt_number} แล้ว — สต๊อกติดลบ ${neg.length} รายการ`,
+              width: 520,
+              okText: 'รับทราบ',
+              content: (
+                <div>
+                  <div style={{ marginBottom: 8 }}>
+                    ของพวกนี้ถูกขายไปแล้วก่อนลบใบ ตัวเลขจึงเชื่อไม่ได้ ต้องไปนับของจริงแล้วแก้ที่หน้าสต๊อก
+                  </div>
+                  {neg.map((n, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                      <span>{n.name}{n.size ? ` (${n.size})` : ''}</span>
+                      <span style={{ fontWeight: 700, color: '#E5484D' }}>{n.after}</span>
+                    </div>
+                  ))}
+                </div>
+              ),
+            });
+          } else {
+            message.success(`ลบใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
+          }
           if (thenEdit) {
             // จับคู่บรรทัดเดิมกลับเป็นรายการในฟอร์มผ่านบาร์โค้ด
             const byBc = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
