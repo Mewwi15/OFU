@@ -224,8 +224,8 @@ export function Receive() {
           barcode: u.text,
           cost_price: u.cost ?? undefined,
         });
+        /* นำเข้าจากไฟล์ก็ขึ้นบนเหมือนกัน — ทั้งชุดคือของที่เพิ่งเข้ามาล่าสุด */
         setLines((prev) => [
-          ...prev,
           {
             variantId,
             label: name,
@@ -239,6 +239,7 @@ export function Receive() {
             qty: u.qty as number,
             unitCost: u.cost ?? null,
           },
+          ...prev,
         ]);
         ok++;
       } catch {
@@ -361,15 +362,18 @@ export function Receive() {
       .slice(0, 8);
   }, [items, query]);
 
+  /* ★ ยิงล่าสุดอยู่บนสุด ★ (เจ้าของสั่ง 10 ต.ค. 2569 "สินค้าตัวใหม่จะไปจัดลำดับอยู่
+     ด้านล่าง ให้เปลี่ยนเป็นสินค้าล่าสุดอยู่บน") ของเดิมต่อท้าย พอรับของเข้าหลายสิบรายการ
+     ตัวที่เพิ่งยิงจะไปโผล่ใต้จอ ต้องเลื่อนลงไปดูทุกครั้งว่าเข้าหรือยัง
+     ยิงซ้ำตัวเดิมก็ยกขึ้นบนด้วย เพราะมันคือตัวที่เพิ่งแตะล่าสุดจริง ๆ */
   const addLine = useCallback((item: PickItem) => {
     setLines((prev) => {
       const at = prev.findIndex((l) => l.variantId === item.variantId);
       if (at >= 0) {
-        const next = [...prev];
-        next[at] = { ...next[at], qty: next[at].qty + 1 };
-        return next;
+        const hit = { ...prev[at], qty: prev[at].qty + 1 };
+        return [hit, ...prev.slice(0, at), ...prev.slice(at + 1)];
       }
-      return [...prev, { ...item, qty: 1, unitCost: item.cost }];
+      return [{ ...item, qty: 1, unitCost: item.cost }, ...prev];
     });
     setQuery('');
     searchRef.current?.focus();
@@ -409,8 +413,8 @@ export function Receive() {
         barcode: /^[0-9A-Za-z-]{6,}$/.test(code) ? code : undefined,
         cost_price: v.cost ?? undefined,
       });
+      /* ขึ้นบนสุดเหมือนการยิงปกติ — สินค้าร่างที่เพิ่งสร้างคือตัวล่าสุดเสมอ */
       setLines((prev) => [
-        ...prev,
         {
           variantId,
           label: name,
@@ -424,6 +428,7 @@ export function Receive() {
           qty: 1,
           unitCost: v.cost ?? null,
         },
+        ...prev,
       ]);
       invalidateProductsCache();
       void listProducts(true).then((ps) => setItems(itemsFromProducts(ps)));
@@ -519,14 +524,23 @@ export function Receive() {
     {
       title: 'จำนวน',
       width: 110,
-      render: (_, l, i) => (
+      render: (_, l) => (
+        /* ★ อ้างด้วยรหัสสินค้า ไม่ใช่ลำดับแถว ★ ตั้งแต่ของล่าสุดขึ้นบน แถวจะสลับที่เมื่อ
+           ยิงตัวใหม่ ถ้ายังอ้างด้วยลำดับ ค่าที่พิมพ์อาจไปลงผิดแถวเมื่อยิงคั่นระหว่างพิมพ์
+           ★ ไม่ใส่ max ★ ช่องกรอกตัวเลขของ antd จะไม่ส่งค่ากลับมาเลยถ้าสิ่งที่พิมพ์เกิน
+           เพดาน (เจอมาแล้วกับช่องส่วนลดหน้าขาย) — บาร์โค้ดที่หลงเข้าช่องนี้จะเงียบหาย
+           แล้ว Enter จะสั่งหั่นค่าลงมาเท่าเพดานพอดี · หนีบเองตอนรับค่าแทน */
         <InputNumber
           min={1}
-          max={100000}
           value={l.qty}
           onChange={(v) =>
-            setLines((prev) => prev.map((x, j) => (j === i ? { ...x, qty: v ?? 1 } : x)))
+            setLines((prev) =>
+              prev.map((x) =>
+                x.variantId === l.variantId ? { ...x, qty: Math.min(Math.max(v ?? 1, 1), 100000) } : x,
+              ),
+            )
           }
+          onPressEnter={() => searchRef.current?.focus()}
         />
       ),
     },
@@ -548,14 +562,17 @@ export function Receive() {
     {
       title: 'ทุน/หน่วย',
       width: 130,
-      render: (_, l, i) => (
+      render: (_, l) => (
         <InputNumber
           min={0}
           placeholder="ไม่บังคับ"
           value={l.unitCost ?? undefined}
           onChange={(v) =>
-            setLines((prev) => prev.map((x, j) => (j === i ? { ...x, unitCost: v ?? null } : x)))
+            setLines((prev) =>
+              prev.map((x) => (x.variantId === l.variantId ? { ...x, unitCost: v ?? null } : x)),
+            )
           }
+          onPressEnter={() => searchRef.current?.focus()}
         />
       ),
     },
@@ -568,12 +585,13 @@ export function Receive() {
     {
       title: '',
       width: 46,
-      render: (_, _l, i) => (
+      render: (_, l) => (
         <Button
           type="text"
           danger
           icon={<RiDeleteBin6Line className="w-4 h-4" />}
-          onClick={() => setLines((prev) => prev.filter((_, j) => j !== i))}
+          /* อ้างด้วยรหัสสินค้า ไม่ใช่ลำดับแถว — แถวสลับที่ได้เมื่อยิงตัวใหม่ */
+          onClick={() => setLines((prev) => prev.filter((x) => x.variantId !== l.variantId))}
         />
       ),
     },
