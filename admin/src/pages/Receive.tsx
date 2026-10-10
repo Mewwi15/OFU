@@ -66,6 +66,7 @@ function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
       barcode: v.barcode ?? null,
       sku: v.sku ?? null,
       cost: v.cost_price ?? null,
+      price: v.price,
       stock: v.stock_qty ?? 0,
       image,
     }));
@@ -114,6 +115,8 @@ type PickItem = {
   barcode: string | null;
   sku: string | null;
   cost: number | null;
+  /** ราคาขายหน้าร้าน — เจ้าของสั่งเพิ่มคอลัมน์ 10 ต.ค. 2569 ไว้เทียบกับทุนตอนรับของ */
+  price: number;
   /* สต๊อกที่มีอยู่ตอนนี้ — ใช้โชว์เฉย ๆ ในใบรับเข้า ★ อ่านจากรายการสินค้าเสมอ ไม่เก็บลง
      บรรทัดใบ ★ ใบที่ทำค้างไว้ข้ามวันได้ ถ้าแช่ตัวเลขไว้ในใบ พรุ่งนี้มันจะโชว์สต๊อกของ
      เมื่อวานโดยไม่มีอะไรบอก */
@@ -234,6 +237,7 @@ export function Receive() {
             barcode: u.text,
             sku: null,
             cost: u.cost ?? null,
+            price,
             stock: 0,
             image: null,
             qty: u.qty as number,
@@ -423,6 +427,7 @@ export function Receive() {
           barcode: code,
           sku: null,
           cost: v.cost ?? null,
+          price,
           stock: 0,
           image: null,
           qty: 1,
@@ -558,6 +563,15 @@ export function Receive() {
           <b className="tabular-nums">{now + l.qty}</b>
         );
       },
+    },
+    {
+      /* ★ ราคาขายอยู่ติดกับทุน ★ ตอนรับของคือจังหวะเดียวที่ได้เห็นทุนใหม่ ถ้าไม่เอา
+         ราคาขายมาวางข้างกัน จะไม่มีใครรู้ว่าทุนที่เพิ่งกรอกไปแพงกว่าราคาขายแล้วหรือยัง
+         จนกว่าจะขายขาดทุนไปแล้วหลายชิ้น */
+      title: 'ราคาขาย',
+      width: 100,
+      align: 'right',
+      render: (_, l) => <span className="tabular-nums">{bahtRound(l.price)}</span>,
     },
     {
       title: 'ทุน/หน่วย',

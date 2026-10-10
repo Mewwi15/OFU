@@ -785,6 +785,22 @@ export function Stock() {
       render: (_, i) => <Text style={{ fontSize: 14 }}>{baht(i.price)}</Text>,
     },
     {
+      /* ★ ทุนอยู่ติดราคาขาย ★ (เจ้าของสั่ง 10 ต.ค. 2569) สองตัวนี้มีความหมายก็ต่อเมื่อ
+         อ่านคู่กัน — ทุน 45 ขาย 49 คือกำไร 4 บาท ซึ่งมองเห็นได้ทันทีเมื่อวางข้างกัน
+         ของที่ยังไม่ได้ใส่ทุนขึ้นขีด ไม่ใช่ 0 เพราะ 0 อ่านเป็น "ได้ของมาฟรี" */
+      title: 'ราคาทุน',
+      width: 110,
+      align: 'right',
+      responsive: ['xl'],
+      sorter: (a, b) => (a.cost ?? -1) - (b.cost ?? -1),
+      render: (_, i) =>
+        i.cost == null ? (
+          <Text type="secondary">—</Text>
+        ) : (
+          <Text style={{ fontSize: 14 }}>{baht(i.cost)}</Text>
+        ),
+    },
+    {
       title: 'คงเหลือ',
       dataIndex: 'stock',
       width: 110,

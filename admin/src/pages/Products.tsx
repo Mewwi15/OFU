@@ -262,6 +262,34 @@ export function Products() {
       render: (_, p) => <span className="font-medium text-[#2B2320]">{priceText(p)}</span>,
     },
     {
+      /* ★ ทุนอยู่ติดราคาขาย ★ (เจ้าของสั่ง 10 ต.ค. 2569) สินค้าหลายขนาดแสดงเป็นช่วง
+         เหมือนที่คอลัมน์ราคาทำ · ขนาดที่ยังไม่ได้ใส่ทุนไม่ถูกนับเข้าช่วง และถ้าไม่มี
+         ขนาดไหนใส่ทุนไว้เลยขึ้นขีด — 0 อ่านเป็น "ได้ของมาฟรี" ซึ่งคนละเรื่องกับยังไม่ได้ใส่ */
+      title: 'ราคาทุน',
+      key: 'cost',
+      width: 110,
+      align: 'right',
+      render: (_, p) => {
+        const cs = p.product_variants
+          .map((v) => v.cost_price)
+          .filter((c): c is number => c != null);
+        if (cs.length === 0) return <Text type="secondary">—</Text>;
+        const lo = Math.min(...cs);
+        const hi = Math.max(...cs);
+        return (
+          <span className="tabular-nums text-[#2B2320]">
+            {lo === hi ? `฿${lo.toLocaleString('th-TH')}` : `฿${lo.toLocaleString('th-TH')}–${hi.toLocaleString('th-TH')}`}
+            {cs.length < p.product_variants.length && (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {' '}
+                ({cs.length}/{p.product_variants.length})
+              </Text>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       title: 'สต็อก',
       key: 'stock',
       width: 150,
