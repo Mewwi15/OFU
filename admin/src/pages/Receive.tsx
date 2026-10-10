@@ -498,6 +498,20 @@ export function Receive() {
     [items],
   );
 
+  /**
+   * ราคาขายของสินค้าตัวนั้น ณ ตอนนี้
+   *
+   * ★ อ่านจากรายการสินค้าเสมอ ไม่เอาค่าที่ติดมากับบรรทัดใบ ★ (เจ้าของเจอ 10 ต.ค. 2569
+   * "ราคาขายเป็น ฿NaN") ใบที่ทำค้างไว้ถูกเก็บลงเครื่องเป็นข้อความ แล้วกู้กลับมาตอนเปิด
+   * หน้าใหม่ · ใบที่ค้างไว้ก่อนจะมีคอลัมน์นี้ย่อมไม่มีราคาติดมาด้วย พอเอาไปคำนวณจึงได้
+   * NaN · เหตุผลเดียวกับที่สต๊อกอ่านจากรายการสินค้า ไม่แช่ไว้ในใบ — ราคาเปลี่ยนได้
+   * ระหว่างที่ใบค้างอยู่ ตัวเลขในใบจะกลายเป็นราคาเมื่อวานโดยไม่มีอะไรบอก
+   */
+  const priceOf = useCallback(
+    (variantId: string) => items.find((i) => i.variantId === variantId)?.price ?? null,
+    [items],
+  );
+
   const draftCols: ColumnsType<DraftLine> = [
     {
       title: 'สินค้า',
@@ -571,7 +585,14 @@ export function Receive() {
       title: 'ราคาขาย',
       width: 100,
       align: 'right',
-      render: (_, l) => <span className="tabular-nums">{bahtRound(l.price)}</span>,
+      render: (_, l) => {
+        const v = priceOf(l.variantId);
+        return v == null ? (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ) : (
+          <span className="tabular-nums">{bahtRound(v)}</span>
+        );
+      },
     },
     {
       title: 'ทุน/หน่วย',
