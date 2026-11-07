@@ -1167,7 +1167,7 @@ export function Pos() {
                           </div>
                           <div className="flex flex-wrap gap-x-3 text-[14px] text-tremor-content mt-0.5 tabular-nums">
                             <span>{baht(l.unitPrice)}</span>
-                            <span>ต้นทุน {cost == null ? '—' : baht(cost)}</span>
+                            <span>CS {cost == null ? '—' : baht(cost)}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
