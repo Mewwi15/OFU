@@ -19,6 +19,7 @@ const VALIDATION_DETAIL_TH: Record<string, string> = {
   min_spend_negative: 'ยอดซื้อขั้นต่ำต้องไม่ติดลบ',
   date_range: 'วันเริ่มต้นต้องมาก่อนวันสิ้นสุด',
   name_required: 'กรอกชื่อร้าน',
+  duplicate_receipt_variant: 'มีสินค้าซ้ำในใบ กรุณารวมจำนวนไว้ในบรรทัดเดียวกัน',
   negative_amount: 'ตัวเลขต้องไม่ติดลบ',
   vat_rate_range: 'อัตรา VAT ต้องอยู่ระหว่าง 0-100',
   promptpay_id_format: 'เลขพร้อมเพย์ต้องเป็นตัวเลข 10 หลัก (มือถือ) 13 หลัก (บัตร ปชช.) หรือ 15 หลัก (e-Wallet)',
@@ -1266,9 +1267,13 @@ export type GoodsReceipt = {
   created_at: string;
 };
 export type GoodsReceiptLine = {
+  variant_id: string;
   product_name: string;
   size: string | null;
   barcode: string | null;
+  sku: string | null;
+  price: number;
+  stock_qty: number;
   qty: number;
   unit_cost: number | null;
 };
@@ -1280,8 +1285,12 @@ export type GoodsReceiptInput = {
   received_at?: string;
   items: { variant_id: string; qty: number; unit_cost?: number }[];
 };
+export type GoodsReceiptSaveResult = {
+  id: string; receipt_number: string; total_cost: number; line_count: number;
+  negative?: VoidNegative[];
+};
 export const createGoodsReceipt = (p: GoodsReceiptInput) =>
-  rpc<{ id: string; receipt_number: string; total_cost: number; line_count: number }>(
+  rpc<GoodsReceiptSaveResult>(
     'create_goods_receipt',
     {
       p_supplier: p.supplier ?? null,
@@ -1303,6 +1312,14 @@ export async function listGoodsReceipts(): Promise<GoodsReceipt[]> {
   if (error) throw error;
   return (data ?? []) as GoodsReceipt[];
 }
+export async function getGoodsReceipt(id: string): Promise<GoodsReceipt> {
+  const { data, error } = await supabase.from('goods_receipts')
+    .select('id, receipt_number, supplier, doc_number, note, total_cost, line_count, created_at, received_at, voided_at')
+    .eq('id', id).is('voided_at', null).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('ไม่พบเอกสารนี้ หรือเอกสารถูกยกเลิกแล้ว');
+  return data as GoodsReceipt;
+}
 /** รายการที่ถอนคืนแล้วสต๊อกติดลบ — ฐานข้อมูลส่งกลับมาหลังลบใบ (0118) */
 export type VoidNegative = { name: string; size: string | null; after: number };
 
@@ -1311,6 +1328,18 @@ export const voidGoodsReceipt = (receiptId: string, reason?: string) =>
     p_receipt_id: receiptId,
     p_reason: reason ?? null,
   });
+export const replaceGoodsReceipt = (receiptId: string, requestId: string, p: GoodsReceiptInput) =>
+  rpc<GoodsReceiptSaveResult>(
+    'replace_goods_receipt', {
+      p_receipt_id: receiptId,
+      p_request_id: requestId,
+      p_supplier: p.supplier ?? null,
+      p_doc_number: p.doc_number ?? null,
+      p_note: p.note ?? null,
+      p_items: p.items,
+      p_received_at: p.received_at ?? null,
+    },
+  );
 export const getGoodsReceiptLines = (receiptId: string) =>
   rpc<GoodsReceiptLine[]>('get_goods_receipt_lines', { p_receipt_id: receiptId });
 

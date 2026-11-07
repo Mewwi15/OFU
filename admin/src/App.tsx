@@ -108,6 +108,7 @@ export default function App() {
           <Route path="/pos-sales" element={<PosSales />} />
           <Route path="/stock" element={<Stock />} />
           <Route path="/receive" element={<Receive />} />
+          <Route path="/receive/:receiptId/edit" element={<Receive />} />
           <Route path="/shift" element={<Shift />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/products" element={<Products />} />

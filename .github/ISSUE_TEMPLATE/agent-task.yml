@@ -1,0 +1,56 @@
+name: Agent Task
+description: Small scoped task for AI-assisted work
+title: "[Agent Task]: "
+labels: ["agent-task"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be true when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What files, flows, or screens are in scope?
+      placeholder: |
+        - app/checkout.tsx
+        - store/cart.ts
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What should agents avoid reading or changing?
+      placeholder: |
+        - docs/
+        - unrelated refactors
+  - type: textarea
+    id: commands
+    attributes:
+      label: Verification commands
+      placeholder: |
+        npm run lint
+        npx tsc --noEmit
+  - type: textarea
+    id: done
+    attributes:
+      label: Done criteria
+      placeholder: |
+        - Local checks pass
+        - QA findings verified or dismissed with evidence
+    validations:
+      required: true
+  - type: dropdown
+    id: budget
+    attributes:
+      label: AI budget
+      options:
+        - small
+        - medium
+        - high
+    validations:
+      required: true

@@ -9,7 +9,7 @@
  * ครึ่งล่าง: ประวัติใบรับเข้า กดขยายดูรายบรรทัด
  */
 
-import { RiAddLine, RiDeleteBin6Line, RiEditLine, RiFileExcel2Line, RiPrinterLine } from '@remixicon/react';
+import { RiAddLine, RiArrowLeftLine, RiDeleteBin6Line, RiEditLine, RiFileExcel2Line, RiPrinterLine } from '@remixicon/react';
 import {
   Alert,
   AutoComplete,
@@ -46,7 +46,20 @@ type ReceiveDraft = {
   receivedAt: string;
   note: string | null;
   lines: DraftLine[];
+  editing?: ReceiptEdit | null;
 };
+
+type ReceiptEdit = {
+  id: string;
+  receiptNumber: string;
+  requestId: string;
+  originalQty: Record<string, number>;
+};
+
+function receiptDraftSignature(d: ReceiveDraft) {
+  return JSON.stringify([d.supplier, d.docNo, dayjs(d.receivedAt).toISOString(), d.note,
+    d.lines.map((l) => [l.variantId, l.qty, l.unitCost])]);
+}
 
 /** แปลงสินค้าจากหลังบ้านเป็นรายการที่ช่องค้นหาของหน้ารับเข้าใช้ — เดิมเขียนซ้ำสองที่ */
 function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
@@ -74,11 +87,14 @@ function itemsFromProducts(ps: Awaited<ReturnType<typeof listProducts>>) {
 }
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { InputRef } from 'antd';
 
 import {
   apiError,
   createGoodsReceipt,
+  replaceGoodsReceipt,
+  getGoodsReceipt,
   getGoodsReceiptLines,
   invalidateProductsCache,
   voidGoodsReceipt,
@@ -135,6 +151,14 @@ type PickItem = {
 type DraftLine = PickItem & { qty: number; unitCost: number | null };
 
 export function Receive() {
+  const { receiptId } = useParams<{ receiptId: string }>();
+  // Remount between documents so a pending fetch or draft cannot leak to another page.
+  return <ReceiveScreen key={receiptId ?? 'new'} receiptId={receiptId} />;
+}
+
+function ReceiveScreen({ receiptId }: { receiptId?: string }) {
+  const navigate = useNavigate();
+  const draftKey = receiptId ? `${DRAFT_KEYS.receiveEdit}:${receiptId}` : DRAFT_KEYS.receive;
   const [items, setItems] = useState<PickItem[]>([]);
   const [supplier, setSupplier] = useState('');
   const [docNo, setDocNo] = useState('');
@@ -154,6 +178,12 @@ export function Receive() {
   const [creatingDrafts, setCreatingDrafts] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null); // 'เลขที่เอกสาร: ขนม' จากหัวไฟล์
   const [lines, setLines] = useState<DraftLine[]>([]);
+  const [editing, setEditing] = useState<ReceiptEdit | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(!!receiptId);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const pageTopRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { pageTopRef.current?.scrollIntoView({ block: 'start' }); }, [loadingReceipt]);
 
   /* ── ใบที่ทำค้างไว้ ต้องไม่หายตอนรีเฟรช ──
      เจ้าของสั่ง 5 ก.ย. 2026 "รีทีนึงแล้วต้องเริ่มใหม่" — คนรับของยิงของไปแล้วสามสิบชิ้น
@@ -164,32 +194,82 @@ export function Receive() {
   const [restore, setRestore] = useState<ReceiveDraft | null>(null);
   /* เวลาที่ค้างไว้ อ่านจากตัวห่อของร่าง ไม่ใช่จากเนื้อร่าง — อ่านตอนเปิดหน้าครั้งเดียว
      ก่อนที่การเก็บร่างรอบใหม่จะทับเวลาเดิม */
-  const [restoreAt] = useState<number | null>(() => draftSavedAt(DRAFT_KEYS.receive));
+  const [restoreAt] = useState<number | null>(() => draftSavedAt(draftKey));
   const restoredRef = useRef(false);
+  const originalDraftRef = useRef<string | null>(null);
+
+  const applyDraft = useCallback((d: ReceiveDraft) => {
+    setSupplier(d.supplier ?? '');
+    setDocNo(d.docNo ?? '');
+    setReceivedAt(d.receivedAt ? dayjs(d.receivedAt) : dayjs());
+    setImportNote(d.note ?? null);
+    setLines(d.lines ?? []);
+    setEditing(d.editing ?? null);
+  }, []);
 
   // เปิดหน้ามาแล้วเจอใบค้าง — ถามก่อน ไม่เติมให้เองเงียบ ๆ
   useEffect(() => {
-    const d = readDraft<ReceiveDraft>(DRAFT_KEYS.receive);
-    if (d) setRestore(d);
-    else restoredRef.current = true;
-  }, []);
+    let cancelled = false;
+    if (!receiptId) {
+      const d = readDraft<ReceiveDraft>(draftKey);
+      if (d) setRestore(d);
+      else restoredRef.current = true;
+      return;
+    }
+    setLoadingReceipt(true);
+    setReceiptError(null);
+    void Promise.all([getGoodsReceipt(receiptId), getGoodsReceiptLines(receiptId)])
+      .then(([r, ls]) => {
+        if (cancelled) return;
+        if (ls.length !== r.line_count || ls.some((l) => !l.variant_id)) {
+          throw new Error('โหลดรายการในใบไม่ครบ กรุณาลองใหม่');
+        }
+        if (new Set(ls.map((l) => l.variant_id)).size !== ls.length) {
+          throw new Error('ใบนี้มีสินค้าซ้ำหลายบรรทัด กรุณาตรวจรายการก่อนแก้ไข');
+        }
+        const original: ReceiveDraft = {
+          supplier: r.supplier ?? '', docNo: r.doc_number ?? '',
+          receivedAt: r.received_at ?? r.created_at, note: r.note,
+          lines: ls.map((l) => ({
+            variantId: l.variant_id,
+            label: `${l.product_name}${l.size ? ` (${l.size})` : ''}`,
+            productName: l.product_name, size: l.size, barcode: l.barcode,
+            sku: l.sku, price: l.price, stock: l.stock_qty, cost: l.unit_cost, image: null,
+            qty: l.qty, unitCost: l.unit_cost,
+          })),
+          editing: { id: r.id, receiptNumber: r.receipt_number, requestId: crypto.randomUUID(),
+            originalQty: Object.fromEntries(ls.map((l) => [l.variant_id, l.qty])) },
+        };
+        originalDraftRef.current = receiptDraftSignature(original);
+        applyDraft(original);
+        const d = readDraft<ReceiveDraft>(draftKey);
+        if (d?.editing?.id === receiptId) setRestore(d);
+        else restoredRef.current = true;
+      })
+      .catch((e) => { if (!cancelled) setReceiptError(apiError(e)); })
+      .finally(() => { if (!cancelled) setLoadingReceipt(false); });
+    return () => { cancelled = true; };
+  }, [receiptId, draftKey, applyDraft, loadAttempt]);
 
   /* เก็บทุกครั้งที่ใบเปลี่ยน — แต่ไม่เก็บก่อนจะตอบเรื่องใบค้างเสร็จ ไม่งั้นสถานะว่าง ๆ
      ตอนเพิ่งเปิดหน้าจะไปทับใบที่ค้างอยู่ทิ้งทันที */
   useEffect(() => {
     if (!restoredRef.current) return;
-    if (lines.length === 0) {
-      clearDraft(DRAFT_KEYS.receive);
+    if (lines.length === 0 && !editing && !supplier && !docNo && !importNote) {
+      clearDraft(draftKey);
       return;
     }
-    writeDraft<ReceiveDraft>(DRAFT_KEYS.receive, {
+    const draft: ReceiveDraft = {
       supplier,
       docNo,
       receivedAt: receivedAt.toISOString(),
       note: importNote,
       lines,
-    });
-  }, [lines, supplier, docNo, receivedAt, importNote]);
+      editing,
+    };
+    if (editing && receiptDraftSignature(draft) === originalDraftRef.current) clearDraft(draftKey);
+    else writeDraft<ReceiveDraft>(draftKey, draft);
+  }, [lines, supplier, docNo, receivedAt, importNote, editing, draftKey]);
   const [saving, setSaving] = useState(false);
   const [receipts, setReceipts] = useState<GoodsReceipt[] | null>(null);
   const [lineCache, setLineCache] = useState<Record<string, GoodsReceiptLine[]>>({});
@@ -273,24 +353,42 @@ export function Receive() {
     );
   };
 
-  /* "ลบ" = ถอนสต๊อกคืนแล้วเอาใบออกจากประวัติ · "แก้ไข" = ลบใบเดิมแล้วดึงทุกบรรทัดกลับ
-   * เข้าฟอร์ม แก้เสร็จบันทึกเป็นใบใหม่
-   * ★ ในฐานข้อมูลยังเป็นการ void ไม่ใช่ลบแถวจริง ★ สมุดสต๊อกอ้างถึงใบนี้อยู่ (ทั้งบรรทัด
-   * ที่รับเข้าและบรรทัดที่ถอนคืน) ลบแถวทิ้งคือทำประวัติสต๊อกขาด — แต่คนใช้งานไม่ต้องรู้
-   * เรื่องนั้น สำหรับเขามันคือลบ ก็ทำให้มันหายไปจากหน้าจอจริง ๆ */
-  const doVoid = (r: GoodsReceipt, thenEdit: boolean) => {
+  const resetForm = () => {
+    clearDraft(draftKey);
+    setEditing(null);
+    setLines([]);
+    setSupplier('');
+    setDocNo('');
+    setReceivedAt(dayjs());
+    setImportReport(null);
+    setImportNote(null);
+    setQuery('');
+  };
+
+  const openEdit = (r: GoodsReceipt) => {
+    navigate(`/receive/${r.id}/edit`);
+  };
+
+  const cancelEdit = () => {
+    Modal.confirm({ title: 'ยกเลิกการแก้ไขใบนี้?',
+      content: 'ทิ้งเฉพาะสิ่งที่แก้ในฟอร์ม เอกสารและสต๊อกที่บันทึกไว้ยังคงเดิม',
+      okText: 'ยกเลิกการแก้ไข', cancelText: 'แก้ไขต่อ', onOk: () => {
+        restoredRef.current = false;
+        clearDraft(draftKey);
+        navigate('/receive');
+      } });
+  };
+
+  const doVoid = (r: GoodsReceipt) => {
     Modal.confirm({
-      title: thenEdit ? `แก้ไขใบ ${r.receipt_number}?` : `ลบใบ ${r.receipt_number}?`,
-      content: thenEdit
-        ? 'ใบเดิมจะถูกลบ (สต๊อกถอนคืน) แล้วดึงรายการกลับมาแก้ในฟอร์ม — บันทึกใหม่ได้เลขใบใหม่'
-        : 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ถ้าของถูกขายไปแล้ว สต๊อกจะติดลบ และระบบจะบอกว่าตัวไหน · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
-      okText: thenEdit ? 'ลบใบเดิมและแก้ไข' : 'ลบใบ',
+      title: `ลบใบ ${r.receipt_number}?`,
+      content: 'สต๊อกที่รับเข้าจากใบนี้จะถูกถอนคืนทั้งหมด · ถ้าของถูกขายไปแล้ว สต๊อกจะติดลบ และระบบจะบอกว่าตัวไหน · ทุนที่เคยอัปเดตไปแล้วจะไม่ย้อนกลับ',
+      okText: 'ลบใบ',
       okButtonProps: { danger: true },
       cancelText: 'ไม่ทำ',
       onOk: async () => {
         try {
-          const ls = lineCache[r.id] ?? (await getGoodsReceiptLines(r.id));
-          const res = await voidGoodsReceipt(r.id, thenEdit ? 'แก้ไขใบ' : undefined);
+          const res = await voidGoodsReceipt(r.id);
           /* ★ ลบได้เสมอแล้ว แต่ต้องไม่เงียบ ★ (เจ้าของตัดสิน 3 ต.ค. 2569 "ยอมให้ติดลบเลย
              ลบใบเก่าได้เสมอ") ของที่ขายไปแล้วพอถอนคืนจะทำให้สต๊อกติดลบ ซึ่งแปลว่าตัวเลข
              ของตัวนั้นเชื่อไม่ได้แล้ว ต้องไปนับใหม่ · ถ้าไม่บอกตรงนี้ จะไม่มีใครรู้จนกว่า
@@ -318,20 +416,9 @@ export function Receive() {
           } else {
             message.success(`ลบใบ ${r.receipt_number} แล้ว — สต๊อกถอนคืนเรียบร้อย`);
           }
-          if (thenEdit) {
-            // จับคู่บรรทัดเดิมกลับเป็นรายการในฟอร์มผ่านบาร์โค้ด
-            const byBc = new Map(items.filter((i) => i.barcode).map((i) => [i.barcode as string, i]));
-            setLines(
-              ls.flatMap((l) => {
-                const it = l.barcode ? byBc.get(l.barcode) : undefined;
-                return it ? [{ ...it, qty: l.qty, unitCost: l.unit_cost }] : [];
-              }),
-            );
-            setSupplier(r.supplier ?? '');
-            setDocNo(r.doc_number ?? '');
-            setReceivedAt(dayjs(r.received_at ?? r.created_at));
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }
+          if (editing?.id === r.id) resetForm();
+          invalidateProductsCache();
+          void listProducts(true).then((ps) => setItems(itemsFromProducts(ps)));
           loadReceipts();
         } catch (e) {
           message.error(apiError(e));
@@ -350,8 +437,8 @@ export function Receive() {
         itemsFromProducts(ps),
       );
     });
-    loadReceipts();
-  }, [loadReceipts]);
+    if (!receiptId) loadReceipts();
+  }, [loadReceipts, receiptId]);
 
   /* ชื่อผู้ขายที่เคยใช้ — ให้ AutoComplete จำแทนคน */
   const supplierOptions = useMemo(() => {
@@ -468,10 +555,10 @@ export function Receive() {
     Math.round(lines.reduce((s, l) => s + (l.unitCost ?? 0) * l.qty, 0) * 100) / 100;
 
   const save = async () => {
-    if (lines.length === 0) return;
+    if (lines.length === 0 || saving || loadingReceipt || (receiptId && !editing)) return;
     setSaving(true);
     try {
-      const res = await createGoodsReceipt({
+      const input = {
         supplier: supplier.trim() || undefined,
         doc_number: docNo.trim() || undefined,
         received_at: receivedAt.toISOString(),
@@ -481,18 +568,27 @@ export function Receive() {
           qty: l.qty,
           ...(l.unitCost != null ? { unit_cost: l.unitCost } : {}),
         })),
-      });
-      message.success(`บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
-      // บันทึกเข้าระบบแล้ว ใบค้างในเครื่องหมดหน้าที่ ต้องไม่ถามซ้ำรอบหน้า
-      clearDraft(DRAFT_KEYS.receive);
+      };
+      const res = editing
+        ? await replaceGoodsReceipt(editing.id, editing.requestId, input)
+        : await createGoodsReceipt(input);
+      message.success(editing
+        ? `บันทึกการแก้ไขแล้ว — ใบ ${res.receipt_number} (${res.line_count} รายการ)`
+        : `บันทึกใบ ${res.receipt_number} — รับเข้า ${res.line_count} รายการ`);
+      if ('negative' in res && res.negative?.length) {
+        Modal.warning({ title: `หลังแก้ไข สต๊อกติดลบ ${res.negative.length} รายการ`,
+          content: res.negative.map((n, i) => <div key={i}>{n.name}{n.size ? ` (${n.size})` : ''}: {n.after}</div>) });
+      }
+      // Stop draft persistence before leaving a saved document.
+      if (receiptId) restoredRef.current = false;
+      clearDraft(draftKey);
       // ไม่พิมพ์อัตโนมัติ (เจ้าของสั่ง 23 ส.ค.) — ปุ่มพิมพ์อยู่ในประวัติเมื่อต้องการ
-      setLines([]);
-      setSupplier('');
-      setDocNo('');
-      setReceivedAt(dayjs());
-      setImportReport(null);
-      setImportNote(null);
-      loadReceipts();
+      resetForm();
+      invalidateProductsCache();
+      void listProducts(true).then((ps) => setItems(itemsFromProducts(ps)));
+      setLineCache({});
+      if (receiptId) navigate('/receive');
+      else loadReceipts();
     } catch (e) {
       message.error(apiError(e));
     } finally {
@@ -573,7 +669,7 @@ export function Receive() {
       ),
     },
     {
-      title: 'หลังรับ',
+      title: editing ? 'หลังแก้ไข' : 'หลังรับ',
       width: 90,
       align: 'right',
       /* เดิม + ที่รับ — ตัวเลขที่จะกลายเป็นสต๊อกจริงหลังกดบันทึก ให้เห็นก่อนกด ไม่ใช่
@@ -583,7 +679,7 @@ export function Receive() {
         return now == null ? (
           <Typography.Text type="secondary">—</Typography.Text>
         ) : (
-          <b className="tabular-nums">{now + l.qty}</b>
+          <b className="tabular-nums">{now + l.qty - (editing?.originalQty[l.variantId] ?? 0)}</b>
         );
       },
     },
@@ -671,33 +767,67 @@ export function Receive() {
           <Button
             size="small"
             icon={<RiEditLine className="w-4 h-4" />}
-            title="แก้ไข (ลบใบเดิม ดึงกลับมาแก้)"
-            onClick={() => doVoid(r, true)}
+            title="เปิดรายการเดิมเพื่อแก้ไข"
+            aria-label={`แก้ไขใบ ${r.receipt_number}`}
+            disabled={saving || loadingReceipt}
+            onClick={() => openEdit(r)}
           />
           <Button
             size="small"
             danger
             icon={<RiDeleteBin6Line className="w-4 h-4" />}
             title="ลบใบ (ถอนสต๊อกคืน)"
-            onClick={() => doVoid(r, false)}
+            disabled={saving || loadingReceipt}
+            onClick={() => doVoid(r)}
           />
         </div>
       ),
     },
   ];
 
+  const backButton = (
+    <Button icon={<RiArrowLeftLine className="w-4 h-4" />} disabled={saving}
+      onClick={() => navigate('/receive')}>กลับหน้ารับเข้า</Button>
+  );
+
+  if (receiptId && (loadingReceipt || receiptError || !editing)) {
+    return <div ref={pageTopRef} className="flex flex-col gap-4">
+      <div>{backButton}</div>
+      <Card title="กรอกเอกสารรับเข้า" loading={loadingReceipt}>
+        {receiptError ? <Alert type="error" showIcon title="เปิดเอกสารไม่ได้" description={receiptError}
+          action={<Button onClick={() => setLoadAttempt((v) => v + 1)}>ลองใหม่</Button>} /> : null}
+      </Card>
+    </div>;
+  }
+
   return (
-    <div className="flex flex-col gap-4">
-      <Card title="สร้างใบรับเข้าสินค้า" size="small">
-        <div className="flex flex-wrap gap-2 mb-3 items-center">
+    <div ref={pageTopRef} className="flex flex-col gap-4">
+      {receiptId ? <div className="flex flex-wrap items-center gap-3">
+        {backButton}
+        <Typography.Title level={4} style={{ margin: 0 }}>กรอกเอกสารรับเข้า</Typography.Title>
+      </div> : null}
+      <Card title={editing ? `เอกสาร ${editing.receiptNumber}` : 'สร้างใบรับเข้าสินค้า'} size="small"
+        extra={editing ? <Button disabled={saving || loadingReceipt} onClick={cancelEdit}>ยกเลิกการแก้ไข</Button> : null}>
+        {editing ? <Alert className="mb-3" type="info" showIcon
+          title={`กำลังแก้ไขรายการเดิม ${editing.receiptNumber}`}
+          description="เอกสารและสต๊อกเดิมยังอยู่ การเปลี่ยนแปลงจะมีผลเมื่อกดบันทึกสำเร็จ และจะได้เลขใบใหม่แทนใบเดิม" /> : null}
+        <fieldset disabled={saving || loadingReceipt} className="border-0 p-0 m-0 min-w-0">
+        <div className="flex flex-wrap gap-3 mb-3 items-end">
+          <div className="flex flex-col gap-1">
+          <label htmlFor="receive-date">วันที่รับสินค้า</label>
           <DatePicker
+            id="receive-date"
             value={receivedAt}
             onChange={(d) => d && setReceivedAt(d)}
             format="DD/MM/YYYY"
             allowClear={false}
             disabledDate={(d) => d.isAfter(dayjs().endOf('day')) || d.isBefore(dayjs().subtract(1, 'year'))}
           />
+          </div>
+          <div className="flex flex-col gap-1">
+          <label htmlFor="receive-supplier">ผู้ขาย</label>
           <AutoComplete
+            id="receive-supplier"
             options={supplierOptions}
             value={supplier}
             onChange={setSupplier}
@@ -707,12 +837,17 @@ export function Receive() {
               (opt?.value ?? '').toLowerCase().includes(input.toLowerCase())
             }
           />
+          </div>
+          <div className="flex flex-col gap-1">
+          <label htmlFor="receive-doc-number">เลขที่เอกสารผู้ขาย</label>
           <Input
+            id="receive-doc-number"
             value={docNo}
             onChange={(e) => setDocNo(e.target.value)}
             placeholder="เลขที่เอกสาร (ถ้ามี)"
             style={{ width: 200 }}
           />
+          </div>
           <Upload
             accept=".csv,.xls,.xlsx"
             showUploadList={false}
@@ -757,6 +892,11 @@ export function Receive() {
             <Button icon={<RiFileExcel2Line className="w-4 h-4" />}>นำเข้าไฟล์</Button>
           </Upload>
         </div>
+        {receiptId ? <div className="flex flex-col gap-1 mb-3">
+          <label htmlFor="receive-note">หมายเหตุ</label>
+          <Input.TextArea id="receive-note" value={importNote ?? ''} rows={2}
+            onChange={(e) => setImportNote(e.target.value || null)} placeholder="หมายเหตุของเอกสาร (ถ้ามี)" />
+        </div> : null}
         {importReport ? (
           <Alert
             className="mb-3"
@@ -878,14 +1018,16 @@ export function Receive() {
                   </span>
                 ) : null}
               </div>
-              <Button type="primary" size="large" loading={saving} onClick={() => void save()}>
-                บันทึกรับเข้า
+              <Button type="primary" size="large" loading={saving} disabled={loadingReceipt} onClick={() => void save()}>
+                {editing ? 'บันทึกการแก้ไข' : 'บันทึกรับเข้า'}
               </Button>
             </div>
           </>
         )}
+        </fieldset>
       </Card>
 
+      {!receiptId ? <>
       <Card title="ประวัติใบรับเข้า" size="small" styles={{ body: { padding: 0 } }}>
         <Table
           rowKey="id"
@@ -929,6 +1071,7 @@ export function Receive() {
         รับของที่นี่ = สต๊อกบวกทันที ลงสมุดสต๊อกทุกบรรทัด · ทุนที่กรอกจะกลายเป็นทุนล่าสุดของสินค้าตัวนั้น
         · ปุ่ม <Tag className="mx-1">เติม</Tag> ในหน้าสต๊อกยังใช้ได้เหมือนเดิมสำหรับของชิ้นเดียวไม่มีเอกสาร
       </Typography.Text>
+      </> : null}
 
       {/* ── ใบที่ทำค้างไว้ ──
           ★ ถามก่อน ไม่เติมให้เองเงียบ ๆ ★ ถ้าเติมกลับให้อัตโนมัติ คนที่ตั้งใจจะเริ่มใบใหม่
@@ -936,23 +1079,26 @@ export function Receive() {
           ไปตามยกเลิกใบ */}
       <Modal
         open={!!restore}
-        title="มีใบรับเข้าที่ทำค้างไว้"
+        title={restore?.editing ? `มีการแก้ไขใบ ${restore.editing.receiptNumber} ค้างไว้` : 'มีใบรับเข้าที่ทำค้างไว้'}
         okText="ทำต่อจากเดิม"
-        cancelText="เริ่มใบใหม่"
+        cancelText={receiptId ? 'ใช้ข้อมูลเอกสารเดิม' : 'เริ่มใบใหม่'}
         closable={false}
         maskClosable={false}
         onOk={() => {
           if (!restore) return;
-          setSupplier(restore.supplier ?? '');
-          setDocNo(restore.docNo ?? '');
-          setReceivedAt(restore.receivedAt ? dayjs(restore.receivedAt) : dayjs());
-          setImportNote(restore.note ?? null);
-          setLines(restore.lines ?? []);
+          // Migrate an edit draft saved before documents had their own page.
+          if (!receiptId && restore.editing) {
+            writeDraft(`${DRAFT_KEYS.receiveEdit}:${restore.editing.id}`, restore);
+            clearDraft(draftKey);
+            navigate(`/receive/${restore.editing.id}/edit`);
+            return;
+          }
+          applyDraft(restore);
           setRestore(null);
           restoredRef.current = true;
         }}
         onCancel={() => {
-          clearDraft(DRAFT_KEYS.receive);
+          clearDraft(draftKey);
           setRestore(null);
           restoredRef.current = true;
         }}>
@@ -962,7 +1108,9 @@ export function Receive() {
           {restoreAt ? <> เมื่อ {thDate(restoreAt).format('D MMM HH:mm น.')}</> : null}
         </p>
         <p style={{ marginTop: 8, marginBottom: 0, color: '#8a807a' }}>
-          ใบนี้ยังไม่ถูกบันทึกเข้าระบบ สต๊อกยังไม่ขยับ — เลือก “เริ่มใบใหม่” จะลบทิ้งเลย
+          {restore?.editing
+            ? 'การแก้ไขนี้ยังไม่ถูกบันทึก เอกสารและสต๊อกเดิมยังอยู่ สามารถทำต่อจากร่างหรือทิ้งการแก้ไขที่ค้างไว้ได้'
+            : 'ใบนี้ยังไม่ถูกบันทึกเข้าระบบ สต๊อกยังไม่ขยับ — เลือก “เริ่มใบใหม่” จะลบร่างที่ค้างไว้'}
         </p>
       </Modal>
 

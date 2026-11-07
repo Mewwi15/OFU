@@ -64,6 +64,8 @@ export const DRAFT_KEYS = {
   posSale: 'ofu-pos-sale-draft',
   /** ใบรับเข้าที่ยังไม่ได้บันทึก */
   receive: 'ofu-receive-draft',
+  /** ร่างแก้ไขเอกสาร แยกตาม receipt ID ต่อท้ายคีย์ */
+  receiveEdit: 'ofu-receive-edit-draft',
   /** ตัวนับเงินตอนปิดรอบ (นับทีละใบ) */
   shiftCount: 'ofu-shift-count-draft',
 } as const;
