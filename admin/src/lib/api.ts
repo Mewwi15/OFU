@@ -619,6 +619,8 @@ export type PosVariant = {
   id: string;
   size: string | null;
   price: number;
+  /** Absent in catalogs cached before costs were included. */
+  cost_price?: number | null;
   stock_qty: number;
   barcode: string | null;
   sku: string | null;
@@ -633,23 +635,26 @@ export type PosProduct = {
   variants: PosVariant[];
 };
 
-/** Published products + variants (with barcode + live stock) for the sell grid. */
+/** Published products + variants with barcode, live stock, and admin-only costs. */
 export async function listPosCatalog(): Promise<PosProduct[]> {
   /* ★ ต้องไล่ดึงให้ครบทุกหน้า ★ ของที่ขายอยู่ตอนนี้ 979 รายการ ห่างจากเพดาน 1,000 แถว
      ต่อคำขอแค่ 21 รายการ ถ้าไม่แก้ไว้ก่อน วันที่เปิดขายสินค้ารายการที่ 1,001 ของที่เก่า
      ที่สุดจะหลุดออกจากแคตตาล็อกหน้าขายเงียบ ๆ ยิงบาร์โค้ดแล้วขึ้นว่าไม่พบสินค้า
      ทั้งที่ของวางอยู่บนชั้น — แบบเดียวกับที่เพิ่งเกิดกับหน้าสต๊อก */
-  const data = await fetchAllRows<unknown>((from, to) =>
-    supabase
-      .from('products')
-      .select(
-        'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku, archived_at)',
-      )
-      .is('archived_at', null)
-      .eq('publish_state', 'published')
-      .order('name')
-      .range(from, to),
-  );
+  const [data, costs] = await Promise.all([
+    fetchAllRows<unknown>((from, to) =>
+      supabase
+        .from('products')
+        .select(
+          'id, name, subtitle, category_id, categories(name), product_images(storage_path, is_primary), product_variants(id, size, price, stock_qty, barcode, sku, archived_at)',
+        )
+        .is('archived_at', null)
+        .eq('publish_state', 'published')
+        .order('name')
+        .range(from, to),
+    ),
+    variantCosts(),
+  ]);
   type Row = {
     id: string;
     name: string;
@@ -669,7 +674,9 @@ export async function listPosCatalog(): Promise<PosProduct[]> {
       (p.product_images?.find((i) => i.is_primary) ?? p.product_images?.[0])?.storage_path,
       300,
     ),
-    variants: (p.product_variants ?? []).filter((v) => !v.archived_at),
+    variants: (p.product_variants ?? [])
+      .filter((v) => !v.archived_at)
+      .map((v) => ({ ...v, cost_price: costs.get(v.id) ?? null })),
   }));
 }
 

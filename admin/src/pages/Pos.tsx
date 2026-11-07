@@ -312,6 +312,12 @@ export function Pos() {
     return m;
   }, [catalog]);
 
+  const costByVariant = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const p of catalog) for (const v of p.variants) m.set(v.id, v.cost_price ?? null);
+    return m;
+  }, [catalog]);
+
   /** แถวที่จำนวนในบิลเกินของที่เหลือ — เก็บจำนวนคงเหลือจริงไว้บอกแคชเชียร์ */
   const shortLines = useMemo(() => {
     const out = new Map<string, number>();
@@ -977,6 +983,7 @@ export function Pos() {
                 {[...lines].reverse().map((l) => {
                   const fresh = flashId === l.variantId;
                   const have = shortLines.get(l.variantId);
+                  const cost = costByVariant.get(l.variantId);
                   return (
                     /* ★ แถวที่ของไม่พอ ย้อมทั้งแถว ★ (เจ้าของสั่ง 20 ก.ย. 2569 "ทำสีด้วย
                        แบบทั้งแถวเลย") ของเดิมเป็นกล่องเตือนแปะใต้แถว ซึ่งกินที่สองบรรทัด
@@ -1032,8 +1039,9 @@ export function Pos() {
                               </span>
                             ) : null}
                           </div>
-                          <div className="text-[14px] text-tremor-content mt-0.5 tabular-nums">
-                            {baht(l.unitPrice)} / หน่วย
+                          <div className="flex flex-wrap gap-x-3 text-[14px] text-tremor-content mt-0.5 tabular-nums">
+                            <span>{baht(l.unitPrice)}</span>
+                            <span>ต้นทุน {cost == null ? '—' : baht(cost)}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
