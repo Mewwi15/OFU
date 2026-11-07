@@ -357,12 +357,6 @@ export function Pos() {
     return m;
   }, [catalog]);
 
-  const costByVariant = useMemo(() => {
-    const m = new Map<string, number | null>();
-    for (const p of catalog) for (const v of p.variants) m.set(v.id, v.cost_price ?? null);
-    return m;
-  }, [catalog]);
-
   /** แถวที่จำนวนในบิลเกินของที่เหลือ — เก็บจำนวนคงเหลือจริงไว้บอกแคชเชียร์ */
   const shortLines = useMemo(() => {
     const out = new Map<string, number>();
